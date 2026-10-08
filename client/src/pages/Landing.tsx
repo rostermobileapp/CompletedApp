@@ -12,6 +12,7 @@ import { useSeo } from '@/hooks/useSeo';
 import { useIsIosDevice } from '@/hooks/useIosPlatform';
 import VisitorMap from '@/components/VisitorMap';
 import AnimatedCounter from '@/components/AnimatedCounter';
+import FunFeaturesShowcase from '@/components/FunFeaturesShowcase';
 
 const testimonials = [
   {
@@ -200,6 +201,9 @@ export default function Landing() {
               <span className="text-[#3c82f4]">more hockey</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-8">Built purely for hockey. Scheduling, RSVPs, rosters, stats, payments, messaging, smart brackets— all in one place. No ads. Ever.</p>
+            <a href="#fun-features" className="inline-block mb-7 rounded-full border border-blue-200 bg-white px-5 py-3 text-sm font-semibold text-[#2563eb] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+              Earn patches. Track post-game beers. Play daily trivia.
+            </a>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
@@ -304,6 +308,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      <FunFeaturesShowcase />
       {/* Video Demo Section */}
       <section className="py-20 px-6 bg-gray-50 pt-[4px] pb-[20px]" id="demo">
         <div className="max-w-4xl mx-auto text-center">
@@ -653,7 +658,7 @@ export default function Landing() {
               </div>
               <p className="text-gray-500 text-sm mb-6">Perfect for players joining their first team. No strings attached.</p>
               <ul className="space-y-3 mb-8">
-                {['Join Leagues / Teams', 'Scheduling', 'RSVP Function', 'Team Only Stats', 'Team-Only Messaging'].map((f, i) => (
+                {['Daily Hockey Trivia', 'Beer Counter (Adult Players)', 'Earn Patch Progress', 'Join Leagues / Teams', 'Scheduling', 'RSVP Function', 'Team Only Stats', 'Team-Only Messaging'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-free-${i}`}>
                     <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-gray-700">{f}</span>
@@ -681,7 +686,7 @@ export default function Landing() {
               </div>
               <p className="text-blue-100 text-sm mb-6">For serious players who want the full experience — messaging, payments, and more.</p>
               <ul className="space-y-3 mb-8">
-                {['FREE +', 'Team Management', 'Unlimited Messaging', 'Payment Tracking', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
+                {['FREE +', 'Trophy Case & Patch Artwork (21+)', 'Team Management', 'Unlimited Messaging', 'Payment Tracking', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-player-pro-${i}`}>
                     <Check className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-white">{f}</span>

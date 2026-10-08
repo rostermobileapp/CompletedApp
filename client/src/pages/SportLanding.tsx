@@ -2,6 +2,7 @@ import { ElementType, useEffect } from 'react';
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { Check, Calendar, MessageCircle, Trophy, Users, CreditCard, Bell } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { FunFeaturesNudge } from '@/components/FunFeaturesShowcase';
 
 interface SportConfig {
   slug: string;
@@ -245,6 +246,12 @@ export default function SportLanding({ sport }: SportLandingProps) {
           </div>
         </div>
       </section>
+
+      {sport === 'hockey' && (
+        <div className="px-6">
+          <FunFeaturesNudge />
+        </div>
+      )}
 
       {/* Problem */}
       <section className="py-16 px-6 bg-white">

@@ -2,6 +2,7 @@ import { ElementType, useEffect } from 'react';
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { Check, Calendar, MessageCircle, Trophy, Users, CreditCard, Bell, Shield } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { FunFeaturesNudge } from '@/components/FunFeaturesShowcase';
 
 interface SegmentConfig {
   slug: string;
@@ -208,6 +209,12 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
           </div>
         </div>
       </section>
+
+      {segment === 'for-adult-leagues' && (
+        <div className="px-6">
+          <FunFeaturesNudge />
+        </div>
+      )}
 
       {/* Pain points */}
       <section className="py-16 px-6 bg-white">

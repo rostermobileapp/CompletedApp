@@ -17,6 +17,10 @@ const featureRows = [
   { label: "Website Portal", free: true, pro: true, comm: true },
   { label: "Team Stats", free: true, pro: true, comm: true },
   { label: "Standings", free: true, pro: true, comm: true },
+  { label: "Daily Hockey Trivia", free: true, pro: true, comm: true },
+  { label: "Beer Counter (Adult Players)", free: true, pro: true, comm: true },
+  { label: "Earn Patch Progress", free: true, pro: true, comm: true },
+  { label: "Trophy Case & Patch Artwork (21+)", free: false, pro: true, comm: true },
   // Player Pro tier
   { label: "Create Team Events/Games", free: false, pro: true, comm: true },
   { label: "Roster Management", free: false, pro: true, comm: true },
@@ -222,7 +226,7 @@ export default function Pricing() {
               <span className="text-gray-400"> / forever</span>
             </div>
             <ul className="space-y-3 mb-8 flex-1">
-              {['Team Schedule', 'In-App Only RSVP', 'In App Messaging (Team Chat)', 'Facility Event Calendar', 'Website Portal', 'Team Stats', 'Standings'].map((f) => (
+              {['Daily Hockey Trivia', 'Beer Counter (Adult Players)', 'Earn Patch Progress', 'Team Schedule', 'In-App Only RSVP', 'In App Messaging (Team Chat)', 'Facility Event Calendar', 'Website Portal', 'Team Stats', 'Standings'].map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-gray-700">{f}</span>
@@ -259,7 +263,7 @@ export default function Pricing() {
             )}
             {!annual && <div className="mb-4" />}
             <ul className="space-y-3 mb-8 flex-1">
-              {['FREE +', 'Create Team Events/Games', 'Roster Management', 'Player/Attendance Tracking', 'Intelligent Sub Request Tool', 'Polls/Bulletins', 'Fee & Payment Tracking', 'Links to Venmo/CashApp', 'Team Expense Tracking', 'Multi-Team/Org Management', 'Registration Notices', 'Volunteer/Role Assignment', 'League Stats'].map((f) => (
+              {['FREE +', 'Trophy Case & Patch Artwork (21+)', 'Create Team Events/Games', 'Roster Management', 'Player/Attendance Tracking', 'Intelligent Sub Request Tool', 'Polls/Bulletins', 'Fee & Payment Tracking', 'Links to Venmo/CashApp', 'Team Expense Tracking', 'Multi-Team/Org Management', 'Registration Notices', 'Volunteer/Role Assignment', 'League Stats'].map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-white">{f}</span>
@@ -308,6 +312,14 @@ export default function Pricing() {
               Get Started
             </button>
           </div>
+        </div>
+      </section>
+
+      <section className="px-6 py-8" aria-labelledby="pricing-fun-heading">
+        <div className="max-w-5xl mx-auto rounded-2xl border border-blue-100 bg-blue-50 p-6 md:p-8">
+          <h2 id="pricing-fun-heading" className="text-2xl font-bold text-gray-900">The fun starts on Free.</h2>
+          <p className="mt-3 text-gray-600 leading-relaxed">Play daily hockey trivia, track your post-game beers, and build patch progress. Upgrade to Player Pro or Commissioner to explore your Trophy Case and reveal patch artwork. Trophy Case access requires a verified age of 21 or older.</p>
+          <Link href="/features#fun-features" className="mt-4 inline-block rounded text-[#2563eb] font-semibold underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">Explore patches, beer tracking &amp; trivia</Link>
         </div>
       </section>
 

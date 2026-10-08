@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 import { useSeo } from '@/hooks/useSeo';
+import FunFeaturesShowcase from '@/components/FunFeaturesShowcase';
 
 // ---------- helpers ----------
 function useReducedMotion() {
@@ -712,6 +713,8 @@ export default function FeaturesLanding() {
           </div>
         )}
       </header>
+
+      <FunFeaturesShowcase underFixedHeader />
 
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
