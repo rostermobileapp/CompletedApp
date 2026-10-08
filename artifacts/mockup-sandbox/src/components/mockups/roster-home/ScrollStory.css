@@ -40,7 +40,7 @@
 .rs-nav-toggle { display:none; width:48px;height:48px;border:1px solid #44617d;background:#142a41;border-radius:50%;align-items:center;justify-content:center; }
 .rs-mobile-menu { display:none; }
 .rs-hero {
-  min-height: max(800px, 100svh); padding: 148px 6vw 65px; position:relative; isolation:isolate; overflow:hidden;
+  min-height: max(800px, 100svh); padding: 104px 6vw 65px; position:relative; isolation:isolate; overflow:hidden;
   display:flex; flex-direction:column; align-items:center; text-align:center;
   background: #081629;
 }
@@ -168,7 +168,7 @@
   .rs-nav-toggle { display:inline-flex; }
   .rs-mobile-menu { display:grid;position:absolute;top:calc(100% + 8px);left:0;right:0;padding:10px;border-radius:15px;border:1px solid #29445f;background:rgba(8,22,40,.97); }
   .rs-mobile-menu a { padding:13px 12px;min-height:44px; }
-  .rs-hero { padding:126px 20px 38px;min-height:max(820px,100svh); }
+  .rs-hero { padding:85px 20px 38px;min-height:max(820px,100svh); }
   .rs-hero h1 { font-size:clamp(59px,14.5vw,96px);line-height:.88;letter-spacing:-.055em; }
   .rs-hero-copy { font-size:16px;max-width:35rem; }
   .rs-section { padding:88px 24px; }
