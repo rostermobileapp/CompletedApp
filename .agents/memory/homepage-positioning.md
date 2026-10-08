@@ -19,4 +19,4 @@ Keep Features, Pricing, About, and Partners discoverable when redesigning the ho
 
 **Why:** The user explicitly objected to losing these existing destinations in the new homepage design.
 
-**How to apply:** Preserve navigation access to all four; do not treat the scroll story as a reason to remove existing site content.
+**How to apply:** Preserve navigation access to all four as separate page previews when redesigning the site. Homepage sections alone do not satisfy a request to redesign these pages.

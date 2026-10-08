@@ -130,15 +130,20 @@ function ScrollStory() {
           <img src={image("logo-dark.png")} alt="Roster" />
         </a>
         <nav className="rs-nav-links" aria-label="Main navigation">
-          <a href="#features" onClick={(e) => { e.preventDefault(); jumpTo("features"); }}>Features</a>
-          <a href="#pricing" onClick={(e) => { e.preventDefault(); jumpTo("pricing"); }}>Pricing</a>
-          <a href="#about" onClick={(e) => { e.preventDefault(); jumpTo("about"); }}>About</a>
-          <a href="#partners" onClick={(e) => { e.preventDefault(); jumpTo("partners"); }}>Partners</a>
+          <a href="/__mockup/preview/roster-home/FeaturesPage">Features</a>
+          <a href="/__mockup/preview/roster-home/PricingPage">Pricing</a>
+          <a href="/__mockup/preview/roster-home/AboutPage">About</a>
+          <a href="/__mockup/preview/roster-home/PartnersPage">Partners</a>
         </nav>
         <button className="rs-nav-cta" onClick={() => previewFlow(signupDestination)}>Get started <ArrowRight size={15} /></button>
         <button className="rs-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
         {menuOpen && <nav className="rs-mobile-menu" aria-label="Mobile navigation">
-          {["features", "pricing", "about", "partners"].map((id) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); jumpTo(id); }}>{id[0].toUpperCase() + id.slice(1)}</a>)}
+          {[
+            ["features", "/__mockup/preview/roster-home/FeaturesPage"],
+            ["pricing", "/__mockup/preview/roster-home/PricingPage"],
+            ["about", "/__mockup/preview/roster-home/AboutPage"],
+            ["partners", "/__mockup/preview/roster-home/PartnersPage"],
+          ].map(([label, href]) => <a key={label} href={href} onClick={() => setMenuOpen(false)}>{label[0].toUpperCase() + label.slice(1)}</a>)}
           <a href="#start" onClick={(e) => { e.preventDefault(); setMenuOpen(false); jumpTo("start"); }}>Get started</a>
         </nav>}
       </header>
@@ -240,7 +245,7 @@ function ScrollStory() {
           <div className="rs-about-copy">
             <p className="rs-about-lede">Hockey should take up your time on the ice—not every minute around it.</p>
             <p className="rs-copy">Roster brings schedules, attendance, team communication, payments, and game-day tools into one shared place. Fewer “who’s in?” messages. More time with the people who make the season.</p>
-            <a className="rs-text-link" href="#features" onClick={(e) => { e.preventDefault(); jumpTo("features"); }}>Take a look at the features <ArrowRight size={16} /></a>
+            <a className="rs-text-link" href="/__mockup/preview/roster-home/FeaturesPage">Take a look at the features <ArrowRight size={16} /></a>
           </div>
         </div>
       </section>
@@ -369,10 +374,10 @@ function ScrollStory() {
         <div className="rs-footer-inner">
           <a href="#top" onClick={(e) => { e.preventDefault(); jumpTo("top"); }}><img src={image("logo-dark.png")} alt="Roster" style={{ width: 96, height: 34, objectFit: "contain" }} /></a>
           <div className="rs-footer-links">
-          <a href="#features" onClick={(e) => { e.preventDefault(); jumpTo("features"); }}>Features</a>
-          <a href="#pricing" onClick={(e) => { e.preventDefault(); jumpTo("pricing"); }}>Pricing</a>
-          <a href="#about" onClick={(e) => { e.preventDefault(); jumpTo("about"); }}>About</a>
-          <a href="#partners" onClick={(e) => { e.preventDefault(); jumpTo("partners"); }}>Partners</a>
+          <a href="/__mockup/preview/roster-home/FeaturesPage">Features</a>
+          <a href="/__mockup/preview/roster-home/PricingPage">Pricing</a>
+          <a href="/__mockup/preview/roster-home/AboutPage">About</a>
+          <a href="/__mockup/preview/roster-home/PartnersPage">Partners</a>
             <a href="#patches" onClick={(e) => { e.preventDefault(); jumpTo("patches"); }}>Patches</a>
             <a href="#trivia" onClick={(e) => { e.preventDefault(); jumpTo("trivia"); }}>Trivia</a>
             <a href={appStore} target="_blank" rel="noreferrer">App Store</a>
