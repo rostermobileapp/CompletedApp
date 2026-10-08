@@ -8,3 +8,9 @@ Keep the mockup sandbox plugin list limited to plugins required by its standalon
 **Why:** The sandbox compiles independent preview entries and should not inherit plugin assumptions about the main application.
 
 **How to apply:** If a sandbox preview shows a Vite overlay, check optional analysis plugins and workspace config imports before changing the mockup component or adding dependencies.
+
+Libraries inherited from the parent workspace must use the sandbox's React runtime, not the parent's runtime.
+
+**Why:** The app and sandbox can have different React major versions. A parent-resolved icon package rendered React 18 elements into React 19 and crashed both otherwise-valid previews. A production build passing did not reveal the development runtime failure.
+
+**How to apply:** Deduplicate React and React DOM in the sandbox resolver when using parent-workspace libraries. In isolated component tests, resolve the JSX runtime from the sandbox too, not from the root package.

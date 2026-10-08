@@ -37,6 +37,8 @@ export default defineConfig({
     runtimeErrorOverlay(),
   ],
   resolve: {
+    // Parent-workspace libraries must use this sandbox's React runtime.
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(import.meta.dirname, 'src'),
     },

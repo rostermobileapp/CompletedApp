@@ -1,0 +1,329 @@
+import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowRight, Menu, X } from "lucide-react";
+import { SiAppstore, SiGoogleplay } from "react-icons/si";
+import "./ScrollStory.css";
+
+const image = (name: string) => `/__mockup/images/roster-home/${name}`;
+const signupDestination = "/get-started";
+const appStore = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
+const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
+const patchItems = [
+  ["hat-trick", "Hat Trick"], ["beer-me", "Beer Me"], ["iron-man", "Iron Man"],
+  ["on-fire", "On Fire"], ["century-club", "Century Club"], ["locked-in", "Locked In"],
+  ["three-stars", "Three Stars"],
+];
+const questions = [
+  { q: "Which franchise won the first Stanley Cup in 1893?", answers: ["Montreal Hockey Club", "Ottawa Senators", "Quebec Bulldogs"], right: "Montreal Hockey Club" },
+  { q: "Which team is known as the Original Six franchise from Detroit?", answers: ["Red Wings", "Blackhawks", "Rangers"], right: "Red Wings" },
+  { q: "What is the name of the trophy awarded to the NHL’s top goaltender?", answers: ["Vezina Trophy", "Norris Trophy", "Selke Trophy"], right: "Vezina Trophy" },
+];
+const gallery = [
+  ["scorekeeper-preview.png", "Keep the game moving. Track the action from the bench."],
+  ["standings-preview.png", "A season’s picture, without a spreadsheet scavenger hunt."],
+  ["payments-preview.png", "Team payments and expenses live with the team."],
+  ["messaging-preview.png", "The right hockey conversation, in the right place."],
+];
+const wordLines = [
+  "Group texts bury the details.",
+  "Spreadsheets get stale before puck drop.",
+  "Then someone asks who’s bringing the jerseys.",
+];
+
+function ScrollStory() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const storyRef = useRef<HTMLElement>(null);
+  const benefitRef = useRef<HTMLDivElement>(null);
+  const [wordProgress, setWordProgress] = useState(0);
+  const [benefitProgress, setBenefitProgress] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [answerState, setAnswerState] = useState("");
+  const reduced = useRef(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    const draw = () => {
+      frame = 0;
+      const sectionProgress = (element: HTMLElement | null) => {
+        if (!element || media.matches) return 1;
+        const rect = element.getBoundingClientRect();
+        return Math.min(1, Math.max(0, (window.innerHeight * .2 - rect.top) /
+          Math.max(window.innerHeight * .55, rect.height - window.innerHeight * .7)));
+      };
+      setWordProgress(sectionProgress(storyRef.current));
+      setBenefitProgress(sectionProgress(benefitRef.current));
+    };
+    const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(draw); };
+    const updatePreference = () => { reduced.current = media.matches; draw(); };
+    reduced.current = media.matches;
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    media.addEventListener("change", updatePreference);
+    draw();
+    if (window.location.hash) {
+      const id = decodeURIComponent(window.location.hash.slice(1));
+      rootRef.current?.querySelector<HTMLElement>(`[id="${CSS.escape(id)}"]`)?.scrollIntoView();
+    }
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      media.removeEventListener("change", updatePreference);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let cleanupMotion = () => {};
+    const setupMotion = () => {
+      cleanupMotion();
+      if (media.matches) return;
+      let frame = 0;
+      const rows = Array.from(rootRef.current?.querySelectorAll<HTMLElement>(".rs-marquee") ?? []);
+      const galleryTrack = rootRef.current?.querySelector<HTMLElement>(".rs-gallery-track");
+      const draw = () => {
+        rows.forEach((row, i) => {
+          const distance = window.innerHeight - row.getBoundingClientRect().top;
+          const shift = -row.scrollWidth / 3 + (i % 2 ? -1 : 1) * distance * .095;
+          row.style.transform = `translate3d(${shift}px,0,0)`;
+        });
+        if (galleryTrack) {
+          const distance = window.innerHeight - galleryTrack.getBoundingClientRect().top;
+          galleryTrack.style.transform = `translate3d(${-(Math.max(0, distance) * .07)}px,0,0)`;
+        }
+        frame = 0;
+      };
+      const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(draw); };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll);
+      draw();
+      cleanupMotion = () => {
+        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        if (frame) window.cancelAnimationFrame(frame);
+        rows.forEach(row => { row.style.transform = ""; });
+        if (galleryTrack) galleryTrack.style.transform = "";
+      };
+    };
+    media.addEventListener("change", setupMotion);
+    setupMotion();
+    return () => {
+      media.removeEventListener("change", setupMotion);
+      cleanupMotion();
+    };
+  }, []);
+
+  const previewFlow = (path: string) => setNotice(`Preview only — ${path} isn’t connected here. This isolated page does not create accounts or send data.`);
+  const jumpTo = (id: string) => { setMenuOpen(false); document.getElementById(id)?.scrollIntoView({ behavior: reduced.current ? "auto" : "smooth" }); };
+  const current = questions[questionIndex];
+  const impactStages = ["GROUP CHAT", "CLEAR LINEUP", "GAME ON"];
+  const impactLabel = impactStages[Math.min(2, Math.floor(benefitProgress * impactStages.length))];
+  const wordCount = wordLines.join(" ").split(" ").length;
+
+  return (
+    <main className="roster-scroll" ref={rootRef}>
+      {notice && <div className="rs-notice" role="status">{notice}<button aria-label="Dismiss notice" onClick={() => setNotice("")}>Got it</button></div>}
+      <header className="rs-nav">
+        <a href="#top" className="rs-logo" aria-label="Roster home" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>
+          <img src={image("logo-dark.png")} alt="Roster" />
+        </a>
+        <nav className="rs-nav-links" aria-label="Main navigation">
+          <a href="#team" onClick={(e) => { e.preventDefault(); jumpTo("team"); }}>The problem</a>
+          <a href="#platform" onClick={(e) => { e.preventDefault(); jumpTo("platform"); }}>The platform</a>
+          <a href="#patches" onClick={(e) => { e.preventDefault(); jumpTo("patches"); }}>Patches & extras</a>
+          <a href="#trivia" onClick={(e) => { e.preventDefault(); jumpTo("trivia"); }}>Daily trivia</a>
+        </nav>
+        <button className="rs-nav-cta" onClick={() => previewFlow(signupDestination)}>Get started <ArrowRight size={15} /></button>
+        <button className="rs-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
+        {menuOpen && <nav className="rs-mobile-menu" aria-label="Mobile navigation">
+          {["team", "platform", "patches", "trivia"].map((id, i) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); jumpTo(id); }}>{["The problem", "The platform", "Patches & extras", "Daily trivia"][i]}</a>)}
+          <a href="#start" onClick={(e) => { e.preventDefault(); setMenuOpen(false); jumpTo("start"); }}>Get started</a>
+        </nav>}
+      </header>
+
+      <section className="rs-hero" id="top">
+        <div className="rs-eyebrow">Hockey runs better together</div>
+        <h1>Less admin.<br /><span>More hockey.</span></h1>
+        <p className="rs-hero-copy">The team app built by a frustrated player, for the people who’d rather be at the rink. One place for your roster, season, and everything around game night.</p>
+        <div className="rs-hero-actions">
+          <button className="rs-button" onClick={() => previewFlow(signupDestination)}>Get started <ArrowRight size={16} /></button>
+          <button className="rs-button secondary" onClick={() => previewFlow("/login")}>Log in</button>
+        </div>
+        <p className="rs-micro">No ads. Free forever tier available. No credit card required.</p>
+        <div className="rs-hero-art">
+          <img src={image("hero-demo.png")} alt="Roster team management app shown on a phone" />
+           <div className="rs-art-label">Your whole team, in your pocket · App preview</div>
+        </div>
+        <a className="rs-sr-only" href="#team">Scroll to the story</a>
+        <span className="rs-eyebrow" aria-hidden="true" style={{ marginTop: 15 }}>Keep going <ArrowDown size={13} /></span>
+      </section>
+
+      <section className="rs-story-scene" id="team" ref={storyRef}>
+        <div className="rs-section rs-story">
+        <div className="rs-story-copy">
+          <div className="rs-section-kicker">The old routine</div>
+          <h2 className="rs-display">Hockey has enough moving parts.</h2>
+          <p className="rs-copy" aria-label={wordLines.join(" ")}>
+            {wordLines.map((line, i) => <span className="rs-wordline" key={line}>
+              {line.split(" ").map((word, j) => {
+                 const wordIndex = wordLines.slice(0, i).reduce((count, previous) => count + previous.split(" ").length, 0) + j;
+                 const lit = wordProgress >= (wordIndex + 1) / wordCount;
+                return <span className={`rs-word${lit ? " is-lit" : ""}`} key={`${word}-${j}`}>{word}</span>;
+              })}
+            </span>)}
+          </p>
+          <ul className="rs-pain-list">
+            <li>Endless group texts that go nowhere</li>
+            <li>Half-baked spreadsheets nobody updates</li>
+            <li>Email chains from 2018</li>
+          </ul>
+        </div>
+        <div className="rs-split-art">
+          <img src={image("features-phones.png")} alt="Roster app screens for organizing a team" />
+          <div className="rs-caption">One app. Your team. Back to hockey.</div>
+        </div>
+        </div>
+      </section>
+
+      <section className="rs-section rs-white" id="platform">
+        <div className="rs-section-inner rs-platform">
+          <div>
+            <div className="rs-section-kicker">The whole season, in one place</div>
+            <h2 className="rs-display">The team stuff.<br />Handled.</h2>
+            <p className="rs-copy">A real management toolkit for teams who want to spend less time coordinating and more time playing. Schedules, RSVPs, roster, stats, payments, messaging and smart brackets work together—without ads.</p>
+            <div className="rs-platform-list">
+              <div>Team schedules, attendance and player subs</div>
+              <div>Stats, scorekeeping, standings and tournaments</div>
+              <div>Payments, expenses, messaging and team updates</div>
+            </div>
+          </div>
+          <img src={image("features-phones.png")} alt="Roster scheduling, team and player management screens" />
+        </div>
+      </section>
+
+      <section className="rs-section rs-product-band">
+        <div className="rs-section-inner">
+          <div className="rs-product-top">
+            <div>
+              <div className="rs-section-kicker">A better bench-to-bench rhythm</div>
+              <h2 className="rs-display">Run the team.<br />Not the group chat.</h2>
+            </div>
+            <p className="rs-copy">From the first RSVP to the final score, give every teammate the same clear view of what’s happening next.</p>
+          </div>
+          <img className="rs-product-image" src={image("scorekeeper-preview.png")} alt="Roster in-game scorekeeping screen" />
+        </div>
+      </section>
+
+      <div className="rs-benefit-scene" ref={benefitRef}>
+      <section className="rs-section rs-benefit" aria-label="What the team gets back">
+        <div className="rs-section-inner rs-benefit-inner">
+          <div className="rs-benefit-copy">
+            <div className="rs-section-kicker">Less time herding. More time here.</div>
+            <h2 className="rs-display">Make room<br />for the game.</h2>
+            <p className="rs-copy">The best part isn’t another dashboard. It’s knowing the lineup, the plan, and the score—then putting the phone away.</p>
+            <div className="rs-meter"><span>Where the focus goes</span><strong>{impactLabel}</strong></div>
+          </div>
+          <div className="rs-feature-art">
+            <img src={image("standings-preview.png")} alt="Roster standings screen for a hockey season" />
+            <div className="rs-badge"><strong>Clear season picture</strong>Illustrative preview screen</div>
+          </div>
+        </div>
+      </section>
+      </div>
+
+      <section className="rs-section rs-patches" id="patches">
+        <div className="rs-patches-head">
+          <div className="rs-section-kicker">A little friendly bragging rights</div>
+          <h2 className="rs-display">Earn your<br />team lore.</h2>
+           <p className="rs-copy">Collectible patches make the season more fun. Build patch progress on every plan. Hat Trick follows the season; Beer Me resets January 1. Unlock the full Trophy Case and patch artwork with Player Pro or Commissioner access and verified age 21+.</p>
+        </div>
+        {[0, 1].map((row) => <div className="rs-marquee-wrap" key={row}>
+          <div className="rs-marquee" aria-label="Illustrative Roster patch collection" style={{ marginLeft: row ? "-8vw" : "-3vw" }}>
+            {[...patchItems, ...patchItems, ...patchItems].map(([slug, title], i) =>
+              <img key={`${row}-${slug}-${i}`} src={`/__mockup/images/roster-home/badges/${slug}/tier-1.webp`} alt={i < patchItems.length ? `${title} patch` : ""} aria-hidden={i >= patchItems.length} />,
+            )}
+          </div>
+        </div>)}
+        <p className="rs-patch-note">The gallery is illustrative; real Trophy Case artwork is part of paid access.</p>
+      </section>
+
+      <section className="rs-section rs-trivia" id="trivia">
+        <div className="rs-section-inner rs-trivia-grid">
+          <div>
+            <div className="rs-section-kicker">One fresh question, every day</div>
+            <h2 className="rs-display">Keep your<br />hockey brain<br />in the game.</h2>
+            <p className="rs-copy">Daily hockey trivia is free to play. Test what you know, discover something new, and build lifetime trivia patch progress on every plan.</p>
+          </div>
+          <div className="rs-question">
+            <div className="rs-question-label">Illustrative question · {questionIndex + 1} of {questions.length}</div>
+            <h3>{current.q}</h3>
+             {current.answers.map((answer) => <button key={answer} className={`rs-answer${answerState === answer ? answer === current.right ? " is-correct" : " is-incorrect" : ""}`} aria-pressed={answerState === answer} onClick={() => setAnswerState(answer)}>{answer}</button>)}
+             <div className={`rs-demo-result${answerState ? answerState === current.right ? " is-correct" : " is-incorrect" : ""}`} role="status" aria-live="polite">
+              {answerState ? answerState === current.right ? "That’s right — nice pull." : "Not this time. The answer is " + current.right + "." : "Tap an answer to try this demo question."}
+            </div>
+            <button className="rs-button secondary" style={{ marginTop: 8, minHeight: 44 }} onClick={() => { setQuestionIndex((questionIndex + 1) % questions.length); setAnswerState(""); }}>Next demo question <ArrowRight size={15} /></button>
+          </div>
+        </div>
+      </section>
+
+      <section className="rs-gallery" aria-label="More Roster app screens">
+        <div className="rs-gallery-head">
+          <div className="rs-section-kicker">Made for the whole bench</div>
+          <h2 className="rs-display">The details<br />stay together.</h2>
+        </div>
+        <div className="rs-gallery-track">
+          {[...gallery, ...gallery].map(([src, caption], i) => <article className="rs-gallery-card" key={`${src}-${i}`}>
+            <img src={image(src)} alt={caption} />
+            <span>{caption}</span>
+          </article>)}
+        </div>
+      </section>
+
+      <section className="rs-section rs-white" aria-label="Seasonal bonus">
+        <div className="rs-section-inner rs-platform">
+          <div>
+            <div className="rs-section-kicker">The fun stuff is part of team culture</div>
+            <h2 className="rs-display">Keep score<br />off the ice, too.</h2>
+             <p className="rs-copy">Track your post-game beers with the free personal counter. Beer Me patch progress starts fresh each January 1. For adult players; enjoy responsibly. Full Trophy Case access and patch artwork require Player Pro or Commissioner access and verified age 21+.</p>
+          </div>
+          <div className="rs-question" style={{ background: "#f3f8fd", color: "#0a1b2e", borderColor: "#bfd4e8" }}>
+            <div className="rs-question-label">Patch preview</div>
+            <img src="/__mockup/images/roster-home/badges/hat-trick/tier-1.webp" alt="Hat Trick collectible patch artwork preview" style={{ width: "78%", display: "block", margin: "8px auto" }} />
+            <div style={{ textAlign: "center", color: "#526c85", fontSize: 12 }}>Hat Trick is a seasonal badge.</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rs-section rs-final" id="start">
+        <div className="rs-section-inner">
+          <div className="rs-eyebrow">Built for hockey. Ad-free. Always.</div>
+          <h2 className="rs-display">Let’s get<br />back to hockey.</h2>
+          <p className="rs-copy">Bring your team together, keep the season in step, and save the admin for the app.</p>
+          <div className="rs-hero-actions">
+            <button className="rs-button" onClick={() => previewFlow(signupDestination)}>Get started <ArrowRight size={16} /></button>
+            <a className="rs-button secondary" href={appStore} target="_blank" rel="noreferrer"><SiAppstore size={19} /> App Store</a>
+            <a className="rs-button secondary" href={playStore} target="_blank" rel="noreferrer"><SiGoogleplay size={18} /> Google Play</a>
+          </div>
+          <p className="rs-micro">Store buttons open Roster’s real app listings. Signup and login are preview-only here.</p>
+        </div>
+      </section>
+      <footer className="rs-footer">
+        <div className="rs-footer-inner">
+          <a href="#top" onClick={(e) => { e.preventDefault(); jumpTo("top"); }}><img src={image("logo-dark.png")} alt="Roster" style={{ width: 96, height: 34, objectFit: "contain" }} /></a>
+          <div className="rs-footer-links">
+            <a href="#platform" onClick={(e) => { e.preventDefault(); jumpTo("platform"); }}>Features</a>
+            <a href="#patches" onClick={(e) => { e.preventDefault(); jumpTo("patches"); }}>Patches</a>
+            <a href="#trivia" onClick={(e) => { e.preventDefault(); jumpTo("trivia"); }}>Trivia</a>
+            <a href={appStore} target="_blank" rel="noreferrer">App Store</a>
+            <a href={playStore} target="_blank" rel="noreferrer">Google Play</a>
+          </div>
+          <span>Ad-free hockey team management.</span>
+        </div>
+      </footer>
+    </main>
+  );
+}
+
+export default ScrollStory;

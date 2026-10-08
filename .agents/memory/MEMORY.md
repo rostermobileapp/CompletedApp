@@ -33,7 +33,7 @@
 - [Team stats query isolation](team-stats-query-isolation.md) — team-specific stats queries need unique cache keys; league-wide and team-roster responses are not interchangeable.
 - [Native calendar export](native-calendar-export.md) — export is one-way by default; optional providers reconcile by stable source key, fingerprint, and editable event ID.
 - [Private calendar feeds](private-calendar-feeds.md) — web subscriptions use a revocable bearer URL; store only its hash and keep one active token per user.
-- [Mockup sandbox plugin isolation](mockup-sandbox-isolation.md) — keep app-specific Vite plugins out of the isolated preview server to avoid importing workspace-only config.
+- [Mockup sandbox isolation](mockup-sandbox-isolation.md) — isolate app-specific plugins and React runtimes; parent-workspace libraries can otherwise crash valid previews.
 - [Trophy Case depth direction](trophy-case-depth-direction.md) — inset shadows alone were rejected as low-quality; use nested rims, distinct surface planes, and consistent lighting for depth.
 - [Badge announcement presentation](badge-announcement-presentation.md) — stats/beer celebrate for everyone; free users see a lock, paid users see tier artwork; retain the current-screen overlay.
 - [Confetti video transparency](badge-confetti-transparency.md) — black-background video needs real alpha; screen blending over a blurred modal can darken the whole screen.
