@@ -150,7 +150,7 @@ function ScrollStory() {
           alt="Hockey teammates sharing a relaxed laugh and catching up outside the arena."
           fetchPriority="high"
         />
-        <h1>More time together.<br /><span>Less time on admin.</span></h1>
+        <h1 className="rs-hero-title mt-[1px]">More time together.<br /><span>Less time on admin.</span></h1>
         <p className="rs-hero-copy">The best part of hockey is the people. Catch up after the game, share a laugh, enjoy being together. Roster handles the team admin, so your time off the ice can be about each other.</p>
         <div className="rs-hero-actions">
           <button className="rs-button" onClick={() => previewFlow(signupDestination)}>Bring your team together <ArrowRight size={16} /></button>
