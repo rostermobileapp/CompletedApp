@@ -144,20 +144,22 @@ function ScrollStory() {
       </header>
 
       <section className="rs-hero" id="top">
-        <div className="rs-eyebrow">Hockey runs better together</div>
-        <h1>Less admin.<br /><span>More hockey.</span></h1>
-        <p className="rs-hero-copy">The team app built by a frustrated player, for the people who’d rather be at the rink. One place for your roster, season, and everything around game night.</p>
+        <img
+          className="rs-hero-photo"
+          src={image("roster-home-friends.jpg")}
+          alt="Hockey teammates sharing a relaxed laugh and catching up outside the arena."
+          fetchPriority="high"
+        />
+        <div className="rs-eyebrow">Time off the ice is yours.</div>
+        <h1>More time together.<br /><span>Less time on admin.</span></h1>
+        <p className="rs-hero-copy">The best part of hockey is the people. Catch up after the game, share a laugh, enjoy being together. Roster handles the team admin, so your time off the ice can be about each other.</p>
         <div className="rs-hero-actions">
-          <button className="rs-button" onClick={() => previewFlow(signupDestination)}>Get started <ArrowRight size={16} /></button>
+          <button className="rs-button" onClick={() => previewFlow(signupDestination)}>Bring your team together <ArrowRight size={16} /></button>
           <button className="rs-button secondary" onClick={() => previewFlow("/login")}>Log in</button>
         </div>
         <p className="rs-micro">No ads. Free forever tier available. No credit card required.</p>
-        <div className="rs-hero-art">
-          <img src={image("hero-demo.png")} alt="Roster team management app shown on a phone" />
-           <div className="rs-art-label">Your whole team, in your pocket · App preview</div>
-        </div>
         <a className="rs-sr-only" href="#team">Scroll to the story</a>
-        <span className="rs-eyebrow" aria-hidden="true" style={{ marginTop: 15 }}>Keep going <ArrowDown size={13} /></span>
+        <span className="rs-eyebrow" aria-hidden="true" style={{ marginTop: 15 }}>Keep the good part going <ArrowDown size={13} /></span>
       </section>
 
       <section className="rs-story-scene" id="team" ref={storyRef}>

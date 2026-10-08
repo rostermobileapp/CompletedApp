@@ -73,3 +73,4 @@
 - [Production secret boundary](production-secret-boundary.md) — Replit workspace secret presence does not establish Railway billing readiness; validate configuration in its actual environment.
 - [Badge tier sort order](badge-tier-sort-order.md) — use explicit progression ranks; the live PostgreSQL enum's native sort order differs from achievement order.
 - [Season patch statistics](season-patch-statistics.md) — count all categories earned within season dates; tiers count separately and cumulative repeat totals need a pre-season baseline.
+- [Homepage positioning](homepage-positioning.md) — lead with enjoying off-ice time together, not spending it on team admin.
