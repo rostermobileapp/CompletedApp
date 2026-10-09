@@ -215,18 +215,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-      <section className="rs-section rs-partners" id="partners">
-        <div className="rs-section-inner rs-partners-layout">
-          <div>
-            <div className="rs-section-kicker">For the whole hockey community</div>
-            <h2 className="rs-display">Good teams<br />start together.</h2>
-          </div>
-          <div className="rs-partners-copy">
-            <p className="rs-copy">Leagues, arenas, and hockey organizations help make the game possible. Roster gives the teams in your community one place to organize the season and stay connected.</p>
-            <a className="rs-button" href="/referral-program">Explore a Roster partnership <ArrowRight size={16} /></a>
-          </div>
-        </div>
-      </section>
       <section className="rs-section rs-final" id="start">
         <div className="rs-section-inner">
           <div className="rs-eyebrow">Built for hockey. Ad-free. Always.</div>
