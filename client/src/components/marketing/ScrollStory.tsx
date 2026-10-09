@@ -202,19 +202,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-      <section className="rs-section rs-about" id="about">
-        <div className="rs-section-inner rs-about-layout">
-          <div>
-            <div className="rs-section-kicker">About Roster</div>
-            <h2 className="rs-display">Built around<br />the game.</h2>
-          </div>
-          <div className="rs-about-copy">
-            <p className="rs-about-lede">Hockey should take up your time on the ice—not every minute around it.</p>
-            <p className="rs-copy">Roster brings schedules, attendance, team communication, payments, and game-day tools into one shared place. Fewer “who’s in?” messages. More time with the people who make the season.</p>
-            <a className="rs-text-link" href="/features">Take a look at the features <ArrowRight size={16} /></a>
-          </div>
-        </div>
-      </section>
       <section className="rs-section rs-product-band">
         <div className="rs-section-inner">
           <div className="rs-product-top">
