@@ -21,12 +21,6 @@ const questions = [
   { q: "Which team is known as the Original Six franchise from Detroit?", answers: ["Red Wings", "Blackhawks", "Rangers"], right: "Red Wings" },
   { q: "What is the name of the trophy awarded to the NHL’s top goaltender?", answers: ["Vezina Trophy", "Norris Trophy", "Selke Trophy"], right: "Vezina Trophy" },
 ];
-const gallery = [
-  ["scorekeeper-preview.png", "Keep the game moving. Track the action from the bench."],
-  ["standings-preview.png", "A season’s picture, without a spreadsheet scavenger hunt."],
-  ["payments-preview.png", "Team payments and expenses live with the team."],
-  ["messaging-preview.png", "The right hockey conversation, in the right place."],
-];
 function ScrollStory() {
   const [, navigate] = useLocation();
   const isIos = useIsIosDevice();
@@ -60,17 +54,12 @@ function ScrollStory() {
       if (media.matches) return;
       let frame = 0;
       const rows = Array.from(rootRef.current?.querySelectorAll<HTMLElement>(".rs-marquee") ?? []);
-      const galleryTrack = rootRef.current?.querySelector<HTMLElement>(".rs-gallery-track");
       const draw = () => {
         rows.forEach((row, i) => {
           const distance = window.innerHeight - row.getBoundingClientRect().top;
           const shift = -row.scrollWidth / 3 + (i % 2 ? -1 : 1) * distance * .095;
           row.style.transform = `translate3d(${shift}px,0,0)`;
         });
-        if (galleryTrack) {
-          const distance = window.innerHeight - galleryTrack.getBoundingClientRect().top;
-          galleryTrack.style.transform = `translate3d(${-(Math.max(0, distance) * .07)}px,0,0)`;
-        }
         frame = 0;
       };
       const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(draw); };
@@ -82,7 +71,6 @@ function ScrollStory() {
         window.removeEventListener("resize", onScroll);
         if (frame) window.cancelAnimationFrame(frame);
         rows.forEach(row => { row.style.transform = ""; });
-        if (galleryTrack) galleryTrack.style.transform = "";
       };
     };
     media.addEventListener("change", setupMotion);
@@ -211,18 +199,6 @@ function ScrollStory() {
             </div>
             <button className="rs-button secondary" style={{ marginTop: 8, minHeight: 44 }} onClick={() => { setQuestionIndex((questionIndex + 1) % questions.length); setAnswerState(""); }}>Next demo question <ArrowRight size={15} /></button>
           </div>
-        </div>
-      </section>
-      <section className="rs-gallery" aria-label="More Roster app screens">
-        <div className="rs-gallery-head">
-          <div className="rs-section-kicker">Made for the whole bench</div>
-          <h2 className="rs-display">The details<br />stay together.</h2>
-        </div>
-        <div className="rs-gallery-track">
-          {[...gallery, ...gallery].map(([src, caption], i) => <article className="rs-gallery-card" key={`${src}-${i}`}>
-            <img src={image(src)} alt={caption} />
-            <span>{caption}</span>
-          </article>)}
         </div>
       </section>
       <section className="rs-section rs-white" aria-label="Seasonal bonus">

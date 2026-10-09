@@ -131,12 +131,6 @@
 .rs-demo-result.is-correct { color:#a2e4bf; }
 .rs-demo-result.is-incorrect { color:#ffbac5; }
 .rs-demo-result { min-height:22px;color:#9ecbfa;font-size:12px;padding-top:9px; }
-.rs-gallery { padding:120px 0;background:#0b1b2e;overflow:hidden; }
-.rs-gallery-head { max-width:1160px;margin:0 auto 34px;padding:0 7vw; }
-.rs-gallery-track { display:flex;gap:22px;width:max-content;will-change:transform; }
-.rs-gallery-card { width:clamp(300px,39vw,510px);padding:18px;border:1px solid #29445f;background:#112740;border-radius:17px; }
-.rs-gallery-card img { width:100%;display:block;border-radius:9px; }
-.rs-gallery-card span { display:block;color:#c6d9eb;font-size:12px;margin-top:14px; }
 .rs-partners { background:radial-gradient(ellipse at 18% 54%,rgba(43,109,177,.17),transparent 35%),#0b1b2e;color:#edf5fc;border-top:1px solid rgba(155,197,238,.1); }
 .rs-partners-copy { max-width:540px;padding:34px 36px;border:1px solid rgba(151,195,236,.17);border-radius:18px;background:linear-gradient(145deg,rgba(21,49,77,.88),rgba(11,30,49,.9));box-shadow:0 24px 56px rgba(0,0,0,.22); }
 .rs-partners-copy .rs-button { margin-top:17px; }
@@ -185,14 +179,12 @@
   .rs-marquee img { width:116px; }
   .rs-patch-note { padding:0 24px;line-height:1.6; }
   .rs-question { padding:23px; }
-  .rs-gallery { padding:82px 0; }
-  .rs-gallery-card { width:78vw;padding:12px; }
   .rs-final { padding:100px 24px; }
   .rs-footer-inner { align-items:flex-start;flex-direction:column; }
 }
 @media (prefers-reduced-motion: reduce) {
   .roster-scroll *, .roster-scroll *:before, .roster-scroll *:after { scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important; }
-  .rs-marquee,.rs-gallery-track { transform:none!important; }
+  .rs-marquee { transform:none!important; }
   .rs-story { position:relative;min-height:unset; }
   .rs-story-scene { min-height:unset; }
 }
