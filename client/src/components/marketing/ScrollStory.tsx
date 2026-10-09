@@ -96,7 +96,19 @@ function ScrollStory() {
           <a href="/about">About</a>
           <a href="/referral-program">Partners</a>
         </nav>
-        <button className="rs-nav-cta" onClick={() => navigate(signupDestination)}>Get started <ArrowRight size={15} /></button>
+        <div className="rs-nav-actions">
+          <div className="rs-nav-stores" role="group" aria-label="Download Roster">
+            <a className="rs-nav-store" href={appStore} target="_blank" rel="noreferrer" aria-label="Get Roster on the App Store" title="App Store">
+              <SiAppstore size={15} aria-hidden="true" />
+              <span>App Store</span>
+            </a>
+            <a className="rs-nav-store" href={playStore} target="_blank" rel="noreferrer" aria-label="Get Roster on Google Play" title="Google Play">
+              <SiGoogleplay size={15} aria-hidden="true" />
+              <span>Google Play</span>
+            </a>
+          </div>
+          <button className="rs-nav-cta" onClick={() => navigate(signupDestination)}>Get started <ArrowRight size={15} /></button>
+        </div>
         <button className="rs-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
         {menuOpen && <nav className="rs-mobile-menu" aria-label="Mobile navigation">
           {[
