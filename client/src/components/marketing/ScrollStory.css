@@ -27,12 +27,12 @@
 }
 .rs-logo { display: flex; align-items: center; min-width: 115px; }
 .rs-logo img { width: 115px; height: 38px; object-fit: contain; object-position: left center; }
-.rs-nav-links { display:flex; gap: 24px; align-items:center; }
+.rs-nav-links { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;gap:24px;align-items:center; }
 .rs-nav a { text-decoration:none; font-size:12px; font-weight:600; color:#b9c9da; transition:color .2s; min-height:44px;display:flex;align-items:center; }
 .rs-nav a:hover { color:#fff; }
 .rs-nav-actions { display:flex;align-items:center;gap:8px;flex:0 0 auto; }
 .rs-nav-stores { display:flex;align-items:center;gap:5px; }
-.rs-nav .rs-nav-store { min-height:36px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid rgba(185,201,218,.2);border-radius:999px;background:rgba(255,255,255,.025);color:#9fb1c5;font-size:10px;font-weight:600;white-space:nowrap; }
+.rs-nav .rs-nav-store { width:36px;height:36px;min-width:36px;min-height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(185,201,218,.2);border-radius:50%;background:rgba(255,255,255,.025);color:#9fb1c5; }
 .rs-nav .rs-nav-store:hover { border-color:rgba(168,216,255,.44);background:rgba(168,216,255,.07);color:#eff7fd; }
 .rs-nav-cta,.rs-button {
   min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:10px;
