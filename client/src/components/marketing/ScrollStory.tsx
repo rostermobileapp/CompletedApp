@@ -210,8 +210,8 @@ function ScrollStory() {
           </div>
           <div className="rs-question" style={{ background: "#f3f8fd", color: "#0a1b2e", borderColor: "#bfd4e8" }}>
             <div className="rs-question-label">Patch preview</div>
-            <img src="/marketing/roster-home/badges/hat-trick/tier-1.webp" alt="Hat Trick collectible patch artwork preview" style={{ width: "78%", display: "block", margin: "8px auto" }} />
-            <div style={{ textAlign: "center", color: "#526c85", fontSize: 12 }}>Hat Trick is a seasonal badge.</div>
+            <img src="/badges/beer-me/tier-3.webp" alt="Beer Me tier 3 collectible patch artwork preview" style={{ width: "78%", display: "block", margin: "8px auto" }} />
+             <div style={{ textAlign: "center", color: "#526c85", fontSize: 12 }}>Beer Me progress resets each January 1.</div>
           </div>
         </div>
       </section>
