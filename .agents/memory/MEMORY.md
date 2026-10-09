@@ -71,6 +71,7 @@
 - [Temporary test services](temporary-test-services.md) — use tracked background processes and explicit local DB connection parameters; workspace PG defaults can leak into fixtures.
 - [Verification runtime compatibility](verification-runtime-compatibility.md) — testing delegation may be unavailable; isolate dynamic import graphs in bundled checks without weakening auth.
 - [Production secret boundary](production-secret-boundary.md) — Replit workspace secret presence does not establish Railway billing readiness; validate configuration in its actual environment.
+- [Production hosting boundary](production-hosting-boundary.md) — Railway serves the live app even when Replit reports no active deployment; verify the actual host before publishing.
 - [Badge tier sort order](badge-tier-sort-order.md) — use explicit progression ranks; the live PostgreSQL enum's native sort order differs from achievement order.
 - [Season patch statistics](season-patch-statistics.md) — count all categories earned within season dates; tiers count separately and cumulative repeat totals need a pre-season baseline.
 - [Homepage positioning](homepage-positioning.md) — lead with time together; fade the hero photo to pure black into the story section.

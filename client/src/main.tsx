@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { forgetMobileScreen } from "./lib/mobileScreenResume";
+import { isOpaqueCrossOriginScriptError } from "./lib/globalErrorHandling";
 
 function showFatalOverlay(label: string, detail: string) {
   try {
@@ -49,10 +50,44 @@ function showFatalOverlay(label: string, detail: string) {
   }
 }
 
+function reportGlobalClientError(message: string, stack: string, componentStack: string) {
+  try {
+    void fetch("/api/client-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        message,
+        stack,
+        componentStack,
+        timestamp: new Date().toISOString(),
+      }),
+      credentials: "include",
+      keepalive: true,
+    }).catch(() => {
+      // Best effort only; reporting must never cause another startup error.
+    });
+  } catch {
+    // Ignore reporting failures.
+  }
+}
+
 window.addEventListener("error", (event) => {
+  if (isOpaqueCrossOriginScriptError(event, window.location.origin)) {
+    console.warn("[GlobalError] Opaque cross-origin script error; allowing the app to continue.");
+    reportGlobalClientError(
+      "Opaque cross-origin script error: Script error.",
+      "",
+      "window.error: browser did not expose the cross-origin script details",
+    );
+    return;
+  }
+
   const msg = (event.error && (event.error.stack || event.error.message)) || event.message || "Unknown error";
   // eslint-disable-next-line no-console
   console.error("[GlobalError]", event.message, event.error);
+  reportGlobalClientError(`Uncaught error: ${event.message || "Unknown error"}`, String(msg), "window.error");
   showFatalOverlay("Uncaught error:", String(msg));
 });
 

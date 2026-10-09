@@ -1788,8 +1788,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await ensureBeerBadgeEvaluationQueue();
   await reconcileCalendarYearBeerMe();
 
-  // Lightweight endpoint for the client-side ErrorBoundary to report rendering
-  // crashes so we can debug what's failing in production / on user devices.
+  // Lightweight endpoint for client runtime handlers and the ErrorBoundary to
+  // report crashes so we can debug what's failing in production / on user devices.
   // No auth required (the user may be unauthenticated at the time of the crash).
   // Hardening: per-IP rate limit, payload truncation, URL query-string redaction
   // to avoid logging tokens / session ids that may appear in query params.
@@ -1844,7 +1844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stack = truncate(body.stack, 4000);
       const componentStack = truncate(body.componentStack, 4000);
       console.error(
-        '[ClientError] Render crash reported by ErrorBoundary',
+        '[ClientError] Client-side crash reported',
         '\n  url:', url,
         '\n  ua:', userAgent,
         '\n  message:', message,
