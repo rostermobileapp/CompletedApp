@@ -26,3 +26,9 @@ Preserve the existing playoff-bracket automation animation exactly when restylin
 **Why:** The user specifically requested the same animation as the current site, not a static bracket or a newly designed sequence.
 
 **How to apply:** Reuse the original animation, including timing and visual progression; apply the new theme to the surrounding page rather than changing the animation.
+
+Keep the homepage hero photo fade and the story section immediately below it pure black for a seamless transition.
+
+**Why:** The user chose to make the next section black rather than preserve its former dark-navy background, so the photo could fade to true black without a visible seam.
+
+**How to apply:** Keep the hero overlay’s final stop and the following story section backgrounds synchronized at `#000` when adjusting this transition.
