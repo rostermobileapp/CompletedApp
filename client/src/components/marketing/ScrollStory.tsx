@@ -91,6 +91,7 @@ function ScrollStory() {
           <img src={image("logo-dark.png")} alt="Roster" />
         </a>
         <nav className="rs-nav-links" aria-label="Main navigation">
+          <a href="#top" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>Home</a>
           <a href="/features">Features</a>
           <a href="/pricing">Pricing</a>
           <a href="/about">About</a>
@@ -109,6 +110,7 @@ function ScrollStory() {
         </div>
         <button className="rs-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
         {menuOpen && <nav className="rs-mobile-menu" aria-label="Mobile navigation">
+          <a href="#top" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>Home</a>
           {[
             ["features", "/features"],
             ["pricing", "/pricing"],
