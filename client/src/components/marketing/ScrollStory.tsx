@@ -115,7 +115,7 @@ function ScrollStory() {
           alt="Hockey teammates sharing a relaxed laugh and catching up outside the arena."
           loading="eager"
         />
-        <h1 className="rs-hero-title mt-[1px] text-[#ffffff]">More time together.<br /><span>Less time on admin.</span></h1>
+        <h1 className="rs-hero-title mt-[1px] text-[#ffffff]">LESS ADMIN<br /><span>Less time on admin.</span></h1>
         <p className="rs-hero-copy text-[#ffffff] font-semibold">When the game ends, the memories begin. Roster handles the admin, so you can enjoy the parking lot party.</p>
         <div className="rs-hero-actions">
           <button className="rs-button" onClick={() => navigate(signupDestination)}>Bring your team together <ArrowRight size={16} /></button>
