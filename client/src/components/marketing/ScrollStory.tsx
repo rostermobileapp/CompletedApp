@@ -27,21 +27,13 @@ const gallery = [
   ["payments-preview.png", "Team payments and expenses live with the team."],
   ["messaging-preview.png", "The right hockey conversation, in the right place."],
 ];
-const wordLines = [
-  "Group texts bury the details.",
-  "Spreadsheets get stale before puck drop.",
-  "Then someone asks who’s bringing the jerseys.",
-];
-
 function ScrollStory() {
   const [, navigate] = useLocation();
   const isIos = useIsIosDevice();
   useMarketingVisit();
   useSeo({ title: "Roster — Hockey Team Management App", description: "More time together. Less time on admin. Roster handles hockey schedules, RSVPs, rosters, stats, and payments in one ad-free app. Free to start." });
   const rootRef = useRef<HTMLDivElement>(null);
-  const storyRef = useRef<HTMLElement>(null);
   const benefitRef = useRef<HTMLDivElement>(null);
-  const [wordProgress, setWordProgress] = useState(0);
   const [benefitProgress, setBenefitProgress] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -59,7 +51,6 @@ function ScrollStory() {
         return Math.min(1, Math.max(0, (window.innerHeight * .2 - rect.top) /
           Math.max(window.innerHeight * .55, rect.height - window.innerHeight * .7)));
       };
-      setWordProgress(sectionProgress(storyRef.current));
       setBenefitProgress(sectionProgress(benefitRef.current));
     };
     const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(draw); };
@@ -126,7 +117,6 @@ function ScrollStory() {
   const current = questions[questionIndex];
   const impactStages = ["GROUP CHAT", "CLEAR LINEUP", "GAME ON"];
   const impactLabel = impactStages[Math.min(2, Math.floor(benefitProgress * impactStages.length))];
-  const wordCount = wordLines.join(" ").split(" ").length;
 
   return (
     <main className="roster-scroll" ref={rootRef}>
@@ -171,20 +161,12 @@ function ScrollStory() {
         <span className="rs-eyebrow" aria-hidden="true" style={{ marginTop: 15 }}>Keep the good part going <ArrowDown size={13} /></span>
       </section>
 
-      <section className="rs-story-scene" id="team" ref={storyRef}>
+      <section className="rs-story-scene" id="team">
         <div className="rs-section rs-story">
         <div className="rs-story-copy">
           <div className="rs-section-kicker">The old routine</div>
           <h2 className="rs-display">Hockey has enough moving parts.</h2>
-          <p className="rs-copy" aria-label={wordLines.join(" ")}>
-            {wordLines.map((line, i) => <span className="rs-wordline" key={line}>
-              {line.split(" ").map((word, j) => {
-                 const wordIndex = wordLines.slice(0, i).reduce((count, previous) => count + previous.split(" ").length, 0) + j;
-                 const lit = wordProgress >= (wordIndex + 1) / wordCount;
-                return <span className={`rs-word${lit ? " is-lit" : ""}`} key={`${word}-${j}`}>{word}</span>;
-              })}
-            </span>)}
-          </p>
+          <p className="rs-copy">A real management toolkit for teams who want to spend less time coordinating and more time playing. Schedules, RSVPs, roster, stats, payments, messaging and smart brackets work together—without ads.</p>
           <ul className="rs-pain-list">
             <li>Endless group texts that go nowhere</li>
             <li>Half-baked spreadsheets nobody updates</li>
