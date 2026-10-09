@@ -33,8 +33,6 @@ function ScrollStory() {
   useMarketingVisit();
   useSeo({ title: "Roster — Hockey Team Management App", description: "More time together. Less time on admin. Roster handles hockey schedules, RSVPs, rosters, stats, and payments in one ad-free app. Free to start." });
   const rootRef = useRef<HTMLDivElement>(null);
-  const benefitRef = useRef<HTMLDivElement>(null);
-  const [benefitProgress, setBenefitProgress] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answerState, setAnswerState] = useState("");
@@ -42,33 +40,15 @@ function ScrollStory() {
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let frame = 0;
-    const draw = () => {
-      frame = 0;
-      const sectionProgress = (element: HTMLElement | null) => {
-        if (!element || media.matches) return 1;
-        const rect = element.getBoundingClientRect();
-        return Math.min(1, Math.max(0, (window.innerHeight * .2 - rect.top) /
-          Math.max(window.innerHeight * .55, rect.height - window.innerHeight * .7)));
-      };
-      setBenefitProgress(sectionProgress(benefitRef.current));
-    };
-    const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(draw); };
-    const updatePreference = () => { reduced.current = media.matches; draw(); };
+    const updatePreference = () => { reduced.current = media.matches; };
     reduced.current = media.matches;
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
     media.addEventListener("change", updatePreference);
-    draw();
     if (window.location.hash) {
       const id = decodeURIComponent(window.location.hash.slice(1));
       rootRef.current?.querySelector<HTMLElement>(`[id="${CSS.escape(id)}"]`)?.scrollIntoView();
     }
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
       media.removeEventListener("change", updatePreference);
-      if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
 
@@ -115,8 +95,6 @@ function ScrollStory() {
 
   const jumpTo = (id: string) => { setMenuOpen(false); document.getElementById(id)?.scrollIntoView({ behavior: reduced.current ? "auto" : "smooth" }); };
   const current = questions[questionIndex];
-  const impactStages = ["GROUP CHAT", "CLEAR LINEUP", "GAME ON"];
-  const impactLabel = impactStages[Math.min(2, Math.floor(benefitProgress * impactStages.length))];
 
   return (
     <main className="roster-scroll" ref={rootRef}>
@@ -202,22 +180,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-      <div className="rs-benefit-scene" ref={benefitRef}>
-      <section className="rs-section rs-benefit" aria-label="What the team gets back">
-        <div className="rs-section-inner rs-benefit-inner">
-          <div className="rs-benefit-copy">
-            <div className="rs-section-kicker">Less time herding. More time here.</div>
-            <h2 className="rs-display">Make room<br />for the game.</h2>
-            <p className="rs-copy">The best part isn’t another dashboard. It’s knowing the lineup, the plan, and the score—then putting the phone away.</p>
-            <div className="rs-meter"><span>Where the focus goes</span><strong>{impactLabel}</strong></div>
-          </div>
-          <div className="rs-feature-art">
-            <img src={image("standings-preview.png")} alt="Roster standings screen for a hockey season" />
-            <div className="rs-badge"><strong>Clear season picture</strong>Illustrative preview screen</div>
-          </div>
-        </div>
-      </section>
-      </div>
       <section className="rs-section rs-patches" id="patches">
         <div className="rs-patches-head">
           <div className="rs-section-kicker">A little friendly bragging rights</div>
