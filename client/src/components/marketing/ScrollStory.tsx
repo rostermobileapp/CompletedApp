@@ -180,22 +180,6 @@ function ScrollStory() {
         </div>
       </section>
 
-      <section className="rs-section rs-white" id="features">
-        <div className="rs-section-inner rs-platform">
-          <div>
-            <div className="rs-section-kicker">The whole season, in one place</div>
-            <h2 className="rs-display">The team stuff.<br />Handled.</h2>
-            <p className="rs-copy">A real management toolkit for teams who want to spend less time coordinating and more time playing. Schedules, RSVPs, roster, stats, payments, messaging and smart brackets work together—without ads.</p>
-            <div className="rs-platform-list">
-              <div>Team schedules, attendance and player subs</div>
-              <div>Stats, scorekeeping, standings and tournaments</div>
-              <div>Payments, expenses, messaging and team updates</div>
-            </div>
-          </div>
-          <img src={image("features-phones.png")} alt="Roster scheduling, team and player management screens" />
-        </div>
-      </section>
-
       <section className="rs-section rs-pricing" id="pricing">
         <div className="rs-section-inner rs-pricing-layout">
           <div className="rs-pricing-intro">

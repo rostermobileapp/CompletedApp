@@ -96,8 +96,6 @@
 .rs-white .rs-display,.rs-pricing .rs-display,.rs-about .rs-display,.rs-partners .rs-display { color:#f1f7fd; }
 .rs-platform { display:grid;grid-template-columns:1fr .86fr;gap:8vw;align-items:center; }
 .rs-platform > img { width:100%;display:block;mix-blend-mode:normal;padding:14px;border:1px solid rgba(151,195,236,.2);border-radius:22px;background:linear-gradient(145deg,#193958,#10243a);box-shadow:0 30px 75px rgba(0,0,0,.35),inset 0 1px rgba(255,255,255,.08); }
-.rs-platform-list { display:grid;gap:10px;margin-top:30px; }
-.rs-platform-list div { border:1px solid rgba(151,195,236,.13);border-left:3px solid #4c9aff;border-radius:8px;padding:15px 17px;background:rgba(18,43,68,.74);font-size:13px;font-weight:600;color:#d8e7f5;box-shadow:0 8px 22px rgba(0,0,0,.12); }
 .rs-pricing { background:radial-gradient(ellipse at 13% 52%,rgba(39,107,174,.19),transparent 38%),#09192b;color:#edf5fc; }
 .rs-pricing-layout { display:grid;grid-template-columns:.9fr 1.1fr;gap:9vw;align-items:center; }
 .rs-pricing .rs-display { font-size:clamp(58px,7vw,88px); }
