@@ -142,7 +142,6 @@ function ScrollStory() {
           <a href="#start" onClick={(e) => { e.preventDefault(); setMenuOpen(false); jumpTo("start"); }}>Get started</a>
         </nav>}
       </header>
-
       <section className="rs-hero" id="top">
         <img
           className="rs-hero-photo"
@@ -160,9 +159,8 @@ function ScrollStory() {
         <a className="rs-sr-only" href="#team">Scroll to the story</a>
         <span className="rs-eyebrow" aria-hidden="true" style={{ marginTop: 15 }}>Keep the good part going <ArrowDown size={13} /></span>
       </section>
-
       <section className="rs-story-scene" id="team">
-        <div className="rs-section rs-story">
+        <div className="rs-section rs-story bg-[#000000]">
         <div className="rs-story-copy">
           <div className="rs-section-kicker">The old routine</div>
           <h2 className="rs-display">Hockey has enough moving parts.</h2>
@@ -178,7 +176,6 @@ function ScrollStory() {
         </div>
         </div>
       </section>
-
       <section className="rs-section rs-pricing" id="pricing">
         <div className="rs-section-inner rs-pricing-layout">
           <div className="rs-pricing-intro">
@@ -205,7 +202,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-
       <section className="rs-section rs-about" id="about">
         <div className="rs-section-inner rs-about-layout">
           <div>
@@ -219,7 +215,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-
       <section className="rs-section rs-product-band">
         <div className="rs-section-inner">
           <div className="rs-product-top">
@@ -232,7 +227,6 @@ function ScrollStory() {
           <img className="rs-product-image" src={image("scorekeeper-preview.png")} alt="Roster in-game scorekeeping screen" />
         </div>
       </section>
-
       <div className="rs-benefit-scene" ref={benefitRef}>
       <section className="rs-section rs-benefit" aria-label="What the team gets back">
         <div className="rs-section-inner rs-benefit-inner">
@@ -249,7 +243,6 @@ function ScrollStory() {
         </div>
       </section>
       </div>
-
       <section className="rs-section rs-patches" id="patches">
         <div className="rs-patches-head">
           <div className="rs-section-kicker">A little friendly bragging rights</div>
@@ -265,7 +258,6 @@ function ScrollStory() {
         </div>)}
         <p className="rs-patch-note">The gallery is illustrative; real Trophy Case artwork is part of paid access.</p>
       </section>
-
       <section className="rs-section rs-trivia" id="trivia">
         <div className="rs-section-inner rs-trivia-grid">
           <div>
@@ -284,7 +276,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-
       <section className="rs-gallery" aria-label="More Roster app screens">
         <div className="rs-gallery-head">
           <div className="rs-section-kicker">Made for the whole bench</div>
@@ -297,7 +288,6 @@ function ScrollStory() {
           </article>)}
         </div>
       </section>
-
       <section className="rs-section rs-white" aria-label="Seasonal bonus">
         <div className="rs-section-inner rs-platform">
           <div>
@@ -312,7 +302,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-
       <section className="rs-section rs-partners" id="partners">
         <div className="rs-section-inner rs-partners-layout">
           <div>
@@ -325,7 +314,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-
       <section className="rs-section rs-final" id="start">
         <div className="rs-section-inner">
           <div className="rs-eyebrow">Built for hockey. Ad-free. Always.</div>
