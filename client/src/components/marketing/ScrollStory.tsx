@@ -202,18 +202,6 @@ function ScrollStory() {
           </div>
         </div>
       </section>
-      <section className="rs-section rs-product-band">
-        <div className="rs-section-inner">
-          <div className="rs-product-top">
-            <div>
-              <div className="rs-section-kicker">A better bench-to-bench rhythm</div>
-              <h2 className="rs-display">Run the team.<br />Not the group chat.</h2>
-            </div>
-            <p className="rs-copy">From the first RSVP to the final score, give every teammate the same clear view of what’s happening next.</p>
-          </div>
-          <img className="rs-product-image" src={image("scorekeeper-preview.png")} alt="Roster in-game scorekeeping screen" />
-        </div>
-      </section>
       <div className="rs-benefit-scene" ref={benefitRef}>
       <section className="rs-section rs-benefit" aria-label="What the team gets back">
         <div className="rs-section-inner rs-benefit-inner">

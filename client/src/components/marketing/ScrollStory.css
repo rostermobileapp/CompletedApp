@@ -110,10 +110,6 @@
 .rs-pricing-note { margin:3px 3px 0;color:#8fa9c1;font-size:11px;line-height:1.6; }
 .rs-partners-layout { display:grid;grid-template-columns:1fr 1fr;gap:8vw;align-items:center; }
 .rs-partners .rs-display { margin-top:18px; }
-.rs-product-band { background:#0d2036;min-height:800px;overflow:hidden; }
-.rs-product-top { display:flex;justify-content:space-between;gap:40px;align-items:end;margin-bottom:42px; }
-.rs-product-top .rs-copy { max-width:390px; }
-.rs-product-image { width:min(1120px,110%);margin-left:-3%;display:block;filter:drop-shadow(0 34px 44px rgba(0,0,0,.3)); }
 .rs-benefit { position:sticky;top:0;min-height:100svh;display:flex;align-items:center;background:#071629;overflow:hidden; }
 .rs-benefit-scene { min-height:180svh;background:#071629; }
 .rs-benefit:after { content:"";position:absolute;width:56vw;height:56vw;border:1px solid rgba(83,147,208,.15);border-radius:50%;right:-12vw;top:10%;box-shadow:0 0 0 70px rgba(83,147,208,.025),0 0 0 140px rgba(83,147,208,.02);pointer-events:none; }
@@ -197,10 +193,6 @@
   .rs-display { font-size:clamp(58px,15vw,84px); }
   .rs-split-art { margin:0 5px; }
   .rs-platform img { order:-1; }
-  .rs-product-band { min-height:unset; }
-  .rs-product-top { display:block; }
-  .rs-product-top .rs-copy { margin-top:20px; }
-  .rs-product-image { width:135%;max-width:none;margin-left:-17%; }
   .rs-benefit { position:relative;min-height:unset; }
   .rs-benefit:after { width:100vw;height:100vw;right:-55vw; }
   .rs-feature-art { margin:0 12px; }
