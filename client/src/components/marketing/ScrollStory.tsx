@@ -175,7 +175,6 @@ function ScrollStory() {
         </div>
         <div className="rs-split-art">
           <img src={image("features-phones.png")} alt="Roster app screens for organizing a team" />
-          <div className="rs-caption">One app. Your team. Back to hockey.</div>
         </div>
         </div>
       </section>

@@ -89,7 +89,6 @@
 .rs-feature-list li { border:1px solid rgba(151,195,236,.2);border-left:3px solid #4c9aff;border-radius:11px;padding:18px 21px;background:rgba(18,43,68,.78);font-size:14px;font-weight:600;line-height:1.45;color:#d8e7f5; }
 .rs-split-art { grid-column:1 / -1;grid-row:1;position:relative;z-index:0;width:calc(100% - 8vw);justify-self:end;align-self:center; }
 .rs-split-art img { width:100%;display:block;border-radius:18px;transform:rotate(2deg);filter:drop-shadow(0 35px 45px rgba(0,0,0,.35));mask-image:linear-gradient(90deg,transparent 0%,transparent 25%,#000 60%);-webkit-mask-image:linear-gradient(90deg,transparent 0%,transparent 25%,#000 60%); }
-.rs-caption { position:absolute;left:auto;right:1%;bottom:8%;background:#163553;border:1px solid #35628b;border-radius:12px;padding:14px 17px;font-size:12px;color:#d5e8fa; }
 .rs-white { background:radial-gradient(ellipse at 82% 48%,rgba(38,109,179,.16),transparent 38%),#0b1b2e;color:#edf5fc; }
 .rs-white .rs-section-kicker,.rs-pricing .rs-section-kicker,.rs-about .rs-section-kicker,.rs-partners .rs-section-kicker { color:#86beff; }
 .rs-white .rs-copy,.rs-pricing .rs-copy,.rs-about .rs-copy,.rs-partners .rs-copy { color:#a9bdd1; }
@@ -202,7 +201,6 @@
   .rs-patches-head { padding-inline:24px; }
   .rs-display { font-size:clamp(58px,15vw,84px); }
   .rs-split-art { margin:0 5px; }
-  .rs-caption { left:auto;right:1%; }
   .rs-platform img { order:-1; }
   .rs-product-band { min-height:unset; }
   .rs-product-top { display:block; }
