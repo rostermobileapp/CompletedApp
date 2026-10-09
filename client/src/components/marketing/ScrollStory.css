@@ -85,9 +85,8 @@
 .rs-display { font-size:clamp(54px,7vw,94px);margin:18px 0 23px; }
 .rs-story-copy > .rs-display { letter-spacing:.01em;line-height:1.02; }
 .rs-copy { font-size:17px;line-height:1.8;color:#a7bbd0; }
-.rs-pain-list { margin:28px 0 0;padding:0;list-style:none;display:grid;gap:13px;color:#96abc1; }
-.rs-pain-list li { display:flex;align-items:center;gap:12px; }
-.rs-pain-list li:before { content:"";width:6px;height:6px;border-radius:50%;background:#5284b8; }
+.rs-feature-list { margin:28px 0 0;padding:0;list-style:none;display:grid;gap:12px; }
+.rs-feature-list li { border:1px solid rgba(151,195,236,.2);border-left:3px solid #4c9aff;border-radius:11px;padding:18px 21px;background:rgba(18,43,68,.78);font-size:14px;font-weight:600;line-height:1.45;color:#d8e7f5; }
 .rs-split-art { position:relative; }
 .rs-split-art img { width:100%;display:block;border-radius:18px; transform:rotate(2deg);filter:drop-shadow(0 35px 45px rgba(0,0,0,.35)); }
 .rs-caption { position:absolute;left:-26px;bottom:8%;background:#163553;border:1px solid #35628b;border-radius:12px;padding:14px 17px;font-size:12px;color:#d5e8fa; }

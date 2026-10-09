@@ -167,10 +167,10 @@ function ScrollStory() {
           <div className="rs-section-kicker">The old routine</div>
           <h2 className="rs-display">Hockey has enough moving parts.</h2>
           <p className="rs-copy">A real management toolkit for teams who want to spend less time coordinating and more time playing. Schedules, RSVPs, roster, stats, payments, messaging and smart brackets work together—without ads.</p>
-          <ul className="rs-pain-list">
-            <li>Endless group texts that go nowhere</li>
-            <li>Half-baked spreadsheets nobody updates</li>
-            <li>Email chains from 2018</li>
+          <ul className="rs-feature-list">
+            <li>Team schedules, attendance and player subs</li>
+            <li>Stats, scorekeeping, standings and tournaments</li>
+            <li>Payments, expenses, messaging and team updates</li>
           </ul>
         </div>
         <div className="rs-split-art">
