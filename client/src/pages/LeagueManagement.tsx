@@ -3413,7 +3413,7 @@ export default function LeagueManagement() {
                 <Users className="w-5 h-5 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">Players</h3>
               </div>
-              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end text-center">
                 <LeaguePlayerMerge leagueId={leagueId} />
                 <button
                   onClick={() => { setExistingUserSearch(''); setShowAddExistingUser(true); }}
@@ -6760,7 +6760,6 @@ export default function LeagueManagement() {
           }}
         />
       )}
-
       {/* Post-Season Draft Prompt */}
       {showDraftAfterSeasonPrompt && selectedSeasonId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[55] p-4">
@@ -6795,7 +6794,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Edit Game Modal */}
       {showEditGame && selectedGame && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -7924,7 +7922,7 @@ export default function LeagueManagement() {
                         
                         setIsReplacingInApproval(true);
                         try {
-                          if (!await confirmPlayerReplacement(leagueId, selectedPlaceholder.userId, selectedMember.userId)) return;
+                          if (!(await confirmPlayerReplacement(leagueId, selectedPlaceholder.userId, selectedMember.userId))) return;
                           const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
                             placeholderUserId: selectedPlaceholder.userId,
                             newUserId: selectedMember.userId,
@@ -8470,7 +8468,7 @@ export default function LeagueManagement() {
                       
                       setIsReplacingPlayer(true);
                       try {
-                        if (!await confirmPlayerReplacement(leagueId, selectedPlayerToReplace.userId, replaceTargetUserId)) return;
+                        if (!(await confirmPlayerReplacement(leagueId, selectedPlayerToReplace.userId, replaceTargetUserId))) return;
                         const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
                           placeholderUserId: selectedPlayerToReplace.userId,
                           newUserId: replaceTargetUserId,
@@ -8593,7 +8591,6 @@ export default function LeagueManagement() {
         onOpenChange={setShowDesktopRequiredSeason}
         description={DESKTOP_REQUIRED_COPY.season}
       />
-
       <AlertDialog
         open={!!seasonToDelete}
         onOpenChange={(open) => {
@@ -8626,7 +8623,6 @@ export default function LeagueManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <AlertDialog
         open={showResetDraftConfirm}
         onOpenChange={(open) => { if (!open) setShowResetDraftConfirm(false); }}
