@@ -3340,7 +3340,7 @@ export default function LeagueManagement() {
             {/* Draft call-to-action: visible until the draft is completed.
                 Requires ≥2 teams so the wizard can build a proper draft order. */}
             {selectedSeasonId && teams.length >= 2 && isDraftEnabled(league?.uniqueLeagueId || leagueId) && (!existingDraft || existingDraft.status !== 'completed') && (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm pt-[0px] pb-[0px]">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Crown className="w-4 h-4 text-primary shrink-0" />
                   <span>
