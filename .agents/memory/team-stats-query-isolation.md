@@ -7,7 +7,7 @@ Team roster stats must use a cache key distinct from league-wide stats, even whe
 
 **Why:** The Teams page and TeamView previously shared a key while calling different endpoints, so opposing roster cards had no matching stats despite a valid stats API.
 
-**How to apply:** Use a team-id-specific key for `/api/teams/:id/stats`; allow free users to query their own team only, and require premium or commissioner access for opponent-team stats.
+**How to apply:** Use a team-id-specific key for `/api/teams/:id/stats`; allow free users to query their own team only, and require premium or commissioner access for opponent-team stats. On My Team, keep the league-stats query for leader summaries separate from roster stats: roster rows need the team endpoint's completed-attendance fallback.
 
 The endpoint must also be exercised when a team has placeholder players. Correlated placeholder queries should use explicit table aliases; otherwise the SQL driver can emit an ambiguous `id` error and fail the entire stats response, including registered players.
 

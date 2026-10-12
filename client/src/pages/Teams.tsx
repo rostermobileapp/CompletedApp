@@ -328,6 +328,18 @@ export default function Teams() {
     enabled: !!currentTeam?.leagueId && !!teamMembers && teamMembers.length > 0,
   });
 
+  // Use the team-roster endpoint for roster rows. It includes completed-game
+  // attendance when older player_stats rows have stale gamesPlayed values.
+  const { data: rosterStats = [] } = useQuery({
+    queryKey: ['/api/teams', currentTeam?.id, 'stats', 'roster', teamMembers?.length],
+    queryFn: async () => {
+      if (!currentTeam?.id || !teamMembers || teamMembers.length === 0) return [];
+      const response = await apiRequest('GET', `/api/teams/${currentTeam.id}/stats`);
+      return response.json();
+    },
+    enabled: !!currentTeam?.id && !!teamMembers && teamMembers.length > 0,
+  });
+
   // Effective league id for season/standings queries — use the selected
   // league directly when a league is in scope (currentTeam may be null).
   const teamsPageLeagueId = currentTeam?.leagueId ?? selectedLeagueId ?? null;
@@ -894,7 +906,7 @@ export default function Teams() {
                   isTeamCaptain={canManageLines}
                   teamMembers={teamMembers}
                   beverageDutyCounts={leagueGamesLoading || leagueGamesError ? null : beverageDutyCounts}
-                  rosterStats={teamStats}
+                  rosterStats={rosterStats}
                   rosterPresentation="team-details"
                   leagueId={currentTeam?.leagueId ?? null}
                   seasonId={currentTeam?.seasonId ?? null}
