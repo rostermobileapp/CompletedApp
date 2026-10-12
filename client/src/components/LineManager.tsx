@@ -823,11 +823,7 @@ export function LineManager({
                     return (
                       <div
                         key={member.id || playerId}
-                        className={`flex items-center justify-between ${
-                          isTeamDetailsLayout
-                            ? 'gap-2 p-3 rounded-lg border bg-card hover:bg-accent'
-                            : 'pr-2 rounded-full bg-card hairline elev-rest overflow-hidden hover:bg-muted/50'
-                        } transition-colors${!isPlaceholder && playerId ? ' cursor-pointer' : ''}`}
+                        className="flex items-center justify-between gap-2 p-3 rounded-lg border bg-card hover:bg-accent transition-colors cursor-pointer pt-[4px] pb-[4px]"
                         data-testid={`roster-player-${playerId}`}
                         onClick={!isPlaceholder && playerId ? () => {
                           setActionSheetPlayer({ userId: playerId, firstName: memberFirstName, lastName: memberLastName, profileImageUrl });
