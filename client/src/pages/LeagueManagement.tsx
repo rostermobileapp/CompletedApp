@@ -3408,7 +3408,7 @@ export default function LeagueManagement() {
             )}
 
             {/* Simple Import Button */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-[4px]">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">Players</h3>
