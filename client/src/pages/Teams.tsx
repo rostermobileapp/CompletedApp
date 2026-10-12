@@ -790,7 +790,7 @@ export default function Teams() {
                 </Card>
 
                 {/* Team Standings */}
-                <Card className="rounded-lg hairline elev-rest text-card-foreground bg-[#e2e2e2] dark:bg-[#212121]">
+                <Card className="rounded-lg hairline elev-rest text-card-foreground bg-[#e2e2e2] dark:bg-[#212121] mt-[12px]">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[5px] pb-[5px]">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-2xl font-semibold leading-none tracking-tight">League Standing</CardTitle>
