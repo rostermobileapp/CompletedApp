@@ -295,8 +295,7 @@ export default function TeamView() {
           <h1 className="text-xl font-semibold" data-testid="text-team-view-title">Team Details</h1>
         </div>
       </div>
-
-      <div className="w-full px-4 py-6 space-y-6">
+      <div className="w-full px-4 py-6 space-y-6 pt-[4px] pb-[4px]">
         <Card>
           <CardHeader className="flex flex-col space-y-1.5 p-6 bg-[#e2e2e2] dark:bg-[#212121] pl-[12px] pr-[12px] pt-[4px] pb-[4px]">
             <div className="flex items-center gap-4">
@@ -502,7 +501,6 @@ export default function TeamView() {
           </CardContent>
         </Card>
       </div>
-
       {/* Player profile preview */}
       <ProfilePhotoPreview
         isOpen={!!previewPlayer}
