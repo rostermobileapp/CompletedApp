@@ -445,7 +445,7 @@ export default function TeamView() {
                   return (
                     <div 
                       key={member.id} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-card border hover:bg-accent transition-colors cursor-pointer"
+                      className="flex items-center justify-between p-3 rounded-lg bg-card border hover:bg-accent transition-colors cursor-pointer pt-[4px] pb-[4px]"
                       data-testid={`roster-member-${member.id}`}
                       onClick={() => {
                         if (!memberId) return;
