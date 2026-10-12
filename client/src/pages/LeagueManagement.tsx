@@ -681,6 +681,8 @@ export default function LeagueManagement() {
   
   // Manual player add state
   const [showManualAddPlayer, setShowManualAddPlayer] = useState(false);
+  const [showAddExistingUser, setShowAddExistingUser] = useState(false);
+  const [existingUserSearch, setExistingUserSearch] = useState('');
   const [manualPlayerForm, setManualPlayerForm] = useState({
     firstName: '',
     lastName: '',
@@ -708,11 +710,6 @@ export default function LeagueManagement() {
   const [scoresImportSeasonId, setScoresImportSeasonId] = useState('');
   const [scoresImportResult, setScoresImportResult] = useState<{ updated: number; warnings: string[]; errors: string[]; total: number } | null>(null);
   const scoresFileInputRef = React.useRef<HTMLInputElement>(null);
-  
-  // Games list scroll refs
-  const gamesListDesktopRef = React.useRef<HTMLDivElement>(null);
-  const gamesListMobileRef = React.useRef<HTMLDivElement>(null);
-  const [hasScrolledToNextGame, setHasScrolledToNextGame] = useState(false);
   
   // Approval modal state
   const [selectedMember, setSelectedMember] = useState<LeagueMember | null>(null);
@@ -1145,63 +1142,6 @@ export default function LeagueManagement() {
     });
   }, [allGamesData, selectedSeasonId, firstCreatedSeasonId]);
 
-  // Reset scroll state when switching to list view
-  useEffect(() => {
-    if (gamesViewMode === 'list') {
-      setHasScrolledToNextGame(false);
-    }
-  }, [gamesViewMode]);
-
-  // Auto-scroll to next upcoming game when list view is shown or on mobile
-  useEffect(() => {
-    if (games.length === 0) return;
-    
-    // For desktop, only scroll when in list mode
-    // For mobile, always scroll (mobile always shows list)
-    const isMobile = window.innerWidth < 768;
-    if (!isMobile && gamesViewMode !== 'list') return;
-    if (hasScrolledToNextGame) return;
-    
-    const now = new Date();
-    const sortedGames = [...games].sort((a, b) => 
-      new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
-    );
-    
-    // Find the first game that is today or in the future
-    const nextGameIndex = sortedGames.findIndex(game => {
-      const gameDate = new Date(game.scheduledAt);
-      return gameDate >= now;
-    });
-    
-    if (nextGameIndex >= 0) {
-      const nextGame = sortedGames[nextGameIndex];
-      
-      // Small delay to ensure DOM is rendered
-      setTimeout(() => {
-        // Try desktop container first (only visible on desktop in list view)
-        const desktopContainer = gamesListDesktopRef.current;
-        if (desktopContainer && desktopContainer.offsetParent !== null) {
-          const gameRow = desktopContainer.querySelector(`[data-game-id="${nextGame.id}"]`);
-          if (gameRow) {
-            gameRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setHasScrolledToNextGame(true);
-            return;
-          }
-        }
-        
-        // Try mobile container (always visible on mobile)
-        const mobileContainer = gamesListMobileRef.current;
-        if (mobileContainer && mobileContainer.offsetParent !== null) {
-          const gameCard = mobileContainer.querySelector(`[data-game-id="${nextGame.id}"]`);
-          if (gameCard) {
-            gameCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setHasScrolledToNextGame(true);
-          }
-        }
-      }, 300);
-    }
-  }, [gamesViewMode, games, hasScrolledToNextGame]);
-  
   // Centralized commissioner check (after league query)
   const isCommissioner = React.useMemo(() => {
     return Boolean(league && user && league.commissionerId === user.id);
@@ -2154,6 +2094,44 @@ export default function LeagueManagement() {
         description: 'Please try again.',
         variant: 'destructive',
       });
+    },
+  });
+
+  const {
+    data: existingUserResults = [],
+    isFetching: existingUserSearchLoading,
+    isError: existingUserSearchError,
+  } = useQuery<any[]>({
+    queryKey: ['/api/users/search', 'league-add', existingUserSearch],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/users/search?q=${encodeURIComponent(existingUserSearch.trim())}`);
+      if (!response.ok) throw new Error('Failed to search users');
+      return response.json();
+    },
+    enabled: showAddExistingUser && existingUserSearch.trim().length >= 2,
+  });
+
+  const addExistingMemberMutation = useMutation({
+    mutationFn: async (targetUserId: string) => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/members/add-existing`, { userId: targetUserId });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add user to league');
+      }
+      return response.json();
+    },
+    onSuccess: (_membership, targetUserId) => {
+      const target = existingUserResults.find((candidate) => candidate.id === targetUserId);
+      const name = target ? `${target.firstName || ''} ${target.lastName || ''}`.trim() : 'The user';
+      toast({ title: 'User added to league', description: `${name} can now access the league.` });
+      setShowAddExistingUser(false);
+      setExistingUserSearch('');
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'pending-members'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Could not add user', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -3355,7 +3333,7 @@ export default function LeagueManagement() {
         </div>
       </div>
       {/* Tab Content */}
-      <div className="px-6 flex-1">
+      <div className="px-3 sm:px-6 flex-1">
         {/* Player Management Tab */}
         {activeTab === 'players' && (
           <div className="space-y-6">
@@ -3430,13 +3408,21 @@ export default function LeagueManagement() {
             )}
 
             {/* Simple Import Button */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">Players</h3>
               </div>
-              <div className="flex gap-2">
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
                 <LeaguePlayerMerge leagueId={leagueId} />
+                <button
+                  onClick={() => { setExistingUserSearch(''); setShowAddExistingUser(true); }}
+                  className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
+                  data-testid="button-add-existing-user"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  Add Existing User
+                </button>
                 <button
                   onClick={() => setShowBulkImport(!showBulkImport)}
                   disabled={seasons.length === 0}
@@ -3458,11 +3444,74 @@ export default function LeagueManagement() {
               </div>
             </div>
 
+            {showAddExistingUser && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl bg-card p-5 shadow-xl">
+                  <div className="mb-3">
+                    <h3 className="text-lg font-semibold">Add Existing User</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Search registered users and add one directly. This does not send an invitation message.
+                    </p>
+                  </div>
+                  <Input
+                    value={existingUserSearch}
+                    onChange={(event) => setExistingUserSearch(event.target.value)}
+                    placeholder="Search by name or email..."
+                    className="mb-3"
+                    autoFocus
+                    data-testid="input-add-existing-user-search"
+                  />
+                  <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+                    {existingUserSearch.trim().length < 2 && (
+                      <p className="py-4 text-center text-sm text-muted-foreground">Enter at least 2 characters to search.</p>
+                    )}
+                    {existingUserSearchLoading && <p className="py-4 text-center text-sm text-muted-foreground">Searching users…</p>}
+                    {existingUserSearchError && <p className="py-4 text-center text-sm text-destructive">Could not search users. Try again.</p>}
+                    {!existingUserSearchLoading && !existingUserSearchError && existingUserSearch.trim().length >= 2 && existingUserResults.length === 0 && (
+                      <p className="py-4 text-center text-sm text-muted-foreground">No users found.</p>
+                    )}
+                    {existingUserResults.map((candidate) => {
+                      const alreadyInLeague =
+                        members.some((member) => member.userId === candidate.id) ||
+                        pendingMembers.some((member: any) => member.userId === candidate.id || member.user?.id === candidate.id);
+                      return (
+                        <div key={candidate.id} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border p-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">
+                              {[candidate.firstName, candidate.lastName].filter(Boolean).join(' ') || candidate.email}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">{candidate.email}</p>
+                          </div>
+                          <button
+                            onClick={() => addExistingMemberMutation.mutate(candidate.id)}
+                            disabled={alreadyInLeague || addExistingMemberMutation.isPending}
+                            className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                            data-testid={`button-add-existing-user-${candidate.id}`}
+                          >
+                            {alreadyInLeague ? 'Already added' : addExistingMemberMutation.isPending ? 'Adding…' : 'Add'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={() => setShowAddExistingUser(false)}
+                      className="rounded-md border border-border px-4 py-2 text-sm hover:bg-muted"
+                      data-testid="button-close-add-existing-user"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {seasons.length === 0 && (
               <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
                 <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <p className="text-sm text-amber-700 dark:text-amber-400 flex-1">
-                  A season is required before importing or adding players.
+                  A season is required before importing players or adding a player manually.
                 </p>
                 <button
                   onClick={openNewSeasonWizard}
@@ -3931,7 +3980,7 @@ export default function LeagueManagement() {
 
             {/* Approved Members */}
             <div className="bg-card rounded-xl hairline elev-rest p-6">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <UserCheck className="w-5 h-5 text-green-500/50" />
                   <h3 className="text-lg font-semibold">League Members ({commissionerDisplayMembers.length})</h3>
@@ -4987,7 +5036,7 @@ export default function LeagueManagement() {
                         setShowEditGame(true);
                       }} />
                     ) : (
-                      <div ref={gamesListDesktopRef} className="max-h-[600px] overflow-y-auto border rounded-lg">
+                  <div className="max-h-[600px] overflow-y-auto border rounded-lg">
                         <table className="w-full">
                           <thead className="bg-muted/50 sticky top-0 z-10">
                             <tr>
@@ -5107,7 +5156,7 @@ export default function LeagueManagement() {
 
                   {/* Mobile: Always show list view with scrolling and sorting */}
                   <div className="md:hidden">
-                    <div ref={gamesListMobileRef} className="max-h-[600px] overflow-y-auto space-y-3 border rounded-lg p-2">
+                    <div className="max-h-[600px] overflow-y-auto space-y-3 border rounded-lg p-2">
                       {(() => {
                         // Sort games by date (chronological order)
                         const sortedGames = [...games].sort((a, b) => {

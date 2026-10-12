@@ -15447,6 +15447,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add an existing account directly to a league without sending an invite.
+  app.post('/api/leagues/:leagueId/members/add-existing', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const commissionerId = req.user.claims.sub;
+      const targetUserId = req.body?.userId;
+      if (typeof targetUserId !== 'string' || !targetUserId) {
+        return res.status(400).json({ message: 'Choose a registered user to add' });
+      }
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== commissionerId) {
+        return res.status(403).json({ message: 'Only commissioners can add players' });
+      }
+
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser || targetUser.deletedAt) {
+        return res.status(404).json({ message: 'Registered user not found' });
+      }
+
+      let membership = await storage.getUserLeagueMembership(targetUserId, leagueId);
+      if (membership?.status === 'approved') {
+        return res.status(409).json({ message: 'This user is already in the league' });
+      }
+      if (!membership) {
+        membership = await storage.requestLeagueMembership({
+          leagueId,
+          userId: targetUserId,
+          displayFirstName: targetUser.firstName || undefined,
+          displayLastName: targetUser.lastName || undefined,
+        });
+      }
+
+      const approvedMembership = membership.status === 'approved'
+        ? membership
+        : await storage.approveLeagueMembership(membership.id, commissionerId);
+      res.status(201).json(approvedMembership);
+    } catch (error) {
+      console.error('Error adding existing user to league:', error);
+      res.status(500).json({ message: 'Failed to add user to league' });
+    }
+  });
+
   // Sync (or create) team group chats for every team in a league.
   // Commissioners can call this to repair missing or stale team chats.
   app.post('/api/leagues/:leagueId/sync-team-chats', isAuthenticated, async (req: any, res) => {
