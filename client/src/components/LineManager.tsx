@@ -265,6 +265,8 @@ interface LineManagerProps {
   isTeamCaptain: boolean;
   teamMembers: any[];
   beverageDutyCounts?: Record<string, number> | null;
+  rosterStats?: any[];
+  rosterPresentation?: 'compact' | 'team-details';
   leagueId?: string | null;
   seasonId?: string | null;
 }
@@ -273,7 +275,16 @@ interface LineManagerProps {
 // Main component
 // ─────────────────────────────────────────────────────────────
 
-export function LineManager({ teamId, isTeamCaptain, teamMembers, beverageDutyCounts, leagueId, seasonId }: LineManagerProps) {
+export function LineManager({
+  teamId,
+  isTeamCaptain,
+  teamMembers,
+  beverageDutyCounts,
+  rosterStats = [],
+  rosterPresentation = 'compact',
+  leagueId,
+  seasonId,
+}: LineManagerProps) {
   const { toast } = useToast();
 
   // ── View toggle ───────────────────────────────────────────────
@@ -772,7 +783,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, beverageDutyCo
                   <Coffee className="mr-1 h-3 w-3" aria-hidden="true" />
                   Recorded beverage duties
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={rosterPresentation === 'team-details' ? 'space-y-2' : 'grid grid-cols-2 gap-2'}>
                   {sortedMembers.map((member: any) => {
                     const memberFirstName  = member.displayFirstName || member.user?.firstName || '';
                     const memberLastName   = member.displayLastName  || member.user?.lastName  || '';
@@ -782,19 +793,26 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, beverageDutyCo
                     const profileImageUrl  = member.user?.profileImageUrl;
                     const playerId         = member.user?.id || member.userId;
                     const streak           = !isPlaceholder && playerId ? streaksData?.streaks?.[playerId] : undefined;
+                    const memberStats = playerId
+                      ? rosterStats.find((stat: any) => String(stat.userId ?? stat.user?.id) === String(playerId))
+                      : undefined;
                     const beverageDutyCount = !isPlaceholder && playerId && beverageDutyCounts
                       ? beverageDutyCounts[playerId] || 0
                       : null;
+                    const isTeamDetailsLayout = rosterPresentation === 'team-details';
 
                     const nameContent = (
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className={`flex items-center gap-2 min-w-0${isTeamDetailsLayout ? ' flex-wrap' : ''}`}>
                         {memberJerseyNumber !== null && memberJerseyNumber !== undefined && (
                           <span className="text-xs font-bold text-muted-foreground shrink-0">
                             #{memberJerseyNumber}
+                            {isTeamDetailsLayout && member.position ? ` · ${member.position}` : ''}
                           </span>
                         )}
-                        <span className="text-sm font-medium truncate">
-                          {memberLastName}{memberFirstName ? `, ${memberFirstName.charAt(0)}.` : ''}
+                        <span className={`${isTeamDetailsLayout ? 'font-medium' : 'text-sm font-medium'} truncate`}>
+                          {isTeamDetailsLayout
+                            ? `${memberFirstName || 'Unknown'} ${memberLastName || 'Player'}`
+                            : `${memberLastName}${memberFirstName ? `, ${memberFirstName.charAt(0)}.` : ''}`}
                         </span>
                         {isCaptain && <span className="text-warning font-bold text-xs shrink-0">C</span>}
                         {streak === 'HOT'  && <Flame    className="w-3 h-3 text-orange-500 shrink-0" />}
@@ -805,7 +823,11 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, beverageDutyCo
                     return (
                       <div
                         key={member.id || playerId}
-                        className={`flex items-center pr-2 rounded-full hover:bg-muted/50 transition-colors bg-card hairline elev-rest overflow-hidden${!isPlaceholder && playerId ? ' cursor-pointer' : ''}`}
+                        className={`flex items-center justify-between ${
+                          isTeamDetailsLayout
+                            ? 'gap-2 p-3 rounded-lg border bg-card hover:bg-accent'
+                            : 'pr-2 rounded-full bg-card hairline elev-rest overflow-hidden hover:bg-muted/50'
+                        } transition-colors${!isPlaceholder && playerId ? ' cursor-pointer' : ''}`}
                         data-testid={`roster-player-${playerId}`}
                         onClick={!isPlaceholder && playerId ? () => {
                           setActionSheetPlayer({ userId: playerId, firstName: memberFirstName, lastName: memberLastName, profileImageUrl });
@@ -818,7 +840,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, beverageDutyCo
                         style={{ touchAction: 'manipulation' }}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Avatar className="!h-[45px] !w-[45px] shrink-0">
+                          <Avatar className={`${isTeamDetailsLayout ? 'h-10 w-10' : '!h-[45px] !w-[45px]'} shrink-0`}>
                             <AvatarImage src={getImageUrl(profileImageUrl) ?? undefined} alt={memberFirstName || 'Player'} />
                             <AvatarFallback>
                               <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
@@ -845,7 +867,34 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, beverageDutyCo
                             <div className="flex items-center gap-2 min-w-0 flex-1">{nameContent}</div>
                           )}
                         </div>
-                        {!isPlaceholder && playerId && (
+                        {isTeamDetailsLayout ? (
+                          <div className="min-w-0 shrink-0 whitespace-nowrap text-right text-sm">
+                            {memberStats && (
+                              <p className="font-medium">
+                                {memberStats.gamesPlayed || 0} GP · {memberStats.goals || 0}G {memberStats.assists || 0}A
+                              </p>
+                            )}
+                            <div className="flex items-center justify-end gap-2">
+                              {memberStats && <span className="text-muted-foreground">{memberStats.points || 0} pts</span>}
+                              {!isPlaceholder && playerId && (
+                                <span
+                                  role="img"
+                                  aria-label={beverageDutyCount === null
+                                    ? 'Recorded beverage duty count unavailable'
+                                    : `Recorded beverage duties: ${beverageDutyCount}`}
+                                  title={beverageDutyCount === null
+                                    ? 'Recorded beverage duty count unavailable'
+                                    : `Recorded beverage duties: ${beverageDutyCount}`}
+                                  className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground"
+                                  data-testid={`roster-beverage-duty-count-${playerId}`}
+                                >
+                                  <Coffee className="h-3 w-3" aria-hidden="true" />
+                                  {beverageDutyCount ?? '—'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : !isPlaceholder && playerId && (
                           <span
                             role="img"
                             aria-label={beverageDutyCount === null

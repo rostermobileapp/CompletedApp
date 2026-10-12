@@ -894,6 +894,8 @@ export default function Teams() {
                   isTeamCaptain={canManageLines}
                   teamMembers={teamMembers}
                   beverageDutyCounts={leagueGamesLoading || leagueGamesError ? null : beverageDutyCounts}
+                  rosterStats={teamStats}
+                  rosterPresentation="team-details"
                   leagueId={currentTeam?.leagueId ?? null}
                   seasonId={currentTeam?.seasonId ?? null}
                 />
