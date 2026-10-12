@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
-  Users, UserPlus, Plus, Upload, Clock,
+  Users, UserPlus, Plus, Upload, Clock, Coffee,
   Flame, Snowflake, X, Save, TrendingUp, Minus, UserRound,
 } from 'lucide-react';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
@@ -264,6 +264,7 @@ interface LineManagerProps {
   teamId: string;
   isTeamCaptain: boolean;
   teamMembers: any[];
+  beverageDutyCounts?: Record<string, number> | null;
   leagueId?: string | null;
   seasonId?: string | null;
 }
@@ -272,7 +273,7 @@ interface LineManagerProps {
 // Main component
 // ─────────────────────────────────────────────────────────────
 
-export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seasonId }: LineManagerProps) {
+export function LineManager({ teamId, isTeamCaptain, teamMembers, beverageDutyCounts, leagueId, seasonId }: LineManagerProps) {
   const { toast } = useToast();
 
   // ── View toggle ───────────────────────────────────────────────
@@ -766,6 +767,11 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   <p className="text-sm">No players on this roster yet.</p>
                 </div>
               ) : (
+                <>
+                <div className="mb-1.5 flex justify-end pr-2 text-[10px] font-medium text-muted-foreground">
+                  <Coffee className="mr-1 h-3 w-3" aria-hidden="true" />
+                  Recorded beverage duties
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   {sortedMembers.map((member: any) => {
                     const memberFirstName  = member.displayFirstName || member.user?.firstName || '';
@@ -776,6 +782,9 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                     const profileImageUrl  = member.user?.profileImageUrl;
                     const playerId         = member.user?.id || member.userId;
                     const streak           = !isPlaceholder && playerId ? streaksData?.streaks?.[playerId] : undefined;
+                    const beverageDutyCount = !isPlaceholder && playerId && beverageDutyCounts
+                      ? beverageDutyCounts[playerId] || 0
+                      : null;
 
                     const nameContent = (
                       <div className="flex items-center gap-2 min-w-0">
@@ -836,10 +845,26 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                             <div className="flex items-center gap-2 min-w-0 flex-1">{nameContent}</div>
                           )}
                         </div>
+                        {!isPlaceholder && playerId && (
+                          <span
+                            role="img"
+                            aria-label={beverageDutyCount === null
+                              ? 'Recorded beverage duty count unavailable'
+                              : `Recorded beverage duties: ${beverageDutyCount}`}
+                            title={beverageDutyCount === null
+                              ? 'Recorded beverage duty count unavailable'
+                              : `Recorded beverage duties: ${beverageDutyCount}`}
+                            className="ml-1 mr-1 inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-1 text-[10px] font-semibold tabular-nums text-muted-foreground"
+                            data-testid={`roster-beverage-duty-count-${playerId}`}
+                          >
+                            {beverageDutyCount ?? '—'}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
                 </div>
+                </>
               )}
               <div className="mt-3 pt-3 border-t border-border">
                 <p className="text-sm text-muted-foreground">

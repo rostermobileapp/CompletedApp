@@ -161,6 +161,22 @@ export default function Teams() {
     enabled: !!isAuthenticated,
   });
 
+  // Fetch league games so the roster can show each player's recorded beverage
+  // duty assignments across every game involving the selected team.
+  const {
+    data: leagueGames,
+    isLoading: leagueGamesLoading,
+    isError: leagueGamesError,
+  } = useQuery<any[]>({
+    queryKey: ['/api/leagues', currentTeam?.leagueId, 'games'],
+    queryFn: async () => {
+      if (!currentTeam?.leagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${currentTeam.leagueId}/games`);
+      return response.json();
+    },
+    enabled: !!currentTeam?.leagueId && location === '/teams',
+  });
+
   // Get user's league memberships (for league data, captain status now via teams.captainId)
   const { data: userLeagueMemberships = [] } = useQuery({
     queryKey: ['/api/user/league-memberships'],
@@ -235,6 +251,7 @@ export default function Teams() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', currentTeam?.leagueId, 'games'] });
       toast({
         title: "Success",
         description: "You've claimed beverage duty for this game!",
@@ -403,6 +420,21 @@ export default function Teams() {
   const teamGames = (upcomingGames as any[]).filter((game: any) => 
     currentTeam && (game.homeTeamId === currentTeam.id || game.awayTeamId === currentTeam.id)
   );
+
+  const beverageDutyCounts: Record<string, number> = {};
+  if (currentTeam) {
+    for (const game of leagueGames ?? []) {
+      const claimantIds = [
+        game.homeTeamId === currentTeam.id ? game.homeBeverageDutyUserId : null,
+        game.awayTeamId === currentTeam.id ? game.awayBeverageDutyUserId : null,
+      ];
+      for (const claimantId of claimantIds) {
+        if (typeof claimantId === 'string' && claimantId) {
+          beverageDutyCounts[claimantId] = (beverageDutyCounts[claimantId] || 0) + 1;
+        }
+      }
+    }
+  }
 
   // Helper functions (after all hooks, before early returns)
   const handleClaimBeverageDuty = (gameId: string) => {
@@ -861,6 +893,7 @@ export default function Teams() {
                   teamId={team.id}
                   isTeamCaptain={canManageLines}
                   teamMembers={teamMembers}
+                  beverageDutyCounts={leagueGamesLoading || leagueGamesError ? null : beverageDutyCounts}
                   leagueId={currentTeam?.leagueId ?? null}
                   seasonId={currentTeam?.seasonId ?? null}
                 />

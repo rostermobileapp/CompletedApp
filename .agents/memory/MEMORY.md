@@ -75,3 +75,4 @@
 - [Badge tier sort order](badge-tier-sort-order.md) — use explicit progression ranks; the live PostgreSQL enum's native sort order differs from achievement order.
 - [Season patch statistics](season-patch-statistics.md) — count all categories earned within season dates; tiers count separately and cumulative repeat totals need a pre-season baseline.
 - [Homepage positioning](homepage-positioning.md) — lead with time together; fade the hero photo to pure black into the story section.
+- [Beverage-duty tally](beverage-duty-tally.md) — roster counts use recorded per-game assignments, not a permanent log of every claim event.
