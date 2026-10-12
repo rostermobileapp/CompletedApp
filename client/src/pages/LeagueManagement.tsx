@@ -3002,7 +3002,7 @@ export default function LeagueManagement() {
   return (
     <div className="min-h-screen flex flex-col pb-6" data-testid="league-management-page">
       {/* Header */}
-      <div className="p-6 pl-[20px] pr-[20px] mt-[8px] mb-[8px] pt-[4px] pb-[4px]">
+      <div className="p-6 pl-[20px] pr-[20px] pt-[4px] pb-[4px] mt-[4px] mb-[4px]">
         <div className="flex items-center gap-4 mb-4">
           <button 
             onClick={() => {
@@ -3408,7 +3408,7 @@ export default function LeagueManagement() {
             )}
 
             {/* Simple Import Button */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-[4px]">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[0px] mt-[4px]">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">Players</h3>
