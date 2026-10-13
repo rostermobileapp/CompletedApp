@@ -15,6 +15,9 @@ export async function initAccountUserMergeDb() {
     );
     CREATE INDEX IF NOT EXISTS account_user_merges_survivor_idx
       ON account_user_merges (survivor_user_id);
+    ALTER TABLE account_user_merges ADD COLUMN IF NOT EXISTS authorization_league_id varchar;
+    ALTER TABLE account_user_merges ADD COLUMN IF NOT EXISTS activity_provenance jsonb NOT NULL DEFAULT '{}';
+    ALTER TABLE account_user_merges ADD COLUMN IF NOT EXISTS merge_policy jsonb NOT NULL DEFAULT '{}';
     CREATE OR REPLACE FUNCTION reject_retired_account_reactivation() RETURNS trigger
     LANGUAGE plpgsql AS $$
     BEGIN

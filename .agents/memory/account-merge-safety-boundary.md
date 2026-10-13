@@ -23,3 +23,15 @@ Transfer records through explicit, audited domain rules. Preserve original attri
 **Why:** Allowing commissioner merges does not authorize silent data loss, duplicated purchases, or arbitrary answers when the accounts disagree.
 
 **How to apply:** Classify and test record moves/deduplication, expose specific conflicts before confirmation, and perform the complete account merge atomically.
+
+Merge-review fingerprints must ignore authentication bookkeeping timestamps while still binding functional account state, authorization context and verified billing evidence.
+
+**Why:** Sign-in reconciliation updates account timestamps on each authenticated request; including those changes makes an otherwise unchanged preview impossible to confirm.
+
+**How to apply:** Revalidate meaningful identity, tier, permission and history changes at confirmation. Do not treat a routine auth timestamp update as a user-data conflict.
+
+Normalize PostgreSQL catalog metadata before treating it as application data, especially when verifying against a different database transport.
+
+**Why:** The isolated TCP driver returned PostgreSQL identifier arrays as strings, while unquoted catalog aliases did not match the expected object keys. These issues hid league grouping or broke otherwise safe reviews.
+
+**How to apply:** Use explicit text-array types and stable column aliases for catalog results, and verify both collision detection and indirect league grouping in isolated fixtures.

@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from '@neondatabase/serverless';
 import { pool } from './db';
+import { assertAccountMergeAccess } from './accountMergeAuthorization';
+import { selectAccountMergeDirection, verifyHistoricalFreeBilling, type AccountMergePolicy } from './accountMergePolicy';
+import { collisionDefinitions, collisionScope, collisionEquivalent, additionalTransferableReferences } from './accountMergeRecords';
 
 export class AccountUserMergeConflict extends Error {}
 
-type UserSummary = { id: string; displayId: string | null; name: string; email: string | null };
+type UserSummary = { id: string; displayId: string | null; name: string; email: string | null; role: string };
 type Reference = { schema: string; table: string; column: string; domain: string; count: number; snapshot: string };
-type Blocker = { domain: string; reason: string; count: number };
+type Blocker = { domain: string; reason: string; count: number; recordIds?: string[] };
 type Combinable = { domain: string; count: number; label: string };
 type MergePreview = {
   source: UserSummary;
@@ -18,23 +21,13 @@ type MergePreview = {
   legacy: { id: string; league: string; name: string; kind: string; disposition: string }[];
   lookalikes: { id: string; league: string; name: string; kind: string }[];
   fingerprint: string;
+  policy: AccountMergePolicy;
 };
 
 const quote = (identifier: string) => `"${identifier.replaceAll('"', '""')}"`;
 const qualified = (schema: string, table: string) => `${quote(schema)}.${quote(table)}`;
-const collisionDefinitions = [
-  { table: 'league_memberships', scope: ['league_id'], label: 'Equivalent league membership' },
-  { table: 'team_memberships', scope: ['team_id'], label: 'Equivalent team membership' },
-  { table: 'game_attendance', scope: ['game_id'], label: 'Equivalent game attendance' },
-  { table: 'game_rsvps', scope: ['game_id', 'team_id'], label: 'Equivalent game RSVP' },
-  { table: 'tournament_match_rsvps', scope: ['match_id', 'team_id'], label: 'Equivalent tournament RSVP' },
-  { table: 'team_event_rsvps', scope: ['team_event_id'], label: 'Equivalent team-event RSVP' },
-  { table: 'event_participants', scope: ['event_id'], label: 'Equivalent event participation' },
-  { table: 'notification_preferences', scope: [], label: 'Compatible notification preferences' },
-  { table: 'badge_awards', scope: ['badge_definition_id', 'scope_key'], label: 'Identical badge award' },
-  { table: 'badge_progress', scope: ['badge_definition_id', 'scope_key'], label: 'Identical badge progress (not added)' },
-] as const;
 const transferableReferences = new Set([
+  ...additionalTransferableReferences,
   'birthday_greetings.user_id',
   'user_notifications.user_id',
   'notification_preferences.user_id',
@@ -96,7 +89,8 @@ const transferableReferences = new Set([
 
 async function rowSnapshot(client: PoolClient, schema: string, table: string, predicate: string, params: unknown[]) {
   const result = await client.query(
-    `SELECT to_jsonb(x)::text AS row FROM ${qualified(schema, table)} x WHERE ${predicate} ORDER BY to_jsonb(x)::text`,
+    `SELECT (${table === 'users' ? "to_jsonb(x)-ARRAY['updated_at','last_updated']" : 'to_jsonb(x)'})::text AS row
+      FROM ${qualified(schema, table)} x WHERE ${predicate} ORDER BY row`,
     params,
   );
   return createHash('sha256').update(JSON.stringify(result.rows.map(row => row.row))).digest('hex');
@@ -105,7 +99,8 @@ async function rowSnapshot(client: PoolClient, schema: string, table: string, pr
 async function identity(client: PoolClient, id: string, lock = false): Promise<UserSummary | null> {
   const result = await client.query(`
     SELECT id, display_id AS "displayId",
-      concat_ws(' ', first_name, last_name) AS name, email
+      concat_ws(' ', first_name, last_name) AS name, email,
+      CASE WHEN role='free_tier' AND is_primary_commissioner THEN 'commissioner' ELSE role::text END AS role
     FROM users
     WHERE id=$1 AND deleted_at IS NULL AND email IS NOT NULL
       AND email NOT ILIKE '%@placeholder.roster'
@@ -114,20 +109,22 @@ async function identity(client: PoolClient, id: string, lock = false): Promise<U
 }
 
 /** Search returns registered, active account rows only. Names/emails are display hints, not matching proof. */
-export async function searchAccountUsers(search = ''): Promise<UserSummary[]> {
+export async function searchAccountUsers(search = '', leagueId?: string): Promise<UserSummary[]> {
   const term = search.trim().slice(0, 100);
   const result = await pool.query(`
     SELECT id, display_id AS "displayId",
-      concat_ws(' ', first_name, last_name) AS name, email
+      concat_ws(' ', first_name, last_name) AS name, email, role
     FROM users
     WHERE deleted_at IS NULL AND email IS NOT NULL
       AND email NOT ILIKE '%@placeholder.roster'
+      AND ($2::varchar IS NULL OR (display_id ~ '^U[0-9]{5}$'
+        AND EXISTS (SELECT 1 FROM league_memberships lm WHERE lm.user_id=users.id AND lm.league_id=$2)))
       AND ($1='' OR id=$1 OR display_id ILIKE '%' || $1 || '%'
         OR email ILIKE '%' || $1 || '%' OR first_name ILIKE '%' || $1 || '%'
         OR last_name ILIKE '%' || $1 || '%'
         OR concat_ws(' ', first_name, last_name) ILIKE '%' || $1 || '%')
     ORDER BY CASE WHEN upper(display_id)=upper($1) THEN 0 ELSE 1 END,
-      display_id NULLS LAST, id LIMIT 100`, [term]);
+      display_id NULLS LAST, id LIMIT 100`, [term, leagueId ?? null]);
   return result.rows;
 }
 
@@ -165,6 +162,9 @@ async function references(client: PoolClient, sourceId: string, survivorId?: str
     if (!count) continue;
     const domain = `${table}.${column}`;
     const snapshot = await rowSnapshot(client, schema, table, `${quote(column)}::text=$1`, [sourceId]);
+    // Retain immutable expired purchase ownership on the source tombstone.
+    // Eligibility verifies billing separately; these are never reassigned.
+    if (domain === 'apple_purchase_links.user_id') { evidence.push([domain, snapshot]); continue; }
     refs.push({ schema, table, column, domain, count, snapshot });
     evidence.push([domain, snapshot]);
     if (survivorId) {
@@ -175,44 +175,6 @@ async function references(client: PoolClient, sourceId: string, survivorId?: str
     }
     if (!transferableReferences.has(domain))
       blockers.push({ domain, reason: 'This user reference is not explicitly classified as safely transferable.', count });
-    if (table === 'league_memberships' && column === 'user_id') {
-      const elevated = await client.query(`SELECT count(*)::int AS count FROM ${qualified(schema, table)}
-        WHERE ${quote(column)}::text=$1 AND
-          (coalesce(league_role::text,'free_tier')<>'free_tier' OR league_special_permissions IS NOT NULL)`, [sourceId]);
-      if (Number(elevated.rows[0].count)) blockers.push({
-        domain: 'league_memberships.permissions',
-        reason: 'Source has league-level role or special permissions; explicitly resolve permissions before merging.',
-        count: Number(elevated.rows[0].count),
-      });
-    }
-    if (table === 'team_memberships' && column === 'user_id') {
-      const captains = await client.query(`SELECT count(*)::int AS count FROM ${qualified(schema, table)}
-        WHERE ${quote(column)}::text=$1 AND is_captain`, [sourceId]);
-      if (Number(captains.rows[0].count)) blockers.push({
-        domain: 'team_memberships.captain',
-        reason: 'Source has team-captain authority; explicitly resolve captain assignments before merging.',
-        count: Number(captains.rows[0].count),
-      });
-    }
-    if (table === 'facility_memberships' && column === 'user_id') {
-      const elevated = await client.query(`SELECT count(*)::int AS count FROM ${qualified(schema, table)}
-        WHERE ${quote(column)}::text=$1 AND (membership_type<>'basic' OR status='suspended')`, [sourceId]);
-      if (Number(elevated.rows[0].count)) blockers.push({
-        domain: 'facility_memberships.entitlements',
-        reason: 'Non-basic or suspended facility membership needs explicit entitlement resolution.',
-        count: Number(elevated.rows[0].count),
-      });
-    }
-    if (table === 'payment_request_recipients' && column === 'user_id') {
-      const settled = await client.query(`SELECT count(*)::int AS count FROM ${qualified(schema, table)}
-        WHERE ${quote(column)}::text=$1 AND
-          (is_paid OR is_confirmed OR paid_at IS NOT NULL OR payment_method IS NOT NULL)`, [sourceId]);
-      if (Number(settled.rows[0].count)) blockers.push({
-        domain: 'payment_request_recipients.settled',
-        reason: 'Paid, confirmed, or payment-method records must be reconciled rather than reassigned.',
-        count: Number(settled.rows[0].count),
-      });
-    }
   }
 
   // Find free-text and JSON/array references not represented by a relational FK.
@@ -240,30 +202,25 @@ async function references(client: PoolClient, sourceId: string, survivorId?: str
       const snapshot = await rowSnapshot(client, schema, table,
         `${quote(column)}::text LIKE '%' || $1 || '%'${excludeMergeIdentities}`, params);
       evidence.push([domain, snapshot]);
+      if (domain === 'google_iap_claims.user_id') continue;
+      if (domain === 'scrimmages.invite_user_ids') {
+        // This is a typed text[] of explicitly selected identities, not opaque
+        // free text. Preserve placeholder IDs and deduplicate the replaced user.
+        const exact = await client.query('SELECT count(*)::int AS count FROM scrimmages WHERE $1=ANY(invite_user_ids)', [sourceId]);
+        if (Number(exact.rows[0].count) === count) continue;
+      }
+      if (transferableReferences.has(domain)) {
+        const exact = await client.query(`SELECT count(*)::int AS count FROM ${qualified(schema, table)} WHERE ${quote(column)}::text=$1`, [sourceId]);
+        if (Number(exact.rows[0].count) === count) {
+          refs.push({ schema, table, column, domain, count, snapshot });
+          continue;
+        }
+      }
       blockers.push({ domain, reason: 'Opaque free-text/JSON/array reference cannot be safely classified or rewritten.', count });
     }
   }
   // Provider identities and paid account authority are stored on the source
   // user itself, not in a row referencing users.id.
-  const userClaims = await client.query(`
-    SELECT
-      (stripe_customer_id IS NOT NULL)::int +
-      (stripe_subscription_id IS NOT NULL)::int +
-      (iap_original_transaction_id IS NOT NULL)::int AS claims,
-      CASE WHEN role::text <> 'free_tier' THEN 1 ELSE 0 END +
-      CASE WHEN coalesce(is_primary_commissioner,false) THEN 1 ELSE 0 END +
-      CASE WHEN coalesce(cardinality(special_permissions),0)>0 THEN 1 ELSE 0 END AS authority
-    FROM users WHERE id=$1`, [sourceId]);
-  if (Number(userClaims.rows[0]?.claims)) blockers.push({
-    domain: 'users.billing_claims',
-    reason: 'Source has provider billing identifiers; verified provider-side resolution is required.',
-    count: Number(userClaims.rows[0].claims),
-  });
-  if (Number(userClaims.rows[0]?.authority)) blockers.push({
-    domain: 'users.account_authority',
-    reason: 'Source has a paid role or account-level authority that cannot be transferred implicitly.',
-    count: Number(userClaims.rows[0].authority),
-  });
   const userSnapshot = await rowSnapshot(client, 'public', 'users', 'id=$1', [sourceId]);
   evidence.push(['users.source', userSnapshot]);
   return { refs, blockers, evidence };
@@ -273,7 +230,7 @@ async function detectUniqueCollisions(client: PoolClient, refs: Reference[], sou
   const blockers: Blocker[] = [];
   const indexes = await client.query(`
     SELECT ns.nspname AS schema, t.relname AS table, i.indexrelid::regclass::text AS index_name,
-      array_agg(a.attname ORDER BY keys.ord) FILTER (WHERE a.attname IS NOT NULL) AS columns,
+      array_agg(a.attname::text ORDER BY keys.ord) FILTER (WHERE a.attname IS NOT NULL) AS columns,
       bool_or(keys.attnum=0) AS has_expression
     FROM pg_index i
     JOIN pg_class t ON t.oid=i.indrelid
@@ -287,7 +244,7 @@ async function detectUniqueCollisions(client: PoolClient, refs: Reference[], sou
       (row.columns ?? []).includes(ref.column))) {
       const collisionDefinition = collisionDefinitions.find(definition => definition.table === ref.table);
       const uniqueScope = (index.columns ?? []).filter((name: string) => name !== ref.column).sort();
-      if (collisionDefinition && ref.column === 'user_id' &&
+      if (collisionDefinition && ref.column === (collisionDefinition.column ?? 'user_id') &&
         JSON.stringify(uniqueScope) === JSON.stringify([...collisionDefinition.scope].sort()))
         continue; // Explicitly classified and fingerprinted by detectAccountDataCollisions.
       if (index.has_expression) {
@@ -312,6 +269,9 @@ async function detectUniqueCollisions(client: PoolClient, refs: Reference[], sou
         domain: ref.domain,
         reason: `Would collide with an existing survivor record (${index.index_name}); reconcile both records before merging.`,
         count,
+        recordIds: (await client.query(`SELECT coalesce(to_jsonb(s)->>'id',to_jsonb(s)->>'user_id') AS id FROM ${qualified(ref.schema, ref.table)} s
+          JOIN ${qualified(ref.schema, ref.table)} d ON ${matching}
+          WHERE s.${quote(ref.column)}::text=$1 AND d.${quote(ref.column)}::text=$2 LIMIT 20`, [sourceId, survivorId])).rows.map(r => r.id),
       });
     }
   }
@@ -322,23 +282,15 @@ async function detectAccountDataCollisions(client: PoolClient, sourceId: string,
   const blockers: Blocker[] = [];
   const combinable: Combinable[] = [];
   for (const definition of collisionDefinitions) {
-    const scopeMatch = definition.scope.length
-      ? definition.scope.map(column => `s.${quote(column)} IS NOT DISTINCT FROM d.${quote(column)}`).join(' AND ')
-      : 'TRUE';
-    const semanticSource = `to_jsonb(s) - ARRAY['id','user_id']::text[]`;
-    const semanticTarget = `to_jsonb(d) - ARRAY['id','user_id']::text[]`;
-    const equivalent = definition.table === 'notification_preferences'
-      ? `s.notification_settings IS NOT DISTINCT FROM d.notification_settings
-         AND s.push_enabled IS NOT DISTINCT FROM d.push_enabled
-         AND (s.onesignal_player_id IS NULL OR s.onesignal_player_id=d.onesignal_player_id)
-         AND (s.onesignal_external_id IS NULL OR s.onesignal_external_id=d.onesignal_external_id)`
-      : `${semanticSource} = ${semanticTarget}`;
+    const scopeMatch = collisionScope(definition);
+    const equivalent = collisionEquivalent(definition);
+    const userColumn = quote(definition.column ?? 'user_id');
     const result = await client.query(`
       SELECT count(*)::int AS count,
         (count(*) FILTER (WHERE ${equivalent}))::int AS safe_count
       FROM ${qualified('public', definition.table)} s
       JOIN ${qualified('public', definition.table)} d ON ${scopeMatch}
-      WHERE s.user_id=$1 AND d.user_id=$2`, [sourceId, survivorId]);
+      WHERE s.${userColumn}=$1 AND d.${userColumn}=$2`, [sourceId, survivorId]);
     const count = Number(result.rows[0].count);
     const safeCount = Number(result.rows[0].safe_count);
     if (safeCount) combinable.push({
@@ -354,7 +306,21 @@ async function detectAccountDataCollisions(client: PoolClient, sourceId: string,
         ? 'Badge progress differs; progress totals are never added without event provenance.'
         : `Overlapping ${definition.table.replaceAll('_', ' ')} records differ; reconcile their history before merging.`,
       count: count - safeCount,
+      recordIds: (await client.query(`SELECT s.id::text AS id FROM ${qualified('public', definition.table)} s
+        JOIN ${qualified('public', definition.table)} d ON ${scopeMatch}
+        WHERE s.${userColumn}=$1 AND d.${userColumn}=$2 AND NOT (${equivalent}) LIMIT 20`, [sourceId, survivorId])).rows.map(r => r.id),
     });
+  }
+  // Compare the entire answer set: equal individual options are insufficient
+  // for a multi-select poll whose remaining options differ.
+  for (const [table, pollColumn, optionColumn] of [['announcement_poll_votes', 'poll_id', 'option_index'], ['chat_poll_votes', 'poll_id', 'option_index']]) {
+    const different = await client.query(`SELECT s.${pollColumn} AS id FROM ${table} s
+      JOIN ${table} d ON d.${pollColumn}=s.${pollColumn}
+      WHERE s.user_id=$1 AND d.user_id=$2 GROUP BY s.${pollColumn}
+      HAVING array_agg(DISTINCT s.${optionColumn} ORDER BY s.${optionColumn})
+        IS DISTINCT FROM array_agg(DISTINCT d.${optionColumn} ORDER BY d.${optionColumn})`, [sourceId, survivorId]);
+    if (different.rowCount) blockers.push({ domain: table, count: different.rowCount,
+      reason: 'The accounts chose different poll answers. Review the poll and resolve the votes before merging.', recordIds: different.rows.map(r => r.id) });
   }
   const stats = await client.query(`
     SELECT count(*)::int AS count FROM player_stats s
@@ -366,6 +332,8 @@ async function detectAccountDataCollisions(client: PoolClient, sourceId: string,
     domain: 'player_stats',
     reason: 'Both accounts have statistics in the same league/season. Totals are not summed without event provenance.',
     count: statsCount,
+    recordIds: (await client.query(`SELECT s.id FROM player_stats s JOIN player_stats d ON s.league_id=d.league_id
+      AND s.season_id IS NOT DISTINCT FROM d.season_id WHERE s.user_id=$1 AND d.user_id=$2 LIMIT 20`, [sourceId, survivorId])).rows.map(r => r.id),
   });
   const facilities = await client.query(`
     SELECT count(*)::int AS count FROM facility_memberships s
@@ -376,6 +344,8 @@ async function detectAccountDataCollisions(client: PoolClient, sourceId: string,
     domain: 'facility_memberships',
     reason: 'Both accounts have a membership at the same facility. Reconcile membership terms first.',
     count: facilityCount,
+    recordIds: (await client.query(`SELECT s.id FROM facility_memberships s JOIN facility_memberships d ON s.facility_id=d.facility_id
+      WHERE s.user_id=$1 AND d.user_id=$2 LIMIT 20`, [sourceId, survivorId])).rows.map(r => r.id),
   });
   return { blockers, combinable };
 }
@@ -383,29 +353,47 @@ async function detectAccountDataCollisions(client: PoolClient, sourceId: string,
 async function combineSafeCollisions(client: PoolClient, sourceId: string, survivorId: string) {
   for (const definition of collisionDefinitions) {
     const table = qualified('public', definition.table);
-    const scopeMatch = definition.scope.length
-      ? definition.scope.map(column => `s.${quote(column)} IS NOT DISTINCT FROM d.${quote(column)}`).join(' AND ')
-      : 'TRUE';
-    const semanticSource = `to_jsonb(s) - ARRAY['id','user_id']::text[]`;
-    const semanticTarget = `to_jsonb(d) - ARRAY['id','user_id']::text[]`;
-    const equivalent = definition.table === 'notification_preferences'
-      ? `s.notification_settings IS NOT DISTINCT FROM d.notification_settings
-         AND s.push_enabled IS NOT DISTINCT FROM d.push_enabled
-         AND (s.onesignal_player_id IS NULL OR s.onesignal_player_id=d.onesignal_player_id)
-         AND (s.onesignal_external_id IS NULL OR s.onesignal_external_id=d.onesignal_external_id)`
-      : `${semanticSource} = ${semanticTarget}`;
+    const scopeMatch = collisionScope(definition);
+    const equivalent = collisionEquivalent(definition);
+    const userColumn = quote(definition.column ?? 'user_id');
+    if (definition.table === 'birthday_greetings') {
+      await client.query(`UPDATE birthday_greetings d SET
+        popup_dismissed_at=coalesce(d.popup_dismissed_at,s.popup_dismissed_at),
+        push_sent_at=coalesce(d.push_sent_at,s.push_sent_at), push_claimed_at=coalesce(d.push_claimed_at,s.push_claimed_at)
+        FROM birthday_greetings s WHERE s.user_id=$1 AND d.user_id=$2 AND s.birthday_date=d.birthday_date`, [sourceId, survivorId]);
+    }
+    if (definition.membership) {
+      const columns = definition.membership === 'league'
+        ? ['assigned_team_id', 'position', 'jersey_number', 'skill_level', 'display_first_name', 'display_last_name', 'notes']
+        : ['position', 'jersey_number'];
+      const extra = definition.membership === 'league'
+        ? `, is_goalie=d.is_goalie OR s.is_goalie, is_skater=d.is_skater OR s.is_skater,
+            league_role=CASE WHEN s.league_role='commissioner' OR d.league_role='commissioner' THEN 'commissioner'::user_role
+              WHEN s.league_role='secondary_commissioner' OR d.league_role='secondary_commissioner' THEN 'secondary_commissioner'::user_role
+              WHEN s.league_role='player_pro' OR d.league_role='player_pro' THEN 'player_pro'::user_role ELSE 'free_tier'::user_role END,
+            league_special_permissions=ARRAY(SELECT DISTINCT unnest(coalesce(s.league_special_permissions,'{}') || coalesce(d.league_special_permissions,'{}')))`
+        : ', is_captain=d.is_captain OR s.is_captain';
+      await client.query(`UPDATE ${table} d SET
+        ${columns.map(c => `${quote(c)}=coalesce(d.${quote(c)},s.${quote(c)})`).join(',')},
+        status=CASE WHEN s.status='approved' OR d.status='approved' THEN 'approved'::membership_status ELSE d.status END
+        ${extra} FROM ${table} s WHERE s.user_id=$1 AND d.user_id=$2 AND ${scopeMatch} AND ${equivalent}`, [sourceId, survivorId]);
+    }
     if (definition.table === 'badge_awards') {
       await client.query(`
-        UPDATE badge_earned_events e SET badge_award_id=d.id
+        UPDATE badge_earned_events e SET badge_award_id=d.id,
+          payload=CASE WHEN e.payload ? 'awardId' THEN jsonb_set(e.payload,'{awardId}',to_jsonb(d.id)) ELSE e.payload END,
+          acknowledged_at=coalesce(e.acknowledged_at,(SELECT max(seen.acknowledged_at) FROM badge_earned_events seen
+            WHERE seen.badge_award_id=d.id AND seen.event_type=e.event_type
+              AND seen.payload->>'tier' IS NOT DISTINCT FROM e.payload->>'tier'))
         FROM badge_awards s JOIN badge_awards d
           ON s.badge_definition_id=d.badge_definition_id AND s.scope_key=d.scope_key
         WHERE s.user_id=$1 AND d.user_id=$2
-          AND ${semanticSource.replaceAll('s.', 's.')} = ${semanticTarget}
+          AND ${equivalent}
           AND e.badge_award_id=s.id`, [sourceId, survivorId]);
     }
     await client.query(`
       DELETE FROM ${table} s USING ${table} d
-      WHERE s.user_id=$1 AND d.user_id=$2
+      WHERE s.${userColumn}=$1 AND d.${userColumn}=$2
         AND ${scopeMatch} AND ${equivalent}`, [sourceId, survivorId]);
   }
 }
@@ -417,8 +405,8 @@ async function resolveLeagueParentPath(client: PoolClient) {
     client.query(`SELECT table_name FROM information_schema.columns
       WHERE table_schema='public' AND column_name='league_id'`),
     client.query(`
-      SELECT child.relname AS child_table, child_col.attname AS child_column,
-        parent.relname AS parent_table, parent_col.attname AS parent_column
+      SELECT child.relname AS "childTable", child_col.attname AS "childColumn",
+        parent.relname AS "parentTable", parent_col.attname AS "parentColumn"
       FROM pg_constraint c
       JOIN pg_class child ON child.oid=c.conrelid
       JOIN pg_namespace child_ns ON child_ns.oid=child.relnamespace
@@ -483,9 +471,44 @@ async function resolveLeagueParentPath(client: PoolClient) {
   return findPath;
 }
 
-async function buildPreview(client: PoolClient, sourceId: string, survivorId: string): Promise<MergePreview> {
+type MergeAccess = { operatorId: string; leagueId?: string };
+async function buildPreview(client: PoolClient, sourceId: string, survivorId: string, access?: MergeAccess): Promise<MergePreview> {
   if (!sourceId || !survivorId || sourceId === survivorId)
     throw new AccountUserMergeConflict('Select two different account IDs.');
+  if (access) {
+    try { await assertAccountMergeAccess(client, access.operatorId, access.leagueId, [sourceId, survivorId]); }
+    catch (error) { throw new AccountUserMergeConflict((error as Error).message); }
+  }
+  const accounts = (await client.query('SELECT * FROM users WHERE id=ANY($1::varchar[]) AND deleted_at IS NULL', [[sourceId, survivorId]])).rows;
+  const a = accounts.find(r => r.id === sourceId), b = accounts.find(r => r.id === survivorId);
+  if (!a || !b) throw new AccountUserMergeConflict('Both accounts must still be active.');
+  const direction = selectAccountMergeDirection(a, b);
+  sourceId = direction.sourceId; survivorId = direction.survivorId;
+  const policy = direction.policy;
+  const billingEvidence: unknown[] = [];
+  const billingBlockers: Blocker[] = [];
+  for (const account of [...accounts].sort((x, y) => x.id.localeCompare(y.id))) {
+    const native = await client.query(`SELECT 'apple' AS provider,to_jsonb(x) AS record FROM apple_purchase_links x WHERE user_id=$1
+      UNION ALL SELECT 'google',to_jsonb(x) FROM google_iap_claims x WHERE user_id=$1`, [account.id]);
+    billingEvidence.push([account.id, native.rows]);
+    if (account.role !== 'free_tier' || account.is_primary_commissioner) continue;
+    try {
+      const canonicalCustomers = native.rows.filter(r => r.provider === 'apple').map(r => r.record.customer_id);
+      const verified = await verifyHistoricalFreeBilling(account, canonicalCustomers.length ? canonicalCustomers : native.rows.length > 0);
+      billingEvidence.push([account.id, verified]);
+      if (verified.active || native.rows.some(r => r.record.expires_at &&
+        Date.parse(r.record.expires_at) > Date.now() && !r.record.revoked_by_apple)) {
+        billingBlockers.push({ domain: 'billing.verification', count: 1, recordIds: [account.display_id || account.id],
+          reason: 'This free-tier profile has an active purchase. Reconcile its tier and subscription status before merging.' });
+      }
+    } catch {
+      billingBlockers.push({ domain: 'billing.verification', count: 1, recordIds: [account.display_id || account.id],
+        reason: 'Could not verify historical billing for this free-tier profile. Retry the review or resolve its subscription status first.' });
+    }
+  }
+  if (billingBlockers.length) { policy.kind = 'verification_required'; policy.message = 'Account billing and tier state must be verified before merging.'; }
+  if (direction.policy.kind === 'billing_duplicate') billingBlockers.push({ domain: 'billing.duplicate', count: 2,
+    recordIds: accounts.map(r => r.display_id || r.id), reason: policy.message });
   const [source, survivor] = await Promise.all([
     identity(client, sourceId), identity(client, survivorId),
   ]);
@@ -521,7 +544,7 @@ async function buildPreview(client: PoolClient, sourceId: string, survivorId: st
   const lookalikes = unlinkedRows.rows;
   const collisionBlockers = await detectUniqueCollisions(client, refs, sourceId, survivorId);
   const accountDataCollisions = await detectAccountDataCollisions(client, sourceId, survivorId);
-  const blockers = [...refBlockers, ...collisionBlockers, ...accountDataCollisions.blockers];
+  const blockers = [...billingBlockers, ...refBlockers, ...collisionBlockers, ...accountDataCollisions.blockers];
   const combinable = accountDataCollisions.combinable;
   const leagues: MergePreview['leagues'] = [];
   const other: MergePreview['other'] = [];
@@ -560,6 +583,9 @@ async function buildPreview(client: PoolClient, sourceId: string, survivorId: st
     if (otherCount) other.push({ domain: ref.domain, count: otherCount });
   }
   const fingerprintPayload = {
+    authorization: access ? [access.operatorId, access.leagueId ?? null] : null,
+    policy: [policy.kind, policy.message],
+    billingEvidence,
     source: [source.id, source.displayId, source.name, source.email],
     survivor: [survivor.id, survivor.displayId, survivor.name, survivor.email],
     evidence: evidence.sort(([a], [b]) => a.localeCompare(b)),
@@ -572,14 +598,14 @@ async function buildPreview(client: PoolClient, sourceId: string, survivorId: st
     lookalikes,
   };
   const fingerprint = createHash('sha256').update(JSON.stringify(fingerprintPayload)).digest('hex');
-  return { source, survivor, leagues, other, combinable, blockers, legacy, lookalikes, fingerprint };
+  return { source, survivor, leagues, other, combinable, blockers, legacy, lookalikes, fingerprint, policy };
 }
 
-export async function previewAccountUserMerge(sourceId: string, survivorId: string): Promise<MergePreview> {
+export async function previewAccountUserMerge(sourceId: string, survivorId: string, access?: MergeAccess): Promise<MergePreview> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    return await buildPreview(client, sourceId, survivorId);
+    return await buildPreview(client, sourceId, survivorId, access);
   } finally {
     await client.query('ROLLBACK').catch(() => undefined);
     client.release();
@@ -587,17 +613,19 @@ export async function previewAccountUserMerge(sourceId: string, survivorId: stri
 }
 
 async function confirmAccountUserMergeOnce(
-  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string,
+  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string, leagueId?: string,
 ) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['account-user-merge']);
+    try { await assertAccountMergeAccess(client, operatorId, leagueId); }
+    catch (error) { throw new AccountUserMergeConflict((error as Error).message); }
     const prior = await client.query(
-      'SELECT survivor_user_id FROM account_user_merges WHERE source_user_id=$1 FOR UPDATE', [sourceId],
+      'SELECT survivor_user_id, authorization_league_id FROM account_user_merges WHERE source_user_id=$1 FOR UPDATE', [sourceId],
     );
     if (prior.rowCount) {
-      if (prior.rows[0].survivor_user_id === survivorId) {
+      if (prior.rows[0].survivor_user_id === survivorId && (!leagueId || prior.rows[0].authorization_league_id === leagueId)) {
         await client.query('COMMIT');
         return { sourceId, survivorId, alreadyMerged: true };
       }
@@ -607,14 +635,28 @@ async function confirmAccountUserMergeOnce(
     const survivor = await identity(client, survivorId, true);
     const operator = await identity(client, operatorId, true);
     if (!source || !survivor) throw new AccountUserMergeConflict('Both selected accounts must still be active.');
-    if (!operator) throw new AccountUserMergeConflict('A valid active support-operator account is required.');
-    const preview = await buildPreview(client, sourceId, survivorId);
+    if (!operator) throw new AccountUserMergeConflict('A valid active merge-operator account is required.');
+    const preview = await buildPreview(client, sourceId, survivorId, { operatorId, leagueId });
+    if (preview.source.id !== sourceId || preview.survivor.id !== survivorId)
+      throw new AccountUserMergeConflict('The non-free profile must be the parent. Refresh the review to confirm the paid account’s login.');
     if (!previewFingerprint || preview.fingerprint !== previewFingerprint)
       throw new AccountUserMergeConflict('Account data changed after review. Refresh the preview before confirming.');
     if (preview.blockers.length) {
       const summary = preview.blockers.slice(0, 5).map(b => `${b.domain}: ${b.reason}`).join(' ');
       throw new AccountUserMergeConflict(`Merge blocked; resolve the listed records first. ${summary}`);
     }
+    const before = await references(client, sourceId, survivorId);
+    const provenance: Record<string, unknown> = {};
+    for (const ref of before.refs) {
+      provenance[ref.domain] = (await client.query(`SELECT to_jsonb(x) AS original FROM ${qualified(ref.schema, ref.table)} x
+        WHERE ${quote(ref.column)}::text IN ($1,$2)`, [sourceId, survivorId])).rows.map(r => r.original);
+    }
+    // Events and their delivery state are also preserved when duplicate awards
+    // are combined. Audit the original award references before rewriting them.
+    provenance.badge_events = (await client.query('SELECT * FROM badge_earned_events WHERE user_id IN ($1,$2)', [sourceId, survivorId])).rows;
+    provenance.account_authority = (await client.query(`SELECT id,special_permissions,is_primary_commissioner,fee_exempt
+      FROM users WHERE id IN ($1,$2)`, [sourceId, survivorId])).rows;
+    provenance.direct_scrimmage_invites = (await client.query('SELECT id,invite_user_ids FROM scrimmages WHERE $1=ANY(invite_user_ids)', [sourceId])).rows;
     await combineSafeCollisions(client, sourceId, survivorId);
     const { refs } = await references(client, sourceId, survivorId);
     for (const ref of refs) {
@@ -623,6 +665,23 @@ async function confirmAccountUserMergeOnce(
         [sourceId, survivorId],
       );
     }
+    await client.query(`UPDATE users d SET
+      special_permissions=ARRAY(SELECT DISTINCT unnest(coalesce(d.special_permissions,'{}') || coalesce(s.special_permissions,'{}'))),
+      fee_exempt=d.fee_exempt OR s.fee_exempt
+      FROM users s WHERE s.id=$1 AND d.id=$2`, [sourceId, survivorId]);
+    await client.query(`UPDATE scrimmages SET invite_user_ids=ARRAY(SELECT DISTINCT unnest(array_replace(invite_user_ids,$1,$2)))
+      WHERE $1=ANY(invite_user_ids)`, [sourceId, survivorId]);
+    // Deduplicate identical earned events while preserving the fact that either
+    // account already saw/acknowledged the celebration.
+    await client.query(`WITH grouped AS (
+      SELECT min(id) AS keep_id, array_agg(id) AS ids, max(acknowledged_at) AS acknowledged_at, max(delivered_at) AS delivered_at
+      FROM badge_earned_events WHERE user_id=$1 GROUP BY badge_award_id,event_type,(payload-ARRAY['awardId','badgeAwardId'])
+      HAVING count(*)>1
+    ) UPDATE badge_earned_events e SET acknowledged_at=coalesce(e.acknowledged_at,g.acknowledged_at),
+      delivered_at=coalesce(e.delivered_at,g.delivered_at) FROM grouped g WHERE e.id=g.keep_id`, [survivorId]);
+    await client.query(`DELETE FROM badge_earned_events e USING badge_earned_events kept
+      WHERE e.user_id=$1 AND kept.user_id=$1 AND e.id>kept.id AND e.badge_award_id=kept.badge_award_id
+      AND e.event_type=kept.event_type AND (e.payload-ARRAY['awardId','badgeAwardId'])=(kept.payload-ARRAY['awardId','badgeAwardId'])`, [survivorId]);
     // Re-scan relational and opaque references before retiring. Any unexpected
     // or concurrently-created record aborts the complete transaction.
     const remaining = await references(client, sourceId, survivorId);
@@ -630,9 +689,11 @@ async function confirmAccountUserMergeOnce(
       throw new AccountUserMergeConflict('Source references remain after transfer; the transaction was rolled back.');
     await client.query(`
       INSERT INTO account_user_merges
-        (source_user_id,survivor_user_id,operator_user_id,source_display_id,source_email,preview_fingerprint)
-      VALUES ($1,$2,$3,$4,$5,$6)`,
-    [sourceId, survivorId, operatorId, source.displayId, source.email, previewFingerprint]);
+        (source_user_id,survivor_user_id,operator_user_id,source_display_id,source_email,preview_fingerprint,
+          authorization_league_id,activity_provenance,merge_policy)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb)`,
+    [sourceId, survivorId, operatorId, source.displayId, source.email, previewFingerprint, leagueId ?? null,
+      JSON.stringify(provenance), JSON.stringify(preview.policy)]);
     await client.query('UPDATE users SET deleted_at=NOW(), updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL', [sourceId]);
     await client.query('COMMIT');
     return { sourceId, survivorId, alreadyMerged: false };
@@ -645,14 +706,14 @@ async function confirmAccountUserMergeOnce(
 }
 
 export async function confirmAccountUserMerge(
-  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string,
+  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string, leagueId?: string,
 ) {
   // A serializable loser in two simultaneous identical confirmations retries
   // from a fresh snapshot and observes the durable audit row as an idempotent
   // replay instead of surfacing a spurious concurrency failure.
   for (let attempt = 0; ; attempt++) {
     try {
-      return await confirmAccountUserMergeOnce(sourceId, survivorId, operatorId, previewFingerprint);
+      return await confirmAccountUserMergeOnce(sourceId, survivorId, operatorId, previewFingerprint, leagueId);
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (attempt >= 2 || (code !== '40001' && code !== '40P01')) throw error;

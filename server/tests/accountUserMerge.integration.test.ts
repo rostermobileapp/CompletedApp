@@ -6,17 +6,24 @@ import { isRetiredAccount } from '../supabaseAuth';
 import {
   AccountUserMergeConflict,
   confirmAccountUserMerge,
-  previewAccountUserMerge,
+  previewAccountUserMerge as buildSupportPreview,
   searchAccountUsers,
 } from '../accountUserMerge';
+
+// Existing support-path fixtures must opt into the same explicit authorization
+// context as the HTTP routes. TestDatabaseGuard prevents use of the app database.
+async function previewAccountUserMerge(sourceId: string, survivorId: string, operatorId: string) {
+  await pool.query('UPDATE users SET email=$2 WHERE id=$1', [operatorId, 'tobin@rosterhockey.com']);
+  return buildSupportPreview(sourceId, survivorId, { operatorId });
+}
 
 test('account search is bounded, empty on a miss, and prioritizes an exact U ID', async () => {
   const key = randomUUID().replaceAll('-', '');
   const prefix = `merge_search_${key}_`;
   const q = (sql: string, params: unknown[] = []) => pool.query(sql, params);
   try {
-    await q(`INSERT INTO users (id,email,first_name)
-      SELECT $1 || n, $1 || n || '@example.test', $2
+    await q(`INSERT INTO users (id,email,first_name,display_id)
+      SELECT $1 || n, $1 || n || '@example.test', $2::varchar, 'U' || lpad((80000+n)::text,5,'0')
       FROM generate_series(1,105) n`, [prefix, `Search${key}`]);
     assert.equal((await searchAccountUsers(`not_found_${key}`)).length, 0);
     assert.equal((await searchAccountUsers(`Search${key}`)).length, 100);
@@ -119,7 +126,7 @@ test('account merge searches registered accounts, retires atomically, and safely
     const found = await searchAccountUsers(ids.source);
     assert.deepEqual(found.map(user => user.id), [ids.source]);
     assert.ok(!(await searchAccountUsers('Source')).some(user => user.id === ids.legacyUser));
-    const preview = await previewAccountUserMerge(ids.source, ids.survivor);
+    const preview = await previewAccountUserMerge(ids.source, ids.survivor, ids.operator);
     assert.equal(preview.source.id, ids.source);
     assert.equal(preview.survivor.id, ids.survivor);
     assert.deepEqual(preview.blockers, []);
@@ -148,7 +155,7 @@ test('account merge searches registered accounts, retires atomically, and safely
     );
     assert.equal((await q('SELECT deleted_at FROM users WHERE id=$1', [ids.source])).rows[0].deleted_at, null);
     await q('UPDATE placeholder_players SET first_name=$2 WHERE id=$1', [ids.placeholder, 'Source']);
-    const freshPreview = await previewAccountUserMerge(ids.source, ids.survivor);
+    const freshPreview = await previewAccountUserMerge(ids.source, ids.survivor, ids.operator);
 
     const concurrentResults = await Promise.all([
       confirmAccountUserMerge(ids.source, ids.survivor, ids.operator, freshPreview.fingerprint),
@@ -236,7 +243,7 @@ test('account merge rejects stale previews without retiring or moving source dat
         [ids[i], `${ids[i]}@example.test`, `User ${i}`]);
     await q(`INSERT INTO birthday_greetings (user_id,birthday_date,popup_dismissed_at)
       VALUES ($1,'2000-02-03',NOW())`, [ids[0]]);
-    const preview = await previewAccountUserMerge(ids[0], ids[1]);
+    const preview = await previewAccountUserMerge(ids[0], ids[1], ids[2]);
     // A column update with the same affected-row count must invalidate review.
     await q(`UPDATE birthday_greetings SET popup_dismissed_at=NULL
       WHERE user_id=$1 AND birthday_date='2000-02-03'`, [ids[0]]);
@@ -281,7 +288,7 @@ test('account merge itemizes overlapping memberships, stats, attendance, and RSV
     }
     await q(`INSERT INTO team_memberships (user_id,team_id,status)
       VALUES ($1,$2,'approved')`, [source, team]);
-    const preview = await previewAccountUserMerge(source, survivor);
+    const preview = await previewAccountUserMerge(source, survivor, operator);
     assert.ok(!preview.blockers.some(blocker => blocker.domain === 'league_memberships'));
     assert.ok(preview.blockers.some(blocker => blocker.domain === 'player_stats'));
     for (const domain of ['league_memberships', 'game_attendance', 'game_rsvps'])
@@ -342,10 +349,9 @@ test('account merge combines equivalent memberships, attendance, RSVPs, preferen
     }
     await q(`UPDATE league_memberships SET league_role='player_pro'
       WHERE user_id=$1 AND league_id=$2`, [source, league]);
-    const changedPermissionPreview = await previewAccountUserMerge(source, survivor);
-    assert.ok(changedPermissionPreview.blockers.some(blocker =>
-      blocker.domain === 'league_memberships.permissions' || blocker.domain === 'league_memberships'));
-    assert.ok(!changedPermissionPreview.combinable.some(record => record.domain === 'league_memberships'));
+    const changedPermissionPreview = await previewAccountUserMerge(source, survivor, operator);
+    assert.ok(!changedPermissionPreview.blockers.some(blocker => blocker.domain === 'league_memberships'));
+    assert.ok(changedPermissionPreview.combinable.some(record => record.domain === 'league_memberships'));
     await q(`UPDATE league_memberships SET league_role='free_tier'
       WHERE user_id=$1 AND league_id=$2`, [source, league]);
     await q(`INSERT INTO notification_preferences
@@ -370,11 +376,11 @@ test('account merge combines equivalent memberships, attendance, RSVPs, preferen
     }
     await q(`INSERT INTO badge_earned_events
       (user_id,badge_award_id,badge_definition_id,event_type,payload)
-      SELECT $1,id,$2,'earned','{"event":"preserve"}'::jsonb
+      SELECT $1::varchar,id,$2::varchar,'earned','{"event":"preserve"}'::jsonb
       FROM badge_awards WHERE user_id=$1 AND badge_definition_id=$2`,
     [source, badge]);
 
-    const preview = await previewAccountUserMerge(source, survivor);
+    const preview = await previewAccountUserMerge(source, survivor, operator);
     assert.deepEqual(preview.blockers, []);
     for (const domain of [
       'league_memberships', 'game_attendance', 'game_rsvps',
@@ -426,7 +432,7 @@ test('account merge blocks notification provider IDs that cannot be relinked to 
       (user_id,notification_settings,push_enabled)
       VALUES ($1,'{"upcomingEvents":true}'::jsonb,true)`, [survivor]);
 
-    const preview = await previewAccountUserMerge(source, survivor);
+    const preview = await previewAccountUserMerge(source, survivor, operator);
     const blocker = preview.blockers.find(item => item.domain === 'notification_preferences');
     assert.ok(blocker);
     assert.match(blocker.reason, /Relink the provider identity/);
@@ -447,7 +453,7 @@ test('account merge blocks notification provider IDs that cannot be relinked to 
   }
 });
 
-test('account merge preview blocks provider purchase claims and preserves them on rejection', async () => {
+test('account merge requires verification of native history and preserves claims on rejection', async () => {
   const key = randomUUID().replaceAll('-', '');
   const ids = [`merge_claim_source_${key}`, `merge_claim_target_${key}`, `merge_claim_operator_${key}`];
   const token = key.padEnd(64, 'a').slice(0, 64);
@@ -462,9 +468,8 @@ test('account merge preview blocks provider purchase claims and preserves them o
       VALUES ($1,$2,'Paid merge invoice',10)`, [paymentRequest, ids[2]]);
     await q(`INSERT INTO payment_request_recipients
       (payment_request_id,user_id,is_paid,is_confirmed) VALUES ($1,$2,true,true)`, [paymentRequest, ids[0]]);
-    const preview = await previewAccountUserMerge(ids[0], ids[1]);
-    assert.ok(preview.blockers.some(blocker => blocker.domain.startsWith('google_iap_claims.')));
-    assert.ok(preview.blockers.some(blocker => blocker.domain === 'payment_request_recipients.settled'));
+    const preview = await previewAccountUserMerge(ids[0], ids[1], ids[2]);
+    assert.ok(preview.blockers.some(blocker => blocker.domain === 'billing.verification'));
     await assert.rejects(
       confirmAccountUserMerge(ids[0], ids[1], ids[2], preview.fingerprint),
       /Merge blocked/,
@@ -480,7 +485,7 @@ test('account merge preview blocks provider purchase claims and preserves them o
   }
 });
 
-test('account merge blocks exact user IDs in non-FK varchar references', async () => {
+test('account merge transfers explicitly classified exact creator IDs and audits attribution', async () => {
   const key = randomUUID().replaceAll('-', '');
   const ids = [`merge_text_source_${key}`, `merge_text_target_${key}`, `merge_text_operator_${key}`];
   const q = (sql: string, params: unknown[] = []) => pool.query(sql, params);
@@ -490,15 +495,15 @@ test('account merge blocks exact user IDs in non-FK varchar references', async (
         [ids[i], `${ids[i]}@example.test`, `User ${i}`]);
     // created_by is currently free-form varchar rather than a declared FK.
     await q('UPDATE users SET created_by=$2 WHERE id=$1', [ids[2], ids[0]]);
-    const preview = await previewAccountUserMerge(ids[0], ids[1]);
-    assert.ok(preview.blockers.some(blocker => blocker.domain === 'users.created_by'));
-    await assert.rejects(
-      confirmAccountUserMerge(ids[0], ids[1], ids[2], preview.fingerprint),
-      /Merge blocked/,
-    );
-    assert.equal((await q('SELECT created_by FROM users WHERE id=$1', [ids[2]])).rows[0].created_by, ids[0]);
-    assert.equal((await q('SELECT deleted_at FROM users WHERE id=$1', [ids[0]])).rows[0].deleted_at, null);
+    const preview = await previewAccountUserMerge(ids[0], ids[1], ids[2]);
+    assert.ok(!preview.blockers.some(blocker => blocker.domain === 'users.created_by'));
+    await confirmAccountUserMerge(ids[0], ids[1], ids[2], preview.fingerprint);
+    assert.equal((await q('SELECT created_by FROM users WHERE id=$1', [ids[2]])).rows[0].created_by, ids[1]);
+    assert.ok((await q('SELECT deleted_at FROM users WHERE id=$1', [ids[0]])).rows[0].deleted_at);
+    assert.equal((await q('SELECT activity_provenance FROM account_user_merges WHERE source_user_id=$1', [ids[0]])).rows[0]
+      .activity_provenance['users.created_by'][0].created_by, ids[0]);
   } finally {
+    await q('DELETE FROM account_user_merges WHERE source_user_id=$1', [ids[0]]);
     await q('DELETE FROM account_user_merges WHERE source_user_id=$1', [ids[0]]);
     await q('DELETE FROM users WHERE id=ANY($1::varchar[])', [ids]);
   }
@@ -513,7 +518,7 @@ test('retired-account trigger rejects auth-style upsert/reactivation while survi
   try {
     for (const [id, name] of [[source, 'Source'], [survivor, 'Survivor'], [operator, 'Operator']])
       await q('INSERT INTO users (id,email,first_name) VALUES ($1,$2,$3)', [id, `${id}@example.test`, name]);
-    const preview = await previewAccountUserMerge(source, survivor);
+    const preview = await previewAccountUserMerge(source, survivor, operator);
     await confirmAccountUserMerge(source, survivor, operator, preview.fingerprint);
 
     await assert.rejects(q(`INSERT INTO users (id,email,first_name) VALUES ($1,$2,$3)
@@ -549,7 +554,7 @@ test('SQL constraint failure after an earlier reference update rolls back the wh
       VALUES ($1,'2000-03-04',NOW())`, [source]);
     await q(`INSERT INTO personal_reminders (user_id,title,scheduled_at)
       VALUES ($1,'Rollback reminder',NOW())`, [source]);
-    const preview = await previewAccountUserMerge(source, survivor);
+    const preview = await previewAccountUserMerge(source, survivor, operator);
     assert.deepEqual(preview.blockers, []);
 
     // This NOT VALID check permits the existing source row, but rejects its

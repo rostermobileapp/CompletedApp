@@ -9,7 +9,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
 import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
-import { hasAccountMergeOperatorContext } from "./accountMergeAuthorization";
+import { hasAccountMergeOperatorContext, hasRealAccountMergeActor, assertAccountMergeAccess } from "./accountMergeAuthorization";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
@@ -16785,16 +16785,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const requireAccountMergeOperator = async (req: any, res: any, next: any) => {
     try {
+      if (!hasRealAccountMergeActor(req)) return res.status(403).json({ message: 'A real commissioner or support account is required; this action is unavailable in Demo.' });
+      const leagueId = z.string().uuid().optional().parse(req.method === 'GET' ? req.query.leagueId : req.body.leagueId);
+      if (leagueId) {
+        await assertAccountMergeAccess(pool, req.user.claims.sub, leagueId);
+        req.accountMergeLeagueId = leagueId;
+        return next();
+      }
       if (!hasAccountMergeOperatorContext(req)) return res.status(403).json({ message: 'Account support access required' });
       const { data, error } = await supabase.auth.admin.getUserById(req.user.claims.supabaseId);
       if (error || !data.user || data.user.email?.toLowerCase() !== 'tobin@rosterhockey.com')
         return res.status(403).json({ message: 'Account support access required' });
       next();
     } catch {
-      res.status(503).json({ message: 'Could not verify support access' });
+      res.status(403).json({ message: 'Could not verify account merge access for this league.' });
     }
   };
-  const mergeAccountsSchema = z.object({ sourceId: z.string().uuid(), survivorId: z.string().uuid() });
+  const mergeAccountsSchema = z.object({ sourceId: z.string().uuid(), survivorId: z.string().uuid(), leagueId: z.string().uuid().optional() });
   const verifyRegisteredAuthAccounts = async (sourceId: string, survivorId: string) => {
     const ids = [sourceId, survivorId];
     const results = await Promise.all(ids.map(id => supabase.auth.admin.getUserById(id)));
@@ -16808,7 +16815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const search = z.string().max(100).parse(req.query.search || '');
       if (search.trim().length < 2) return res.json([]);
-      const candidates = await searchAccountUsers(search);
+      const candidates = await searchAccountUsers(search, req.accountMergeLeagueId);
       const verified = await Promise.all(candidates.map(async candidate => {
         const { data, error } = await supabase.auth.admin.getUserById(candidate.id);
         if (error) throw error;
@@ -16826,7 +16833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sourceId, survivorId } = mergeAccountsSchema.parse(req.body);
       if (!await verifyRegisteredAuthAccounts(sourceId, survivorId))
         return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
-      res.json(await previewAccountUserMerge(sourceId, survivorId));
+      res.json(await previewAccountUserMerge(sourceId, survivorId, { operatorId: req.user.claims.sub, leagueId: req.accountMergeLeagueId }));
     } catch (error: any) {
       res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)
         .json({ message: error instanceof AccountUserMergeConflict ? error.message : 'Could not review account merge.' });
@@ -16840,15 +16847,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acknowledgeSurvivorId: z.string(),
         acknowledgeIdentity: z.literal(true),
       }).parse(req.body);
-      if (!await verifyRegisteredAuthAccounts(body.sourceId, body.survivorId))
+      // A response can be lost after commit. A replay must use the archived
+      // source identity: that login is intentionally no longer active.
+      const prior = (await pool.query(`SELECT survivor_user_id,source_display_id,authorization_league_id
+        FROM account_user_merges WHERE source_user_id=$1`, [body.sourceId])).rows[0];
+      const replay = prior?.survivor_user_id === body.survivorId &&
+        (!req.accountMergeLeagueId || prior.authorization_league_id === req.accountMergeLeagueId);
+      if (!replay && !await verifyRegisteredAuthAccounts(body.sourceId, body.survivorId))
         return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
-      const [source, survivor] = await Promise.all([body.sourceId, body.survivorId].map(id =>
-        pool.query('SELECT display_id FROM users WHERE id=$1 AND deleted_at IS NULL', [id])));
+      const [source, survivor] = await Promise.all([
+        replay ? Promise.resolve({ rows: [{ display_id: prior.source_display_id }] }) :
+          pool.query('SELECT display_id FROM users WHERE id=$1 AND deleted_at IS NULL', [body.sourceId]),
+        pool.query('SELECT display_id FROM users WHERE id=$1 AND deleted_at IS NULL', [body.survivorId]),
+      ]);
       if (!source.rows[0]?.display_id || !survivor.rows[0]?.display_id ||
           body.acknowledgeSourceId !== source.rows[0].display_id ||
           body.acknowledgeSurvivorId !== survivor.rows[0].display_id)
         return res.status(409).json({ message: 'Type both exact displayed U IDs before confirming.' });
-      res.json(await confirmAccountUserMerge(body.sourceId, body.survivorId, req.user.claims.sub, body.previewFingerprint));
+      const result = await confirmAccountUserMerge(body.sourceId, body.survivorId, req.user.claims.sub, body.previewFingerprint, req.accountMergeLeagueId);
+      // Retiring the login also ends connections authenticated before the merge.
+      for (const connection of Array.from(activeConnections.get(result.sourceId) ?? [])) connection.close(1008, 'Account retired; sign in with the parent account.');
+      activeConnections.delete(result.sourceId);
+      unsubscribeUserFromAllDrafts(result.sourceId);
+      res.json(result);
     } catch (error: any) {
       console.error('Account-wide merge failed:', error);
       res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)

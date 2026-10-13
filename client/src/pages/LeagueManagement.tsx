@@ -113,7 +113,6 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 import { DraftSetupWizard } from '@/components/DraftSetupWizard';
-import { LeaguePlayerMerge } from '@/components/LeaguePlayerMerge';
 import { AccountUserMerge } from '@/components/AccountUserMerge';
 import {
   AlertDialog,
@@ -3344,7 +3343,7 @@ export default function LeagueManagement() {
                 <h3 className="text-lg font-semibold">Players</h3>
               </div>
               <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end text-center">
-                <LeaguePlayerMerge leagueId={leagueId} />
+                {isCommissioner && <AccountUserMerge leagueId={leagueId} />}
                 <button
                   onClick={() => { setExistingUserSearch(''); setShowAddExistingUser(true); }}
                   className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"

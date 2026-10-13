@@ -329,6 +329,23 @@ export const applePurchaseLinks = pgTable("apple_purchase_links", {
   attestedAt: timestamp("attested_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Immutable identity retirement and original record attribution for full merges.
+export const accountUserMerges = pgTable("account_user_merges", {
+  sourceUserId: varchar("source_user_id").primaryKey().references(() => users.id, { onDelete: "restrict" }),
+  survivorUserId: varchar("survivor_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  operatorUserId: varchar("operator_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  sourceDisplayId: varchar("source_display_id"),
+  sourceEmail: varchar("source_email"),
+  mergedAt: timestamp("merged_at", { withTimezone: true }).defaultNow().notNull(),
+  previewFingerprint: varchar("preview_fingerprint", { length: 64 }).notNull(),
+  authorizationLeagueId: varchar("authorization_league_id"),
+  activityProvenance: jsonb("activity_provenance").notNull().default({}),
+  mergePolicy: jsonb("merge_policy").notNull().default({}),
+}, table => [
+  index("account_user_merges_survivor_idx").on(table.survivorUserId),
+  check("account_user_merges_distinct_users", sql`${table.sourceUserId} <> ${table.survivorUserId}`),
+]);
+
 // Popup dismissal and push delivery have separate lifecycles. One row per
 // user and local birthday also protects against duplicate sends on restarts.
 export const birthdayGreetings = pgTable("birthday_greetings", {

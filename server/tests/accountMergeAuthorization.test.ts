@@ -1,8 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hasAccountMergeOperatorContext } from '../accountMergeAuthorization';
+import { hasAccountMergeOperatorContext, hasRealAccountMergeActor } from '../accountMergeAuthorization';
 
-test('a league commissioner cannot open account-wide merge without support authorization', () => {
+test('global search remains support-only while real commissioners may use the league-authorized path', () => {
+  assert.equal(hasRealAccountMergeActor({
+    user: { claims: { sub: 'commissioner-id' } }, realActor: { id: 'commissioner-id' },
+  }), true);
+  assert.equal(hasRealAccountMergeActor({
+    user: { claims: { sub: 'commissioner-id' } }, realActor: { id: 'someone-else' },
+  }), false);
+  assert.equal(hasRealAccountMergeActor({
+    demoContext: {}, user: { claims: { sub: 'commissioner-id' } }, realActor: { id: 'commissioner-id' },
+  }), false);
   assert.equal(hasAccountMergeOperatorContext({
     user: { claims: { email: 'commissioner@example.test', sub: 'commissioner-id' } },
     realActor: { id: 'commissioner-id' },

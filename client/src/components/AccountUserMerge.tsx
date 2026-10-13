@@ -2,39 +2,55 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-type Candidate = { id: string; displayId: string | null; name: string; email: string | null };
-type Identity = Candidate;
-const userIdLabel = (user: Identity) => user.displayId || `U ID unavailable · internal ID ${user.id}`;
+type Candidate = { id: string; displayId: string | null; name: string; email: string | null; role?: string };
+type Identity = Candidate & { role: string };
+const userIdLabel = (user: Candidate) => user.displayId || `U ID unavailable · internal ID ${user.id}`;
+const humanTier = (role?: string) => {
+  const value = (role || 'unknown').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  if (value === 'free') return 'Free';
+  if (value === 'paid' || value === 'pro' || value === 'premium') return 'Paid';
+  return value.replace(/\b\w/g, character => character.toUpperCase());
+};
 type Count = { domain: string; count: number };
+type MergePolicy = {
+  kind: 'free_free' | 'keep_paid' | 'billing_duplicate' | 'verification_required';
+  message: string;
+  autoSelected: boolean;
+};
 type Preview = {
   source: Identity;
   survivor: Identity;
+  policy: MergePolicy;
   leagues: { id: string; name: string; records: Count[] }[];
   other: Count[];
   combinable: { domain: string; count: number; label: string }[];
-  blockers: { domain: string; reason: string; count: number }[];
+  blockers: { domain: string; reason: string; count: number; recordIds?: string[] }[];
   legacy: { id: string; league: string; name: string; kind: string; disposition: string }[];
   lookalikes: { id: string; league: string; name: string; kind: string }[];
   fingerprint: string;
 };
 
-function UserPicker({ label, selected, onSelect, enabled }: {
+function UserPicker({ label, selected, onSelect, enabled, leagueId }: {
   label: string;
   selected: Candidate | null;
   onSelect: (candidate: Candidate | null) => void;
   enabled: boolean;
+  leagueId?: string;
 }) {
   const [search, setSearch] = useState('');
   const term = search.trim();
   const validTerm = term.length >= 2;
   const { data = [], isFetching, isError, error } = useQuery<Candidate[]>({
-    queryKey: ['account-user-merge-candidates', term],
-    queryFn: async () => (await apiRequest('GET', `/api/account-user-merge/candidates?search=${encodeURIComponent(term)}`)).json(),
+    queryKey: ['account-user-merge-candidates', leagueId ?? null, term],
+    queryFn: async () => (await apiRequest('GET',
+      `/api/account-user-merge/candidates?search=${encodeURIComponent(term)}${leagueId ? `&leagueId=${encodeURIComponent(leagueId)}` : ''}`)).json(),
     enabled: enabled && validTerm,
   });
 
@@ -67,8 +83,13 @@ function Counts({ rows }: { rows: Count[] }) {
     <li key={`${row.domain}:${i}`} className="flex justify-between gap-3"><span>{row.domain}</span><b>{row.count}</b></li>)}</ul>;
 }
 
-export function AccountUserMerge({ survivorId, onClose }: { survivorId?: string; onClose?: () => void } = {}) {
+export function AccountUserMerge({ survivorId, leagueId, onClose }: {
+  survivorId?: string;
+  leagueId?: string;
+  onClose?: () => void;
+} = {}) {
   const contextual = !!survivorId;
+  const commissionerContext = !!leagueId;
   const [open, setOpen] = useState(contextual);
   const [source, setSource] = useState<Candidate | null>(null);
   const [survivor, setSurvivor] = useState<Candidate | null>(null);
@@ -80,11 +101,12 @@ export function AccountUserMerge({ survivorId, onClose }: { survivorId?: string;
   const [error, setError] = useState('');
   const client = useQueryClient();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
   const { data: verifiedSurvivor, isFetching: verifyingSurvivor, isError: survivorError } = useQuery<Candidate | null>({
-    queryKey: ['account-user-merge-survivor', survivorId],
+    queryKey: ['account-user-merge-survivor', leagueId ?? null, survivorId],
     queryFn: async () => {
       const candidates: Candidate[] = await (await apiRequest('GET',
-        `/api/account-user-merge/candidates?search=${encodeURIComponent(survivorId!)}`)).json();
+        `/api/account-user-merge/candidates?search=${encodeURIComponent(survivorId!)}${leagueId ? `&leagueId=${encodeURIComponent(leagueId)}` : ''}`)).json();
       return candidates.find(candidate => candidate.id === survivorId) || null;
     },
     enabled: contextual && open,
@@ -99,16 +121,36 @@ export function AccountUserMerge({ survivorId, onClose }: { survivorId?: string;
   const reset = () => {
     setOpen(false); setSource(null); setSurvivor(null); setPreview(null);
     setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError('');
+    setBusy(false);
     onClose?.();
   };
   const changeSource = (value: Candidate | null) => { setSource(value); setPreview(null); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError(''); };
   const changeSurvivor = (value: Candidate | null) => { setSurvivor(value); setPreview(null); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError(''); };
-  const request = async (action: 'preview' | 'confirm', body: unknown) => {
+  const request = async (action: 'preview' | 'confirm', body: Record<string, unknown>) => {
+    return (await apiRequest('POST', `/api/account-user-merge/${action}`, {
+      ...body,
+      ...(leagueId ? { leagueId } : {}),
+    })).json();
+  };
+  const clearAcknowledgements = () => {
+    setSourceAck('');
+    setSurvivorAck('');
+    setIdentityAck(false);
+  };
+  const refreshPreview = async (preserveError = false) => {
+    if (!preview) return;
+    const reviewedIds = { sourceId: preview.source.id, survivorId: preview.survivor.id };
+    setBusy(true);
+    if (!preserveError) setError('');
     try {
-      return await (await apiRequest('POST', `/api/account-user-merge/${action}`, body)).json();
+      const refreshed = await request('preview', reviewedIds) as Preview;
+      setPreview(refreshed);
+      clearAcknowledgements();
     } catch (e) {
-      setError((e as Error)?.message || `Could not ${action} account merge.`);
-      return null;
+      const refreshError = (e as Error)?.message || 'Could not refresh the account merge review.';
+      setError(previous => preserveError && previous ? `${previous} Review refresh also failed: ${refreshError}` : refreshError);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -120,23 +162,30 @@ export function AccountUserMerge({ survivorId, onClose }: { survivorId?: string;
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Account-wide user merge</DialogTitle>
-          <DialogDescription>This support-only operation merges two registered sign-in accounts across the entire service. Search results are accounts, not imported or placeholder roster entries. Search by name, email or U ID and independently verify both identities.</DialogDescription>
+          <DialogDescription>{commissionerContext
+            ? 'Commissioner review: merge two registered sign-in accounts across the entire service and every league, not just this league. This is not a support-only action. Search results are registered accounts, never imported or placeholder roster entries.'
+            : 'Support-only global operation: merge two registered sign-in accounts across the entire service and every league. Search results are registered accounts, not imported or placeholder roster entries.'} Search by name, email or U ID and independently verify both identities.</DialogDescription>
         </DialogHeader>
         {!preview && <>
           <div className="grid gap-4 sm:grid-cols-2">
-             <UserPicker label="Source · account to retire" selected={source} onSelect={changeSource} enabled={open} />
+              <UserPicker label="Source · account to retire" selected={source} onSelect={changeSource} enabled={open} leagueId={leagueId} />
              {contextual ? <section className="rounded border border-primary p-3 text-sm" data-testid="fixed-merge-survivor">
-               <b>Survivor · this registered account keeps its login</b>
+                <b>Preferred account to retain · subject to paid tier</b>
                {verifyingSurvivor ? <p>Verifying registered account…</p> :
                  survivorError || !survivor ? <p role="alert">Could not verify this registered survivor. Close and reopen this action.</p> :
-                 <p>{survivor.name}<br /><strong>{userIdLabel(survivor)}</strong><br />{survivor.email}</p>}
+                  <p>{survivor.name}<br /><strong>{userIdLabel(survivor)}</strong><br />{survivor.email || 'No email'}<br />
+                    Account tier: {humanTier(survivor.role)}</p>}
              </section> :
-               <UserPicker label="Survivor · account to keep" selected={survivor} onSelect={changeSurvivor} enabled={open} />}
+                <UserPicker label="Preferred account to retain · subject to paid tier" selected={survivor} onSelect={changeSurvivor} enabled={open} leagueId={leagueId} />}
           </div>
           <Button disabled={!source || !survivor || source.id === survivor.id || busy} onClick={async () => {
             setBusy(true); setError('');
-            const data = await request('preview', { sourceId: source!.id, survivorId: survivor!.id });
-            if (data) { setPreview(data); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); }
+            try {
+              const data = await request('preview', { sourceId: source!.id, survivorId: survivor!.id }) as Preview;
+              setPreview(data); clearAcknowledgements();
+            } catch (e) {
+              setError((e as Error)?.message || 'Could not preview account merge.');
+            }
             setBusy(false);
           }}>{busy ? 'Preparing review…' : 'Review account-wide changes'}</Button>
         </>}
@@ -149,10 +198,34 @@ export function AccountUserMerge({ survivorId, onClose }: { survivorId?: string;
               return <section key={user.id} className="min-w-0 rounded-lg border p-3 text-sm">
                 <h3 className="font-bold">{label}</h3>
                 <p className="mt-2">{user.name}<br /><span className="break-all font-semibold">{userIdLabel(user)}</span><br />
-                  <span className="break-all">{user.email || 'No email'}</span></p>
+                  <span className="break-all">{user.email || 'No email'}</span><br />
+                  Account tier: {humanTier(user.role)}</p>
               </section>;
             })}
           </div>
+          <section className={`rounded-lg border p-3 text-sm space-y-1 ${
+            preview.policy.kind === 'billing_duplicate' || preview.policy.kind === 'verification_required'
+              ? 'border-destructive bg-destructive/10' : 'border-primary/40 bg-primary/5'
+          }`} role={preview.policy.kind === 'billing_duplicate' || preview.policy.kind === 'verification_required' ? 'alert' : 'status'}>
+            <h3 className="font-bold">
+              {preview.policy.kind === 'billing_duplicate' ? 'Two paid accounts: billing duplication risk' :
+                preview.policy.kind === 'verification_required' ? 'Paid-account verification required' :
+                  'Account tier and login selection'}
+            </h3>
+            <p>{preview.policy.message}</p>
+            {preview.policy.kind === 'billing_duplicate' &&
+              <p className="font-semibold">Both accounts are paid. Do not proceed: merging could duplicate billing or entitlements. Confirmation is disabled.</p>}
+            {preview.policy.kind === 'verification_required' &&
+              <p className="font-semibold">Resolve the required billing or account verification before continuing. Confirmation is disabled.</p>}
+            {preview.policy.kind === 'free_free' &&
+              <p>For free/free accounts, the parent account's login and profile are retained.</p>}
+            {preview.policy.autoSelected && <p>
+              The server automatically selected the parent account to retain based on paid-tier rules. The returned source and survivor below are authoritative.
+            </p>}
+            {commissionerContext && <p className="font-semibold">
+              This is a full-account merge across the entire service and all leagues; it is not limited to this league and does not require support staff.
+            </p>}
+          </section>
           <section className="rounded-lg border p-3 space-y-3">
             <h3 className="font-bold">Records to review by league</h3>
             {!preview.leagues.length && <p className="text-sm text-muted-foreground">No league records</p>}
@@ -182,12 +255,16 @@ export function AccountUserMerge({ survivorId, onClose }: { survivorId?: string;
           <section className="rounded-lg border border-destructive/50 p-3 space-y-2">
             <h3 className="font-bold text-destructive">Blockers · {preview.blockers.length}</h3>
             {preview.blockers.length ? <ul className="space-y-2 text-sm">{preview.blockers.map((item, i) =>
-              <li key={`${item.domain}:${i}`}><b>{item.domain}</b> · {item.count} record(s): {item.reason}</li>)}</ul> :
+              <li key={`${item.domain}:${i}`}><b>{item.domain}</b> · {item.count} record(s): {item.reason}
+                {item.recordIds?.length ? <span className="block mt-1 break-all text-muted-foreground">Record IDs: {item.recordIds.join(', ')}</span> : null}
+              </li>)}</ul> :
               <p className="text-sm">No blockers reported by preflight.</p>}
           </section>
           <div className="rounded-lg border border-amber-500/50 bg-amber-500/5 p-3 text-sm space-y-1">
             <h3 className="font-bold">Account and billing consequences</h3>
-            <p>The source account will be retired and must no longer be used to log in or recreate a profile. The survivor’s login and personal profile remain authoritative. The original source ID, displayed U ID, email, operator and review fingerprint remain in an internal audit record; transferred authored content appears under the survivor.</p>
+            <p>The source account will be retired and its login cannot be used again. The server-selected survivor’s login and profile remain authoritative. The original source ID, displayed U ID, email, operator and review fingerprint remain in an internal audit record; transferred authored content appears under the survivor.</p>
+            <p>The selected survivor is only the preferred account to retain; the server may reorient the merge to preserve a paid account.</p>
+            <p>Invitations and reminders are not resent, and badges are not replayed.</p>
             <p>Billing identities, subscriptions, purchases, paid seats, and entitlements must not be assumed transferable or duplicated. Resolve billing ownership explicitly; any unresolved conflict blocks this merge.</p>
             <p className="break-all text-xs text-muted-foreground">Preview fingerprint: {preview.fingerprint}</p>
           </div>
@@ -204,26 +281,36 @@ export function AccountUserMerge({ survivorId, onClose }: { survivorId?: string;
           </div>
           <label className="flex items-start gap-2 text-sm">
             <Checkbox checked={identityAck} onCheckedChange={value => setIdentityAck(value === true)} />
-            I verified the exact IDs and emails above belong to the same person, independently of names or shared email, and understand the source account is retired and the account-wide merge is irreversible.
+            I verified the exact IDs and emails above belong to the same person, independently of names or shared email, and understand the source login is permanently retired and the account-wide merge is irreversible.
           </label>
           <div className="flex flex-wrap gap-2">
             <Button variant="destructive" disabled={busy || preview.blockers.length > 0 ||
+              preview.policy.kind === 'billing_duplicate' || preview.policy.kind === 'verification_required' ||
               !preview.source.displayId || !preview.survivor.displayId ||
               sourceAck !== preview.source.displayId || survivorAck !== preview.survivor.displayId || !identityAck}
               onClick={async () => {
                 setBusy(true); setError('');
-                const result = await request('confirm', {
-                  sourceId: preview.source.id, survivorId: preview.survivor.id,
-                  previewFingerprint: preview.fingerprint,
-                  acknowledgeSourceId: sourceAck, acknowledgeSurvivorId: survivorAck, acknowledgeIdentity: true,
-                });
-                setBusy(false);
-                if (result) {
+                try {
+                  await request('confirm', {
+                    sourceId: preview.source.id, survivorId: preview.survivor.id,
+                    previewFingerprint: preview.fingerprint,
+                    acknowledgeSourceId: sourceAck, acknowledgeSurvivorId: survivorAck, acknowledgeIdentity: true,
+                  });
                   await client.invalidateQueries();
                   toast({ title: 'Account-wide merge completed', description: 'Account data has been refreshed.' });
+                  const sourceWasCurrentUser = authUser?.id === preview.source.id;
                   reset();
+                  if (sourceWasCurrentUser) await supabase.auth.signOut();
+                } catch (e) {
+                  const confirmError = (e as Error)?.message || 'Could not confirm account merge.';
+                  setError(confirmError);
+                  setBusy(false);
+                  await refreshPreview(true);
                 }
               }}>{busy ? 'Merging…' : 'Confirm irreversible account merge'}</Button>
+             <Button variant="outline" disabled={busy} onClick={() => refreshPreview()}>
+               {busy ? 'Refreshing…' : 'Refresh review'}
+             </Button>
              <Button variant="outline" disabled={busy} onClick={() => { setPreview(null); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError(''); }}>{contextual ? 'Change source' : 'Change accounts'}</Button>
           </div>
         </>}
