@@ -125,7 +125,7 @@ import * as path from 'path';
 import { createHash, randomBytes } from 'crypto';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
-import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail, sendNewDirectMessageEmail } from "./emails";
+import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail } from "./emails";
 import { startEventReminderJob } from "./eventReminderJob";
 import { startTournamentAccessJob } from "./tournamentAccessJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
@@ -22654,18 +22654,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (pushed) {
                 anyPushDelivered = true;
               }
-              // If push was not delivered (no token yet), fall back to email
-              if (!pushed) {
-                try {
-                  const recipient = await storage.getUser(recipientId);
-                  if (recipient?.email) {
-                    await sendNewDirectMessageEmail(recipient.email, senderName, conversationId);
-                    console.log(`[Message Notification] Email fallback sent to ${recipient.email}`);
-                  }
-                } catch (emailErr) {
-                  console.error('[Message Notification] Email fallback failed:', emailErr);
-                }
-              }
+              // In-app messages never trigger email, including when push
+              // delivery is unavailable or disabled for the recipient.
             }
             // Mark message as delivered if at least one push reached a device
             if (anyPushDelivered) {

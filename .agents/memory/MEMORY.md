@@ -76,3 +76,4 @@
 - [Season patch statistics](season-patch-statistics.md) — count all categories earned within season dates; tiers count separately and cumulative repeat totals need a pre-season baseline.
 - [Homepage positioning](homepage-positioning.md) — lead with time together; fade the hero photo to pure black into the story section.
 - [Beverage-duty tally](beverage-duty-tally.md) — roster counts use recorded per-game assignments, not a permanent log of every claim event.
+- [In-app message email policy](in-app-message-email-policy.md) — chat messages may notify in-app or by push, but must never trigger email, including as a delivery fallback.
