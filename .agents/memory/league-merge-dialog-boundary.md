@@ -8,3 +8,9 @@ The commissioner merge dialog selects only active league user accounts with U ID
 **Why:** Applying dialog-only candidate rules to the replacement confirmation can prevent commissioners from safely reviewing and replacing older placeholder-backed members.
 
 **How to apply:** When changing league merge candidate or preview validation, check both the user-only dialog and the legacy replacement confirmation path; do not widen the dialog to make replacement work.
+
+League approvals, announcements, invites, duties, reminders, and badges should be eligible for explicitly classified transfer to the surviving account, rather than blocked simply because records exist.
+
+**Why:** The user requested preservation of these league records when consolidating player accounts.
+
+**How to apply:** Keep transfers league-scoped, preserve historical attribution in an audit record, and distinguish safe deduplication from meaningful conflicts or permission changes. This does not authorize account-wide billing, login, or other-league transfers.
