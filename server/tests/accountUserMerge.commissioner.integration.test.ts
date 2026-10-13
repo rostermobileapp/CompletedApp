@@ -139,6 +139,14 @@ test('unknown references fail closed and the entire merge remains unchanged', as
   } finally { await q('DROP TABLE merge_unclassified_fixture'); }
 });
 
+test('changing a verified sign-in identity invalidates the account merge review', async () => {
+  const authIdentities: [string, string][] = [[source, 'original-sign-in'], [target, 'parent-sign-in']];
+  const p = await previewAccountUserMerge(source, target, { ...access(), authIdentities });
+  await assert.rejects(confirmAccountUserMerge(source, target, actor, p.fingerprint, league,
+    [[source, 'replacement-sign-in'], [target, 'parent-sign-in']]), /changed after review/);
+  assert.equal((await q('SELECT count(*)::int n FROM account_user_merges')).rows[0].n, 0);
+});
+
 test('badge duplicates preserve acknowledged delivery, payload references and original audit', async () => {
   const badge = randomUUID(), srcAward = randomUUID(), dstAward = randomUUID();
   await q(`INSERT INTO badge_definitions(id,slug,name,description,category,trigger_type,status)

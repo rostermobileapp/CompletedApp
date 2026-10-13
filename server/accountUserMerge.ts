@@ -471,7 +471,7 @@ async function resolveLeagueParentPath(client: PoolClient) {
   return findPath;
 }
 
-type MergeAccess = { operatorId: string; leagueId?: string };
+type MergeAccess = { operatorId: string; leagueId?: string; authIdentities?: [string, string][] };
 async function buildPreview(client: PoolClient, sourceId: string, survivorId: string, access?: MergeAccess): Promise<MergePreview> {
   if (!sourceId || !survivorId || sourceId === survivorId)
     throw new AccountUserMergeConflict('Select two different account IDs.');
@@ -583,7 +583,7 @@ async function buildPreview(client: PoolClient, sourceId: string, survivorId: st
     if (otherCount) other.push({ domain: ref.domain, count: otherCount });
   }
   const fingerprintPayload = {
-    authorization: access ? [access.operatorId, access.leagueId ?? null] : null,
+    authorization: access ? [access.operatorId, access.leagueId ?? null, access.authIdentities ?? null] : null,
     policy: [policy.kind, policy.message],
     billingEvidence,
     source: [source.id, source.displayId, source.name, source.email],
@@ -613,7 +613,7 @@ export async function previewAccountUserMerge(sourceId: string, survivorId: stri
 }
 
 async function confirmAccountUserMergeOnce(
-  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string, leagueId?: string,
+  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string, leagueId?: string, authIdentities?: [string, string][],
 ) {
   const client = await pool.connect();
   try {
@@ -636,7 +636,7 @@ async function confirmAccountUserMergeOnce(
     const operator = await identity(client, operatorId, true);
     if (!source || !survivor) throw new AccountUserMergeConflict('Both selected accounts must still be active.');
     if (!operator) throw new AccountUserMergeConflict('A valid active merge-operator account is required.');
-    const preview = await buildPreview(client, sourceId, survivorId, { operatorId, leagueId });
+    const preview = await buildPreview(client, sourceId, survivorId, { operatorId, leagueId, authIdentities });
     if (preview.source.id !== sourceId || preview.survivor.id !== survivorId)
       throw new AccountUserMergeConflict('The non-free profile must be the parent. Refresh the review to confirm the paid account’s login.');
     if (!previewFingerprint || preview.fingerprint !== previewFingerprint)
@@ -706,14 +706,14 @@ async function confirmAccountUserMergeOnce(
 }
 
 export async function confirmAccountUserMerge(
-  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string, leagueId?: string,
+  sourceId: string, survivorId: string, operatorId: string, previewFingerprint: string, leagueId?: string, authIdentities?: [string, string][],
 ) {
   // A serializable loser in two simultaneous identical confirmations retries
   // from a fresh snapshot and observes the durable audit row as an idempotent
   // replay instead of surfacing a spurious concurrency failure.
   for (let attempt = 0; ; attempt++) {
     try {
-      return await confirmAccountUserMergeOnce(sourceId, survivorId, operatorId, previewFingerprint, leagueId);
+      return await confirmAccountUserMergeOnce(sourceId, survivorId, operatorId, previewFingerprint, leagueId, authIdentities);
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (attempt >= 2 || (code !== '40001' && code !== '40P01')) throw error;

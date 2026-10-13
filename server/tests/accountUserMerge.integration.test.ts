@@ -521,6 +521,8 @@ test('retired-account trigger rejects auth-style upsert/reactivation while survi
     const preview = await previewAccountUserMerge(source, survivor, operator);
     await confirmAccountUserMerge(source, survivor, operator, preview.fingerprint);
 
+    assert.equal(await isRetiredAccount('different-legacy-auth-id', `  ${source.toUpperCase()}@EXAMPLE.TEST  `), true);
+    assert.equal(await isRetiredAccount('different-parent-auth-id', `${survivor}@example.test`), false);
     await assert.rejects(q(`INSERT INTO users (id,email,first_name) VALUES ($1,$2,$3)
       ON CONFLICT (id) DO UPDATE SET deleted_at=NULL,first_name=EXCLUDED.first_name`,
     [source, `${source}@example.test`, 'Attempted resurrection']), /Retired account cannot be reactivated/);

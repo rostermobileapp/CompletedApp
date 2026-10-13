@@ -35,3 +35,9 @@ Normalize PostgreSQL catalog metadata before treating it as application data, es
 **Why:** The isolated TCP driver returned PostgreSQL identifier arrays as strings, while unquoted catalog aliases did not match the expected object keys. These issues hid league grouping or broke otherwise safe reviews.
 
 **How to apply:** Use explicit text-array types and stable column aliases for catalog results, and verify both collision detection and indirect league grouping in isolated fixtures.
+
+A registered Roster account can retain a legacy database ID that differs from its Supabase sign-in ID. Preserve that distinction rather than assuming the database ID is an Auth ID.
+
+**Why:** Historical migration can retain the old profile while its real sign-in is uniquely linked by normalized email. Direct Auth-ID lookup alone incorrectly hides these registered users.
+
+**How to apply:** Verify an unambiguous normalized-email link against the Auth provider, reject contradictory identities, bind the resolved identities to the review, and reject retired sign-ins by original email too.
