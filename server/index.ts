@@ -10,7 +10,7 @@ import { initGoogleIapClaimsDb } from "./googleIapClaimsInit";
 import { initApplePurchaseLinks, reconcileApplePurchaseLinks, startApplePurchaseLinkJob } from "./applePurchaseLinks";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
-import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
+import { reconcileSeasonBeercules, reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
 import { runHistoricalBadgeBackfills } from "./badgeDbInit";
 import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
 import { startDailyTriviaPushJob } from "./triviaPushJob";
@@ -109,6 +109,8 @@ app.use((req, res, next) => {
       console.error("[Badges] Sub Magnet season reconciliation failed:", error));
     reconcileSeasonRsvpKing(true).catch((error) =>
       console.error("[Badges] RSVP King season reconciliation failed:", error));
+    reconcileSeasonBeercules(true).catch((error) =>
+      console.error("[Badges] Beercules season reconciliation failed:", error));
   }, 60 * 60 * 1000).unref();
 
   // Pre-warm the city geo cache from existing DB records so the first heatmap

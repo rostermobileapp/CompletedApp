@@ -4400,6 +4400,7 @@ export type LeagueInviteSent = typeof leagueInvitesSent.$inferSelect;
 
 export const badgeCategoryEnum = pgEnum("badge_category", [
   "nhl_trophy",
+  "season_award",
   "team_badge",
   "achievement",
 ]);

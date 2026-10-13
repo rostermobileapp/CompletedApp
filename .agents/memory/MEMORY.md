@@ -77,3 +77,4 @@
 - [Homepage positioning](homepage-positioning.md) — lead with time together; fade the hero photo to pure black into the story section.
 - [Beverage-duty tally](beverage-duty-tally.md) — roster counts use recorded per-game assignments, not a permanent log of every claim event.
 - [In-app message email policy](in-app-message-email-policy.md) — chat messages may notify in-app or by push, but must never trigger email, including as a delivery fallback.
+- [Beercules season award](beercules-season-award.md) — season-long beer totals decide tied winners after completion; keep it independent of Beer Me's calendar-year reset.

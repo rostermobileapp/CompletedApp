@@ -149,7 +149,7 @@ function TrophyAwardSection({ section, visibleBadges, preview, onSelect }: {
   const [expanded, setExpanded] = useState(false);
   const contentId = `trophy-awards-${section.category}`;
   return <section className={`trophy-depth-panel rounded-2xl px-3.5 sm:px-5 ${expanded ? "pt-2 pb-3.5 sm:pt-3 sm:pb-5" : "py-1 sm:py-1.5"}`}>
-    <TrophySectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={visibleBadges.length} expanded={expanded} onToggle={() => setExpanded((open) => !open)} contentId={contentId} />
+    <TrophySectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : section.category === "season_award" ? "Awards for leading the league during a completed season." : "Badges awarded by team captains."} count={visibleBadges.length} expanded={expanded} onToggle={() => setExpanded((open) => !open)} contentId={contentId} />
     <div id={contentId} hidden={!expanded} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{visibleBadges.map((badge) => <BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />)}</div>
   </section>;
 }

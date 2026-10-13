@@ -144,6 +144,7 @@ import {
   reconcileCalendarYearBeerMe,
   reconcileSeasonSubMagnet,
   reconcileSeasonRsvpKing,
+  reconcileSeasonBeercules,
   getTrophyCaseAccess,
   getTrophyCase,
   getEarnedPatches,
@@ -7942,6 +7943,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await reconcileSeasonRsvpKing(true, closeCurrentSeasonId);
         } catch (error) {
           console.error("[Badges] Could not award RSVP King after season close:", error);
+        }
+        try {
+          await reconcileSeasonBeercules(true, closeCurrentSeasonId);
+        } catch (error) {
+          console.error("[Badges] Could not award Beercules after season close:", error);
         }
       }
       res.json({ season: newSeason });

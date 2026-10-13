@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { ensureDefaultBadges, reconcileCalendarYearCenturyClub, reconcileCareerShutouts, reconcileFirstSubBadge, reconcileHistoricalThreeStarPoints, reconcileIronMan, reconcileRookieCard, reconcileSeasonEarlyBird, reconcileSeasonHatTricks, reconcileSeasonOnFire, reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
+import { ensureDefaultBadges, reconcileCalendarYearCenturyClub, reconcileCareerShutouts, reconcileFirstSubBadge, reconcileHistoricalThreeStarPoints, reconcileIronMan, reconcileRookieCard, reconcileSeasonBeercules, reconcileSeasonEarlyBird, reconcileSeasonHatTricks, reconcileSeasonOnFire, reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
 import { runBadgeBackfillJobs } from "./badgeBackfillRunner";
 
 // Runtime-safe DDL keeps older deployments compatible. The Drizzle schema
@@ -8,7 +8,7 @@ import { runBadgeBackfillJobs } from "./badgeBackfillRunner";
 export async function ensureBadgeTables() {
   await db.execute(sql`
     DO $$ BEGIN
-      CREATE TYPE badge_category AS ENUM ('nhl_trophy', 'team_badge', 'achievement');
+      CREATE TYPE badge_category AS ENUM ('nhl_trophy', 'season_award', 'team_badge', 'achievement');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     DO $$ BEGIN
       CREATE TYPE badge_achievement_type AS ENUM ('multiplier', 'tiered', 'onetime');
@@ -29,6 +29,8 @@ export async function ensureBadgeTables() {
       CREATE TYPE badge_status AS ENUM ('draft', 'published', 'archived');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
   `);
+  // Commit the new enum label before the Beercules definition can use it.
+  await db.execute(sql`ALTER TYPE badge_category ADD VALUE IF NOT EXISTS 'season_award'`);
   // A new enum label must be committed before it can be used in tier rows.
   await db.execute(sql`ALTER TYPE badge_tier ADD VALUE IF NOT EXISTS 'emerald'`);
   await db.execute(sql`
@@ -132,6 +134,7 @@ export async function runHistoricalBadgeBackfills(): Promise<void> {
     { name: "Rookie Card", run: reconcileRookieCard },
     { name: "Sub", run: reconcileFirstSubBadge },
     { name: "Sub Magnet", run: reconcileSeasonSubMagnet },
+    { name: "Beercules", run: reconcileSeasonBeercules },
     { name: "Century Club", run: reconcileCalendarYearCenturyClub },
     { name: "Hat Trick", run: reconcileSeasonHatTricks },
     { name: "On Fire", run: reconcileSeasonOnFire },

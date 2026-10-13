@@ -37,7 +37,7 @@ import { ON_FIRE_TIERS } from "@shared/onFireTiers";
 import { IRON_MAN_TIERS } from "@shared/ironManTiers";
 import { LOCKED_IN_TIERS } from "@shared/lockedInTiers";
 
-export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
+export type BadgeCategory = "nhl_trophy" | "season_award" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
 export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "emerald" | "diamond" | "legend" | "god_mode";
 
@@ -160,6 +160,18 @@ const achievement = (
 });
 
 DEFAULT_BADGES.push(
+  {
+    ...achievement(
+      "beercules",
+      "Beercules",
+      "Most beers logged during a completed league season. Ties share the award.",
+      "onetime",
+      "event",
+      "season_beercules_winner",
+    ),
+    category: "season_award",
+    imagePath: "/badges/beercules/patch-v1.webp",
+  },
   achievement("hat_trick", "Hat Trick", "Games with 3 or more goals in one season. Each qualifying game counts once.", "tiered", "metric", "season_hat_tricks", {}, [
     ...HAT_TRICK_TIERS.map(({ tier, threshold, imagePath }) => ({
       ...defaultTier(tier, threshold), imagePath,
@@ -208,6 +220,7 @@ DEFAULT_BADGES.push(
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   nhl_trophy: "League Awards",
+  season_award: "Season Awards",
   team_badge: "Team Awards",
   achievement: "Achievements",
 };
@@ -328,6 +341,15 @@ export async function ensureDefaultBadges() {
       if (badge.slug === "sub_magnet") {
         await db.update(badgeDefinitions).set({
           description: badge.description, triggerKey: badge.triggerKey, imagePath: badge.imagePath,
+        }).where(eq(badgeDefinitions.id, existing.id));
+      }
+      if (badge.slug === "beercules") {
+        await db.update(badgeDefinitions).set({
+          category: badge.category,
+          description: badge.description,
+          triggerType: badge.triggerType,
+          triggerKey: badge.triggerKey,
+          imagePath: badge.imagePath,
         }).where(eq(badgeDefinitions.id, existing.id));
       }
       if (badge.slug === "ghost" || badge.slug === "league_hopper" || badge.slug === "rookie_card") {
@@ -1657,6 +1679,53 @@ export async function reconcileSeasonSubMagnet(announce = false, seasonId?: stri
   return inserted.rows.length;
 }
 
+// Award Beercules to every tied beer-count leader after a league season closes.
+// Startup reconciliation backfills completed seasons silently; live close and
+// hourly deadline checks announce newly inserted awards.
+export async function reconcileSeasonBeercules(announce = false, seasonId?: string) {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "beercules"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return 0;
+  const inserted = await db.execute(sql`
+    WITH totals AS (
+      SELECT s.id AS season_id, s.league_id, gbc.user_id,
+        SUM(gbc.count)::int AS beers_consumed
+      FROM seasons s
+        JOIN leagues l ON l.id = s.league_id
+        JOIN games g ON g.season_id = s.id AND g.league_id = s.league_id
+        JOIN game_beer_counts gbc ON gbc.game_id = g.id
+        JOIN users u ON u.id = gbc.user_id
+      WHERE g.scheduled_at <= (NOW() AT TIME ZONE COALESCE(l.timezone, 'America/New_York'))
+        AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
+        ${seasonId ? sql`AND s.id = ${seasonId}` : sql``}
+      GROUP BY s.id, s.league_id, gbc.user_id
+    ), ranked AS (
+      SELECT *, MAX(beers_consumed) OVER (PARTITION BY season_id) AS top_count
+      FROM totals
+    )
+    INSERT INTO badge_awards (badge_definition_id, user_id, league_id, season_id, scope_key, count, source, metadata)
+    SELECT ${definition.id}, user_id, league_id, season_id,
+      'season:' || season_id, 1, 'evaluator', jsonb_build_object('beersConsumed', beers_consumed)
+    FROM ranked
+    WHERE beers_consumed = top_count AND beers_consumed > 0
+    ON CONFLICT (badge_definition_id, user_id, scope_key) DO NOTHING
+    RETURNING id, user_id, season_id, metadata
+  `);
+  if (announce) {
+    for (const row of inserted.rows) {
+      const beersConsumed = Number((row.metadata as { beersConsumed?: number })?.beersConsumed ?? 0);
+      await emitEarnedEvent(String(row.user_id), String(row.id), definition, {
+        awardId: String(row.id),
+        seasonId: String(row.season_id),
+        count: beersConsumed,
+        beersConsumed,
+        imagePath: definition.imagePath,
+      });
+    }
+  }
+  return inserted.rows.length;
+}
+
 export async function awardManualBadge(input: {
   badgeDefinitionId: string;
   userId: string;
@@ -1671,7 +1740,9 @@ export async function awardManualBadge(input: {
     eq(badgeDefinitions.status, "published"),
   )).limit(1);
   if (!definition) throw new Error("Badge definition not found");
-  if (definition.category === "achievement") throw new Error("Achievements are earned automatically");
+  if (definition.category === "achievement" || definition.category === "season_award") {
+    throw new Error("Achievements and season awards are earned automatically");
+  }
   const scopeKey = scopeKeyFor(definition, input);
   const [award] = await db.insert(badgeAwards).values({
     badgeDefinitionId: definition.id, userId: input.userId, awardedBy: input.awardedBy,
@@ -1833,7 +1904,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     isGoalie,
     hatTrickSeasons,
     selectedHatTrickSeasonId,
-    sections: (["nhl_trophy", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
+    sections: (["nhl_trophy", "season_award", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
       category,
       label: CATEGORY_LABELS[category],
       badges: badges.filter((badge) => badge.category === category && (badge.slug !== "broom" || isGoalie)),
@@ -1867,7 +1938,7 @@ export async function getTrophyCasePreview() {
   }));
   return {
     isGoalie: true,
-    sections: (["nhl_trophy", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
+    sections: (["nhl_trophy", "season_award", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
       category,
       label: CATEGORY_LABELS[category],
       badges: badges.filter((badge) => badge.category === category),
