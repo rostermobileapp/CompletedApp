@@ -147,6 +147,51 @@ test('changing a verified sign-in identity invalidates the account merge review'
   assert.equal((await q('SELECT count(*)::int n FROM account_user_merges')).rows[0].n, 0);
 });
 
+test('different derived badge counters combine without adding counts or losing earned tiers', async () => {
+  const badge = randomUUID();
+  await q(`INSERT INTO badge_definitions(id,slug,name,description,category,trigger_type,status)
+    VALUES ($1,'fixture-progress','Fixture progress','Fixture','achievement','manual','published')`, [badge]);
+  await q(`INSERT INTO badge_progress(badge_definition_id,user_id,scope_key,progress,count,earned_tiers,current_tier)
+    VALUES ($1,$2,'global',6,6,ARRAY['bronze']::badge_tier[],'bronze'),
+      ($1,$3,'global',10,10,ARRAY['silver']::badge_tier[],'silver')`, [badge, source, target]);
+  const p = await preview();
+  assert.deepEqual(p.blockers, []);
+  await confirm(p);
+  const rows = (await q('SELECT * FROM badge_progress WHERE badge_definition_id=$1', [badge])).rows;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].user_id, target);
+  assert.equal(rows[0].progress, 10);
+  assert.equal(rows[0].count, 10); // Not 16: counters may describe the same events.
+  assert.equal(rows[0].current_tier, 'silver');
+  const tiers = (await q('SELECT earned_tiers::text[] tiers FROM badge_progress WHERE badge_definition_id=$1', [badge])).rows[0].tiers;
+  assert.deepEqual([...tiers].sort(), ['bronze', 'silver']);
+  const audit = (await q('SELECT activity_provenance FROM account_user_merges WHERE source_user_id=$1', [source])).rows[0];
+  assert.equal(audit.activity_provenance['badge_progress.user_id'].length, 2);
+});
+
+test('Free Supabase tiers may merge with a RevenueCat login link, preserving its original ownership', async () => {
+  await q(`CREATE TABLE revenuecat_native_accounts (
+    user_id varchar PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    app_user_id varchar NOT NULL UNIQUE, updated_at timestamptz DEFAULT NOW())`);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => { throw Error('A login link alone must not trigger provider verification'); }) as typeof fetch;
+  try {
+    await q(`INSERT INTO revenuecat_native_accounts(user_id,app_user_id) VALUES ($1,$2),($3,$4)`,
+      [source, `native:${source}`, target, `native:${target}`]);
+    const p = await preview();
+    assert.equal(p.policy.kind, 'free_free');
+    assert.deepEqual(p.blockers, []);
+    // Login bookkeeping is not a change to ownership or the reviewed content.
+    await q('UPDATE revenuecat_native_accounts SET updated_at=NOW()');
+    await confirm(p);
+    const rows = (await q('SELECT user_id,app_user_id FROM revenuecat_native_accounts ORDER BY user_id')).rows;
+    assert.equal(rows.length, 2);
+    assert.ok(rows.some(r => r.user_id === source && r.app_user_id === `native:${source}`));
+    assert.ok(rows.some(r => r.user_id === target && r.app_user_id === `native:${target}`));
+    assert.ok((await q('SELECT deleted_at FROM users WHERE id=$1', [source])).rows[0].deleted_at);
+  } finally { globalThis.fetch = originalFetch; await q('DROP TABLE revenuecat_native_accounts'); }
+});
+
 test('badge duplicates preserve acknowledged delivery, payload references and original audit', async () => {
   const badge = randomUUID(), srcAward = randomUUID(), dstAward = randomUUID();
   await q(`INSERT INTO badge_definitions(id,slug,name,description,category,trigger_type,status)

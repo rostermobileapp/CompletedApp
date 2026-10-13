@@ -89,7 +89,8 @@ const transferableReferences = new Set([
 
 async function rowSnapshot(client: PoolClient, schema: string, table: string, predicate: string, params: unknown[]) {
   const result = await client.query(
-    `SELECT (${table === 'users' ? "to_jsonb(x)-ARRAY['updated_at','last_updated']" : 'to_jsonb(x)'})::text AS row
+    `SELECT (${table === 'users' ? "to_jsonb(x)-ARRAY['updated_at','last_updated']" :
+      table === 'revenuecat_native_accounts' ? "to_jsonb(x)-ARRAY['shown_at','created_at','updated_at','claim_token_hash','claim_expires_at']" : 'to_jsonb(x)'})::text AS row
       FROM ${qualified(schema, table)} x WHERE ${predicate} ORDER BY row`,
     params,
   );
@@ -164,7 +165,9 @@ async function references(client: PoolClient, sourceId: string, survivorId?: str
     const snapshot = await rowSnapshot(client, schema, table, `${quote(column)}::text=$1`, [sourceId]);
     // Retain immutable expired purchase ownership on the source tombstone.
     // Eligibility verifies billing separately; these are never reassigned.
-    if (domain === 'apple_purchase_links.user_id') { evidence.push([domain, snapshot]); continue; }
+    if (domain === 'apple_purchase_links.user_id' || domain === 'revenuecat_native_accounts.user_id') {
+      evidence.push([domain, snapshot]); continue;
+    }
     refs.push({ schema, table, column, domain, count, snapshot });
     evidence.push([domain, snapshot]);
     if (survivorId) {
@@ -203,6 +206,13 @@ async function references(client: PoolClient, sourceId: string, survivorId?: str
         `${quote(column)}::text LIKE '%' || $1 || '%'${excludeMergeIdentities}`, params);
       evidence.push([domain, snapshot]);
       if (domain === 'google_iap_claims.user_id') continue;
+      if (table === 'revenuecat_native_accounts') {
+        // Retain the provider login/claim on its original account tombstone.
+        // Do not rewrite customer IDs or excuse references owned by other users.
+        const owned = await client.query(`SELECT count(*)::int AS count FROM ${qualified(schema, table)}
+          WHERE user_id=$1 AND ${quote(column)}::text LIKE '%' || $1 || '%'`, [sourceId]);
+        if (Number(owned.rows[0].count) === count) continue;
+      }
       if (domain === 'scrimmages.invite_user_ids') {
         // This is a typed text[] of explicitly selected identities, not opaque
         // free text. Preserve placeholder IDs and deduplicate the replaced user.
@@ -302,8 +312,6 @@ async function detectAccountDataCollisions(client: PoolClient, sourceId: string,
       domain: definition.table,
       reason: definition.table === 'notification_preferences'
         ? 'Source notification preferences contain a device or external ID that does not already match the survivor. Relink the provider identity before merging.'
-        : definition.table === 'badge_progress'
-        ? 'Badge progress differs; progress totals are never added without event provenance.'
         : `Overlapping ${definition.table.replaceAll('_', ' ')} records differ; reconcile their history before merging.`,
       count: count - safeCount,
       recordIds: (await client.query(`SELECT s.id::text AS id FROM ${qualified('public', definition.table)} s
@@ -356,6 +364,21 @@ async function combineSafeCollisions(client: PoolClient, sourceId: string, survi
     const scopeMatch = collisionScope(definition);
     const equivalent = collisionEquivalent(definition);
     const userColumn = quote(definition.column ?? 'user_id');
+    if (definition.table === 'badge_progress') {
+      // These are derived counters, not additive game events. Keep both earned
+      // tier sets and the strongest existing cache without inventing progress.
+      // Trophy Case derives current activity totals from transferred game data.
+      await client.query(`UPDATE badge_progress d SET
+        progress=greatest(s.progress,d.progress), count=greatest(s.count,d.count),
+        earned_tiers=ARRAY(SELECT DISTINCT unnest(s.earned_tiers || d.earned_tiers)),
+        current_tier=CASE WHEN coalesce(array_position(
+          ARRAY['bronze','silver','gold','platinum','emerald','diamond','legend','god_mode'],s.current_tier::text),0)
+          > coalesce(array_position(ARRAY['bronze','silver','gold','platinum','emerald','diamond','legend','god_mode'],d.current_tier::text),0)
+          THEN s.current_tier ELSE coalesce(d.current_tier,s.current_tier) END,
+        updated_at=NOW()
+        FROM badge_progress s WHERE s.user_id=$1 AND d.user_id=$2 AND ${scopeMatch}`,
+      [sourceId, survivorId]);
+    }
     if (definition.table === 'birthday_greetings') {
       await client.query(`UPDATE birthday_greetings d SET
         popup_dismissed_at=coalesce(d.popup_dismissed_at,s.popup_dismissed_at),
@@ -487,9 +510,19 @@ async function buildPreview(client: PoolClient, sourceId: string, survivorId: st
   const policy = direction.policy;
   const billingEvidence: unknown[] = [];
   const billingBlockers: Blocker[] = [];
+  const hasNativeAccounts = (await client.query(`SELECT to_regclass('public.revenuecat_native_accounts') IS NOT NULL AS present`)).rows[0].present;
   for (const account of [...accounts].sort((x, y) => x.id.localeCompare(y.id))) {
     const native = await client.query(`SELECT 'apple' AS provider,to_jsonb(x) AS record FROM apple_purchase_links x WHERE user_id=$1
       UNION ALL SELECT 'google',to_jsonb(x) FROM google_iap_claims x WHERE user_id=$1`, [account.id]);
+    if (hasNativeAccounts) {
+      const linked = await client.query(`SELECT 'revenuecat' AS provider,
+        to_jsonb(x)-ARRAY['shown_at','created_at','updated_at','claim_token_hash','claim_expires_at'] AS record
+        FROM revenuecat_native_accounts x WHERE user_id=$1`, [account.id]);
+      // A native login association alone is not a purchase or a paid tier.
+      // Supabase's Free tier remains authoritative for this link; retain it
+      // unchanged and bind its ownership to the review, without an RC lookup.
+      billingEvidence.push([account.id, 'native-login-link', linked.rows]);
+    }
     billingEvidence.push([account.id, native.rows]);
     if (account.role !== 'free_tier' || account.is_primary_commissioner) continue;
     try {

@@ -11,14 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 
 type Candidate = { id: string; displayId: string | null; name: string; email: string | null; role?: string };
 type Identity = Candidate & { role: string };
-const userIdLabel = (user: Candidate) => user.displayId || `U ID unavailable · internal ID ${user.id}`;
-const humanTier = (role?: string) => {
-  const value = (role || 'unknown').trim().toLowerCase().replace(/[_-]+/g, ' ');
-  if (value === 'free') return 'Free';
-  if (value === 'paid' || value === 'pro' || value === 'premium') return 'Paid';
-  return value.replace(/\b\w/g, character => character.toUpperCase());
-};
-type Count = { domain: string; count: number };
+const userIdLabel = (user: Candidate) => user.displayId || 'U ID unavailable';
 type MergePolicy = {
   kind: 'free_free' | 'keep_paid' | 'billing_duplicate' | 'verification_required';
   message: string;
@@ -28,14 +21,37 @@ type Preview = {
   source: Identity;
   survivor: Identity;
   policy: MergePolicy;
-  leagues: { id: string; name: string; records: Count[] }[];
-  other: Count[];
-  combinable: { domain: string; count: number; label: string }[];
+  leagues: { id: string; name: string; records?: unknown[] }[];
   blockers: { domain: string; reason: string; count: number; recordIds?: string[] }[];
-  legacy: { id: string; league: string; name: string; kind: string; disposition: string }[];
-  lookalikes: { id: string; league: string; name: string; kind: string }[];
   fingerprint: string;
 };
+
+function humanBlocker(item: Preview['blockers'][number]) {
+  const text = `${item.domain} ${item.reason}`.toLowerCase();
+  if (/poll|vote/.test(text)) return 'The accounts have different poll answers. Resolve their responses before merging.';
+  if (/notification_preferences/.test(text)) return 'The accounts have different notification settings or device links. Resolve these before merging.';
+  if (/player_stats|game_attendance|game_rsvps|game_goalies/.test(text))
+    return 'The accounts have conflicting game records. Review those games before merging.';
+  if (/billing|subscription|purchase|entitlement/.test(text)) {
+    return 'There is a billing or subscription conflict that must be resolved before these accounts can be merged.';
+  }
+  if (/badge|patch|progress/.test(text)) {
+    return 'Some earned patches or progress cannot be safely combined yet. Please resolve this before continuing.';
+  }
+  if (/email|identity|account/.test(text)) {
+    return 'An account identity conflict needs to be resolved before continuing.';
+  }
+  if (/league|team|roster/.test(text)) {
+    return 'A league or roster conflict needs to be resolved before continuing.';
+  }
+  if (/duplicate|already exists|unique/.test(text)) {
+    return 'Some information is already linked elsewhere. Resolve that conflict before continuing.';
+  }
+  if (/missing|orphan|reference|relation|constraint/.test(text)) {
+    return 'Some linked account information is missing or inconsistent. Resolve it before continuing.';
+  }
+  return 'Some account information cannot be safely combined yet. Please resolve this before continuing.';
+}
 
 function UserPicker({ label, selected, onSelect, enabled, leagueId }: {
   label: string;
@@ -77,25 +93,16 @@ function UserPicker({ label, selected, onSelect, enabled, leagueId }: {
   </div>;
 }
 
-function Counts({ rows }: { rows: Count[] }) {
-  if (!rows.length) return <p className="text-sm text-muted-foreground">No records</p>;
-  return <ul className="space-y-1 text-sm">{rows.map((row, i) =>
-    <li key={`${row.domain}:${i}`} className="flex justify-between gap-3"><span>{row.domain}</span><b>{row.count}</b></li>)}</ul>;
-}
-
 export function AccountUserMerge({ survivorId, leagueId, onClose }: {
   survivorId?: string;
   leagueId?: string;
   onClose?: () => void;
 } = {}) {
   const contextual = !!survivorId;
-  const commissionerContext = !!leagueId;
   const [open, setOpen] = useState(contextual);
   const [source, setSource] = useState<Candidate | null>(null);
   const [survivor, setSurvivor] = useState<Candidate | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
-  const [sourceAck, setSourceAck] = useState('');
-  const [survivorAck, setSurvivorAck] = useState('');
   const [identityAck, setIdentityAck] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -114,18 +121,18 @@ export function AccountUserMerge({ survivorId, leagueId, onClose }: {
   useEffect(() => {
     if (contextual) {
       setSurvivor(verifiedSurvivor || null);
-      setPreview(null); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false);
+      setPreview(null); setIdentityAck(false);
     }
   }, [contextual, survivorId, verifiedSurvivor]);
 
   const reset = () => {
     setOpen(false); setSource(null); setSurvivor(null); setPreview(null);
-    setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError('');
+    setIdentityAck(false); setError('');
     setBusy(false);
     onClose?.();
   };
-  const changeSource = (value: Candidate | null) => { setSource(value); setPreview(null); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError(''); };
-  const changeSurvivor = (value: Candidate | null) => { setSurvivor(value); setPreview(null); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError(''); };
+  const changeSource = (value: Candidate | null) => { setSource(value); setPreview(null); setIdentityAck(false); setError(''); };
+  const changeSurvivor = (value: Candidate | null) => { setSurvivor(value); setPreview(null); setIdentityAck(false); setError(''); };
   const request = async (action: 'preview' | 'confirm', body: Record<string, unknown>) => {
     return (await apiRequest('POST', `/api/account-user-merge/${action}`, {
       ...body,
@@ -133,8 +140,6 @@ export function AccountUserMerge({ survivorId, leagueId, onClose }: {
     })).json();
   };
   const clearAcknowledgements = () => {
-    setSourceAck('');
-    setSurvivorAck('');
     setIdentityAck(false);
   };
   const refreshPreview = async (preserveError = false) => {
@@ -162,21 +167,18 @@ export function AccountUserMerge({ survivorId, leagueId, onClose }: {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Account-wide user merge</DialogTitle>
-          <DialogDescription>{commissionerContext
-            ? 'Commissioner review: merge two registered sign-in accounts across the entire service and every league, not just this league. This is not a support-only action. Search results are registered accounts, never imported or placeholder roster entries.'
-            : 'Support-only global operation: merge two registered sign-in accounts across the entire service and every league. Search results are registered accounts, not imported or placeholder roster entries.'} Search by name, email or U ID and independently verify both identities.</DialogDescription>
+          <DialogDescription>Combine two registered accounts across all leagues. Check both identities carefully before continuing.</DialogDescription>
         </DialogHeader>
         {!preview && <>
           <div className="grid gap-4 sm:grid-cols-2">
-              <UserPicker label="Source · account to retire" selected={source} onSelect={changeSource} enabled={open} leagueId={leagueId} />
+              <UserPicker label="Account that will close" selected={source} onSelect={changeSource} enabled={open} leagueId={leagueId} />
              {contextual ? <section className="rounded border border-primary p-3 text-sm" data-testid="fixed-merge-survivor">
-                <b>Preferred account to retain · subject to paid tier</b>
+                 <b>Account that stays</b>
                {verifyingSurvivor ? <p>Verifying registered account…</p> :
                  survivorError || !survivor ? <p role="alert">Could not verify this registered survivor. Close and reopen this action.</p> :
-                  <p>{survivor.name}<br /><strong>{userIdLabel(survivor)}</strong><br />{survivor.email || 'No email'}<br />
-                    Account tier: {humanTier(survivor.role)}</p>}
+                   <p>{survivor.name}<br /><strong>{userIdLabel(survivor)}</strong><br />{survivor.email || 'No email'}</p>}
              </section> :
-                <UserPicker label="Preferred account to retain · subject to paid tier" selected={survivor} onSelect={changeSurvivor} enabled={open} leagueId={leagueId} />}
+                 <UserPicker label="Account that stays" selected={survivor} onSelect={changeSurvivor} enabled={open} leagueId={leagueId} />}
           </div>
           <Button disabled={!source || !survivor || source.id === survivor.id || busy} onClick={async () => {
             setBusy(true); setError('');
@@ -192,109 +194,71 @@ export function AccountUserMerge({ survivorId, leagueId, onClose }: {
         {preview && <>
           <div className="grid gap-3 sm:grid-cols-2">
             {[
-              { label: 'Source · will be retired', user: preview.source },
-              { label: 'Survivor · login/profile retained', user: preview.survivor },
+              { label: 'This account will close', user: preview.source },
+              { label: 'This login stays', user: preview.survivor },
             ].map(({ label, user }) => {
               return <section key={user.id} className="min-w-0 rounded-lg border p-3 text-sm">
                 <h3 className="font-bold">{label}</h3>
                 <p className="mt-2">{user.name}<br /><span className="break-all font-semibold">{userIdLabel(user)}</span><br />
                   <span className="break-all">{user.email || 'No email'}</span><br />
-                  Account tier: {humanTier(user.role)}</p>
+                  </p>
               </section>;
             })}
           </div>
-          <section className={`rounded-lg border p-3 text-sm space-y-1 ${
+          {(preview.policy.kind !== 'free_free' || preview.policy.autoSelected) && <section className={`rounded-lg border p-3 text-sm space-y-1 ${
             preview.policy.kind === 'billing_duplicate' || preview.policy.kind === 'verification_required'
               ? 'border-destructive bg-destructive/10' : 'border-primary/40 bg-primary/5'
           }`} role={preview.policy.kind === 'billing_duplicate' || preview.policy.kind === 'verification_required' ? 'alert' : 'status'}>
             <h3 className="font-bold">
-              {preview.policy.kind === 'billing_duplicate' ? 'Two paid accounts: billing duplication risk' :
-                preview.policy.kind === 'verification_required' ? 'Paid-account verification required' :
-                  'Account tier and login selection'}
+              {preview.policy.kind === 'billing_duplicate' ? 'Billing needs attention' :
+                preview.policy.kind === 'verification_required' ? 'Account verification needed' : 'Account selection'}
             </h3>
-            <p>{preview.policy.message}</p>
             {preview.policy.kind === 'billing_duplicate' &&
-              <p className="font-semibold">Both accounts are paid. Do not proceed: merging could duplicate billing or entitlements. Confirmation is disabled.</p>}
+              <p>These accounts have a billing conflict. Resolve it before merging; confirmation is unavailable.</p>}
             {preview.policy.kind === 'verification_required' &&
-              <p className="font-semibold">Resolve the required billing or account verification before continuing. Confirmation is disabled.</p>}
-            {preview.policy.kind === 'free_free' &&
-              <p>For free/free accounts, the parent account's login and profile are retained.</p>}
+              <p>Verify the account or billing details before merging; confirmation is unavailable.</p>}
             {preview.policy.autoSelected && <p>
-              The server automatically selected the parent account to retain based on paid-tier rules. The returned source and survivor below are authoritative.
+              We selected the account that stays to preserve its paid benefits. The identities above show the final selection.
             </p>}
-            {commissionerContext && <p className="font-semibold">
-              This is a full-account merge across the entire service and all leagues; it is not limited to this league and does not require support staff.
+            {preview.policy.kind === 'keep_paid' && !preview.policy.autoSelected &&
+              <p>The account that stays keeps its paid membership.</p>}
+          </section>}
+          <section className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+            <h3 className="font-bold">Your hockey history stays together</h3>
+            <p className="text-sm">Stats and earned patches from these two accounts will be combined across all leagues.</p>
+            {!!preview.leagues.length && <p className="text-sm text-muted-foreground">
+              Leagues included: {preview.leagues.map(league => league.name).filter(Boolean).join(', ')}
             </p>}
           </section>
-          <section className="rounded-lg border p-3 space-y-3">
-            <h3 className="font-bold">Records to review by league</h3>
-            {!preview.leagues.length && <p className="text-sm text-muted-foreground">No league records</p>}
-            {preview.leagues.map(league => <div key={league.id} className="border-t pt-2">
-              <h4 className="text-sm font-semibold">{league.name}</h4><Counts rows={league.records} />
-            </div>)}
-          </section>
-          <section className="rounded-lg border p-3 space-y-2">
-            <h3 className="font-bold">Other account-wide records</h3><Counts rows={preview.other} />
-          </section>
-          <section className="rounded-lg border p-3 space-y-2">
-            <h3 className="font-bold">Explicitly linked imported records</h3>
-            {preview.legacy.length ? <ul className="text-sm space-y-1">{preview.legacy.map(row =>
-              <li key={row.id}>{row.kind} {row.id} · {row.name} · {row.league}: {row.disposition}</li>)}</ul> :
-              <p className="text-sm">No explicitly linked imported records.</p>}
-            <h3 className="font-bold">Separate roster lookalikes</h3>
-            {preview.lookalikes.length ? <ul className="text-sm space-y-1">{preview.lookalikes.map(row =>
-              <li key={`${row.kind}:${row.id}`}>{row.kind} {row.id} · {row.name} · {row.league}: not included; resolve separately after verifying identity.</li>)}</ul> :
-              <p className="text-sm">No matching unlinked roster entries found for either account. Matching names or emails never establish linkage.</p>}
-          </section>
-          <section className="rounded-lg border p-3 space-y-2">
-            <h3 className="font-bold">Equivalent records to combine</h3>
-            {preview.combinable.length ? <ul className="space-y-1 text-sm">
-              {preview.combinable.map(item => <li key={item.domain}>{item.label} · {item.count} ({item.domain})</li>)}
-            </ul> : <p className="text-sm text-muted-foreground">No overlapping records will be combined.</p>}
-          </section>
-          <section className="rounded-lg border border-destructive/50 p-3 space-y-2">
-            <h3 className="font-bold text-destructive">Blockers · {preview.blockers.length}</h3>
+          <section className={`rounded-lg border p-3 space-y-2 ${
+            preview.blockers.length ? 'border-destructive/50 bg-destructive/5' : 'border-primary/30 bg-primary/5'
+          }`}>
+            <h3 className={`font-bold ${preview.blockers.length ? 'text-destructive' : ''}`}>
+              {preview.blockers.length ? 'This merge can’t continue yet' : 'Ready to continue'}
+            </h3>
             {preview.blockers.length ? <ul className="space-y-2 text-sm">{preview.blockers.map((item, i) =>
-              <li key={`${item.domain}:${i}`}><b>{item.domain}</b> · {item.count} record(s): {item.reason}
-                {item.recordIds?.length ? <span className="block mt-1 break-all text-muted-foreground">Record IDs: {item.recordIds.join(', ')}</span> : null}
-              </li>)}</ul> :
-              <p className="text-sm">No blockers reported by preflight.</p>}
+              <li key={`${item.domain}:${i}`}>{humanBlocker(item)}</li>)}</ul> :
+              <p className="text-sm">The account checks are complete. Your original login will close permanently, and this merge can’t be undone.</p>}
           </section>
-          <div className="rounded-lg border border-amber-500/50 bg-amber-500/5 p-3 text-sm space-y-1">
-            <h3 className="font-bold">Account and billing consequences</h3>
-            <p>The source account will be retired and its login cannot be used again. The server-selected survivor’s login and profile remain authoritative. The original source ID, displayed U ID, email, operator and review fingerprint remain in an internal audit record; transferred authored content appears under the survivor.</p>
-            <p>The selected survivor is only the preferred account to retain; the server may reorient the merge to preserve a paid account.</p>
-            <p>Invitations and reminders are not resent, and badges are not replayed.</p>
-            <p>Billing identities, subscriptions, purchases, paid seats, and entitlements must not be assumed transferable or duplicated. Resolve billing ownership explicitly; any unresolved conflict blocks this merge.</p>
-            <p className="break-all text-xs text-muted-foreground">Preview fingerprint: {preview.fingerprint}</p>
-          </div>
           {(!preview.source.displayId || !preview.survivor.displayId) && <p role="alert" className="text-sm text-destructive">
-            A required displayed U ID is missing. This account merge cannot be confirmed until both accounts have displayed U IDs.
+            A U ID is unavailable for one of these accounts, so we can’t verify both identities for confirmation.
           </p>}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm">Type source U ID exactly: <b className="break-all">{preview.source.displayId || 'Unavailable'}</b>
-              <Input value={sourceAck} onChange={e => setSourceAck(e.target.value)} autoComplete="off" disabled={!preview.source.displayId} />
-            </label>
-            <label className="space-y-1 text-sm">Type survivor U ID exactly: <b className="break-all">{preview.survivor.displayId || 'Unavailable'}</b>
-              <Input value={survivorAck} onChange={e => setSurvivorAck(e.target.value)} autoComplete="off" disabled={!preview.survivor.displayId} />
-            </label>
-          </div>
           <label className="flex items-start gap-2 text-sm">
             <Checkbox checked={identityAck} onCheckedChange={value => setIdentityAck(value === true)} />
-            I verified the exact IDs and emails above belong to the same person, independently of names or shared email, and understand the source login is permanently retired and the account-wide merge is irreversible.
+            <span>I confirm these displayed U IDs belong to the same person and consent to merging them permanently. I understand the original login will close and the merge cannot be undone.</span>
           </label>
           <div className="flex flex-wrap gap-2">
             <Button variant="destructive" disabled={busy || preview.blockers.length > 0 ||
               preview.policy.kind === 'billing_duplicate' || preview.policy.kind === 'verification_required' ||
               !preview.source.displayId || !preview.survivor.displayId ||
-              sourceAck !== preview.source.displayId || survivorAck !== preview.survivor.displayId || !identityAck}
+              !identityAck}
               onClick={async () => {
                 setBusy(true); setError('');
                 try {
                   await request('confirm', {
                     sourceId: preview.source.id, survivorId: preview.survivor.id,
                     previewFingerprint: preview.fingerprint,
-                    acknowledgeSourceId: sourceAck, acknowledgeSurvivorId: survivorAck, acknowledgeIdentity: true,
+                    acknowledgeSourceId: preview.source.displayId, acknowledgeSurvivorId: preview.survivor.displayId, acknowledgeIdentity: true,
                   });
                   await client.invalidateQueries();
                   toast({ title: 'Account-wide merge completed', description: 'Account data has been refreshed.' });
@@ -307,11 +271,11 @@ export function AccountUserMerge({ survivorId, leagueId, onClose }: {
                   setBusy(false);
                   await refreshPreview(true);
                 }
-              }}>{busy ? 'Merging…' : 'Confirm irreversible account merge'}</Button>
+              }}>{busy ? 'Merging…' : 'Merge accounts permanently'}</Button>
              <Button variant="outline" disabled={busy} onClick={() => refreshPreview()}>
                {busy ? 'Refreshing…' : 'Refresh review'}
              </Button>
-             <Button variant="outline" disabled={busy} onClick={() => { setPreview(null); setSourceAck(''); setSurvivorAck(''); setIdentityAck(false); setError(''); }}>{contextual ? 'Change source' : 'Change accounts'}</Button>
+              <Button variant="outline" disabled={busy} onClick={() => { setPreview(null); setIdentityAck(false); setError(''); }}>{contextual ? 'Change source' : 'Change accounts'}</Button>
           </div>
         </>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

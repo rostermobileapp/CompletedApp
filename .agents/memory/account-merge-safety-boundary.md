@@ -41,3 +41,15 @@ A registered Roster account can retain a legacy database ID that differs from it
 **Why:** Historical migration can retain the old profile while its real sign-in is uniquely linked by normalized email. Direct Auth-ID lookup alone incorrectly hides these registered users.
 
 **How to apply:** Verify an unambiguous normalized-email link against the Auth provider, reject contradictory identities, bind the resolved identities to the review, and reject retired sign-ins by original email too.
+
+Keep the commissioner merge review concise: selected accounts, retained login, preserved hockey history, one explicit confirmation, and human-readable blocking issues. Do not display database inventories, UUID lists or audit fingerprints.
+
+**Why:** The user rejected these internal details on 2026-10-13 and wants assurance that the accounts merge correctly without interpreting implementation data.
+
+**How to apply:** Preserve server checks and internal audit detail, but present only information needed for the merge decision.
+
+A RevenueCat native-login association alone must not block a merge when the Supabase account tier is Free. Leave its provider ownership attached to the original account; do not reassign the provider customer.
+
+**Why:** The user explicitly confirmed on 2026-10-13 that this association is not a concern for a Free Supabase tier.
+
+**How to apply:** Do not infer a paid account or require a RevenueCat lookup merely from this association. Retain existing paid-parent rules and checks for actual purchase records.
