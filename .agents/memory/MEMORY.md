@@ -60,7 +60,7 @@
 - [Google Play order recovery](google-play-order-recovery.md) — GPA numbers and reporting identities are not ownership proof; native Google tokens must drive verification.
 - [Overtime result eligibility](overtime-result-eligibility.md) — one-goal margin is required but not enough; overtime must be explicitly chosen for the final result.
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
-- [Account merge safety boundary](account-merge-safety-boundary.md) — registered-account merges must fail closed on unclassified records, authority, and billing; never infer identity from name or email.
+- [Account merge policy](account-merge-safety-boundary.md) — commissioners may combine accounts; free/free allowed, paid/free keeps paid parent, paid/paid needs billing resolution.
 - [League merge dialog boundary](league-merge-dialog-boundary.md) — the U-account-only commissioner picker and placeholder replacement preview have different eligibility rules.
 - [Responsive fixture verification](responsive-fixture-verification.md) — phone-width containers still use desktop media queries; use iframe viewports and explicit UTF-8 in isolated checks.
 - [Tool clock compatibility](tool-clock-compatibility.md) — some operational sandbox versions reject durable clock reads; obtain real time in an impure function before checking expiry.

@@ -1,10 +1,25 @@
 ---
 name: Account merge safety boundary
-description: Conservative policy for merging two independently authenticated registered accounts
+description: Commissioner account-wide merge authority, paid-parent selection, and billing/conflict safeguards
 ---
 
-An account-wide merge is not the same operation as consolidating a league roster entry. Only explicitly classified, non-authority records may move automatically; unclassified relational or opaque references, paid entitlements, and conflicting records block the merge for manual resolution. The retired source remains an audit tombstone and must not be revived by delayed sign-in reconciliation.
+The user explicitly authorized league commissioners to merge registered accounts across the entire application on 2026-10-13. Do not reimpose a founder/support-only restriction as a product requirement. This is a full account combination, not a league-only history transfer: the chosen parent retains the login email and username/profile, and the source login is retired.
 
-**Why:** Two valid logins may each control separate billing identities or privileges. A same-name or same-email match cannot establish ownership, and a generic foreign-key rewrite can silently confer permissions or duplicate purchases.
+**Why:** The user corrected the assumption that managing one league must categorically exclude account-wide merge authority. Commissioners must be able to resolve duplicate player accounts.
 
-**How to apply:** When adding user references or new billing providers, classify their merge behavior explicitly and exercise the retirement guard; do not make the account merge permissive merely to get a particular pair through preflight.
+**How to apply:** Authorize the real acting commissioner against the managed league and eligible selected accounts on the server, while preserving the separate global support path. Keep identity verification/explicit acknowledgement; never infer that two accounts belong to one person from names or email alone.
+
+Tier policy:
+- Two free profiles are eligible to merge; the commissioner selects the parent.
+- One free and one non-free profile: the non-free Player Pro or commissioner profile is always the default parent. Preserve its login/profile and billing ownership rather than retiring it into the free profile.
+- Both profiles non-free: show a billing-duplication warning and require account billing to be resolved before merging. Do not cancel, refund, or migrate purchases automatically.
+
+**Why:** This is the user's explicit billing safeguard and parent-selection policy; it supersedes blanket paid-account prohibitions.
+
+**How to apply:** Apply the same tier policy to preview and transactional confirmation, regardless of selection order, and recheck stale tier/billing state. Historical provider IDs alone are not proof of current paid status.
+
+Transfer records through explicit, audited domain rules. Preserve original attribution and existing same-person relationships; keep unclassified references and meaningful discrepancies fail-closed. Differing poll votes or invitation responses require review, never silent survivor preference. Retain the retirement tombstone and prevent delayed sign-in reconciliation from recreating the source.
+
+**Why:** Allowing commissioner merges does not authorize silent data loss, duplicated purchases, or arbitrary answers when the accounts disagree.
+
+**How to apply:** Classify and test record moves/deduplication, expose specific conflicts before confirmation, and perform the complete account merge atomically.
