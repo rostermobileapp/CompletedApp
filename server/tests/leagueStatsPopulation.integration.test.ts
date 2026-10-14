@@ -5,11 +5,13 @@ import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { storage } from '../storage.js';
 
-test('large league stats match approved Players across seasons without duplicates', async () => {
+test('league stats include only rostered players across seasons without duplicates', async () => {
   const run = randomUUID().replace(/-/g, '');
   const leagueId = `test_${run}_league`;
   const commissionerId = `test_${run}_commissioner`;
   const teamId = `test_${run}_team`;
+  const outsideTeamId = `test_${run}_outside_team`;
+  const gameId = `test_${run}_game`;
   const seasons = [`test_${run}_first`, `test_${run}_second`];
   const skaters = Array.from({ length: 51 }, (_, index) => `test_${run}_skater_${index}`);
   const goalieId = `test_${run}_goalie`;
@@ -39,20 +41,22 @@ test('large league stats match approved Players across seasons without duplicate
     }
     await db.execute(sql`INSERT INTO teams (id, name, league_id, season_id)
       VALUES (${teamId}, 'Roster Team', ${leagueId}, ${seasons[1]})`);
+    await db.execute(sql`INSERT INTO teams (id, name)
+      VALUES (${outsideTeamId}, 'Unrelated Team')`);
     await db.execute(sql`INSERT INTO league_memberships
       (user_id, league_id, status, is_goalie, is_skater, assigned_team_id)
       VALUES ${sql.join([
-        ...skaters.map((id, index) => sql`(${id}, ${leagueId}, 'approved', false, true, ${index === 1 ? teamId : null})`),
-        sql`(${goalieId}, ${leagueId}, 'approved', true, false, NULL)`,
+        ...skaters.map((id, index) => sql`(${id}, ${leagueId}, 'approved', false, true, ${index < 3 ? teamId : null})`),
+        sql`(${goalieId}, ${leagueId}, 'approved', true, false, ${teamId})`,
         sql`(${pendingId}, ${leagueId}, 'pending', false, true, NULL)`,
         sql`(${pendingGoalieId}, ${leagueId}, 'pending', true, false, NULL)`,
       ], sql`, `)}`);
     await db.execute(sql`INSERT INTO team_memberships (user_id, team_id, status)
       VALUES (${skaters[1]}, ${teamId}, 'approved')`);
     await db.execute(sql`INSERT INTO placeholder_players
-      (id, league_id, first_name, last_name, is_goalie, is_skater)
-      VALUES (${placeholderSkaterId}, ${leagueId}, 'Zero', 'Skater', false, true),
-             (${placeholderGoalieId}, ${leagueId}, 'Zero', 'Goalie', true, false)`);
+      (id, league_id, team_id, first_name, last_name, is_goalie, is_skater)
+      VALUES (${placeholderSkaterId}, ${leagueId}, ${teamId}, 'Zero', 'Skater', false, true),
+             (${placeholderGoalieId}, ${leagueId}, ${teamId}, 'Zero', 'Goalie', true, false)`);
     await db.execute(sql`INSERT INTO player_stats
       (user_id, league_id, season_id, games_played, goals, assists, penalty_minutes)
       VALUES (${skaters[2]}, ${leagueId}, ${seasons[0]}, 2, 3, 1, 4),
@@ -62,7 +66,7 @@ test('large league stats match approved Players across seasons without duplicate
     const placeholders = await storage.getLeaguePlaceholderPlayers(leagueId);
     assert.equal(approvedPlayers.length, 52);
     assert.equal(placeholders.length, 2);
-    const expectedSkaters = new Set([...skaters, `placeholder:${placeholderSkaterId}`]);
+    const expectedSkaters = new Set([...skaters.slice(0, 3), `placeholder:${placeholderSkaterId}`]);
     const expectedGoalies = new Set([goalieId, `placeholder:${placeholderGoalieId}`]);
 
     for (const seasonId of [...seasons, undefined]) {
@@ -89,8 +93,7 @@ test('large league stats match approved Players across seasons without duplicate
       );
     }
 
-    // Imported historical records are retained even without an approved
-    // registered membership, and have one row in the all-season response.
+    // Unassigned imports are hidden without deleting their historical records.
     await db.execute(sql`INSERT INTO player_imports
       (id, league_id, imported_by, file_name, total_records, successful_records, failed_records)
       VALUES (${importId}, ${leagueId}, ${commissionerId}, 'history.csv', 1, 1, 0)`);
@@ -101,18 +104,59 @@ test('large league stats match approved Players across seasons without duplicate
       (imported_player_id, league_id, season_id, games_played, goals, assists, penalty_minutes)
       VALUES (${importedId}, ${leagueId}, ${seasons[0]}, 2, 1, 0, 0),
              (${importedId}, ${leagueId}, ${seasons[1]}, 1, 0, 1, 0)`);
+    assert.equal((await storage.getPlayerStats(leagueId, undefined, 'non-goalies'))
+      .some(stat => stat.importedPlayerId === importedId), false);
+    await db.execute(sql`UPDATE imported_players SET team_id = ${teamId} WHERE id = ${importedId}`);
     const historical = (await storage.getPlayerStats(leagueId, undefined, 'non-goalies'))
       .filter(stat => stat.importedPlayerId === importedId);
     assert.equal(historical.length, 1);
     assert.deepEqual([historical[0].gamesPlayed, historical[0].goals, historical[0].assists], [3, 1, 1]);
+
+    // Direct approved roster membership counts; pending roster requests do not.
+    await db.execute(sql`INSERT INTO team_memberships (user_id, team_id, status)
+      VALUES (${skaters[3]}, ${teamId}, 'approved'), (${skaters[4]}, ${teamId}, 'pending')`);
+    const rostered = await storage.getPlayerStats(leagueId);
+    assert.equal(rostered.some(stat => stat.userId === skaters[3]), true);
+    assert.equal(rostered.some(stat => stat.userId === skaters[4]), false);
+    await db.execute(sql`INSERT INTO team_memberships (user_id, team_id, status)
+      VALUES (${skaters[5]}, ${outsideTeamId}, 'approved')`);
+    await db.execute(sql`UPDATE league_memberships SET assigned_team_id = ${outsideTeamId}
+      WHERE user_id = ${skaters[6]} AND league_id = ${leagueId}`);
+    assert.equal((await storage.getPlayerStats(leagueId))
+      .some(stat => [skaters[5], skaters[6]].includes(stat.userId)), false);
+
+    // Recorded goalie games must not reintroduce someone after roster removal.
+    await db.execute(sql`INSERT INTO games
+      (id, league_id, season_id, home_team_id, away_team_id, scheduled_at,
+       home_score, away_score, is_completed)
+      VALUES (${gameId}, ${leagueId}, ${seasons[1]}, ${teamId}, ${outsideTeamId},
+        NOW(), 3, 1, true)`);
+    await db.execute(sql`INSERT INTO game_goalies (game_id, team_id, goalie_user_id)
+      VALUES (${gameId}, ${teamId}, ${goalieId})`);
+    assert.equal((await storage.getGoalieStats(leagueId, seasons[1]))
+      .find(stat => stat.userId === goalieId)?.gamesPlayed, 1);
+
+    // Removing a team assignment hides records in every season, not deletes them.
+    await db.execute(sql`UPDATE league_memberships SET assigned_team_id = NULL
+      WHERE user_id IN (${skaters[2]}, ${goalieId}) AND league_id = ${leagueId}`);
+    await db.execute(sql`UPDATE placeholder_players SET team_id = NULL WHERE league_id = ${leagueId}`);
+    for (const seasonId of [...seasons, undefined]) {
+      assert.equal((await storage.getPlayerStats(leagueId, seasonId))
+        .some(stat => stat.userId === skaters[2] || stat.userId === `placeholder:${placeholderSkaterId}`), false);
+      assert.equal((await storage.getGoalieStats(leagueId, seasonId)).length, 0);
+    }
+    const preserved = await storage.getAllPlayerStatsByUser(skaters[2], leagueId);
+    assert.equal(preserved.length, 2);
   } finally {
+    await db.execute(sql`DELETE FROM game_goalies WHERE game_id = ${gameId}`);
+    await db.execute(sql`DELETE FROM games WHERE id = ${gameId}`);
     await db.execute(sql`DELETE FROM player_stats WHERE league_id = ${leagueId}`);
     await db.execute(sql`DELETE FROM placeholder_players WHERE league_id = ${leagueId}`);
     await db.execute(sql`DELETE FROM imported_players WHERE id = ${importedId}`);
     await db.execute(sql`DELETE FROM player_imports WHERE id = ${importId}`);
-    await db.execute(sql`DELETE FROM team_memberships WHERE team_id = ${teamId}`);
+    await db.execute(sql`DELETE FROM team_memberships WHERE team_id IN (${teamId}, ${outsideTeamId})`);
     await db.execute(sql`DELETE FROM league_memberships WHERE league_id = ${leagueId}`);
-    await db.execute(sql`DELETE FROM teams WHERE id = ${teamId}`);
+    await db.execute(sql`DELETE FROM teams WHERE id IN (${teamId}, ${outsideTeamId})`);
     await db.execute(sql`DELETE FROM seasons WHERE league_id = ${leagueId}`);
     await db.execute(sql`DELETE FROM leagues WHERE id = ${leagueId}`);
     await db.execute(sql`DELETE FROM users WHERE id IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`);

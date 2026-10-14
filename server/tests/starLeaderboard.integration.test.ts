@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { storage } from '../storage.js';
-import { getCareerThreeStarPoints, getTrophyCase } from '../badges.js';
+import { ensureDefaultBadges, getCareerThreeStarPoints, getTrophyCase } from '../badges.js';
 
 const run = randomUUID().replace(/-/g, '');
 const commissionerId = `test_${run}_commissioner`;
@@ -25,6 +25,7 @@ const gameIds = [
 
 test('star leaderboards stay season-scoped and preserve capped and full-list requests', async () => {
   try {
+    await ensureDefaultBadges();
     await db.execute(sql`
       INSERT INTO users
         (id, email, first_name, last_name, role, onboarding_completed,
@@ -68,6 +69,11 @@ test('star leaderboards stay season-scoped and preserve capped and full-list req
         (${awayTeamId}, 'Away Team', ${leagueId}, ${currentSeasonId}, NOW(), NOW())
     `);
 
+    for (const playerId of [...currentPlayerIds, previousPlayerId]) {
+      await db.execute(sql`INSERT INTO league_memberships
+        (user_id, league_id, status, assigned_team_id)
+        VALUES (${playerId}, ${leagueId}, 'approved', ${homeTeamId})`);
+    }
     for (const [index, gameId] of gameIds.entries()) {
       const seasonId = index < currentPlayerIds.length ? currentSeasonId : previousSeasonId;
       await db.execute(sql`
@@ -139,12 +145,20 @@ test('star leaderboards stay season-scoped and preserve capped and full-list req
       defaultLeaderboard.every(entry => entry.starPoints > 0),
       'the default leaderboard should still return ranked players',
     );
+
+    await db.execute(sql`UPDATE league_memberships SET assigned_team_id = NULL
+      WHERE user_id = ${currentPlayerIds[0]} AND league_id = ${leagueId}`);
+    const afterRemoval = await storage.getLeagueStarLeaderboard(leagueId, null, currentSeasonId);
+    assert.equal(afterRemoval.some(entry => entry.user.id === currentPlayerIds[0]), false);
+    assert.equal(await getCareerThreeStarPoints(currentPlayerIds[0]), 8,
+      'hiding an unassigned player must not delete their historical awards');
   } finally {
     await db.execute(sql`
       DELETE FROM game_stars
       WHERE game_id IN (SELECT id FROM games WHERE league_id = ${leagueId})
     `);
     await db.execute(sql`DELETE FROM games WHERE league_id = ${leagueId}`);
+    await db.execute(sql`DELETE FROM league_memberships WHERE league_id = ${leagueId}`);
     await db.execute(sql`DELETE FROM teams WHERE league_id = ${leagueId}`);
     await db.execute(sql`DELETE FROM seasons WHERE league_id = ${leagueId}`);
     await db.execute(sql`DELETE FROM leagues WHERE id = ${leagueId}`);

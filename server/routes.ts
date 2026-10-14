@@ -4,6 +4,7 @@ import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
 import { getSeasonPatchCounts } from "./seasonPatchStats";
 import { getTeamRosterStats } from "./teamRosterStats";
+import { leagueStatsPlayerEligible } from "./leagueStatsEligibility";
 import { registerTeamStatsRoute } from "./teamStatsRoute";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -8381,9 +8382,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied - not an approved league member' });
       }
       
-      // Get all league members and format them for stats management
+      // League membership alone is not enough to appear in stats management.
       const members = await storage.getLeagueMembers(leagueId);
-      const players = members.map(member => ({
+      const eligibleRows = await db.select({ id: users.id }).from(users)
+        .where(leagueStatsPlayerEligible(users.id, leagueId));
+      const eligibleIds = new Set(eligibleRows.map(row => row.id));
+      const players = members.filter(member => eligibleIds.has(member.user.id)).map(member => ({
         id: member.user.id,
         // Use displayFirstName/displayLastName from membership if set, otherwise fall back to user's names
         firstName: member.displayFirstName || member.user.firstName || '',
@@ -21792,7 +21796,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           penaltyMinutes: sql<number>`COALESCE(SUM(${tournamentStats.penaltyMinutes}), 0)`,
         })
         .from(tournamentStats)
-        .where(inArray(tournamentStats.tournamentId, tournamentIds))
+        .where(and(inArray(tournamentStats.tournamentId, tournamentIds),
+          leagueStatsPlayerEligible(tournamentStats.userId, leagueId)))
         .groupBy(tournamentStats.userId);
 
       if (aggregated.length === 0) {
@@ -21849,6 +21854,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!await canViewPlayerStats(req.userWithPermissions, playerId, leagueId)) {
         return res.status(403).json({ message: 'Player Pro is required to view stats outside your current team' });
+      }
+      const [eligiblePlayer] = await db.select({ id: users.id }).from(users)
+        .where(and(eq(users.id, playerId), leagueStatsPlayerEligible(users.id, leagueId)));
+      if (!eligiblePlayer) {
+        return res.status(404).json({ message: 'Player is not on a team in this league' });
       }
       
       // Validate season ownership if seasonId is provided
@@ -31358,6 +31368,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isCommissioner = league?.commissionerId === requesterId;
         if (membership?.status !== 'approved' && !isCommissioner) {
           return res.status(403).json({ message: 'Not a member of this league' });
+        }
+        const [eligiblePlayer] = isSyntheticPlaceholder
+          ? await db.select({ id: placeholderPlayers.id }).from(placeholderPlayers)
+            .innerJoin(teams, eq(teams.id, placeholderPlayers.teamId))
+            .where(and(eq(placeholderPlayers.id, placeholderId!), eq(teams.leagueId, leagueId)))
+          : await db.select({ id: users.id }).from(users)
+            .where(and(eq(users.id, userId), leagueStatsPlayerEligible(users.id, leagueId)));
+        if (!eligiblePlayer) {
+          return res.status(404).json({ message: 'Player is not on a team in this league' });
         }
       }
       // No leagueId: the current-team check above still protects career views.

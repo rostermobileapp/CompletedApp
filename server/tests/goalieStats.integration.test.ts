@@ -13,6 +13,7 @@ test('goalie stats include approved goalies with no completed games', async () =
   const leagueId = `test_${run}_league`;
   const membershipId = `test_${run}_membership`;
   const seasonId = `test_${run}_season`;
+  const teamId = `test_${run}_team`;
   const uniqueLeagueId = `Z${run.slice(0, 5)}`.toUpperCase();
 
   try {
@@ -42,17 +43,21 @@ test('goalie stats include approved goalies with no completed games', async () =
     `);
 
     await db.execute(sql`
+      INSERT INTO teams (id, name, league_id, season_id)
+      VALUES (${teamId}, 'Goalie Team', ${leagueId}, ${seasonId})
+    `);
+    await db.execute(sql`
       INSERT INTO league_memberships
-        (id, user_id, league_id, status, requested_at, is_goalie, is_skater)
+        (id, user_id, league_id, status, requested_at, is_goalie, is_skater, assigned_team_id)
       VALUES
-        (${membershipId}, ${goalieId}, ${leagueId}, 'approved', NOW(), true, false)
+        (${membershipId}, ${goalieId}, ${leagueId}, 'approved', NOW(), true, false, ${teamId})
     `);
 
     await db.execute(sql`
       INSERT INTO placeholder_players
-        (id, league_id, first_name, last_name, is_goalie, is_skater, created_at)
+        (id, league_id, first_name, last_name, is_goalie, is_skater, created_at, team_id)
       VALUES
-        (${placeholderId}, ${leagueId}, 'Placeholder', 'Goalie', true, false, NOW())
+        (${placeholderId}, ${leagueId}, 'Placeholder', 'Goalie', true, false, NOW(), ${teamId})
     `);
 
     const allSeasonStats = await storage.getGoalieStats(leagueId);
@@ -83,6 +88,7 @@ test('goalie stats include approved goalies with no completed games', async () =
   } finally {
     await db.execute(sql`DELETE FROM placeholder_players WHERE id = ${placeholderId}`);
     await db.execute(sql`DELETE FROM league_memberships WHERE id = ${membershipId}`);
+    await db.execute(sql`DELETE FROM teams WHERE id = ${teamId}`);
     await db.execute(sql`DELETE FROM seasons WHERE id = ${seasonId}`);
     await db.execute(sql`DELETE FROM leagues WHERE id = ${leagueId}`);
     await db.execute(sql`DELETE FROM users WHERE id = ${goalieId}`);

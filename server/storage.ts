@@ -1,5 +1,6 @@
 import { hasOneGoalMargin } from "@shared/gameResultType";
 import { resolveTeamJerseyNumber } from "./teamJerseyNumber";
+import { leagueStatsPlayerEligible, leagueStatsTeamEligible } from "./leagueStatsEligibility";
 import {
   users,
   leagues,
@@ -7301,7 +7302,7 @@ export class DatabaseStorage implements IStorage {
     const playersData = await db
       .select()
       .from(users)
-      .where(inArray(users.id, playerIds));
+      .where(and(inArray(users.id, playerIds), leagueStatsPlayerEligible(users.id, leagueId)));
 
     const leaderboard = playersData.map(user => {
       const counts = playerStarCounts[user.id];
@@ -11316,7 +11317,7 @@ export class DatabaseStorage implements IStorage {
       statsConditions.push(eq(playerStats.seasonId, seasonId));
     }
     
-    // Get all approved league members and LEFT JOIN with their stats
+    // Only approved league members on a team in this league belong in stats.
     const result = await db
       .select({
         // User info
@@ -11364,6 +11365,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.leagueId, leagueId),
           eq(leagueMemberships.status, "approved"),
+          leagueStatsPlayerEligible(users.id, leagueId),
           // Filter by player type if specified
           ...(playerType === 'goalies' ? [eq(leagueMemberships.isGoalie, true)] : []),
           ...(playerType === 'non-goalies' ? [eq(leagueMemberships.isGoalie, false)] : [])
@@ -11415,9 +11417,12 @@ export class DatabaseStorage implements IStorage {
     // Include placeholders using the same synthetic identity as the League
     // Players screen. Goalie placeholders are provided by getGoalieStats for
     // the goalie tab; the unfiltered response includes both player types.
+    const leagueTeamIds = new Set((await db.select({ id: teams.id }).from(teams)
+      .where(eq(teams.leagueId, leagueId))).map(team => team.id));
     const placeholderRows = playerType === 'goalies'
       ? []
       : (await this.getLeaguePlaceholderPlayers(leagueId))
+        .filter(placeholder => placeholder.teamId && leagueTeamIds.has(placeholder.teamId))
         .filter(placeholder => playerType !== 'non-goalies'
           ? placeholder.isGoalie || placeholder.isSkater
           : !placeholder.isGoalie && placeholder.isSkater)
@@ -11492,7 +11497,8 @@ export class DatabaseStorage implements IStorage {
       })
       .from(playerStats)
       .innerJoin(importedPlayers, eq(playerStats.importedPlayerId, importedPlayers.id))
-      .where(and(...importedStatsConditions, isNull(importedPlayers.mergedWithUserId)));
+      .where(and(...importedStatsConditions, isNull(importedPlayers.mergedWithUserId),
+        leagueStatsTeamEligible(importedPlayers.teamId, leagueId)));
 
     const importedMappedRows = importedRows.map(r => ({
       id: r.statsId,
@@ -11769,6 +11775,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(games.leagueId, leagueId),
           eq(games.isCompleted, true),
+          leagueStatsPlayerEligible(users.id, leagueId),
           ...gameSeasonConditions
         )
       );
@@ -11802,6 +11809,7 @@ export class DatabaseStorage implements IStorage {
         eq(leagueMemberships.leagueId, leagueId),
         eq(leagueMemberships.status, 'approved'),
         eq(leagueMemberships.isGoalie, true),
+        leagueStatsPlayerEligible(users.id, leagueId),
       ));
 
     // Group stats by goalie userId
@@ -11858,8 +11866,10 @@ export class DatabaseStorage implements IStorage {
     // League Players also includes active placeholder players. Keep goalie
     // placeholders in the stats response with the same synthetic identity
     // used by the league-members endpoint until they claim a real account.
+    const leagueTeamIds = new Set((await db.select({ id: teams.id }).from(teams)
+      .where(eq(teams.leagueId, leagueId))).map(team => team.id));
     const placeholderGoalies = (await this.getLeaguePlaceholderPlayers(leagueId))
-      .filter(placeholder => placeholder.isGoalie);
+      .filter(placeholder => placeholder.isGoalie && placeholder.teamId && leagueTeamIds.has(placeholder.teamId));
     placeholderGoalies.forEach(placeholder => {
       const placeholderUserId = `placeholder:${placeholder.id}`;
       goalieStatsMap.set(placeholderUserId, {
@@ -12051,17 +12061,8 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Historical goalie game records can exist for someone whose current
-    // league request is pending. Do not publish that applicant on the stats
-    // list before their membership is approved.
-    const pendingGoalies = await db
-      .select({ userId: leagueMemberships.userId })
-      .from(leagueMemberships)
-      .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.status, 'pending')));
-    const pendingIds = new Set(pendingGoalies.map(row => row.userId));
-
     // Convert to final format with proper GAA calculation
-    const finalStats = Array.from(goalieStatsMap.values()).filter(stats => !pendingIds.has(stats.userId)).map(stats => ({
+    const finalStats = Array.from(goalieStatsMap.values()).map(stats => ({
       userId: stats.userId,
       gamesPlayed: stats.gamesPlayed,
       wins: stats.wins,

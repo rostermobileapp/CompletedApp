@@ -31,6 +31,7 @@
 - [Goalie stat fallback](goalie-stat-fallback.md) — completed games may lack game_goalies rows; calculate from scores and roster goalie assignments, including placeholder identities.
 - [Goalie stats trends](goalie-stats-trends.md) — league goalie views use the existing goals-against-per-game GAA convention and goalie game records.
 - [Team stats query isolation](team-stats-query-isolation.md) — team-specific stats queries need unique cache keys; league-wide and team-roster responses are not interchangeable.
+- [League stats roster requirement](league-stats-roster-requirement.md) — league membership alone never qualifies for league stats; players must be on a team in that league.
 - [Native calendar export](native-calendar-export.md) — export is one-way by default; optional providers reconcile by stable source key, fingerprint, and editable event ID.
 - [Private calendar feeds](private-calendar-feeds.md) — web subscriptions use a revocable bearer URL; store only its hash and keep one active token per user.
 - [Mockup sandbox isolation](mockup-sandbox-isolation.md) — isolate app-specific plugins and React runtimes; parent-workspace libraries can otherwise crash valid previews.
