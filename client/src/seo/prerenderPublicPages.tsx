@@ -1,7 +1,7 @@
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Router, memoryLocation } from 'wouter';
+import { Router } from 'wouter';
 import Landing from '@/components/marketing/ScrollStory';
 import { FeaturesPage } from '@/components/marketing/FeaturesPage';
 import { PricingPage } from '@/components/marketing/PricingPage';
@@ -54,7 +54,8 @@ function pageElement(path: string): ReactElement {
 }
 
 export function renderPublicPage(path: string, stripePrices: unknown) {
-  const location = memoryLocation({ path, static: true });
+  const locationHook = () => [path, () => undefined] as [string, (to: string) => void];
+  locationHook.searchHook = () => '';
   const metadata: { current: SeoMetadata | null } = { current: null };
   const queryClient = new QueryClient({
     defaultOptions: { queries: { enabled: false, retry: false } },
@@ -64,12 +65,19 @@ export function renderPublicPage(path: string, stripePrices: unknown) {
   const content = renderToStaticMarkup(
     createElement(
       SeoMetadataCollector,
-      { value: metadata },
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(Router, { hook: location.hook }, pageElement(path)),
-      ),
+      {
+        value: metadata,
+        children: createElement(
+          QueryClientProvider,
+          {
+            client: queryClient,
+            children: createElement(Router, {
+              hook: locationHook,
+              children: pageElement(path),
+            }),
+          },
+        ),
+      },
     ),
   );
 

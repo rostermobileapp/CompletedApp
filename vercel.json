@@ -79,6 +79,7 @@
     { "source": "/payment-requests/:id", "destination": "/index.html" },
     { "source": "/facility-memberships", "destination": "/index.html" },
     { "source": "/calendar-events/create", "destination": "/index.html" },
+    { "source": "/tournaments", "destination": "/index.html" },
     { "source": "/tournament-search", "destination": "/index.html" },
     { "source": "/tournaments/create", "destination": "/index.html" },
     { "source": "/leagues/:leagueId/tournaments/create", "destination": "/index.html" },

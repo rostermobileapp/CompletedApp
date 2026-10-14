@@ -74,8 +74,8 @@ const sportConfigs: Record<string, SportConfig> = {
       initials: "MT",
       gradient: "from-blue-500 to-blue-700",
     },
-    metaTitle: 'Hockey Team Management App | Roster — Scheduling, RSVP & Stats',
-    metaDescription: 'Roster is the best hockey team management app. Scheduling, RSVP reminders, player substitutions, stats, standings, and in-app payments — all in one place. Free to start.',
+    metaTitle: 'Hockey Team Management | Roster',
+    metaDescription: 'Manage hockey schedules, RSVPs, rosters, stats, and payments with Roster. One ad-free app for your team.',
   },
   soccer: {
     slug: 'soccer',
@@ -130,8 +130,8 @@ const sportConfigs: Record<string, SportConfig> = {
       initials: "SM",
       gradient: "from-green-500 to-green-700",
     },
-    metaTitle: 'Soccer Team Management App | Roster — Coming Soon',
-    metaDescription: 'Roster is bringing its powerful hockey team management tools to soccer. Scheduling, RSVPs, lineups, stats, and payments — all in one ad-free app.',
+    metaTitle: 'Soccer Team Management | Roster',
+    metaDescription: 'Roster brings team management to soccer: schedules, RSVPs, lineups, stats, and payments in one ad-free app.',
     comingSoon: true,
   },
   baseball: {
@@ -187,8 +187,8 @@ const sportConfigs: Record<string, SportConfig> = {
       initials: "CR",
       gradient: "from-amber-500 to-amber-700",
     },
-    metaTitle: 'Baseball Team Management App | Roster — Coming Soon',
-    metaDescription: 'Roster is bringing powerful team management to baseball. Batting orders, schedules, RSVP reminders, stats, and in-app payments — all in one ad-free app.',
+    metaTitle: 'Baseball Team Management | Roster',
+    metaDescription: 'Manage baseball schedules, batting orders, RSVPs, stats, and payments with Roster in one ad-free app.',
     comingSoon: true,
   },
 };

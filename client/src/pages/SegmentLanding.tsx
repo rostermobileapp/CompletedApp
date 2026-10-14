@@ -64,8 +64,8 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       initials: "CP",
       gradient: "from-blue-500 to-blue-700",
     },
-    metaTitle: 'Youth Sports Team Management App | Roster — Easy for Parents & Coaches',
-    metaDescription: 'Roster makes managing youth sports teams simple for volunteer coaches and parents. Scheduling, RSVP reminders, player tracking, and digital fee collection — all in one app. Free to start.',
+    metaTitle: 'Youth Team Management | Roster',
+    metaDescription: 'Keep youth teams organized with scheduling, parent communication, RSVPs, and payments in one app for coaches and families.',
   },
   'for-adult-leagues': {
     slug: 'for-adult-leagues',
@@ -110,8 +110,8 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       initials: "DR",
       gradient: "from-emerald-500 to-emerald-700",
     },
-    metaTitle: 'Adult Recreational League Management App | Roster — RSVP, Subs & Dues',
-    metaDescription: 'Roster is built for adult rec sports leagues. RSVP tracking, automatic sub-finding, digital dues collection, league standings, and scheduling — all in one ad-free app.',
+    metaTitle: 'Adult League Management | Roster',
+    metaDescription: 'Simplify adult league schedules, RSVP tracking, substitute coverage, and dues with one app built for recreational teams.',
   },
   'for-varsity': {
     slug: 'for-varsity',
@@ -156,8 +156,8 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       initials: "AP",
       gradient: "from-teal-500 to-teal-700",
     },
-    metaTitle: 'Varsity & Competitive Sports Team App | Roster — Stats, Tournaments & Standings',
-    metaDescription: 'Roster is built for competitive and varsity sports teams. Live stats, tournament brackets, scorekeeping, deep roster management, and standings — all in one app. Free to start.',
+    metaTitle: 'Varsity Team Management | Roster',
+    metaDescription: 'Manage varsity rosters, schedules, stats, tournaments, and standings with one app for competitive teams.',
   },
 };
 

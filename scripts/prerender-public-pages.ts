@@ -7,6 +7,7 @@ const API_ORIGIN = (process.env.PRERENDER_API_ORIGIN || process.env.VITE_API_BAS
   'https://completedapp-production.up.railway.app').replace(/\/+$/, '').replace(/\/api$/, '');
 const outputDir = path.resolve('dist/public');
 const indexPath = path.join(outputDir, 'index.html');
+const templatePath = path.join(outputDir, '.prerender-index.html');
 
 function escapeHtml(value: string) {
   return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -93,11 +94,28 @@ async function writeSitemap(pagePaths: readonly string[], lastmod: string) {
 
 async function main() {
   const prices = await fetchRealPrices();
-  const baseHtml = await fs.readFile(indexPath, 'utf8');
+  let baseHtml: string;
+  try {
+    baseHtml = await fs.readFile(templatePath, 'utf8');
+  } catch {
+    baseHtml = await fs.readFile(indexPath, 'utf8');
+    await fs.writeFile(templatePath, baseHtml);
+  }
   const previousNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   const vite = await createServer({
+    configFile: false,
     mode: 'production',
+    root: path.resolve('client'),
+    resolve: {
+      alias: [
+        { find: /^@\/lib\/supabase$/, replacement: path.resolve('client/src/seo/ssrSupabaseStub.ts') },
+        { find: '@shared', replacement: path.resolve('shared') },
+        { find: '@assets', replacement: path.resolve('attached_assets') },
+        { find: '@', replacement: path.resolve('client/src') },
+      ],
+    },
+    esbuild: { jsx: 'automatic' },
     server: { middlewareMode: true },
     appType: 'custom',
     logLevel: 'error',
@@ -112,14 +130,16 @@ async function main() {
       faqStructuredData: () => Record<string, unknown>;
     };
     const titles = new Set<string>();
+    const seoErrors: string[] = [];
+    let rootHtml: string | undefined;
     for (const pathname of renderer.publicPagePaths) {
       const { content, metadata } = renderer.renderPublicPage(pathname, prices);
       const canonical = `${SITE_ORIGIN}${pathname === '/' ? '/' : pathname}`;
       const title = metadata.title.trim();
       const description = metadata.description.trim();
-      if (title.length >= 60) throw new Error(`${pathname} title must be under 60 characters (${title.length}).`);
-      if (description.length >= 160) throw new Error(`${pathname} description must be under 160 characters (${description.length}).`);
-      if (titles.has(title)) throw new Error(`Duplicate SEO title "${title}" on ${pathname}.`);
+      if (title.length >= 60) seoErrors.push(`${pathname} title must be under 60 characters (${title.length}): ${title}`);
+      if (description.length >= 160) seoErrors.push(`${pathname} description must be under 160 characters (${description.length}).`);
+      if (titles.has(title)) seoErrors.push(`Duplicate SEO title "${title}" on ${pathname}.`);
       titles.add(title);
 
       let html = baseHtml.replace('<div id="root"></div>', `<div id="root" data-prerendered="true">${content}</div>`);
@@ -144,13 +164,21 @@ async function main() {
         `    ${jsonLdScript(structuredData(pathname, prices, renderer.faqStructuredData()))}\n  </head>`);
       const relativePath = pathname === '/' ? 'index.html' : path.join(pathname.slice(1), 'index.html');
       const destination = path.join(outputDir, relativePath);
-      await fs.mkdir(path.dirname(destination), { recursive: true });
-      await fs.writeFile(destination, html);
+      if (pathname === '/') {
+        rootHtml = html;
+      } else {
+        await fs.mkdir(path.dirname(destination), { recursive: true });
+        await fs.writeFile(destination, html);
+      }
       console.log(`Prerendered ${pathname}`);
     }
     await fs.writeFile(path.join(outputDir, '404.html'),
       '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Page not found | Roster</title><link rel="canonical" href="https://www.roster-app.com/"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to Roster</a></main></body></html>');
     await writeSitemap(renderer.publicPagePaths, new Date().toISOString().slice(0, 10));
+    if (seoErrors.length) throw new Error(`SEO validation failed:\n${seoErrors.map(error => `- ${error}`).join('\n')}`);
+    if (!rootHtml) throw new Error('The homepage was not prerendered.');
+    await fs.writeFile(indexPath, rootHtml);
+    await fs.rm(templatePath, { force: true });
   } finally {
     await vite.close();
     if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
