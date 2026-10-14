@@ -1,0 +1,42 @@
+I need to make https://www.roster-app.com crawlable by search engines and AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, Googlebot). Right now the homepage appears to be a client-side JavaScript shell: fetching it returns almost no text in the HTML. Do not break the existing app or any logged-in functionality.
+
+CANONICAL DOMAIN: https://www.roster-app.com. 301 redirect the apex (roster-app.com) to www, and 301 redirect rosterhockey.com and www.rosterhockey.com to the matching www.roster-app.com path, preserving paths. Use this domain everywhere: canonical tags, sitemap, robots.txt, Open Graph URLs, JSON-LD.
+
+STEP 1: Diagnose first, then report before changing anything.
+- Tell me what framework/stack this project uses and how the site is currently rendered (client-side SPA, SSR, static).
+- Show me what a crawler sees without JavaScript for the homepage (curl-equivalent against the local build).
+- Tell me whether the marketing site and the app are the same codebase. Propose the lowest-risk way to get server-rendered or pre-rendered HTML for public marketing pages (SSR, static generation, or prerendering), keeping the logged-in app client-side. Wait for my OK if it requires a major restructure; otherwise proceed.
+
+STEP 2: Make public pages render real HTML without JavaScript.
+Pages: home, features, pricing, about, FAQ, and any blog/guide pages. Every page must contain its full text content in the initial HTML response.
+
+STEP 3: Technical SEO basics.
+- Add /robots.txt that allows all crawlers, explicitly allows GPTBot, ClaudeBot, PerplexityBot, Google-Extended and CCBot, disallows only logged-in/app/admin paths, and references the sitemap.
+- Add /sitemap.xml listing all public pages with lastmod, auto-generated.
+- Implement the redirects described under CANONICAL DOMAIN and add a canonical <link> on every page.
+- Make sure unknown URLs return a real 404 status, not the app shell with a 200.
+- Add <meta name="robots" content="noindex"> and an X-Robots-Tag header on any staging/preview deployments.
+
+STEP 4: Per-page metadata.
+- Unique <title> (under 60 chars) and meta description (under 160 chars) per page.
+- Open Graph and Twitter card tags.
+- One <h1> per page, logical heading hierarchy, semantic HTML (header, main, nav, section, footer), descriptive alt text on images, descriptive link text.
+
+STEP 5: Homepage copy.
+Make the first visible sentence plain and quotable: "Roster is a hockey-specific team and league management app for iOS and Android." Directly below it, a short plain-text list of what it does (scheduling, attendance/RSVPs, team chat, dues/payments, sub and goalie management, league management). Only state features, pricing, and platforms that already exist in the codebase or that I confirm. Do not invent anything. Leave clearly marked TODO placeholders where you need facts from me (pricing, App Store/Google Play URLs, etc).
+
+STEP 6: Structured data (JSON-LD, server-rendered in the HTML).
+- Organization (name, url, logo, sameAs placeholders for social profiles and app store pages)
+- SoftwareApplication or MobileApplication (name, applicationCategory SportsApplication, operatingSystem iOS/Android, offers with real pricing, description)
+- FAQPage on the FAQ page, using real questions and answers visible on the page
+- Validate that the JSON-LD parses.
+
+STEP 7: Optional, low-effort extras.
+- Add /llms.txt: a short markdown file describing Roster in two sentences and linking to the key pages.
+- Serve a markdown version of each public page at the same URL plus .md, if easy in this stack.
+
+STEP 8: Verify and report.
+- Show curl output (no JS) for the homepage, /robots.txt, /sitemap.xml, and one other page, confirming real text content, canonical tags, and JSON-LD are present.
+- Show the redirect chain for roster-app.com, rosterhockey.com, and www.rosterhockey.com.
+- Confirm the app login flow and core app routes still work.
+- Summarize what changes and list every TODO placeholder I need to fill in.
