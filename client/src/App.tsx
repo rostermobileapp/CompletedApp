@@ -108,6 +108,7 @@ import TrophyCase, { TrophyCasePreview } from "@/pages/TrophyCase";
 import EarnedPatches from "@/pages/EarnedPatches";
 import BadgeCatalogAdmin from "@/pages/BadgeCatalogAdmin";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
+import { applyCanonicalUrl } from "@/lib/seoMetadata";
 
 function RedirectToLogin() {
   const [, setLocation] = useLocation();
@@ -147,6 +148,7 @@ function Router() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isActive: isDemoActive } = useDemo();
   const [location, setLocation] = useLocation();
+  useEffect(() => applyCanonicalUrl(location), [location]);
 
   const isDesktopWeb = useIsDesktopWeb();
   useAppDataPrefetch(isAuthenticated && !authLoading);
@@ -243,6 +245,7 @@ function Router() {
   const marketingPage = location === '/features' ? <FeaturesLanding />
     : location === '/pricing' ? <Pricing />
     : location === '/about' ? <About />
+    : location === '/faq' ? <Support />
     : location === '/referral-program' ? <ReferralProgram /> : null;
   if (marketingPage) return <><ScrollToTop />{marketingPage}</>;
 
@@ -291,7 +294,7 @@ function Router() {
           <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
           <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
           <Route path="/admin/referrals" component={ReferralAdmin} />
-          <Route component={Landing} />
+          <Route component={NotFound} />
         </Switch>
       </>
     );
@@ -398,7 +401,7 @@ function Router() {
               <Route path="/about" component={About} />
               <Route path="/admin/stripe" component={StripeAdmin} />
               <Route path="/admin/metrics" component={AdminMetrics} />
-              <Route component={Dashboard} />
+              <Route component={NotFound} />
             </Switch>
   );
 

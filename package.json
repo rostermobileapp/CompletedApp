@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx scripts/generate-trivia-patches.ts && NODE_ENV=development tsx server/index.ts",
-    "build": "tsx scripts/generate-trivia-patches.ts && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "tsx scripts/generate-trivia-patches.ts && vite build && tsx scripts/prerender-public-pages.ts && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "generate-trivia": "tsx scripts/trivia.ts generate",

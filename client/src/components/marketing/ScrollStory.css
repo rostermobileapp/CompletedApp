@@ -73,6 +73,8 @@
 .rs-hero h1.rs-hero-title { margin-top:1px;color:#ffffff; }
 .rs-hero h1 span { color:var(--blue); }
 .rs-hero-copy { max-width:700px; margin-top:100px; font-size:clamp(16px,1.6vw,20px); line-height:1.6; color:#ffffff;font-weight:600;text-shadow:0 2px 18px rgba(1,9,18,.62); }
+.rs-hero-features { display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;margin:12px auto 0;padding:0 18px;max-width:850px;list-style:disc;list-style-position:inside;color:#fff;font-size:14px;line-height:1.5;text-shadow:0 2px 18px rgba(1,9,18,.62); }
+.rs-hero-features li { padding:0; }
 .rs-hero-actions { display:flex; gap:12px; margin:25px 0 13px; flex-wrap:wrap;justify-content:center; }
 .rs-button.secondary { background:rgba(222,239,255,.08);border:1px solid rgba(195,222,248,.28); }
 .rs-button.secondary:hover { background:rgba(222,239,255,.16); }

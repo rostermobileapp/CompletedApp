@@ -128,7 +128,15 @@ function ScrollStory() {
           loading="eager"
         />
         <h1 className="rs-hero-title mt-[1px] text-[#ffffff]">LESS ADMIN<br /><span>MORE HOCKEY</span></h1>
-        <p className="rs-hero-copy text-[#ffffff] font-semibold">When the game ends, the memories begin. Roster handles the admin, so you can enjoy the parking lot party.</p>
+        <p className="rs-hero-copy text-[#ffffff] font-semibold">Roster is a hockey-specific team and league management app for iOS and Android.</p>
+        <ul className="rs-hero-features" aria-label="Roster features">
+          <li>Scheduling</li>
+          <li>Attendance/RSVPs</li>
+          <li>Team chat</li>
+          <li>Dues/payments</li>
+          <li>Sub and goalie management</li>
+          <li>League management</li>
+        </ul>
         <div className="rs-hero-actions">
           <button className="rs-button" onClick={() => navigate(signupDestination)}>Bring your team together <ArrowRight size={16} /></button>
           <button className="rs-button secondary" onClick={() => navigate("/login")}>Log in</button>

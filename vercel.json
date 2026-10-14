@@ -3,6 +3,26 @@
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "framework": null,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "roster-app.com" }],
+      "destination": "https://www.roster-app.com/:path*",
+      "statusCode": 301
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "rosterhockey.com" }],
+      "destination": "https://www.roster-app.com/:path*",
+      "statusCode": 301
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
+      "destination": "https://www.roster-app.com/:path*",
+      "statusCode": 301
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -12,10 +32,78 @@
       "source": "/.well-known/:file*",
       "destination": "/.well-known/:file*"
     },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/app", "destination": "/index.html" },
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/get-started", "destination": "/index.html" },
+    { "source": "/reset-password", "destination": "/index.html" },
+    { "source": "/forgot-password", "destination": "/index.html" },
+    { "source": "/hpib", "destination": "/index.html" },
+    { "source": "/demo", "destination": "/index.html" },
+    { "source": "/trophy-case-preview", "destination": "/index.html" },
+    { "source": "/gerry-home-preview", "destination": "/index.html" },
+    { "source": "/league-tournament-search", "destination": "/index.html" },
+    { "source": "/league-search", "destination": "/index.html" },
+    { "source": "/team-search", "destination": "/index.html" },
+    { "source": "/messages/:conversationId", "destination": "/index.html" },
+    { "source": "/user/:userId", "destination": "/index.html" },
+    { "source": "/trophy-case", "destination": "/index.html" },
+    { "source": "/trophy-case/earned-patches", "destination": "/index.html" },
+    { "source": "/admin/badges", "destination": "/index.html" },
+    { "source": "/subscription", "destination": "/index.html" },
+    { "source": "/roster", "destination": "/index.html" },
+    { "source": "/create-league", "destination": "/index.html" },
+    { "source": "/create-team", "destination": "/index.html" },
+    { "source": "/create-scrimmage", "destination": "/index.html" },
+    { "source": "/edit-scrimmage/:id", "destination": "/index.html" },
+    { "source": "/scrimmage-management", "destination": "/index.html" },
+    { "source": "/invite-groups", "destination": "/index.html" },
+    { "source": "/invite-groups/new", "destination": "/index.html" },
+    { "source": "/invite-groups/:id", "destination": "/index.html" },
+    { "source": "/league-management", "destination": "/index.html" },
+    { "source": "/draft/:draftId", "destination": "/index.html" },
+    { "source": "/league/:leagueId/score-verification", "destination": "/index.html" },
+    { "source": "/league-list", "destination": "/index.html" },
+    { "source": "/calendar", "destination": "/index.html" },
+    { "source": "/game/:id", "destination": "/index.html" },
+    { "source": "/scrimmage/:id", "destination": "/index.html" },
+    { "source": "/team-event/:id", "destination": "/index.html" },
+    { "source": "/team/:id", "destination": "/index.html" },
+    { "source": "/player-stats/:userId", "destination": "/index.html" },
+    { "source": "/announcements", "destination": "/index.html" },
+    { "source": "/substitute-confirmations", "destination": "/index.html" },
+    { "source": "/stats", "destination": "/index.html" },
+    { "source": "/stats-management", "destination": "/index.html" },
+    { "source": "/scorekeeper", "destination": "/index.html" },
+    { "source": "/create-payment-request", "destination": "/index.html" },
+    { "source": "/payment-requests/:id/edit", "destination": "/index.html" },
+    { "source": "/payment-requests/:id", "destination": "/index.html" },
+    { "source": "/facility-memberships", "destination": "/index.html" },
+    { "source": "/calendar-events/create", "destination": "/index.html" },
+    { "source": "/tournament-search", "destination": "/index.html" },
+    { "source": "/tournaments/create", "destination": "/index.html" },
+    { "source": "/leagues/:leagueId/tournaments/create", "destination": "/index.html" },
+    { "source": "/leagues/:leagueId/tournaments", "destination": "/index.html" },
+    { "source": "/tournaments/:tournamentId/edit", "destination": "/index.html" },
+    { "source": "/tournaments/:tournamentId/custom-builder", "destination": "/index.html" },
+    { "source": "/tournament-teams/:tournamentId", "destination": "/index.html" },
+    { "source": "/tournaments/:tournamentId", "destination": "/index.html" },
+    { "source": "/media/tournament/:id", "destination": "/index.html" },
+    { "source": "/media/league/:id", "destination": "/index.html" },
+    { "source": "/media/team/:id", "destination": "/index.html" },
+    { "source": "/referral-program/portal/auth", "destination": "/index.html" },
+    { "source": "/referral-program/portal/set-password", "destination": "/index.html" },
+    { "source": "/referral-program/portal/forgot-password", "destination": "/index.html" },
+    { "source": "/referral-program/portal/login", "destination": "/index.html" },
+    { "source": "/referral-program/portal", "destination": "/index.html" },
+    { "source": "/referral-program/verify", "destination": "/index.html" },
+    { "source": "/admin/referrals/login", "destination": "/index.html" },
+    { "source": "/admin/referrals/partner/:id", "destination": "/index.html" },
+    { "source": "/admin/referrals", "destination": "/index.html" },
+    { "source": "/privacy", "destination": "/index.html" },
+    { "source": "/facilities", "destination": "/index.html" },
+    { "source": "/facilities/:id", "destination": "/index.html" },
+    { "source": "/admin/stripe", "destination": "/index.html" },
+    { "source": "/admin/metrics", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -40,6 +128,13 @@
       "source": "/.well-known/apple-app-site-association",
       "headers": [
         { "key": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "(?<host>.*\\.vercel\\.app)" }],
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
       ]
     }
   ]

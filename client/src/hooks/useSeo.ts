@@ -1,23 +1,26 @@
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { applyCanonicalUrl, CANONICAL_SITE_ORIGIN, canonicalUrl, SeoMetadataContext } from '@/lib/seoMetadata';
 
 interface SeoOptions {
   title: string;
   description: string;
   ogTitle?: string;
   ogDescription?: string;
+  canonical?: string;
 }
 
 const DEFAULT_TITLE = 'Roster — Hockey Team Management App';
-const OG_IMAGE = '/roster-logo.png';
+const OG_IMAGE = `${CANONICAL_SITE_ORIGIN}/roster-logo.png`;
 
-export function useSeo({ title, description, ogTitle, ogDescription }: SeoOptions) {
+export function useSeo({ title, description, ogTitle, ogDescription, canonical }: SeoOptions) {
   const [location] = useLocation();
+  const collector = useContext(SeoMetadataContext);
+  const resolvedCanonical = canonicalUrl(canonical ?? location);
+  if (collector) collector.current = { title, description, ogTitle, ogDescription, canonical: resolvedCanonical };
 
   useEffect(() => {
     document.title = title;
-
-    const canonical = window.location.origin + location;
 
     const setMeta = (name: string, content: string, property = false) => {
       const attr = property ? 'property' : 'name';
@@ -47,16 +50,17 @@ export function useSeo({ title, description, ogTitle, ogDescription }: SeoOption
     setMeta('og:title', resolvedOgTitle, true);
     setMeta('og:description', resolvedOgDesc, true);
     setMeta('og:type', 'website', true);
-    setMeta('og:image', window.location.origin + OG_IMAGE, true);
-    setMeta('og:url', canonical, true);
+    setMeta('og:image', OG_IMAGE, true);
+    setMeta('og:url', resolvedCanonical, true);
     setMeta('twitter:card', 'summary_large_image');
     setMeta('twitter:title', resolvedOgTitle);
     setMeta('twitter:description', resolvedOgDesc);
-    setMeta('twitter:image', window.location.origin + OG_IMAGE);
-    setCanonical(canonical);
+    setMeta('twitter:image', OG_IMAGE);
+    setCanonical(resolvedCanonical);
+    applyCanonicalUrl(canonical ?? location);
 
     return () => {
       document.title = DEFAULT_TITLE;
     };
-  }, [title, description, ogTitle, ogDescription, location]);
+  }, [title, description, ogTitle, ogDescription, canonical, location, resolvedCanonical]);
 }

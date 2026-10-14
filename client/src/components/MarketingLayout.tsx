@@ -1,9 +1,11 @@
-import { useEffect, ReactNode, useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useIsIosDevice } from '@/hooks/useIosPlatform';
 import { Link, useLocation } from 'wouter';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSeo } from '@/hooks/useSeo';
+import { canonicalUrl } from '@/lib/seoMetadata';
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
 
 interface MarketingLayoutProps {
@@ -15,75 +17,18 @@ interface MarketingLayoutProps {
   children: ReactNode;
 }
 
-const OG_IMAGE = '/roster-logo.png';
-
 export function MarketingLayout({ title, description, ogTitle, ogDescription, canonical, children }: MarketingLayoutProps) {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isIos = useIsIosDevice();
   const { isAuthenticated } = useAuth();
-
-
-  useEffect(() => {
-    document.title = title;
-
-    const resolvedCanonical = canonical ?? (window.location.origin + location);
-    const resolvedOgTitle = ogTitle ?? title;
-    const resolvedOgDesc = ogDescription ?? description;
-    const ogImageUrl = window.location.origin + OG_IMAGE;
-
-    const setMeta = (name: string, content: string, property = false) => {
-      const attr = property ? 'property' : 'name';
-      let el = document.querySelector(`meta[${attr}="${name}"]`);
-      if (!el) {
-        el = document.createElement('meta');
-        el.setAttribute(attr, name);
-        document.head.appendChild(el);
-      }
-      el.setAttribute('content', content);
-    };
-
-    const setCanonical = (href: string) => {
-      let el = document.querySelector('link[rel="canonical"]');
-      if (!el) {
-        el = document.createElement('link');
-        el.setAttribute('rel', 'canonical');
-        document.head.appendChild(el);
-      }
-      el.setAttribute('href', href);
-    };
-
-    setMeta('description', description);
-    setMeta('og:title', resolvedOgTitle, true);
-    setMeta('og:description', resolvedOgDesc, true);
-    setMeta('og:type', 'website', true);
-    setMeta('og:image', ogImageUrl, true);
-    setMeta('og:url', resolvedCanonical, true);
-    setMeta('twitter:card', 'summary_large_image');
-    setMeta('twitter:title', resolvedOgTitle);
-    setMeta('twitter:description', resolvedOgDesc);
-    setMeta('twitter:image', ogImageUrl);
-    setCanonical(resolvedCanonical);
-
-    return () => {
-      document.title = 'Roster — Hockey Team Management App';
-      const clearMeta = (name: string, property = false) => {
-        const attr = property ? 'property' : 'name';
-        const el = document.querySelector(`meta[${attr}="${name}"]`);
-        if (el) el.setAttribute('content', '');
-      };
-      clearMeta('description');
-      clearMeta('og:title', true);
-      clearMeta('og:description', true);
-      clearMeta('og:image', true);
-      clearMeta('og:url', true);
-      clearMeta('twitter:title');
-      clearMeta('twitter:description');
-      clearMeta('twitter:image');
-      const canonicalEl = document.querySelector('link[rel="canonical"]');
-      if (canonicalEl) canonicalEl.setAttribute('href', '');
-    };
-  }, [title, description, ogTitle, ogDescription, canonical, location]);
+  useSeo({
+    title,
+    description,
+    ogTitle,
+    ogDescription,
+    canonical: canonical ? canonicalUrl(canonical) : undefined,
+  });
 
   return (
     <div className="min-h-screen bg-white text-gray-900">

@@ -1,8 +1,9 @@
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { Mail, MessageCircle, Bug, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation } from 'wouter';
 
-const faqs = [
+export const supportFaqs = [
   {
     question: 'How do I create a team or league?',
     answer:
@@ -51,6 +52,8 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
     <div className="border border-gray-200 rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={`faq-answer-${question.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
         className="w-full flex justify-between items-center px-6 py-5 text-left hover:bg-gray-50 transition-colors"
       >
         <span className="font-semibold text-gray-900 text-base">{question}</span>
@@ -60,22 +63,30 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
           <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0 ml-4" />
         )}
       </button>
-      {open && (
-        <div className="px-6 pb-5 text-gray-600 leading-relaxed text-sm border-t border-gray-100">
-          <p className="mt-4">{answer}</p>
-        </div>
-      )}
+      <div
+        id={`faq-answer-${question.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+        hidden={!open}
+        className="px-6 pb-5 text-gray-600 leading-relaxed text-sm border-t border-gray-100"
+      >
+        <p className="mt-4">{answer}</p>
+      </div>
     </div>
   );
 }
 
 export default function Support() {
+  const [location] = useLocation();
+  const isFaqPage = location === '/faq';
   return (
     <MarketingLayout
-      title="Support | Roster — Hockey & Sports Team Management"
-      description="Get help with Roster. Browse our FAQ, contact support by email, or report a bug. We're here to help you manage your team or league."
-      ogTitle="Roster Support"
-      ogDescription="Need help with Roster? Find answers to common questions or reach out to our support team directly."
+      title={isFaqPage ? 'Roster FAQ | Hockey Team and League Management' : 'Support | Roster — Hockey & Sports Team Management'}
+      description={isFaqPage
+        ? 'Answers about Roster teams, leagues, RSVPs, payments, substitutions, and subscriptions.'
+        : 'Get help with Roster. Browse our FAQ, contact support by email, or report a bug. We’re here to help you manage your team or league.'}
+      ogTitle={isFaqPage ? 'Roster FAQ' : 'Roster Support'}
+      ogDescription={isFaqPage
+        ? 'Answers to common questions about managing teams, leagues, games, and Roster accounts.'
+        : 'Need help with Roster? Find answers to common questions or reach out to our support team directly.'}
     >
       {/* Hero */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white text-center">
@@ -84,7 +95,7 @@ export default function Support() {
             <span className="text-sm font-medium text-[#3c82f4]">We're here to help</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
-            Roster Support
+            {isFaqPage ? 'Roster FAQ' : 'Roster Support'}
           </h1>
           <p className="text-lg text-gray-500 max-w-xl mx-auto">
             Browse the FAQ below or reach out directly — we typically respond within one business day.
@@ -146,7 +157,7 @@ export default function Support() {
             <h2 className="text-3xl font-bold text-gray-900">Frequently Asked Questions</h2>
           </div>
           <div className="space-y-3">
-            {faqs.map((faq) => (
+            {supportFaqs.map((faq) => (
               <FAQItem key={faq.question} question={faq.question} answer={faq.answer} />
             ))}
           </div>

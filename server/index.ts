@@ -56,6 +56,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
+  const hostname = (req.hostname || '').toLowerCase();
+  const isPreview = process.env.NODE_ENV !== 'production'
+    || hostname.endsWith('.vercel.app')
+    || hostname.endsWith('.replit.dev')
+    || hostname.endsWith('.replit.app');
+  if (isPreview) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  next();
+});
+
+app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
