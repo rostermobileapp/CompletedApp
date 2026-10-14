@@ -15,7 +15,6 @@ interface UserProfileData {
   firstName?: string | null;
   lastName?: string | null;
   email?: string | null;
-  phoneNumber?: string | null;
   city?: string | null;
   dateOfBirth?: string | null;
   profileImageUrl?: string | null;
@@ -280,10 +279,6 @@ export default function UserProfile() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Date of Birth:</span>
               <span data-testid="text-profile-dob">{user.dateOfBirth || 'Not specified'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Phone:</span>
-              <span data-testid="text-profile-phone">{user.phoneNumber || 'Not specified'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">City:</span>
