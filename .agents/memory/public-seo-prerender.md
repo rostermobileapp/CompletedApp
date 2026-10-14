@@ -8,3 +8,9 @@ Keep build-time marketing rendering isolated from the browser authentication run
 **Why:** The Replit build runtime is Node 20, while the logged-in app is intentionally client-rendered.
 
 **How to apply:** Preserve the prerender-only module aliases and static location hook when changing page rendering; do not make the live Supabase client or signed-in app depend on the SSR workaround.
+
+Express and Vercel must both serve generated directory-index pages at their clean URLs. Express's automatic directory slash redirects can turn a valid prerendered page into a client-router 404 after JavaScript runs.
+
+**Why:** The marketing browser router matches clean paths exactly, whereas Express static middleware normally redirects a directory such as `/faq` to `/faq/`.
+
+**How to apply:** Verify both initial HTML and browser behavior when changing static serving. Avoid mounted wildcard middleware when testing `req.path`: Express strips the matched mount path, so `app.use("*", ...)` can make every request look like `/` and defeat a route allowlist.

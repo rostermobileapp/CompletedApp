@@ -6,7 +6,8 @@ import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSeo } from '@/hooks/useSeo';
 import { canonicalUrl } from '@/lib/seoMetadata';
-import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
+// Public URLs work in both build-time HTML and the browser bundle.
+const rosterLightLogo = "/marketing/roster-home/logo-light.png";
 
 interface MarketingLayoutProps {
   title: string;

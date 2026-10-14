@@ -25,7 +25,7 @@ function ScrollStory() {
   const [, navigate] = useLocation();
   const isIos = useIsIosDevice();
   useMarketingVisit();
-  useSeo({ title: "Roster — Hockey Team Management App", description: "More time together. Less time on admin. Roster handles hockey schedules, RSVPs, rosters, stats, and payments in one ad-free app. Free to start." });
+  useSeo({ title: "Roster — Hockey Team and League Management App", description: "More time together. Less time on admin. Roster handles hockey schedules, RSVPs, rosters, stats, and payments in one ad-free app. Free to start." });
   const rootRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);

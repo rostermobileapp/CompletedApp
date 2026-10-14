@@ -14,43 +14,31 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfService from '@/pages/TermsOfService';
 import { SeoMetadataCollector, type SeoMetadata } from '@/lib/seoMetadata';
 
-export const publicPagePaths = [
-  '/',
-  '/features',
-  '/pricing',
-  '/about',
-  '/hockey',
-  '/soccer',
-  '/baseball',
-  '/for-youth-teams',
-  '/for-adult-leagues',
-  '/for-varsity',
-  '/referral-program',
-  '/faq',
-  '/support',
-  '/privacy-policy',
-  '/terms-of-service',
-] as const;
+// Register future public blog/guide pages here too: both their initial HTML
+// and sitemap entries are generated from this single registry at build time.
+const publicPages: Record<string, () => ReactElement> = {
+  '/': () => createElement(Landing),
+  '/features': () => createElement(FeaturesPage),
+  '/pricing': () => createElement(PricingPage),
+  '/about': () => createElement(AboutPage),
+  '/hockey': () => createElement(SportLanding, { sport: 'hockey' }),
+  '/soccer': () => createElement(SportLanding, { sport: 'soccer' }),
+  '/baseball': () => createElement(SportLanding, { sport: 'baseball' }),
+  '/for-youth-teams': () => createElement(SegmentLanding, { segment: 'for-youth-teams' }),
+  '/for-adult-leagues': () => createElement(SegmentLanding, { segment: 'for-adult-leagues' }),
+  '/for-varsity': () => createElement(SegmentLanding, { segment: 'for-varsity' }),
+  '/referral-program': () => createElement(PartnersPage),
+  '/faq': () => createElement(Support),
+  '/support': () => createElement(Support),
+  '/privacy-policy': () => createElement(PrivacyPolicy),
+  '/terms-of-service': () => createElement(TermsOfService),
+};
+export const publicPagePaths = Object.keys(publicPages);
 
 function pageElement(path: string): ReactElement {
-  switch (path) {
-    case '/': return createElement(Landing);
-    case '/features': return createElement(FeaturesPage);
-    case '/pricing': return createElement(PricingPage);
-    case '/about': return createElement(AboutPage);
-    case '/hockey': return createElement(SportLanding, { sport: 'hockey' });
-    case '/soccer': return createElement(SportLanding, { sport: 'soccer' });
-    case '/baseball': return createElement(SportLanding, { sport: 'baseball' });
-    case '/for-youth-teams': return createElement(SegmentLanding, { segment: 'for-youth-teams' });
-    case '/for-adult-leagues': return createElement(SegmentLanding, { segment: 'for-adult-leagues' });
-    case '/for-varsity': return createElement(SegmentLanding, { segment: 'for-varsity' });
-    case '/referral-program': return createElement(PartnersPage);
-    case '/faq':
-    case '/support': return createElement(Support);
-    case '/privacy-policy': return createElement(PrivacyPolicy);
-    case '/terms-of-service': return createElement(TermsOfService);
-    default: throw new Error(`No public page renderer registered for ${path}`);
-  }
+  const render = Object.hasOwn(publicPages, path) ? publicPages[path] : undefined;
+  if (!render) throw new Error(`No public page renderer registered for ${path}`);
+  return render();
 }
 
 export function renderPublicPage(path: string, stripePrices: unknown) {

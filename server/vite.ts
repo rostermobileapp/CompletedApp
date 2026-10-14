@@ -5,6 +5,7 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import { serveCrawlabilityFiles } from "./crawlabilityFiles";
 
 const viteLogger = createLogger();
 
@@ -40,6 +41,7 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  serveCrawlabilityFiles(app, path.resolve(import.meta.dirname, "..", "dist", "public"));
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
@@ -67,8 +69,7 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+export function serveStatic(app: Express, distPath = path.resolve(import.meta.dirname, "public")) {
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -76,7 +77,21 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  serveCrawlabilityFiles(app, distPath);
+  app.get("*", (req, res, next) => {
+    // Serve generated /faq/index.html at /faq without redirecting to /faq/.
+    // The browser router uses clean paths, just like the Vercel frontend.
+    const pagePath = path.resolve(distPath, `.${req.path}`, "index.html");
+    if (!pagePath.startsWith(`${path.resolve(distPath)}${path.sep}`)
+      || !fs.existsSync(pagePath) || !fs.statSync(pagePath).isFile()) return next();
+    if (req.path !== "/" && req.path.endsWith("/")) {
+      const query = req.originalUrl.slice(req.originalUrl.indexOf("?") < 0
+        ? req.originalUrl.length : req.originalUrl.indexOf("?"));
+      return res.redirect(301, `/${req.path.split("/").filter(Boolean).join("/")}${query}`);
+    }
+    return res.sendFile(pagePath);
+  });
+  app.use(express.static(distPath, { redirect: false }));
 
   const clientRoutes = [
     /^\/$/,
@@ -88,7 +103,7 @@ export function serveStatic(app: Express) {
     /^\/(?:leagues\/[^/]+\/tournaments\/(?:create)?|media\/(?:tournament|league|team)\/[^/]+|referral-program\/(?:portal(?:\/(?:auth|set-password|forgot-password|login))?|verify)|admin\/referrals(?:\/(?:login|partner\/[^/]+))?)$/,
   ];
 
-  app.use("*", (req, res) => {
+  app.use((req, res) => {
     if (clientRoutes.some(route => route.test(req.path))) {
       return res.sendFile(path.resolve(distPath, "index.html"));
     }

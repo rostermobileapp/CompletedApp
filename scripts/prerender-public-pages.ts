@@ -31,6 +31,11 @@ async function fetchRealPrices() {
   const prices = await response.json() as Record<string, { amount?: number | null; currency?: string | null }>;
   const available = Object.values(prices).filter(price => Number.isFinite(price.amount) && price.currency);
   if (available.length === 0) throw new Error('Stripe price endpoint returned no verified prices for application structured data.');
+  for (const key of ['player_pro_monthly', 'commissioner_monthly']) {
+    if (!Number.isFinite(prices[key]?.amount) || !prices[key]?.currency) {
+      throw new Error(`Missing verified ${key} price; refusing to publish incomplete pricing HTML.`);
+    }
+  }
   return prices;
 }
 
@@ -43,7 +48,14 @@ function structuredData(
     'https://apps.apple.com/us/app/roster-hockey/id6756852981',
     'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med',
   ];
-  const offers = Object.entries(prices)
+  const offers = [{
+    '@type': 'Offer',
+    name: 'Free',
+    price: 0,
+    priceCurrency: prices.player_pro_monthly.currency!.toUpperCase(),
+    availability: 'https://schema.org/InStock',
+    url: `${SITE_ORIGIN}/pricing`,
+  }, ...Object.entries(prices)
     .filter(([, price]) => Number.isFinite(price.amount) && price.currency)
     .map(([key, price]) => ({
       '@type': 'Offer',
@@ -55,16 +67,22 @@ function structuredData(
       } as Record<string, string>)[key] || key.replaceAll('_', ' '),
       price: price.amount,
       priceCurrency: price.currency!.toUpperCase(),
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        price: price.amount,
+        priceCurrency: price.currency!.toUpperCase(),
+        billingDuration: key.endsWith('_yearly') ? 'P1Y' : 'P1M',
+      },
       availability: 'https://schema.org/InStock',
       url: `${SITE_ORIGIN}/pricing`,
-    }));
+    }))];
   const entities: Record<string, unknown>[] = [
     {
       '@context': 'https://schema.org',
       '@type': 'Organization',
       name: 'Roster',
       url: SITE_ORIGIN,
-      logo: `${SITE_ORIGIN}/roster-logo.png`,
+      logo: `${SITE_ORIGIN}/marketing/roster-home/logo-light.png`,
       sameAs: storeLinks,
     },
     {
@@ -134,6 +152,9 @@ async function main() {
     let rootHtml: string | undefined;
     for (const pathname of renderer.publicPagePaths) {
       const { content, metadata } = renderer.renderPublicPage(pathname, prices);
+      if (/\/@fs\/|\/@id\//.test(content)) {
+        throw new Error(`Development-only asset URL found in ${pathname}; use a public static path.`);
+      }
       const canonical = `${SITE_ORIGIN}${pathname === '/' ? '/' : pathname}`;
       const title = metadata.title.trim();
       const description = metadata.description.trim();
