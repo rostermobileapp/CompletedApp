@@ -14,7 +14,6 @@ interface SportConfig {
   description: string;
   pains: string[];
   features: { icon: ElementType; title: string; description: string }[];
-  testimonial: { quote: string; name: string; team: string; initials: string; gradient: string };
   metaTitle: string;
   metaDescription: string;
   comingSoon?: boolean;
@@ -26,7 +25,7 @@ const sportConfigs: Record<string, SportConfig> = {
     name: 'Hockey',
     emoji: '🏒',
     tagline: 'Built for Hockey',
-    headline: 'The #1 team management app for hockey.',
+    headline: 'Built specifically for hockey teams and leagues.',
     subheadline: 'Scheduling, lineups, RSVPs, stats, and payments — built specifically for hockey teams and leagues.',
     description: 'Running a hockey team is harder than it looks. Between scheduling ice time, tracking who\'s showing up, managing subs, and handling dues — it\'s a full-time job. Roster handles all of it so you can focus on the game.',
     pains: [
@@ -67,13 +66,6 @@ const sportConfigs: Record<string, SportConfig> = {
         description: 'Keep all team communication in one place. No more buried group texts or missed emails.',
       },
     ],
-    testimonial: {
-      quote: "We used to lose 15 minutes at every game figuring out who was playing. Now I open Roster and everything is right there — lineup confirmed, subs arranged, and dues collected.",
-      name: "Marcus T.",
-      team: "Wednesday Night Hockey",
-      initials: "MT",
-      gradient: "from-blue-500 to-blue-700",
-    },
     metaTitle: 'Hockey Team Management | Roster',
     metaDescription: 'Manage hockey schedules, RSVPs, rosters, stats, and payments with Roster. One ad-free app for your team.',
   },
@@ -123,13 +115,6 @@ const sportConfigs: Record<string, SportConfig> = {
         description: 'One place for all team communication. No more fragmented group chats.',
       },
     ],
-    testimonial: {
-      quote: "We've been waiting for an app like this for our soccer league. The RSVP system alone would save our captain 2 hours of back-and-forth every week.",
-      name: "Sofia M.",
-      team: "Sunday Co-ed Soccer",
-      initials: "SM",
-      gradient: "from-green-500 to-green-700",
-    },
     metaTitle: 'Soccer Team Management | Roster',
     metaDescription: 'Roster brings team management to soccer: schedules, RSVPs, lineups, stats, and payments in one ad-free app.',
     comingSoon: true,
@@ -180,13 +165,6 @@ const sportConfigs: Record<string, SportConfig> = {
         description: 'One channel for all team news. No more missed messages about field changes or canceled games.',
       },
     ],
-    testimonial: {
-      quote: "Every baseball team needs something like this. We spend more time managing communication than actually coaching. Roster looks like it solves all of it.",
-      name: "Coach R.",
-      team: "Adult Baseball League",
-      initials: "CR",
-      gradient: "from-amber-500 to-amber-700",
-    },
     metaTitle: 'Baseball Team Management | Roster',
     metaDescription: 'Manage baseball schedules, batting orders, RSVPs, stats, and payments with Roster in one ad-free app.',
     comingSoon: true,
@@ -227,7 +205,7 @@ export default function SportLanding({ sport }: SportLandingProps) {
           </p>
           {config.comingSoon && (
             <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-4 py-2 mb-6 text-sm font-semibold">
-              ⏳ Launching for {config.name} teams June 1, 2026
+              {config.name} is not yet available. Roster is available now for hockey.
             </div>
           )}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -290,29 +268,6 @@ export default function SportLanding({ sport }: SportLandingProps) {
         </div>
       </section>
 
-      {/* Testimonial */}
-      <section className="py-16 px-6 bg-white">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-8">
-            <div className="flex items-center gap-1 mb-4">
-              {[...Array(5)].map((_, i) => (
-                <span key={i} className="text-yellow-400 text-lg">★</span>
-              ))}
-            </div>
-            <p className="text-gray-700 text-lg leading-relaxed mb-6">"{config.testimonial.quote}"</p>
-            <div className="flex items-center gap-3">
-              <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${config.testimonial.gradient} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
-                {config.testimonial.initials}
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">{config.testimonial.name}</p>
-                <p className="text-gray-400 text-xs">{config.testimonial.team}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Pricing preview */}
       <section className="py-16 px-6 bg-gray-50">
         <div className="max-w-3xl mx-auto text-center">
@@ -347,7 +302,7 @@ export default function SportLanding({ sport }: SportLandingProps) {
             Ready to get organized?
           </h2>
           <p className="text-gray-500 text-lg mb-8">
-            Launching <span className="text-gray-900 font-semibold">June 1, 2026</span>. Free tier available on day one.
+            Roster for hockey is live on the App Store and Google Play. Free tier available now.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button

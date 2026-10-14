@@ -48,8 +48,13 @@ test("crawler files have explicit content types and never fall through to the SP
 test("production static serving keeps clean prerendered URLs and SPA/404 boundaries", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "roster-static-pages-"));
   await mkdir(path.join(root, "faq"));
+  await mkdir(path.join(root, "soccer"));
+  await mkdir(path.join(root, "baseball"));
   await writeFile(path.join(root, "index.html"), "<h1>Homepage</h1>");
   await writeFile(path.join(root, "faq", "index.html"), "<h1>FAQ</h1><p>Initial HTML answer</p>");
+  for (const sport of ["soccer", "baseball"]) {
+    await writeFile(path.join(root, sport, "index.html"), `<meta name="robots" content="noindex"><h1>${sport}</h1>`);
+  }
   const app = express();
   serveStatic(app, root);
   const server = app.listen(0, "127.0.0.1");
@@ -59,6 +64,15 @@ test("production static serving keeps clean prerendered URLs and SPA/404 boundar
     const faq = await fetch(`${origin}/faq`, { redirect: "manual" });
     assert.equal(faq.status, 200);
     assert.match(await faq.text(), /Initial HTML answer/);
+    assert.equal(faq.headers.get("x-robots-tag"), null);
+    for (const sport of ["soccer", "baseball"]) {
+      for (const suffix of ["", "/", "/index.html"]) {
+        const response = await fetch(`${origin}/${sport}${suffix}`);
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get("x-robots-tag"), "noindex");
+        assert.match(await response.text(), /<meta name="robots" content="noindex">/);
+      }
+    }
     const slash = await fetch(`${origin}/faq/?source=crawl`, { redirect: "manual" });
     assert.equal(slash.status, 301);
     assert.equal(slash.headers.get("location"), "/faq?source=crawl");

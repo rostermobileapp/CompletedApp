@@ -108,6 +108,12 @@
   ],
   "headers": [
     {
+      "source": "/(soccer|baseball)(/.*)?",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex" }
+      ]
+    },
+    {
       "source": "/robots.txt",
       "headers": [
         { "key": "Content-Type", "value": "text/plain; charset=utf-8" },

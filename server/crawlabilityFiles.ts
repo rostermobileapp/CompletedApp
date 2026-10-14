@@ -1,9 +1,14 @@
 import type { Express } from "express";
 import path from "node:path";
+import { isUnindexedPublicPage } from "../shared/publicPagePolicy";
 
 // Exact routes must run before Vite/static middleware and every SPA fallback.
 // A missing build artifact is a real 404, never a 200 HTML app shell.
 export function serveCrawlabilityFiles(app: Express, publicDir: string) {
+  app.use((req, res, next) => {
+    if (isUnindexedPublicPage(req.path)) res.set("X-Robots-Tag", "noindex");
+    next();
+  });
   for (const [filename, contentType] of [
     ["robots.txt", "text/plain; charset=utf-8"],
     ["sitemap.xml", "application/xml; charset=utf-8"],

@@ -15,7 +15,6 @@ interface SegmentConfig {
   pains: string[];
   solutions: { title: string; description: string }[];
   features: { icon: ElementType; label: string }[];
-  testimonial: { quote: string; name: string; team: string; initials: string; gradient: string };
   metaTitle: string;
   metaDescription: string;
 }
@@ -57,13 +56,6 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: MessageCircle, label: 'Parent & Team Messaging' },
       { icon: Shield, label: 'No Ads. Kid-Friendly.' },
     ],
-    testimonial: {
-      quote: "I'm a volunteer coach with three kids of my own. The last thing I need is another complicated app. Roster is the first tool that actually made my life easier, not harder.",
-      name: "Coach Patel",
-      team: "U12 Youth Hockey",
-      initials: "CP",
-      gradient: "from-blue-500 to-blue-700",
-    },
     metaTitle: 'Youth Team Management | Roster',
     metaDescription: 'Keep youth teams organized with scheduling, parent communication, RSVPs, and payments in one app for coaches and families.',
   },
@@ -103,13 +95,6 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: Trophy, label: 'League Standings & Stats' },
       { icon: MessageCircle, label: 'Team Messaging' },
     ],
-    testimonial: {
-      quote: "I run a 6-team adult hockey league. Roster replaced my spreadsheet, our group chat, and the Venmo money-collecting nightmare. I get my Tuesday nights back.",
-      name: "Derek R.",
-      team: "City Adult Hockey League",
-      initials: "DR",
-      gradient: "from-emerald-500 to-emerald-700",
-    },
     metaTitle: 'Adult League Management | Roster',
     metaDescription: 'Simplify adult league schedules, RSVP tracking, substitute coverage, and dues with one app built for recreational teams.',
   },
@@ -149,13 +134,6 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: MessageCircle, label: 'Coaching Staff Messaging' },
       { icon: Shield, label: 'League-Wide Posts & Awards' },
     ],
-    testimonial: {
-      quote: "We run a competitive tournament series and Roster's bracket management is the only thing that's ever made sense to us. Brackets, scoring, standings — all clean and automatic.",
-      name: "Aisha P.",
-      team: "Regional Hockey Club",
-      initials: "AP",
-      gradient: "from-teal-500 to-teal-700",
-    },
     metaTitle: 'Varsity Team Management | Roster',
     metaDescription: 'Manage varsity rosters, schedules, stats, tournaments, and standings with one app for competitive teams.',
   },
@@ -274,29 +252,6 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
         </div>
       </section>
 
-      {/* Testimonial */}
-      <section className="py-16 px-6 bg-gray-50">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
-            <div className="flex items-center gap-1 mb-4">
-              {[...Array(5)].map((_, i) => (
-                <span key={i} className="text-yellow-400 text-lg">★</span>
-              ))}
-            </div>
-            <p className="text-gray-700 text-lg leading-relaxed mb-6">"{config.testimonial.quote}"</p>
-            <div className="flex items-center gap-3">
-              <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${config.testimonial.gradient} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
-                {config.testimonial.initials}
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">{config.testimonial.name}</p>
-                <p className="text-gray-400 text-xs">{config.testimonial.team}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50 to-white text-center">
         <div className="max-w-2xl mx-auto">
@@ -304,7 +259,7 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
             Ready to simplify your season?
           </h2>
           <p className="text-gray-500 text-lg mb-8">
-            Launching <span className="text-gray-900 font-semibold">June 1, 2026</span>. Free tier available on day one.
+            Live on the App Store and Google Play. Free tier available now.
           </p>
           <button
             onClick={() => setLocation('/get-started')}

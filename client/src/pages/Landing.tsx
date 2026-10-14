@@ -14,30 +14,6 @@ import VisitorMap from '@/components/VisitorMap';
 import AnimatedCounter from '@/components/AnimatedCounter';
 import FunFeaturesShowcase from '@/components/FunFeaturesShowcase';
 
-const testimonials = [
-  {
-    quote: "The app is sweet! You nailed it!",
-    name: "Donny U.",
-    team: "Mentor Hockey League",
-    initials: "DU",
-    gradient: "from-blue-500 to-blue-700",
-  },
-  {
-    quote: "The player sub system is the crown jewel of Roster. This feature alone makes Roster worth it if you are a captain.",
-    name: "TJ K.",
-    team: "The Edge Ice Arena",
-    initials: "TJ",
-    gradient: "from-rose-500 to-rose-700",
-  },
-  {
-    quote: "Our whole tournament went smoothly this year. Brackets, scheduling, scores — done.",
-    name: "Scott C.",
-    team: "RMRHL Legend",
-    initials: "SC",
-    gradient: "from-teal-500 to-teal-700",
-  },
-];
-
 const howItWorks = [
   {
     step: "01",
@@ -586,39 +562,6 @@ export default function Landing() {
               </>
             );
           })()}
-        </div>
-      </section>
-      {/* Testimonials Section */}
-      <section className="py-24 px-6 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">What players are saying</h2>
-            <p className="text-gray-500 text-lg">Real players. Real teams. Real results.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {testimonials.map((t) => (
-              <div
-                key={t.name}
-                className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-md transition-all flex flex-col gap-4 shadow-sm"
-              >
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-gray-700 leading-relaxed flex-1">"{t.quote}"</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
-                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm ring-2 ring-white`}>
-                    {t.initials}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 text-sm">{t.name}</div>
-                    <div className="text-gray-400 text-xs">{t.team}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
       {/* Pricing Section */}

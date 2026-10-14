@@ -80,3 +80,4 @@
 - [In-app message email policy](in-app-message-email-policy.md) — chat messages may notify in-app or by push, but must never trigger email, including as a delivery fallback.
 - [Beercules season award](beercules-season-award.md) — season-long beer totals decide tied winners after completion; keep it independent of Beer Me's calendar-year reset.
 - [Static marketing prerender runtime](public-seo-prerender.md) — isolate Node 20 static rendering from Supabase realtime and Wouter's client-only memory location.
+- [Public launch and review policy](public-launch-review-policy.md) — hockey is live in both stores; soccer/baseball stay reachable but unindexed; no invented marketing testimonials.

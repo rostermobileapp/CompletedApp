@@ -1,6 +1,7 @@
 import { createServer } from 'vite';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { isUnindexedPublicPage } from '../shared/publicPagePolicy';
 
 const SITE_ORIGIN = 'https://www.roster-app.com';
 const API_ORIGIN = (process.env.PRERENDER_API_ORIGIN || process.env.VITE_API_BASE_URL ||
@@ -178,7 +179,9 @@ async function main() {
         `<meta name="twitter:title" content="${escapeHtml(metadata.ogTitle || title)}" />`);
       html = putMeta(html, /<meta\s+name="twitter:description"[^>]*>/i,
         `<meta name="twitter:description" content="${escapeHtml(metadata.ogDescription || description)}" />`);
-      if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
+      if (isUnindexedPublicPage(pathname)) {
+        html = putMeta(html, /<meta\s+name="robots"[^>]*>/i, '<meta name="robots" content="noindex" />');
+      } else if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
         html = putMeta(html, /<meta\s+name="robots"[^>]*>/i, '<meta name="robots" content="noindex,nofollow" />');
       }
       html = html.replace('</head>',
@@ -195,7 +198,7 @@ async function main() {
     }
     await fs.writeFile(path.join(outputDir, '404.html'),
       '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Page not found | Roster</title><link rel="canonical" href="https://www.roster-app.com/"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to Roster</a></main></body></html>');
-    await writeSitemap(renderer.publicPagePaths, new Date().toISOString().slice(0, 10));
+    await writeSitemap(renderer.publicPagePaths.filter(path => !isUnindexedPublicPage(path)), new Date().toISOString().slice(0, 10));
     if (seoErrors.length) throw new Error(`SEO validation failed:\n${seoErrors.map(error => `- ${error}`).join('\n')}`);
     if (!rootHtml) throw new Error('The homepage was not prerendered.');
     await fs.writeFile(indexPath, rootHtml);
