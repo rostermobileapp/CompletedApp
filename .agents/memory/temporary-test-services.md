@@ -20,3 +20,9 @@ Tests that use the app's Neon serverless pool cannot connect directly to a plain
 **Why:** The application pool uses Neon’s WebSocket transport; a standard local PostgreSQL listener accepts native PostgreSQL connections, not that transport.
 
 **How to apply:** Use a Neon-compatible isolated test endpoint or a deliberate test-only adapter. A successful `psql` probe does not establish that app integration tests can connect.
+
+When generating disposable fixture schemas with the installed Drizzle Kit API under Node 20, load its CommonJS API through `createRequire` rather than its ESM entry.
+
+**Why:** The installed ESM bundle throws `Dynamic require of "fs" is not supported` before schema generation; the CommonJS entry works with the same schema and API.
+
+**How to apply:** Use this only for isolated test setup. Generate the schema into `/tmp` and apply it solely to the guarded local test database, never the application's database.

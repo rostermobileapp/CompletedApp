@@ -6,6 +6,8 @@ export const collisionDefinitions: readonly CollisionDefinition[] = [
   { table: 'league_memberships', scope: ['league_id'], label: 'Compatible league membership', membership: 'league' },
   { table: 'team_memberships', scope: ['team_id'], label: 'Compatible team membership', membership: 'team' },
   { table: 'game_attendance', scope: ['game_id'], label: 'Equivalent attendance', fields: ['team_id', 'placeholder_player_id'] },
+  { table: 'line_combination_assignments', column: 'player_id', scope: ['line_combination_id'],
+    label: 'Equivalent line assignment', fields: ['position', 'placeholder_player_id'] },
   { table: 'game_rsvps', scope: ['game_id', 'team_id'], label: 'Equivalent game RSVP', fields: ['status'] },
   { table: 'tournament_match_rsvps', scope: ['match_id', 'team_id'], label: 'Equivalent tournament RSVP', fields: ['status'] },
   { table: 'team_event_rsvps', scope: ['team_event_id'], label: 'Equivalent event RSVP', fields: ['status'] },
@@ -48,6 +50,7 @@ export const additionalTransferableReferences = [
   'game_score_submissions.submitted_by', 'game_stars.awarded_by',
   'badge_awards.awarded_by', 'league_pro_seats.user_id',
   'users.created_by',
+  'line_combination_assignments.player_id',
 ];
 const q = (s: string) => `"${s.replaceAll('"', '""')}"`;
 export function collisionScope(def: CollisionDefinition) {

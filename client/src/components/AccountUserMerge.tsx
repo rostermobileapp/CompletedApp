@@ -28,6 +28,8 @@ type Preview = {
 
 function humanBlocker(item: Preview['blockers'][number]) {
   const text = `${item.domain} ${item.reason}`.toLowerCase();
+  if (/line_combination_assignments/.test(text))
+    return 'The accounts occupy different positions in the same saved line. Keep one position for this player before merging.';
   if (/poll|vote/.test(text)) return 'The accounts have different poll answers. Resolve their responses before merging.';
   if (/notification_preferences/.test(text)) return 'The accounts have different notification settings or device links. Resolve these before merging.';
   if (/player_stats|game_attendance|game_rsvps|game_goalies/.test(text))

@@ -26,6 +26,37 @@ beforeEach(async () => {
   await q(`INSERT INTO league_memberships(user_id,league_id,status) VALUES ($1,$3,'approved'),($2,$3,'approved')`, [source, target, league]);
 });
 
+test('saved line assignments transfer to the retained login without changing their position', async () => {
+  const team = randomUUID(), line = randomUUID(), assignment = randomUUID();
+  await q(`INSERT INTO teams(id,name,league_id) VALUES ($1,'Line team',$2)`, [team, league]);
+  await q(`INSERT INTO line_combinations(id,team_id,name,line_type,line_number)
+    VALUES ($1,$2,'First forwards','forward',1)`, [line, team]);
+  await q(`INSERT INTO line_combination_assignments(id,line_combination_id,position,player_id)
+    VALUES ($1,$2,'C',$3)`, [assignment, line, source]);
+  const p = await preview();
+  assert.deepEqual(p.blockers, []);
+  await confirm(p);
+  const row = (await q(`SELECT id,line_combination_id,position,player_id
+    FROM line_combination_assignments WHERE id=$1`, [assignment])).rows[0];
+  assert.deepEqual(row, { id: assignment, line_combination_id: line, position: 'C', player_id: target });
+  const audit = (await q(`SELECT activity_provenance FROM account_user_merges WHERE source_user_id=$1`, [source])).rows[0];
+  assert.equal(audit.activity_provenance['line_combination_assignments.player_id'][0].player_id, source);
+});
+
+test('different positions for the two accounts in one saved line block the merge without losing assignments', async () => {
+  const team = randomUUID(), line = randomUUID();
+  await q(`INSERT INTO teams(id,name,league_id) VALUES ($1,'Line team',$2)`, [team, league]);
+  await q(`INSERT INTO line_combinations(id,team_id,name,line_type,line_number)
+    VALUES ($1,$2,'First forwards','forward',1)`, [line, team]);
+  await q(`INSERT INTO line_combination_assignments(line_combination_id,position,player_id)
+    VALUES ($1,'C',$2),($1,'LW',$3)`, [line, source, target]);
+  const p = await preview();
+  assert.ok(p.blockers.some(b => b.domain === 'line_combination_assignments'));
+  await assert.rejects(confirm(p), /Merge blocked/);
+  assert.equal((await q('SELECT count(*)::int AS count FROM line_combination_assignments WHERE line_combination_id=$1', [line])).rows[0].count, 2);
+  assert.equal((await q('SELECT deleted_at FROM users WHERE id=$1', [source])).rows[0].deleted_at, null);
+});
+
 test('a real league commissioner combines free accounts across leagues with provenance and retirement', async () => {
   const outsideLeague = randomUUID(), team = randomUUID(), announcement = randomUUID();
   await q(`INSERT INTO leagues(id,name,unique_league_id,sport,commissioner_id)
