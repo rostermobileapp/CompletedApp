@@ -22482,7 +22482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
       
-      const messages = await messagingService.getConversationMessagesForUser(id, userId, limit);
+      const messages = await messagingService.getConversationMessagesForUser(id, userId, limit, before);
       
       // Import Supabase storage service for signed URLs
       const { SupabaseStorageService } = await import('./supabaseStorage');

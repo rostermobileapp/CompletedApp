@@ -4,7 +4,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle, RefreshCw, Check } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -717,6 +717,28 @@ export default function Messages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const pendingScrollConversation = useRef<string | null>(null);
+  const olderPageScrollSnapshotRef = useRef<{ conversationId: string; scrollHeight: number; scrollTop: number } | null>(null);
+  const olderPageRequestRef = useRef<{ conversationId: string; generation: number } | null>(null);
+  const historyGenerationRef = useRef(0);
+  const previousBaseMessagesRef = useRef<{ conversationId: string; messages: Message[] } | null>(null);
+  const [loadedOlderHistory, setLoadedOlderHistory] = useState<{
+    conversationId: string;
+    messages: Message[];
+    hasMore: boolean;
+  }>({ conversationId: '', messages: [], hasMore: false });
+  const [loadingOlderConversation, setLoadingOlderConversation] = useState<string | null>(null);
+
+  useEffect(() => {
+    historyGenerationRef.current += 1;
+    olderPageRequestRef.current = null;
+    olderPageScrollSnapshotRef.current = null;
+    setLoadedOlderHistory({
+      conversationId: selectedConversation ?? '',
+      messages: [],
+      hasMore: false,
+    });
+    setLoadingOlderConversation(null);
+  }, [selectedConversation]);
   const firstUnreadMessageRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectedConversationRef = useRef<string | null>(null);
@@ -1051,6 +1073,125 @@ export default function Messages() {
     enabled: !!selectedConversation // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
+  const olderMessages = loadedOlderHistory.conversationId === selectedConversation
+    ? loadedOlderHistory.messages
+    : [];
+  const hasOlderMessages = loadedOlderHistory.conversationId === selectedConversation
+    ? loadedOlderHistory.hasMore
+    : messages.length >= 50;
+  const allMessages = useMemo(() => {
+    const messagesById = new Map<string, Message>();
+    for (const message of [...olderMessages, ...messages]) {
+      messagesById.set(message.id, message);
+    }
+    return Array.from(messagesById.values()).sort((a, b) => {
+      const timeDifference = new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
+      return timeDifference || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
+  }, [olderMessages, messages]);
+
+  useEffect(() => {
+    if (!selectedConversation) {
+      previousBaseMessagesRef.current = null;
+      return;
+    }
+
+    const previousBase = previousBaseMessagesRef.current;
+    if (
+      previousBase?.conversationId === selectedConversation &&
+      loadedOlderHistory.conversationId === selectedConversation &&
+      loadedOlderHistory.messages.length > 0
+    ) {
+      const currentMessageIds = new Set(messages.map(message => message.id));
+      const messagesLeavingLiveWindow = previousBase.messages.filter(
+        message => !currentMessageIds.has(message.id)
+      );
+      if (messagesLeavingLiveWindow.length > 0) {
+        setLoadedOlderHistory(previous => {
+          if (previous.conversationId !== selectedConversation) return previous;
+          const merged = new Map(previous.messages.map(message => [message.id, message]));
+          for (const message of messagesLeavingLiveWindow) merged.set(message.id, message);
+          return { ...previous, messages: Array.from(merged.values()) };
+        });
+      }
+    }
+
+    previousBaseMessagesRef.current = { conversationId: selectedConversation, messages };
+  }, [loadedOlderHistory.conversationId, loadedOlderHistory.messages, messages, selectedConversation]);
+
+  const loadOlderMessages = useCallback(async () => {
+    const conversationId = selectedConversation;
+    const scrollElement = messagesScrollRef.current;
+    const cursor = allMessages[0]?.id;
+    if (
+      !conversationId ||
+      !cursor ||
+      !hasOlderMessages ||
+      olderPageRequestRef.current
+    ) return;
+
+    const generation = historyGenerationRef.current;
+    const visibleMessagesAtRequest = messages;
+    olderPageRequestRef.current = { conversationId, generation };
+    setLoadingOlderConversation(conversationId);
+    if (scrollElement) {
+      olderPageScrollSnapshotRef.current = {
+        conversationId,
+        scrollHeight: scrollElement.scrollHeight,
+        scrollTop: scrollElement.scrollTop,
+      };
+    }
+
+    try {
+      const response = await apiRequest(
+        'GET',
+        `/api/conversations/${conversationId}/messages?limit=50&before=${encodeURIComponent(cursor)}`
+      );
+      const page = await response.json() as Message[];
+      if (
+        historyGenerationRef.current !== generation ||
+        selectedConversationRef.current !== conversationId
+      ) return;
+
+      setLoadedOlderHistory(previous => {
+        const previousMessages = previous.conversationId === conversationId ? previous.messages : [];
+        const merged = new Map(previousMessages.map(message => [message.id, message]));
+        for (const message of visibleMessagesAtRequest) merged.set(message.id, message);
+        for (const message of page) merged.set(message.id, message);
+        return {
+          conversationId,
+          messages: Array.from(merged.values()).sort((a, b) => {
+            const timeDifference = new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime();
+            return timeDifference || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+          }),
+          hasMore: page.length >= 50,
+        };
+      });
+    } catch (error) {
+      olderPageScrollSnapshotRef.current = null;
+      if (historyGenerationRef.current !== generation) return;
+      toast({
+        title: 'Could not load older messages',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      if (olderPageRequestRef.current?.generation === generation) {
+        olderPageRequestRef.current = null;
+        setLoadingOlderConversation(null);
+      }
+    }
+  }, [allMessages, hasOlderMessages, messages, selectedConversation, toast]);
+
+  useLayoutEffect(() => {
+    const snapshot = olderPageScrollSnapshotRef.current;
+    if (!snapshot || snapshot.conversationId !== selectedConversation) return;
+    const scrollElement = messagesScrollRef.current;
+    if (!scrollElement) return;
+    scrollElement.scrollTop = snapshot.scrollTop + (scrollElement.scrollHeight - snapshot.scrollHeight);
+    olderPageScrollSnapshotRef.current = null;
+  }, [olderMessages, selectedConversation]);
+
   // Fetch payment requests for selected conversation
   const { data: conversationPaymentRequests = [] } = useQuery<any[]>({
     queryKey: ['/api/conversations', selectedConversation, 'payment-requests'],
@@ -1062,11 +1203,11 @@ export default function Messages() {
   // Merge messages and payment requests chronologically
   const timelineItems = useMemo(() => {
     const items: Array<{ type: 'message' | 'payment', data: any, createdAt: Date }> = [
-      ...messages.map(msg => ({ type: 'message' as const, data: msg, createdAt: new Date(msg.sentAt) })),
+      ...allMessages.map(msg => ({ type: 'message' as const, data: msg, createdAt: new Date(msg.sentAt) })),
       ...conversationPaymentRequests.map(pr => ({ type: 'payment' as const, data: pr, createdAt: new Date(pr.createdAt) }))
     ];
     return items.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  }, [messages, conversationPaymentRequests]);
+  }, [allMessages, conversationPaymentRequests]);
 
   // Reset dialog function
   const resetDialog = () => {
@@ -1575,13 +1716,13 @@ export default function Messages() {
 
   // Find first unread message
   const firstUnreadMessage = useMemo(() => {
-    return messages.find(msg => 
+    return allMessages.find(msg =>
       msg.senderId !== currentUserId && 
       !msg.readReceipts.some(receipt => receipt.userId === currentUserId)
     );
-  }, [messages, currentUserId]);
+  }, [allMessages, currentUserId]);
 
-  const prevMessagesLengthRef = useRef<number>(0);
+  const previousNewestMessageIdRef = useRef<string | null>(null);
 
   const scrollMessagesToEnd = useCallback((behavior: ScrollBehavior = 'instant') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
@@ -1591,6 +1732,7 @@ export default function Messages() {
     if (selectedConversation) {
       pendingScrollConversation.current = selectedConversation;
     }
+    olderPageScrollSnapshotRef.current = null;
   }, [selectedConversation]);
 
   useEffect(() => {
@@ -1603,13 +1745,13 @@ export default function Messages() {
       setTimeout(() => scrollMessagesToEnd('instant'), 300);
       setTimeout(() => scrollMessagesToEnd('instant'), 600);
     } else {
-      const isNewMessage = messages.length > prevMessagesLengthRef.current;
-      if (isNewMessage) {
+      const newestMessageId = messages[messages.length - 1]?.id ?? null;
+      if (newestMessageId && previousNewestMessageIdRef.current && newestMessageId !== previousNewestMessageIdRef.current) {
         scrollMessagesToEnd('smooth');
       }
     }
 
-    prevMessagesLengthRef.current = messages.length;
+    previousNewestMessageIdRef.current = messages[messages.length - 1]?.id ?? null;
   }, [messages, selectedConversation, messagesLoading, scrollMessagesToEnd]);
 
   // Typing indicator functions
@@ -2820,7 +2962,7 @@ export default function Messages() {
                 />
               </div>
             )}
-            <div ref={messagesScrollRef} className="absolute inset-0 overflow-y-auto z-10">
+            <div ref={messagesScrollRef} className="absolute inset-0 overflow-y-auto z-10" style={{ overflowAnchor: 'none' }}>
             <div
               className="relative p-4 space-y-4 pb-4"
               style={
@@ -2847,6 +2989,20 @@ export default function Messages() {
                 ))}
               </div>
             ) : (
+              <>
+              {hasOlderMessages && (
+                <div className="flex justify-center pb-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={loadOlderMessages}
+                    disabled={loadingOlderConversation === selectedConversation}
+                    data-testid="button-load-older-messages"
+                  >
+                    {loadingOlderConversation === selectedConversation ? 'Loading older messages…' : 'Load older messages'}
+                  </Button>
+                </div>
+              )}
               <AnimatePresence initial={false}>
               {timelineItems.map((item) => {
                 if (item.type === 'payment') {
@@ -3060,6 +3216,7 @@ export default function Messages() {
                 );
               })}
               </AnimatePresence>
+              </>
             )}
             
             {/* Typing indicators */}

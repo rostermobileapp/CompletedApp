@@ -37,7 +37,7 @@ import {
   type InsertChatPollVote,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull, lt, or } from "drizzle-orm";
 
 export class MessagingService {
   // Conversation operations
@@ -263,7 +263,12 @@ export class MessagingService {
   }
 
   // User-aware version that respects history clearing and hiding
-  async getConversationMessagesForUser(conversationId: string, userId: string, limit: number = 50): Promise<any[]> {
+  async getConversationMessagesForUser(
+    conversationId: string,
+    userId: string,
+    limit: number = 50,
+    before?: string
+  ): Promise<any[]> {
     // Get user's participant info to check for hiddenAt and historyClearedAt
     const [participant] = await db
       .select({
@@ -303,6 +308,29 @@ export class MessagingService {
     // If conversation was hidden but resurfaced, only show messages after hiddenAt
     if (participant.hiddenAt) {
       whereConditions.push(sql`${messages.createdAt} > ${participant.hiddenAt}`);
+    }
+
+    if (before) {
+      // Resolve the cursor only within the caller's visible history. A cursor
+      // from another conversation, or one hidden by a cleared/hidden boundary,
+      // must not allow older messages to be fetched.
+      const [cursor] = await db
+        .select({ createdAt: messages.createdAt })
+        .from(messages)
+        .where(and(...whereConditions, eq(messages.id, before)))
+        .limit(1);
+
+      if (!cursor) return [];
+
+      whereConditions.push(
+        or(
+          lt(messages.createdAt, cursor.createdAt),
+          and(
+            eq(messages.createdAt, cursor.createdAt),
+            lt(messages.id, before)
+          )
+        )!
+      );
     }
 
     const result = await db
