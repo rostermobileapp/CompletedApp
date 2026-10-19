@@ -562,6 +562,20 @@ export default function ScorekeeperDashboard() {
         : 'Unnamed player';
     };
 
+    const orderedPlayers = [...players].sort((a, b) => {
+      const getNumber = (member: TeamMember) => {
+        const value = member.jerseyNumber ?? member.user?.jerseyNumber;
+        if (value === null || value === undefined || value === '') return null;
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
+      };
+      const aNumber = getNumber(a);
+      const bNumber = getNumber(b);
+      if (aNumber === null) return bNumber === null ? 0 : 1;
+      if (bNumber === null) return -1;
+      return aNumber - bNumber;
+    });
+
     const getEventPlayerName = (
       player: Player | null | undefined,
       playerId: string | null | undefined,
@@ -715,7 +729,7 @@ export default function ScorekeeperDashboard() {
                         <SelectItem value="substitute" className="text-muted-foreground italic">
                           Substitute Player
                         </SelectItem>
-                        {players.map(p => (
+                        {orderedPlayers.map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
                             {getPlayerName(p)}
                           </SelectItem>
@@ -734,7 +748,7 @@ export default function ScorekeeperDashboard() {
                         <SelectItem value="substitute" className="text-muted-foreground italic">
                           Substitute Player
                         </SelectItem>
-                        {players.filter(p => p.userId !== scorerId).map(p => (
+                        {orderedPlayers.filter(p => p.userId !== scorerId).map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
                             {getPlayerName(p)}
                           </SelectItem>
@@ -753,7 +767,7 @@ export default function ScorekeeperDashboard() {
                         <SelectItem value="substitute" className="text-muted-foreground italic">
                           Substitute Player
                         </SelectItem>
-                        {players.filter(p => p.userId !== scorerId && p.userId !== assistId).map(p => (
+                        {orderedPlayers.filter(p => p.userId !== scorerId && p.userId !== assistId).map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
                             {getPlayerName(p)}
                           </SelectItem>
