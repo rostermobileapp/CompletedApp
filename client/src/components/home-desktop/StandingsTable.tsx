@@ -99,6 +99,7 @@ export function StandingsTable({
                 <th className="text-right font-normal pb-1.5 w-8">W</th>
                 <th className="text-right font-normal pb-1.5 w-8">L</th>
                 <th className="text-right font-normal pb-1.5 w-8">T</th>
+                <th className="text-right font-normal pb-1.5 w-10">OTL</th>
                 <th className="text-right font-normal pb-1.5 pr-1 w-10">PTS</th>
               </tr>
             </thead>
@@ -134,6 +135,9 @@ export function StandingsTable({
                     <td className="py-1 text-right">{row.wins}</td>
                     <td className="py-1 text-right">{row.losses}</td>
                     <td className="py-1 text-right">{row.ties}</td>
+                    <td className="py-1 text-right" data-testid={`overtime-losses-${row.teamId}`}>
+                      {row.shootoutLosses ?? 0}
+                    </td>
                     <td className="py-1 text-right pr-1 font-medium">
                       {row.points}
                     </td>

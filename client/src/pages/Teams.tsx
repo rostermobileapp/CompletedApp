@@ -821,8 +821,9 @@ export default function Teams() {
                       <div className="flex justify-between items-center gap-2">
                         <div className="text-center flex-1">
                           <div className="text-2xl font-bold">
-                            {teamStanding.wins}-{teamStanding.losses}-{teamStanding.ties}
+                            {teamStanding.wins}-{teamStanding.losses}-{teamStanding.ties}-{teamStanding.shootoutLosses ?? 0}
                           </div>
+                          <div className="text-sm text-muted-foreground">W-L-T-OTL</div>
                         </div>
                         <div className="text-center flex-1">
                           <div className="text-2xl font-bold text-blue-600">{teamStanding.points}</div>
