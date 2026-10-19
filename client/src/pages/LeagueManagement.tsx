@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { apiRequest, getImageUrl, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useWebSocket } from '@/context/WebSocketContext';
@@ -872,13 +872,14 @@ export default function LeagueManagement() {
   // Get league ID and edit mode from URL params
   // Use location from wouter to make this reactive to URL changes
   const [locationPath] = useLocation();
+  const routeParams = useParams();
   
   // Parse query params reactively based on location changes
   const searchParams = React.useMemo(() => {
     return new URLSearchParams(window.location.search);
   }, [locationPath]);
   
-  const leagueId = searchParams.get('leagueId') || '';
+  const leagueId = routeParams.leagueId || searchParams.get('leagueId') || '';
   const editMode = searchParams.get('edit') === 'true';
   const editMemberId = searchParams.get('editMember') || '';
   const settingsDeepLink = searchParams.get('settings') || '';

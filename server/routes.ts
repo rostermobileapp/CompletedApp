@@ -4982,7 +4982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 type: 'payment_failed',
                 title: 'Payment Failed',
                 message: 'Your subscription payment failed. Please update your payment method to continue using premium features.',
-                actionUrl: '/settings/billing',
+                actionUrl: '/subscription',
                 actionText: 'Update Payment Method',
                 isRead: false,
                 isDismissed: false,
@@ -7594,7 +7594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'general',
         title: 'Co-Commissioner Role Granted',
         message: `${commissionerName} has added you as a co-commissioner for ${league.name}. You now have access to League Management features for this league.`,
-        actionUrl: `/league-management/${leagueId}`,
+        actionUrl: `/league-management/${encodeURIComponent(leagueId)}`,
         actionText: 'View League Management'
       });
       broadcastNotificationUpdate(targetUser.id);
@@ -7676,7 +7676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'general',
         title: 'You Are Now the Commissioner',
         message: `${formerName} has transferred the commissioner role of ${league.name} to you.`,
-        actionUrl: `/league-management/${leagueId}`,
+        actionUrl: `/league-management/${encodeURIComponent(leagueId)}`,
         actionText: 'Go to League Management',
       });
       broadcastNotificationUpdate(targetUserId);
@@ -7687,7 +7687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'general',
         title: 'Commissioner Role Transferred',
         message: `You have successfully transferred the commissioner role of ${league.name} to ${newCommissioner ? `${newCommissioner.firstName || ''} ${newCommissioner.lastName || ''}`.trim() : 'the new commissioner'}.`,
-        actionUrl: `/league-management/${leagueId}`,
+        actionUrl: `/league-management/${encodeURIComponent(leagueId)}`,
         actionText: 'View League',
       });
       broadcastNotificationUpdate(userId);
@@ -8065,10 +8065,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { sendJoinRequestPushNotification } = await import('./oneSignalNotifications');
           sendJoinRequestPushNotification(
             league.commissionerId,
-            requesterName,
+            requesterName ?? 'Someone',
             'league',
             league.name,
-            membership.id
+            membership.id,
+            league.id,
           ).catch(console.error);
         }
       }).catch(err => console.error('[Notifications] Failed to send join request notification:', err));
@@ -11499,6 +11500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'team',
             league.name,
             request.id,
+            leagueId,
             teamLogoUrl
           ).catch(err => console.error('[Notifications] Failed to send team join request notification:', err));
         }).catch(console.error);

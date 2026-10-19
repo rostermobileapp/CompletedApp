@@ -4369,7 +4369,7 @@ export class DatabaseStorage implements IStorage {
         title: 'League Pro seats are full',
         message:
           "Your league's Player Pro seats are all taken — you're using the free plan. You can still upgrade individually any time.",
-        actionUrl: '/subscriptions',
+        actionUrl: '/subscription',
         actionText: 'View Player Pro',
       });
     } catch (error) {

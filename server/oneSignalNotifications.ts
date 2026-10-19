@@ -1,6 +1,7 @@
 import { storage } from './storage';
 import { lookupCityStateFromZip } from './zipLookup';
 import { formatDateInTimezone } from './dateUtils';
+import { getNotificationClickUrl } from './notificationClickUrl';
 
 // DisplayId of the sole admin who should receive real-time new-signup alerts.
 // Intentionally hardcoded (not a settings toggle) since this is an internal
@@ -57,11 +58,7 @@ interface SendPushNotificationOptions {
 export async function sendPushNotificationToUser(options: SendPushNotificationOptions): Promise<boolean> {
   const { userId, title, message, data, iconUrl, idempotencyKey, timeoutMs } = options;
   const largeIcon = iconUrl ?? NOTIFICATION_ICON_URL;
-  const clickUrl = data?.type === "daily_trivia"
-    ? `${APP_BASE_URL}/?trivia=1`
-    : data?.type === "message" && data.conversationId
-      ? `${APP_BASE_URL}/messages/${encodeURIComponent(data.conversationId)}`
-      : undefined;
+  const clickUrl = getNotificationClickUrl(data, APP_BASE_URL);
   
   const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
   const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
@@ -118,9 +115,9 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
         // `large_icon` (this URL) shows the colored logo in the expanded
         // notification card.
         large_icon: largeIcon,
-        // Set an explicit destination so notification taps don't fall through
-        // to a OneSignal dashboard default. Message links open the thread.
-        ...(clickUrl ? { url: clickUrl } : {}),
+        // Always override the OneSignal dashboard default with an app route.
+        // Notification data without a specific destination safely opens home.
+        url: clickUrl,
         data,
       }),
     });
@@ -291,6 +288,7 @@ export async function sendJoinRequestPushNotification(
   entityType: 'team' | 'league',
   entityName: string,
   requestId: string,
+  entityId?: string,
   teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
@@ -308,6 +306,7 @@ export async function sendJoinRequestPushNotification(
       type: 'join_request',
       entityType,
       requestId,
+      ...(entityId ? { entityId } : {}),
     },
     iconUrl: teamLogoUrl,
   });

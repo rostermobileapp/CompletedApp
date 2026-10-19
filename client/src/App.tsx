@@ -338,6 +338,9 @@ function Router() {
               <Route path="/trophy-case" component={TrophyCase} />
               <Route path="/admin/badges" component={BadgeCatalogAdmin} />
               <Route path="/subscription" component={Subscription} />
+               {/* Keep routes used by notifications created before URL normalization. */}
+               <Route path="/settings/billing" component={Subscription} />
+               <Route path="/subscriptions" component={Subscription} />
               <Route path="/roster" component={Roster} />
               <Route path="/create-league" component={CreateLeague} />
               <Route path="/create-team" component={CreateTeam} />
@@ -348,6 +351,7 @@ function Router() {
               <Route path="/invite-groups/new" component={EditInviteGroup} />
               <Route path="/invite-groups/:id" component={EditInviteGroup} />
               <Route path="/league-management" component={LeagueManagement} />
+               <Route path="/league-management/:leagueId" component={LeagueManagement} />
               <Route path="/draft/:draftId" component={DraftRoom} />
               <Route path="/league/:leagueId/score-verification" component={ScoreVerification} />
               <Route path="/league-list" component={LeagueList} />
