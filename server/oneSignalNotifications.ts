@@ -57,6 +57,11 @@ interface SendPushNotificationOptions {
 export async function sendPushNotificationToUser(options: SendPushNotificationOptions): Promise<boolean> {
   const { userId, title, message, data, iconUrl, idempotencyKey, timeoutMs } = options;
   const largeIcon = iconUrl ?? NOTIFICATION_ICON_URL;
+  const clickUrl = data?.type === "daily_trivia"
+    ? `${APP_BASE_URL}/?trivia=1`
+    : data?.type === "message" && data.conversationId
+      ? `${APP_BASE_URL}/messages/${encodeURIComponent(data.conversationId)}`
+      : undefined;
   
   const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
   const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
@@ -113,8 +118,9 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
         // `large_icon` (this URL) shows the colored logo in the expanded
         // notification card.
         large_icon: largeIcon,
-        // Cold native launches and web push clicks request trivia immediately.
-        ...(data?.type === "daily_trivia" ? { url: `${APP_BASE_URL}/?trivia=1` } : {}),
+        // Set an explicit destination so notification taps don't fall through
+        // to a OneSignal dashboard default. Message links open the thread.
+        ...(clickUrl ? { url: clickUrl } : {}),
         data,
       }),
     });

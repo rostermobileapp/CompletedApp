@@ -331,6 +331,7 @@ function Router() {
       <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
               <Route path="/league-search" component={LeagueSearch} />
               <Route path="/team-search" component={TeamSearch} />
+              <Route path="/messages" component={Messages} />
               <Route path="/messages/:conversationId" component={Messages} />
               <Route path="/user/:userId" component={UserProfile} />
               <Route path="/trophy-case/earned-patches" component={EarnedPatches} />
