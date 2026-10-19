@@ -342,10 +342,13 @@ export class MessagingService {
           : sql`false`
       )
       .where(and(...whereConditions))
-      .orderBy(messages.createdAt)
+      // Return the newest messages within the limit, then restore chronological
+      // order for the chat timeline. Sorting oldest-first here silently hid
+      // every message after the first page in longer conversations.
+      .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(limit);
     
-    return result;
+    return result.reverse();
   }
 
   // Message attachment operations
