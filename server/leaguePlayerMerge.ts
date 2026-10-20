@@ -71,6 +71,24 @@ export async function previewLeaguePlayerMerge(leagueId: string, identity: Merge
   return { ...match, seasons, teams: teams.map(t => t.name), history };
 }
 
+export async function previewLeaguePlaceholderMerge(leagueId: string, placeholderId: string, survivorId: string) {
+  const { rows: [source] } = await pool.query(`
+    SELECT p.id, concat_ws(' ',p.first_name,p.last_name) AS name, p.email,
+      p.position, p.jersey_number AS "jerseyNumber", p.skill_level AS "skillLevel",
+      t.name AS "teamName",
+      (SELECT count(*)::int FROM game_attendance a WHERE a.placeholder_player_id=p.id) AS attendance,
+      (SELECT count(*)::int FROM draft_picks d WHERE d.placeholder_player_id=p.id) AS "draftPicks",
+      (SELECT count(*)::int FROM draft_keepers d WHERE d.placeholder_player_id IN (p.id,'placeholder:' || p.id)) AS keepers,
+      (SELECT count(*)::int FROM line_combination_assignments a WHERE a.placeholder_player_id=p.id) AS "lineAssignments"
+    FROM placeholder_players p
+    LEFT JOIN teams t ON t.id=p.team_id
+    WHERE p.id=$1 AND coalesce(p.league_id,t.league_id)=$2
+  `, [placeholderId, leagueId]);
+  if (!source) throw new PlayerMergeConflict('This manually added player is no longer in this league. Refresh and try again.');
+  const survivor = await previewLeaguePlayerMerge(leagueId, { type: 'user', id: survivorId });
+  return { source: { ...source, type: 'placeholder' as const }, survivor };
+}
+
 /**
  * All changes are made under a per-league transaction lock. Never delete a user:
  * other leagues, authentication, subscriptions and global activity remain theirs.
@@ -165,7 +183,7 @@ export async function mergeLeaguePlayer(
             UNION
             SELECT a.game_id FROM game_rsvps a JOIN game_rsvps b ON b.game_id=a.game_id
               WHERE a.user_id=$1 AND b.user_id=$2 AND a.status='attending' AND b.status='attending'
-          ) both JOIN games g ON g.id=both.game_id
+          ) shared_game JOIN games g ON g.id=shared_game.game_id
           WHERE g.league_id=$3 AND g.season_id IS NOT DISTINCT FROM $4`,
             [from, survivorId, leagueId, row.season_id])
             : { rows: [{ count: 0 }] };
@@ -291,7 +309,7 @@ export async function mergeLeaguePlayer(
       if (overlappingDraft.rowCount) throw new PlayerMergeConflict('Both profiles have picks in the same draft. Resolve the draft first.');
       const overlappingKeepers = await run(`SELECT 1 FROM draft_keepers a JOIN draft_keepers b ON b.draft_id=a.draft_id
         JOIN drafts d ON d.id=a.draft_id WHERE d.league_id=$3
-          AND a.placeholder_player_id IN ($1, 'placeholder:' || $1) AND b.user_id=$2 LIMIT 1`,
+          AND a.placeholder_player_id::text IN ($1::text, 'placeholder:' || $1::text) AND b.user_id=$2 LIMIT 1`,
         [from, survivorId, leagueId]);
       if (overlappingKeepers.rowCount) throw new PlayerMergeConflict('Both profiles are keepers in the same draft. Resolve the keepers first.');
       const overlappingLines = await run(`SELECT 1 FROM line_combination_assignments a
@@ -304,7 +322,7 @@ export async function mergeLeaguePlayer(
         WHERE placeholder_player_id=$1 AND draft_id IN (SELECT id FROM drafts WHERE league_id=$3)`,
         [from, survivorId, leagueId]);
       await run(`UPDATE draft_keepers SET user_id=$2, placeholder_player_id=NULL
-        WHERE placeholder_player_id IN ($1, 'placeholder:' || $1)
+        WHERE placeholder_player_id::text IN ($1::text, 'placeholder:' || $1::text)
           AND draft_id IN (SELECT id FROM drafts WHERE league_id=$3)`, [from, survivorId, leagueId]);
       await run(`UPDATE line_combination_assignments SET player_id=$2, placeholder_player_id=NULL
         WHERE placeholder_player_id=$1 AND line_combination_id IN
@@ -422,12 +440,12 @@ export async function mergeLeaguePlayer(
       const team = p?.team_id ? await run('SELECT id FROM teams WHERE id=$1 AND league_id=$2', [p.team_id, leagueId]) : null;
       if (p?.team_id && !team?.rowCount) throw new PlayerMergeConflict('The source team does not belong to this league.');
       await run(`INSERT INTO league_memberships (user_id,league_id,status,assigned_team_id,position,jersey_number,skill_level)
-        SELECT $1,$2,'approved',$3,$4,$5,$6 WHERE NOT EXISTS
-        (SELECT 1 FROM league_memberships WHERE user_id=$1 AND league_id=$2)`,
+        SELECT $1::varchar,$2::varchar,'approved',$3::varchar,$4,$5,$6 WHERE NOT EXISTS
+        (SELECT 1 FROM league_memberships WHERE user_id=$1::varchar AND league_id=$2::varchar)`,
         [survivorId, leagueId, p?.team_id, p?.position, p?.jersey_number, p?.skill_level]);
       if (p?.team_id) await run(`INSERT INTO team_memberships (user_id,team_id,status,position,jersey_number,skill_level)
-        SELECT $1,$2,'approved',$3,$4,$5 WHERE NOT EXISTS
-        (SELECT 1 FROM team_memberships WHERE user_id=$1 AND team_id=$2)`,
+        SELECT $1::varchar,$2::varchar,'approved',$3::varchar,$4,$5 WHERE NOT EXISTS
+        (SELECT 1 FROM team_memberships WHERE user_id=$1::varchar AND team_id=$2::varchar)`,
         [survivorId, p.team_id, p.position, p.jersey_number, p.skill_level]);
       if (source.type === 'placeholder') {
         // FK cascade on delete must never silently erase an unhandled reference.
@@ -435,7 +453,7 @@ export async function mergeLeaguePlayer(
           (SELECT count(*) FROM game_attendance WHERE placeholder_player_id=$1)
           +(SELECT count(*) FROM draft_picks WHERE placeholder_player_id=$1)
           +(SELECT count(*) FROM line_combination_assignments WHERE placeholder_player_id=$1)
-          +(SELECT count(*) FROM draft_keepers WHERE placeholder_player_id IN ($1, 'placeholder:' || $1)) AS count`, [from]);
+          +(SELECT count(*) FROM draft_keepers WHERE placeholder_player_id::text IN ($1::text, 'placeholder:' || $1::text)) AS count`, [from]);
         if (Number(remaining.rows[0].count)) throw new PlayerMergeConflict('This roster entry has history outside this league. Move or resolve it before merging.');
         await run('DELETE FROM placeholder_players WHERE id=$1', [from]);
       } else await run(`UPDATE imported_players SET merged_with_user_id=$2, merged_at=NOW(), is_placeholder=false

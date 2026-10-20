@@ -114,6 +114,7 @@ import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 import { DraftSetupWizard } from '@/components/DraftSetupWizard';
 import { AccountUserMerge } from '@/components/AccountUserMerge';
+import { LeaguePlaceholderMerge } from '@/components/LeaguePlaceholderMerge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -137,6 +138,8 @@ type LeagueMember = {
   isSkater?: boolean;
   displayFirstName?: string; // For merged players - overrides user.firstName for league display
   displayLastName?: string; // For merged players - overrides user.lastName for league display
+  isPlaceholderPlayer?: boolean;
+  placeholderPlayerId?: string;
   isGoalie?: boolean; // Added for goalie status
   leagueRole?: string; // League-specific role
   leagueSpecialPermissions?: string[]; // League-specific special permissions
@@ -650,6 +653,7 @@ export default function LeagueManagement() {
   const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([]);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
+  const [placeholderMergeSource, setPlaceholderMergeSource] = useState<{ id: string; name: string; email: string } | null>(null);
   const [accountMergeSurvivorId, setAccountMergeSurvivorId] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [teamCaptains, setTeamCaptains] = useState<string[]>([]);
@@ -5209,6 +5213,8 @@ export default function LeagueManagement() {
       {/* Player Detail Modal */}
       {accountMergeSurvivorId && <AccountUserMerge key={accountMergeSurvivorId}
         survivorId={accountMergeSurvivorId} onClose={() => setAccountMergeSurvivorId(null)} />}
+      {placeholderMergeSource && leagueId && <LeaguePlaceholderMerge key={placeholderMergeSource.id}
+        leagueId={leagueId} source={placeholderMergeSource} onClose={() => setPlaceholderMergeSource(null)} />}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-xl hairline elev-inset w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -5484,8 +5490,32 @@ export default function LeagueManagement() {
                   </button>
                 </div>
 
-                {/* Replace Player (Commissioner Only) */}
-                {league?.commissionerId === user?.id && (
+                {league?.commissionerId === user?.id && selectedPlayer.isPlaceholderPlayer && selectedPlayer.placeholderPlayerId && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm">Merge roster entry</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Transfer this manually added player’s league history to their registered account.
+                    </p>
+                    <button type="button"
+                      onClick={() => {
+                        setPlaceholderMergeSource({
+                          id: selectedPlayer.placeholderPlayerId!,
+                          name: formatUserName(selectedPlayer.user, selectedPlayer),
+                          email: selectedPlayer.user.email || '',
+                        });
+                        setSelectedPlayer(null);
+                      }}
+                      className="w-full px-4 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium"
+                      data-testid={`button-merge-placeholder-${selectedPlayer.placeholderPlayerId}`}>
+                      <Users className="w-4 h-4 inline mr-2" />
+                      Merge into registered account
+                    </button>
+                  </div>
+                )}
+                {/* Replace legacy placeholder users (stored before placeholder_players existed). */}
+                {league?.commissionerId === user?.id &&
+                  !selectedPlayer.isPlaceholderPlayer &&
+                  selectedPlayer.user.email?.toLowerCase().endsWith('@placeholder.roster') && (
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm">Replace Player</h4>
                     <p className="text-xs text-muted-foreground">

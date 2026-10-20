@@ -8,7 +8,7 @@ import { leagueStatsPlayerEligible } from "./leagueStatsEligibility";
 import { registerTeamStatsRoute } from "./teamStatsRoute";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
+import { findLeagueMergeCandidates, previewLeaguePlayerMerge, previewLeaguePlaceholderMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
 import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
 import { hasAccountMergeOperatorContext, hasRealAccountMergeActor, assertAccountMergeAccess } from "./accountMergeAuthorization";
 import { verifyMergeSignIns } from "./accountMergeIdentity";
@@ -16787,6 +16787,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('League player merge failed:', error);
       res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 409 : 500)
         .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not merge players. No changes were saved.' });
+    }
+  });
+  app.post('/api/leagues/:leagueId/player-merge/placeholder-preview', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      const { placeholderId, survivorId } = z.object({
+        placeholderId: z.string().min(1), survivorId: z.string().min(1),
+      }).parse(req.body);
+      const [preview, auth] = await Promise.all([
+        previewLeaguePlaceholderMerge(req.params.leagueId, placeholderId, survivorId),
+        supabase.auth.admin.getUserById(survivorId),
+      ]);
+      if (!preview.survivor.canSurvive || auth.error || !auth.data.user)
+        return res.status(400).json({ message: 'The surviving profile must be an active registered account in this league.' });
+      res.json(preview);
+    } catch (error: any) {
+      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 400 : 500)
+        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not preview this roster merge.' });
+    }
+  });
+  app.post('/api/leagues/:leagueId/player-merge/placeholder-confirm', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      const { placeholderId, survivorId } = z.object({
+        placeholderId: z.string().min(1), survivorId: z.string().min(1), acknowledgeIdentity: z.literal(true),
+      }).parse(req.body);
+      const preview = await previewLeaguePlaceholderMerge(req.params.leagueId, placeholderId, survivorId);
+      if (!preview.survivor.canSurvive)
+        return res.status(400).json({ message: 'The survivor must remain an active registered account in this league.' });
+      const { data, error } = await supabase.auth.admin.getUserById(survivorId);
+      if (error || !data.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      res.json(await mergeLeaguePlayer(req.params.leagueId, req.user.claims.sub,
+        { type: 'placeholder', id: placeholderId }, survivorId));
+    } catch (error: any) {
+      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 409 : 500)
+        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not merge this roster entry. No changes were saved.' });
     }
   });
 

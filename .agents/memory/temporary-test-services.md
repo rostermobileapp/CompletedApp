@@ -26,3 +26,9 @@ When generating disposable fixture schemas with the installed Drizzle Kit API un
 **Why:** The installed ESM bundle throws `Dynamic require of "fs" is not supported` before schema generation; the CommonJS entry works with the same schema and API.
 
 **How to apply:** Use this only for isolated test setup. Generate the schema into `/tmp` and apply it solely to the guarded local test database, never the application's database.
+
+When starting a disposable PostgreSQL cluster in this workspace, set `unix_socket_directories` to an existing writable path such as `/tmp`.
+
+**Why:** PostgreSQL may otherwise exit before listening because its default `/run/postgresql` directory is absent.
+
+**How to apply:** Keep the TCP host, port, database, and role explicit for test clients, and set the socket directory separately for the local server process.

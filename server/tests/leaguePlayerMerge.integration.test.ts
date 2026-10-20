@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { pool } from '../db';
-import { findLeagueMergeCandidates, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema, mergeLeaguePlayer, previewLeaguePlayerMerge } from '../leaguePlayerMerge';
+import { findLeagueMergeCandidates, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema, mergeLeaguePlayer, previewLeaguePlaceholderMerge, previewLeaguePlayerMerge } from '../leaguePlayerMerge';
 
 test('commissioner merge transfers different-email league history and preserves other leagues', async () => {
   const key = randomUUID().replaceAll('-', '');
@@ -106,6 +106,12 @@ test('commissioner merge transfers different-email league history and preserves 
       [ids.placeholder, l, team, 'Roster', 'Entry']);
     await q('INSERT INTO game_attendance (game_id,team_id,placeholder_player_id) VALUES ($1,$2,$3)',
       [ids.placeholderGame, team, ids.placeholder]);
+    const placeholderPreview = await previewLeaguePlaceholderMerge(l, ids.placeholder, target);
+    assert.equal(placeholderPreview.source.name, 'Roster Entry');
+    assert.equal(placeholderPreview.source.teamName, 'Test team');
+    assert.equal(placeholderPreview.source.attendance, 1);
+    assert.equal(placeholderPreview.survivor.id, target);
+    await assert.rejects(previewLeaguePlaceholderMerge(ids.outside, ids.placeholder, target), /no longer in this league/);
     await mergeLeaguePlayer(l, ids.commissioner, { type: 'placeholder', id: ids.placeholder }, target);
     assert.equal((await q('SELECT user_id FROM game_attendance WHERE game_id=$1', [ids.placeholderGame])).rows[0].user_id, target);
 
