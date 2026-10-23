@@ -370,11 +370,12 @@ export function LineManager({
   });
 
   const { data: comboStats, isLoading: comboStatsLoading, isError: comboStatsFailed } = useQuery<LineComboStats>({
-    queryKey: ['/api/teams', teamId, 'line-combos', 'stats', 'points-v1'],
+    queryKey: ['/api/teams', teamId, 'line-combos', 'stats', 'adaptive-v1'],
     queryFn: async () => {
-      const res = await apiRequest('GET', `/api/teams/${teamId}/line-combos/stats?model=points-v1`);
+      const res = await apiRequest('GET', `/api/teams/${teamId}/line-combos/stats?model=adaptive-v1`);
       const stats: LineComboStats = await res.json();
-      if (stats.model !== 'sum-player-ppg-v1' || !Array.isArray(stats.players)) {
+      if (stats.model !== 'sum-player-ppg-v1' || !Array.isArray(stats.players) ||
+        stats.learning?.version !== 'residual-pairs-v1') {
         throw new Error('The line-combo prediction model is unavailable.');
       }
       return stats;
@@ -382,6 +383,7 @@ export function LineManager({
     enabled: !!teamId && view === 'lines',
     staleTime: 60 * 1000,
     refetchOnWindowFocus: 'always',
+    refetchInterval: 60 * 1000,
   });
 
   // ── Sync DB template → editor state ──────────────────────────

@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 /** Completed team games with saved lines and recorded scoring (including real 0-goal games). */
-export function lineComboHistoryQuery(teamId: string) {
+export function lineComboHistoryQuery(teamId: string, includeFrozenForecasts = false) {
   return sql`
     WITH historical_members AS (
       SELECT DISTINCT lc.id AS line_id,lc.game_id,lc.line_type,a.player_id
@@ -15,6 +15,14 @@ export function lineComboHistoryQuery(teamId: string) {
           OR EXISTS (SELECT 1 FROM game_goals recorded
             WHERE recorded.game_id=g.id AND recorded.team_id=${teamId} AND recorded.is_submitted=true)
         )
+      ${includeFrozenForecasts ? sql`
+        UNION
+        SELECT 'forecast:' || f.game_id || ':' || f.line_type || ':' || f.line_number,
+          f.game_id,f.line_type::line_type,p.player_id
+        FROM line_combo_forecasts f
+        CROSS JOIN LATERAL unnest(f.player_ids) AS p(player_id)
+        WHERE f.team_id=${teamId} AND f.actual_points IS NOT NULL AND f.exclusion_reason IS NULL
+      ` : sql``}
     )
     SELECT h.line_id AS "lineId",h.game_id AS "gameId",h.line_type AS "lineType",
       h.player_id AS "playerId",

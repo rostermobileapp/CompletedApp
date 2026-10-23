@@ -21,8 +21,8 @@ The line tool must estimate previously unseen combinations immediately while pla
 
 **How to apply:** Distinguish recorded group averages from predictions and preserve unsaved preview behavior. Missing exact-group history must not suppress an estimate when the constituent players have usable scoring history.
 
-With no varied historical combinations, use a transparent additive player-PPG baseline rather than claiming learned chemistry.
+Use a transparent additive player-PPG starting baseline. Learn conservative corrections prospectively from genuine forecasts and later verified results, not from fabricated historical variation.
 
-**Why:** Identical historical groupings cannot establish how an unseen combination interacts. Summing individual scorekeeper-derived goals-plus-assists rates gives a defensible, explainable baseline without inventing interaction evidence.
+**Why:** Identical historical groupings cannot establish how an unseen combination interacts. The owner subsequently clarified that future results must tune the formula itself, not merely update player averages or produce an accuracy report.
 
-**How to apply:** Label estimates explicitly, expose their historical basis and sample size, and do not describe them as tracked on-ice scoring or learned synergy. A richer model needs evidence from genuinely different historical combinations.
+**How to apply:** Keep these synthetic groupings in the requested baseline calculation, but exclude them from calibration evidence. Never manufacture retrospective pre-game forecasts. Label estimates and learning sample sizes honestly; these are whole-game player-production estimates, not tracked on-ice chemistry.

@@ -50,6 +50,7 @@ import { dutyAssignments, dutyTemplates } from "@shared/schema";
 import { withBeverageDutyAssignments } from "@shared/beverageDutyCounts";
 import { buildLineComboStats, type ComboHistoryRow } from "@shared/lineComboPredictions";
 import { lineComboHistoryQuery } from "./lineComboPredictions";
+import { loadLineComboCalibration } from "./lineComboLearning";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
@@ -10467,9 +10468,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Versioned points model: old clients retain their existing goals-only contract.
-      if (req.query.model === "points-v1") {
-        const history = await db.execute(lineComboHistoryQuery(teamId));
-        return res.json(buildLineComboStats(history.rows as ComboHistoryRow[]));
+      if (req.query.model === "points-v1" || req.query.model === "adaptive-v1") {
+        const learning = req.query.model === "adaptive-v1" ? await loadLineComboCalibration(pool, teamId) : undefined;
+        const history = await db.execute(lineComboHistoryQuery(teamId, learning?.available === true));
+        const stats = buildLineComboStats(history.rows as ComboHistoryRow[]);
+        if (learning) stats.learning = learning;
+        return res.json(stats);
       }
 
       // SQL: for each current template combo (sorted player-ID set), find historical

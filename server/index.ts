@@ -17,9 +17,23 @@ import { startDailyTriviaPushJob } from "./triviaPushJob";
 import { checkAppleSigningReadiness } from "./appleSigningReadiness";
 import { startTeamAwardPushJob } from "./teamAwardPushJob";
 import { ensureTeamAwardDatabaseUpdates } from "./teamAwardDbInit";
+import { ensureLineComboLearningDatabase } from "./lineComboLearningDb";
+import { createLineComboLearningWorker } from "./lineComboLearning";
 import { pool } from "./db";
 
 const app = express();
+const lineComboLearner = createLineComboLearningWorker(pool);
+let lineComboLearningReady = false;
+// Successful line saves refresh prospective forecasts promptly, not just on the
+// one-minute sweep. This cannot create forecasts for already-started games.
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.path.includes("/line-combinations")) {
+    res.on("finish", () => {
+      if (lineComboLearningReady && res.statusCode >= 200 && res.statusCode < 300) void lineComboLearner.request();
+    });
+  }
+  next();
+});
 startTeamAwardPushJob();
 
 // CORS configuration for Vercel frontend
@@ -125,6 +139,12 @@ app.use((req, res, next) => {
     });
   }
 
+  try {
+    await ensureLineComboLearningDatabase(pool);
+    lineComboLearningReady = true;
+  } catch (error: any) {
+    console.error("[LineComboLearning] Automatic setup failed; learning is unavailable.", { code: error?.code ?? "unknown" });
+  }
   const server = await registerRoutes(app);
   await reconcileApplePurchaseLinks();
   startApplePurchaseLinkJob();
@@ -174,6 +194,7 @@ app.use((req, res, next) => {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
+    if (lineComboLearningReady) lineComboLearner.start();
     log(`serving on port ${port}`);
     startDailyTriviaPushJob();
     // Backfill historical badges after readiness. Errors are logged per badge

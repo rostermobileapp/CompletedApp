@@ -58,6 +58,16 @@ try {
   await click('[data-testid="picker-player-a"]');
   await wait(`${badges}.some(b=>b.innerText.includes('Recorded 3.0 PPG'))`);
   console.log("PASS restoring the original grouping restores the recorded average");
+  await fetch("http://127.0.0.1:3002/__learn", { method: "POST" });
+  await ev("window.fixtureRefetch()");
+  await wait(`${badges}.some(b=>b.innerText.includes('Tuned · 4 games'))`);
+  assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Predicted 3.7 PPG'))`), true);
+  assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Recorded 3.0 PPG'))`), true);
+  console.log("PASS future outcomes change the predicted formula while recorded averages stay separate");
+  await fetch("http://127.0.0.1:3002/__learn", { method: "DELETE" });
+  await ev("window.fixtureRefetch()");
+  await wait(`${badges}.some(b=>b.innerText.includes('Predicted 3.0 PPG'))`);
+  console.log("PASS correcting outcomes recalibrates the displayed prediction without changing the roster");
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   assert.equal(await ev("document.documentElement.scrollWidth<=innerWidth"), true);
   assert.deepEqual(errors, []);

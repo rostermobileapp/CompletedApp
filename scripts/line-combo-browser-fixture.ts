@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import postcss from "postcss";
 import tailwindcss from "tailwindcss";
 import { buildLineComboStats, type ComboHistoryRow } from "../shared/lineComboPredictions";
+import { learnLineComboCalibration } from "../shared/lineComboLearning";
 
 const players = ["a", "b", "c", "d", "e", "f"].map(id => ({
   userId: id, position: "C", user: { id, firstName: "Player", lastName: id.toUpperCase() },
@@ -17,6 +18,7 @@ for (let game = 1; game <= 6; game++) for (const [line, ids] of [[1, ["a", "b", 
   });
 }
 const stats = buildLineComboStats(rows);
+stats.learning = learnLineComboCalibration([]);
 const lines = [[1, ["a", "b", "c"]], [2, ["d", "e", "f"]]].map(([number, ids]) => ({
   id: `line-${number}`, name: `Line ${number}`, lineType: "forward", lineNumber: number,
   assignments: (ids as string[]).map((id, index) => ({
@@ -28,6 +30,7 @@ let writes = 0;
 const state = `
 import React from 'react';import {QueryClient} from '@tanstack/react-query';
 export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false}}});
+window.fixtureRefetch=()=>queryClient.invalidateQueries();
 export async function apiRequest(method,url,data){const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});if(!r.ok)throw new Error('Fixture API failure');return r}
 export function getImageUrl(path){return path}
 export async function getAuthHeaders(){return {}}
@@ -58,6 +61,15 @@ const built = await build({
 });
 const css = await postcss([tailwindcss("./tailwind.config.ts")]).process(await readFile("client/src/index.css", "utf8"), { from: "client/src/index.css" });
 createServer(async (req, res) => {
+  if (req.url === "/__learn") {
+    const corrected = req.method === "DELETE";
+    stats.learning = learnLineComboCalibration(Array.from({length:4},(_,i)=>[
+      {gameId:'future'+i,lineType:'forward' as const,playerIds:['a','b','c'],basePointsPerGame:3,actualPoints:corrected?3:5},
+      {gameId:'future'+i,lineType:'forward' as const,playerIds:['d','e','f'],basePointsPerGame:4,actualPoints:corrected?4:6},
+    ]).flat());
+    res.setHeader("Content-Type","application/json");
+    return res.end(JSON.stringify({ok:true}));
+  }
   if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript"); return res.end(built.outputFiles[0].contents); }
   if (req.url === "/fixture.css") { res.setHeader("Content-Type", "text/css"); return res.end(css.css); }
   if (req.url?.startsWith("/api/") || req.url === "/__writes") {
