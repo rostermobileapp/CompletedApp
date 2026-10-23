@@ -38,6 +38,9 @@ try {
   assert.ok(await ev(`document.querySelector('section[aria-label="Custom team awards"]').getBoundingClientRect().height<=60`));
   assert.ok(await ev(`${disclosure}.getBoundingClientRect().height>=44`));
   pass("phone starts as one compact, accessible row with all controls hidden");
+  const awardGaps=()=>ev(`(()=>{const section=document.querySelector('section[aria-label="Custom team awards"]').getBoundingClientRect();return {above:section.top-document.querySelector('main>header').getBoundingClientRect().bottom,below:document.querySelector('section[aria-label="Roster"]').getBoundingClientRect().top-section.bottom}})()`);
+  assert.deepEqual(await awardGaps(),{above:4,below:4});
+  pass("My Team keeps exactly 4px above and below the awards row without shrinking its tap target");
   await ev(`window.fixtureQueryClient.invalidateQueries({queryKey:['/api/teams','team-a','awards']})`);
   assert.equal(await ev(`${disclosure}.getAttribute('aria-expanded')`),"false");
   pass("background query refresh does not expand a closed section");

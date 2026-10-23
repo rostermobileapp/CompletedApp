@@ -18,6 +18,9 @@ const requests: any[]=[];
 let configError=false, configDelay=0, enabled=true;
 let celebrations:any[]=[], patchEvents:any[]=[], ackError=false, ackDelay=0;
 let viewerId="captain";
+const teamPanelClass=(await readFile("client/src/pages/Teams.tsx","utf8"))
+  .match(/<TabsContent key=\{team\.id\}[^>]*className="([^"]+)"/)?.[1];
+if(!teamPanelClass)throw new Error("My Team panel styling was not found");
 const state = `
 import React from 'react';import {QueryClient} from '@tanstack/react-query';
 export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false,queryFn:async({queryKey})=>{const r=await fetch(queryKey[0]);if(!r.ok)throw new Error('Fixture request failed');return r.json()}}}});
@@ -45,7 +48,7 @@ const built=await build({
       const h=useTeamAwardHolders();
       const[teamId,setTeamId]=React.useState('team-a');
       window.fixtureSetTeamId=setTeamId;
-      return <main className="mx-auto max-w-3xl space-y-6 p-4">
+      return <main className={${JSON.stringify(`mx-auto max-w-3xl p-4 ${teamPanelClass}`)}}>
         {celebrationFixture&&<BadgeEarnedHost/>}
         <header className="flex justify-between"><h1 className="text-2xl font-bold">My Team</h1><TeamAwardHolderStrip playerId="captain"/></header>
         <div id="notice" role="status"/>
@@ -73,7 +76,7 @@ createServer(async(req,res)=>{
   if(path==="/fixture.js"){res.setHeader("Content-Type","text/javascript");res.end(built.outputFiles[0].contents);return;}
   if(path==="/fixture.css"){res.setHeader("Content-Type","text/css");res.end(css.css);return;}
   if(!path.startsWith("/api/")&&!path.startsWith("/__")){
-    res.setHeader("Content-Type","text/html; charset=utf-8");res.end(`<!doctype html><html class="dark"><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>`);return;
+    res.setHeader("Content-Type","text/html; charset=utf-8");res.end(`<!doctype html><html class="dark"><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/fixture.css"><style>#notice:empty{display:none}</style></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>`);return;
   }
   res.setHeader("Content-Type","application/json");
   let raw="";for await(const chunk of req)raw+=chunk;

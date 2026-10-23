@@ -696,7 +696,7 @@ export default function Teams() {
 
             <Tabs value={selectedTeamId || primaryTeam?.id || ''} onValueChange={setTeamSelection}>
             {displayedTeams.map((team: any) => (
-              <TabsContent key={team.id} value={team.id} className="space-y-6">
+              <TabsContent key={team.id} value={team.id} className="space-y-6 [&>section[aria-label='Custom_team_awards']]:!mt-1 [&>section[aria-label='Custom_team_awards']+*]:!mt-1">
                 {/* Team Header Card */}
                 <Card className="hairline elev-rest">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 bg-[#e2e2e2] dark:bg-[#212121] pl-[12px] pr-[12px] pt-[4px] pb-[4px]">
