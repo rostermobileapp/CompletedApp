@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import { buildOpponentAdjustment, type OpponentSummary } from "../shared/lineComboOpponent";
+import { buildOpponentAdjustment, type LineComboOpponent, type OpponentSummary } from "../shared/lineComboOpponent";
 
 /**
  * Matchup and comparison games use the same league/season. League wall-clock
@@ -33,7 +33,16 @@ export const lineComboOpponentSql = `
   FROM next_game n LEFT JOIN teams t ON t.id=n.opponent_id
 `;
 
-export async function loadLineComboOpponent(connection: Pick<Pool, "query">, teamId: string, gameId?: string) {
-  const { rows } = await connection.query(lineComboOpponentSql, [teamId, gameId ?? null]);
-  return buildOpponentAdjustment(rows[0] as OpponentSummary | undefined);
+export async function loadLineComboOpponent(connection: Pick<Pool, "query">, teamId: string, gameId?: string): Promise<LineComboOpponent> {
+  try {
+    const { rows } = await connection.query(lineComboOpponentSql, [teamId, gameId ?? null]);
+    return buildOpponentAdjustment(rows[0] as OpponentSummary | undefined);
+  } catch (error: any) {
+    // Matchup context is optional; keep real player-history predictions available.
+    // Never log the raw error, SQL parameters, connection details or user data.
+    console.warn("[LineComboOpponent] Matchup lookup unavailable; retaining player baseline.", {
+      code: typeof error?.code === "string" && /^[A-Z0-9]{5}$/.test(error.code) ? error.code : "unknown",
+    });
+    return { version: "opponent-v1", status: "unavailable", gamesPlayed: 0, multiplier: 1 };
+  }
 }

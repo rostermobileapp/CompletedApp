@@ -1,6 +1,6 @@
 export type LineComboOpponent = {
   version: "opponent-v1";
-  status: "adjusted" | "no-upcoming-game" | "untracked-opponent" | "no-scored-history";
+  status: "adjusted" | "no-upcoming-game" | "untracked-opponent" | "no-scored-history" | "unavailable";
   gameId?: string;
   opponentId?: string;
   opponentName?: string;

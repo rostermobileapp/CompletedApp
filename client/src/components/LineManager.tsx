@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { projectLineCombo, type LineComboStats } from '@shared/lineComboPredictions';
 import { LineComboPredictionBadge } from './LineComboPredictionBadge';
 import { LineComboOpponentSummary } from './LineComboOpponentSummary';
+import { loadLineComboStats } from '@/lib/lineComboStats';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -371,16 +372,8 @@ export function LineManager({
   });
 
   const { data: comboStats, isLoading: comboStatsLoading, isError: comboStatsFailed } = useQuery<LineComboStats>({
-    queryKey: ['/api/teams', teamId, 'line-combos', 'stats', 'adaptive-v2'],
-    queryFn: async () => {
-      const res = await apiRequest('GET', `/api/teams/${teamId}/line-combos/stats?model=adaptive-v2`);
-      const stats: LineComboStats = await res.json();
-      if (stats.model !== 'sum-player-ppg-v1' || !Array.isArray(stats.players) ||
-        stats.learning?.version !== 'residual-pairs-v1' || stats.opponent?.version !== 'opponent-v1') {
-        throw new Error('The line-combo prediction model is unavailable.');
-      }
-      return stats;
-    },
+    queryKey: ['/api/teams', teamId, 'line-combos', 'stats', 'adaptive-v2-optional-opponent'],
+    queryFn: () => loadLineComboStats(path => apiRequest('GET', path), teamId),
     enabled: !!teamId && view === 'lines',
     staleTime: 60 * 1000,
     refetchOnWindowFocus: 'always',

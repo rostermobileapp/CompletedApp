@@ -74,6 +74,15 @@ try {
   await ev("window.fixtureRefetch()");
   await wait(`${badges}.some(b=>b.innerText.includes('Predicted ${(3*multiplier).toFixed(1)} PPG'))`);
   console.log("PASS correcting outcomes recalibrates the displayed prediction without changing the roster");
+  for(const mode of ["missing","absent","unavailable"]){
+    await fetch(`http://127.0.0.1:3002/__opponent?mode=${mode}`);
+    await ev("window.fixtureRefetch()");
+    await wait(`${badges}.some(b=>b.innerText.includes('Predicted 3.0 PPG'))`);
+    assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Stats unavailable'))`),false);
+    const summary=await ev(`document.querySelector('[data-testid="line-combo-opponent"]').innerText`);
+    assert.ok(summary.includes(mode==="missing"?"no opponent scoring history":"base prediction"));
+  }
+  console.log("PASS missing scores, missing opponent metadata and failed matchup lookup all preserve visible base predictions");
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   assert.equal(await ev("document.documentElement.scrollWidth<=innerWidth"), true);
   assert.deepEqual(errors, []);

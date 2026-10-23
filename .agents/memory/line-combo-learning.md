@@ -20,3 +20,9 @@ Predictions must include the next opponent's goals scored and goals allowed per 
 **Why:** The owner explicitly requested merging the next game's opponent and both scoring/conceding rates into the prediction formula.
 
 **How to apply:** Use comparable league/season results, label the matchup influence, and remain neutral when no usable opponent history exists. Saved forecasts must use their own game's opponent, not whichever game is currently next. Learn against the frozen matchup-adjusted baseline; do not mix evidence from incompatible baseline formulas.
+
+Opponent lineups are never a prerequisite for predictions or matchup adjustments.
+
+**Why:** The owner explicitly clarified that the prediction formula must not depend on the next opposing team having line combos set.
+
+**How to apply:** Read opponent goals scored/allowed from completed game scores, independently of saved lineups. Treat matchup context as optional: a missing or failed opponent lookup must preserve valid player-history predictions and visibly identify that no matchup adjustment was applied. Never substitute legacy goals-only aggregates for player PPG or bypass authorization to obtain a baseline.

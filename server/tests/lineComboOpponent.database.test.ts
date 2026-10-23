@@ -36,7 +36,8 @@ test("next-opponent selection, scored history isolation and neutral fallback", {
       INSERT INTO games(id,league_id,season_id,home_team_id,away_team_id,scheduled_at,is_completed,home_score,away_score,is_scrimmage)
         VALUES('scrimmage','league','season','them','third',timezone('America/New_York',clock_timestamp()-interval '1 day'),true,99,99,true);
     `);
-    await t.test("next real future game uses correct home/away rates, same-season league baseline and genuine zeroes",async()=>{
+    await t.test("opponent scoring works with no line-combination tables or opponent lineups at all",async()=>{
+      assert.equal((await pool!.query("SELECT to_regclass('public.line_combinations') AS table_name")).rows[0].table_name,null);
       const result=await loadLineComboOpponent(pool!,"us");
       assert.equal(result.gameId,"next");assert.equal(result.opponentName,"Ice Owls");
       assert.equal(result.gamesPlayed,2);assert.equal(result.goalsForPerGame,2);

@@ -66,6 +66,16 @@ const built = await build({
 });
 const css = await postcss([tailwindcss("./tailwind.config.ts")]).process(await readFile("client/src/index.css", "utf8"), { from: "client/src/index.css" });
 createServer(async (req, res) => {
+  if (req.url?.startsWith("/__opponent")) {
+    const mode=new URL(req.url,"http://fixture").searchParams.get("mode");
+    if(mode==="absent") delete stats.opponent;
+    else stats.opponent=mode==="adjusted"?buildOpponentAdjustment({
+      gameId:"next",opponentId:"other",opponentName:"Ice Owls",gamesPlayed:6,
+      goalsForPerGame:4,goalsAgainstPerGame:5,leagueGoalsPerTeam:3,
+    }):{version:"opponent-v1",status:mode==="missing"?"no-scored-history":"unavailable",gamesPlayed:0,multiplier:1};
+    res.setHeader("Content-Type","application/json");
+    return res.end(JSON.stringify({ok:true}));
+  }
   if (req.url === "/__learn") {
     const corrected = req.method === "DELETE";
     stats.learning = learnLineComboCalibration(Array.from({length:4},(_,i)=>[
