@@ -79,65 +79,67 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
   }, []);
   if (config.data && !config.data.enabled) return null;
 
-  return <section aria-label="Custom team awards">
-    <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
-        <CardHeader className="p-0">
-          <CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5">
-            <span className="text-sm font-semibold">Custom Team Awards</span>
-            <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
-          </CollapsibleTrigger>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="space-y-4 border-t border-border/60 p-4 sm:p-5">
-            {config.isLoading && <div aria-label="Loading award settings" className="space-y-2 animate-pulse"><div className="h-4 w-48 rounded bg-muted" /><div className="h-14 rounded-xl bg-muted" /></div>}
-            {config.isError && <ErrorLine message="Award settings could not be loaded." retry={() => void config.refetch()} />}
-            {config.data?.enabled && config.data.setupRequired && !bundle.data && !bundle.isError && <div className="flex items-start gap-3 rounded-xl border border-dashed border-border p-4"><Clock3 className="mt-0.5 h-5 w-5 text-muted-foreground" /><div><p className="font-medium">Team awards are getting set up</p><p className="text-sm text-muted-foreground">They’ll be ready here once this team’s award setup is complete.</p></div></div>}
-            {config.data?.enabled && (!config.data.setupRequired || !!bundle.data || bundle.isError) && <>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">Little traditions, made by your team.</p>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setShowArchived((v) => !v)}><History className="mr-1.5 h-4 w-4" />{showArchived ? 'Active awards' : 'History'}</Button>
-                  {bundle.data?.canManage && !showArchived && <Button size="sm" onClick={() => setCreating(true)} disabled={activeCount >= (bundle.data?.activeLimit ?? 5)}><Plus className="mr-1.5 h-4 w-4" />Create Award</Button>}
+  return (
+    <section aria-label="Custom team awards">
+      <Collapsible open={expanded} onOpenChange={setExpanded}>
+        <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
+          <CardHeader className="p-0">
+            <CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5 pt-[2px] pb-[2px]">
+              <span className="text-sm font-semibold">Custom Team Awards</span>
+              <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-4 border-t border-border/60 p-4 sm:p-5">
+              {config.isLoading && <div aria-label="Loading award settings" className="space-y-2 animate-pulse"><div className="h-4 w-48 rounded bg-muted" /><div className="h-14 rounded-xl bg-muted" /></div>}
+              {config.isError && <ErrorLine message="Award settings could not be loaded." retry={() => void config.refetch()} />}
+              {config.data?.enabled && config.data.setupRequired && !bundle.data && !bundle.isError && <div className="flex items-start gap-3 rounded-xl border border-dashed border-border p-4"><Clock3 className="mt-0.5 h-5 w-5 text-muted-foreground" /><div><p className="font-medium">Team awards are getting set up</p><p className="text-sm text-muted-foreground">They’ll be ready here once this team’s award setup is complete.</p></div></div>}
+              {config.data?.enabled && (!config.data.setupRequired || !!bundle.data || bundle.isError) && <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">Little traditions, made by your team.</p>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowArchived((v) => !v)}><History className="mr-1.5 h-4 w-4" />{showArchived ? 'Active awards' : 'History'}</Button>
+                    {bundle.data?.canManage && !showArchived && <Button size="sm" onClick={() => setCreating(true)} disabled={activeCount >= (bundle.data?.activeLimit ?? 5)}><Plus className="mr-1.5 h-4 w-4" />Create Award</Button>}
+                  </div>
                 </div>
-              </div>
-              {bundle.isLoading && <div className="space-y-2 animate-pulse"><div className="h-16 rounded-xl bg-muted" /><div className="h-16 rounded-xl bg-muted" /></div>}
-              {bundle.isError && <ErrorLine message="Awards could not be loaded." retry={() => void bundle.refetch()} />}
-              {bundle.data && <>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{activeCount} of {bundle.data.activeLimit ?? 5} active awards</span>
-            <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{bundle.data.roster.length} players</span>
-          </div>
-          {bundle.data.canManage && <div className="flex flex-wrap items-end gap-2 rounded-lg bg-muted/30 p-3">
-            <div className="min-w-[220px] flex-1"><Label htmlFor={`award-zone-${teamId}`} className="text-xs">Award timezone</Label>
-              <Input id={`award-zone-${teamId}`} list={`award-zones-${teamId}`} value={timezone || bundle.data.timezone} onChange={(e) => setTimezone(e.target.value)} className="mt-1 h-9" placeholder="America/New_York" />
-              <datalist id={`award-zones-${teamId}`}>{zones.map((zone) => <option key={zone} value={zone} />)}</datalist>
+                {bundle.isLoading && <div className="space-y-2 animate-pulse"><div className="h-16 rounded-xl bg-muted" /><div className="h-16 rounded-xl bg-muted" /></div>}
+                {bundle.isError && <ErrorLine message="Awards could not be loaded." retry={() => void bundle.refetch()} />}
+                {bundle.data && <>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>{activeCount} of {bundle.data.activeLimit ?? 5} active awards</span>
+              <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{bundle.data.roster.length} players</span>
             </div>
-            <Button size="sm" variant="outline" disabled={!timezone || timezone === bundle.data.timezone || mutation.isPending} onClick={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/award-settings`, data: { timezone } })}>Save timezone</Button>
-          </div>}
-          {!visibleAwards.length && <div className="rounded-xl border border-dashed border-border px-5 py-8 text-center"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-5 w-5" /></div><h3 className="font-semibold">{showArchived ? 'No awards in the archives' : 'Start a team tradition'}</h3><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{showArchived ? 'Archived awards will live here.' : 'Create a custom award and pass it around after games, weeks, months, or seasons.'}</p></div>}
-          <div className="grid gap-3">
-            {visibleAwards.map((award) => <AwardRow key={award.id} award={award} canManage={bundle.data!.canManage} onEdit={() => setEditing(award)} onArchive={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/awards/${award.id}`, data: { archived: true } })} onGrant={() => { setGrantAward(award); setGrantPlayer(''); setReassign(false); }} />)}
-          </div>
+            {bundle.data.canManage && <div className="flex flex-wrap items-end gap-2 rounded-lg bg-muted/30 p-3">
+              <div className="min-w-[220px] flex-1"><Label htmlFor={`award-zone-${teamId}`} className="text-xs">Award timezone</Label>
+                <Input id={`award-zone-${teamId}`} list={`award-zones-${teamId}`} value={timezone || bundle.data.timezone} onChange={(e) => setTimezone(e.target.value)} className="mt-1 h-9" placeholder="America/New_York" />
+                <datalist id={`award-zones-${teamId}`}>{zones.map((zone) => <option key={zone} value={zone} />)}</datalist>
+              </div>
+              <Button size="sm" variant="outline" disabled={!timezone || timezone === bundle.data.timezone || mutation.isPending} onClick={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/award-settings`, data: { timezone } })}>Save timezone</Button>
+            </div>}
+            {!visibleAwards.length && <div className="rounded-xl border border-dashed border-border px-5 py-8 text-center"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-5 w-5" /></div><h3 className="font-semibold">{showArchived ? 'No awards in the archives' : 'Start a team tradition'}</h3><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{showArchived ? 'Archived awards will live here.' : 'Create a custom award and pass it around after games, weeks, months, or seasons.'}</p></div>}
+            <div className="grid gap-3">
+              {visibleAwards.map((award) => <AwardRow key={award.id} award={award} canManage={bundle.data!.canManage} onEdit={() => setEditing(award)} onArchive={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/awards/${award.id}`, data: { archived: true } })} onGrant={() => { setGrantAward(award); setGrantPlayer(''); setReassign(false); }} />)}
+            </div>
+                </>}
               </>}
-            </>}
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
-    {(creating || editing) && <AwardDialog teamId={teamId} award={editing} onClose={() => { setEditing(null); setCreating(false); }} onSave={save} onImageSaved={refresh} onError={(message) => toast({ title: 'Image update', description: message, variant: 'destructive' })} />}
-    {grantAward && bundle.data && <Dialog open onOpenChange={(open) => { if (!open) setGrantAward(null); }}>
-      <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl p-5 sm:p-6">
-        <DialogHeader><DialogTitle>Pass on {grantAward.name}</DialogTitle><DialogDescription>{grantAward.window.opensAt ? `Award window: ${new Date(grantAward.window.opensAt).toLocaleDateString()}${grantAward.window.closesAt ? ` – ${new Date(grantAward.window.closesAt).toLocaleDateString()}` : ''}` : 'No current award window is open.'}</DialogDescription></DialogHeader>
-        <Label className="mt-4 block" htmlFor="award-player">Choose a roster player</Label><select id="award-player" value={grantPlayer} onChange={(e) => setGrantPlayer(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Select a player</option>{bundle.data.roster.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select>
-        {grantAward.currentGrant && <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p><strong>{grantAward.currentGrant.playerName}</strong> currently holds this award for this period.</p><label className="mt-2 flex cursor-pointer items-center gap-2"><input type="checkbox" checked={reassign} onChange={(e) => setReassign(e.target.checked)} />Confirm reassigning it to another player</label></div>}
-        <div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={() => setGrantAward(null)}>Cancel</Button><Button disabled={!grantPlayer || mutation.isPending || (!!grantAward.currentGrant && !reassign) || !grantAward.window.periodKey} onClick={() => {
-          const chosen = grantPlayer;
-          apiRequest('POST', `/api/teams/${teamId}/awards/${grantAward.id}/grants`, { playerId: chosen, periodKey: grantAward.window.periodKey, reassign }).then(async (r) => { const result = await r.json(); await refresh(); setGrantAward(null); toast({ title: result.changed ? 'Award passed on' : 'No change', description: result.changed ? 'The roster has a new holder.' : 'That player already holds the award.' }); }).catch((e: any) => toast({ title: 'Could not pass on award', description: e?.message || 'Please try again.', variant: 'destructive' }));
-        }}>Grant award</Button></div>
-      </DialogContent>
-    </Dialog>}
-  </section>;
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+      {(creating || editing) && <AwardDialog teamId={teamId} award={editing} onClose={() => { setEditing(null); setCreating(false); }} onSave={save} onImageSaved={refresh} onError={(message) => toast({ title: 'Image update', description: message, variant: 'destructive' })} />}
+      {grantAward && bundle.data && <Dialog open onOpenChange={(open) => { if (!open) setGrantAward(null); }}>
+        <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl p-5 sm:p-6">
+          <DialogHeader><DialogTitle>Pass on {grantAward.name}</DialogTitle><DialogDescription>{grantAward.window.opensAt ? `Award window: ${new Date(grantAward.window.opensAt).toLocaleDateString()}${grantAward.window.closesAt ? ` – ${new Date(grantAward.window.closesAt).toLocaleDateString()}` : ''}` : 'No current award window is open.'}</DialogDescription></DialogHeader>
+          <Label className="mt-4 block" htmlFor="award-player">Choose a roster player</Label><select id="award-player" value={grantPlayer} onChange={(e) => setGrantPlayer(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Select a player</option>{bundle.data.roster.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select>
+          {grantAward.currentGrant && <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p><strong>{grantAward.currentGrant.playerName}</strong> currently holds this award for this period.</p><label className="mt-2 flex cursor-pointer items-center gap-2"><input type="checkbox" checked={reassign} onChange={(e) => setReassign(e.target.checked)} />Confirm reassigning it to another player</label></div>}
+          <div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={() => setGrantAward(null)}>Cancel</Button><Button disabled={!grantPlayer || mutation.isPending || (!!grantAward.currentGrant && !reassign) || !grantAward.window.periodKey} onClick={() => {
+            const chosen = grantPlayer;
+            apiRequest('POST', `/api/teams/${teamId}/awards/${grantAward.id}/grants`, { playerId: chosen, periodKey: grantAward.window.periodKey, reassign }).then(async (r) => { const result = await r.json(); await refresh(); setGrantAward(null); toast({ title: result.changed ? 'Award passed on' : 'No change', description: result.changed ? 'The roster has a new holder.' : 'That player already holds the award.' }); }).catch((e: any) => toast({ title: 'Could not pass on award', description: e?.message || 'Please try again.', variant: 'destructive' }));
+          }}>Grant award</Button></div>
+        </DialogContent>
+      </Dialog>}
+    </section>
+  );
 
 }
 
