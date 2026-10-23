@@ -6,7 +6,9 @@ type NotificationData = Record<string, string> | undefined;
  */
 export function getNotificationClickUrl(data: NotificationData, appBaseUrl: string): string {
   const baseUrl = appBaseUrl.replace(/\/+$/, '');
-  const urlFor = (path: string) => `${baseUrl}${path}`;
+  // Root-targeted pushes must be distinguishable from an ordinary app launch,
+  // otherwise last-screen restoration can silently replace the intended Home.
+  const urlFor = (path: string) => `${baseUrl}${path === '/' ? '/?notification=1' : path}`;
   const id = (field: string) => {
     const value = data?.[field]?.trim();
     return value ? encodeURIComponent(value) : undefined;

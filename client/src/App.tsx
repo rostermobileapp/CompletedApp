@@ -109,12 +109,7 @@ import EarnedPatches from "@/pages/EarnedPatches";
 import BadgeCatalogAdmin from "@/pages/BadgeCatalogAdmin";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 import { applyCanonicalUrl } from "@/lib/seoMetadata";
-
-function RedirectToLogin() {
-  const [, setLocation] = useLocation();
-  useEffect(() => { setLocation('/login'); }, [setLocation]);
-  return null;
-}
+import { authenticatedEntryDestination, shouldShowAppLogin } from "@/lib/appRouteEntry";
 
 function LoadingScreen() {
   return (
@@ -144,7 +139,7 @@ function LoadingScreen() {
   );
 }
 
-function Router() {
+export function Router() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isActive: isDemoActive } = useDemo();
   const [location, setLocation] = useLocation();
@@ -197,19 +192,24 @@ function Router() {
     lastUserId.current = user.id;
     if (!userData?.onboardingCompleted) return;
 
+    let savedPath: string | null = null;
     if (!resumeReady) {
       // A link that arrived while auth was loading supersedes the saved screen.
-      const savedPath = resolveLaunchScreen(
+      savedPath = resolveLaunchScreen(
         localStorage, user.id, launchIsRoot.current, location,
         window.location.search, window.location.hash, isDemoActive,
       );
-      if (savedPath) {
-        restoringPath.current = savedPath;
-        setLocation(savedPath, { replace: true });
-        setResumeReady(true);
-        return;
-      }
       setResumeReady(true);
+    }
+    const entryDestination = authenticatedEntryDestination(
+      location, window.location.search, window.location.hash, savedPath,
+    );
+    if (entryDestination) {
+      // Resolve restoration and launch aliases in ONE effect. Separate redirect
+      // components can race and overwrite a notification or saved destination.
+      restoringPath.current = entryDestination;
+      setLocation(entryDestination, { replace: true });
+      return;
     }
     // Wouter can notify its listeners on the next render; do not overwrite
     // the saved destination with the launch root in that narrow interval.
@@ -262,6 +262,11 @@ function Router() {
   }
 
   if (!isAuthenticated) {
+    // Keep the notification URL in place while signing in. An expired session
+    // is not a missing page, and login must not discard the requested resource.
+    if (shouldShowAppLogin(location, isInsideNativeWrapper(), window.location.search)) {
+      return <Login />;
+    }
     return (
       <>
         <ScrollToTop />
@@ -276,7 +281,7 @@ function Router() {
           <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
           <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
           <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
-          <Route path="/app" component={RedirectToLogin} />
+          <Route path="/app" component={Login} />
           <Route path="/login" component={Login} />
           <Route path="/get-started" component={OnboardingQuestionnaire} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
@@ -319,6 +324,9 @@ function Router() {
   }
 
   if (isInsideNativeWrapper() && !resumeReady) return <LoadingScreen />;
+  // The layout effect resolves these before paint; never mount the 404 fallback
+  // for the launch address or the just-completed login during that transition.
+  if (location === '/app' || location === '/login') return <LoadingScreen />;
 
   // Render get-started questionnaire without the app shell (no nav bar, no slide menus)
   if (location === '/get-started') {

@@ -9,6 +9,7 @@ import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import rosterModalLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
 import { EmailVerificationModal } from '@/components/EmailVerificationModal';
+import { loginDestination } from '@/lib/appRouteEntry';
 
 const rosterLogo = '/roster-logo-transparent.png';
 
@@ -24,8 +25,15 @@ export default function Login() {
   const [emailTaken, setEmailTaken] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const currentUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const finishLogin = (startedAt = currentUrl()) => {
+    // A notification arriving during the auth request wins over this callback.
+    if (currentUrl() !== startedAt) return;
+    setLocation(loginDestination(window.location.pathname, window.location.search, window.location.hash), { replace: true });
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const startedAt = currentUrl();
     setLoading(true);
 
     try {
@@ -66,7 +74,7 @@ export default function Login() {
             title: 'Welcome!',
             description: 'Your account has been created.',
           });
-          setLocation('/app');
+          finishLogin(startedAt);
         } else {
           console.log('[Signup] No user or session returned');
           toast({
@@ -87,7 +95,7 @@ export default function Login() {
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
         });
-        setLocation('/app');
+        finishLogin(startedAt);
       }
     } catch (error: unknown) {
       toast({
@@ -116,7 +124,7 @@ export default function Login() {
       title: 'Welcome!',
       description: 'Your account is now active. You are signed in.',
     });
-    setLocation('/app');
+    finishLogin();
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {

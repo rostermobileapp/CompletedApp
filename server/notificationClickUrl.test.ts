@@ -39,7 +39,7 @@ describe('push notification click destinations', () => {
     ['tournament photo tag', { type: 'photo_tag', entityType: 'tournament', entityId: 't-1' }, `${APP_URL}/media/tournament/t-1`],
     ['draft', { type: 'draft_starting', draftId: 'draft-1' }, `${APP_URL}/draft/draft-1`],
     ['signup alert', { type: 'admin_new_signup', newUserId: 'u-1' }, `${APP_URL}/user/u-1`],
-    ['birthday', { type: 'birthday' }, `${APP_URL}/`],
+    ['birthday', { type: 'birthday' }, `${APP_URL}/?notification=1`],
     ['trivia', { type: 'daily_trivia' }, `${APP_URL}/?trivia=1`],
   ];
 
@@ -57,8 +57,8 @@ describe('push notification click destinations', () => {
   });
 
   it('falls back to the app root when a destination is missing or unknown', () => {
-    assert.equal(getNotificationClickUrl({ type: 'message' }, APP_URL), `${APP_URL}/`);
-    assert.equal(getNotificationClickUrl({ type: 'future_notification' }, APP_URL), `${APP_URL}/`);
-    assert.equal(getNotificationClickUrl(undefined, APP_URL), `${APP_URL}/`);
+    assert.equal(getNotificationClickUrl({ type: 'message' }, APP_URL), `${APP_URL}/?notification=1`);
+    assert.equal(getNotificationClickUrl({ type: 'future_notification' }, APP_URL), `${APP_URL}/?notification=1`);
+    assert.equal(getNotificationClickUrl(undefined, APP_URL), `${APP_URL}/?notification=1`);
   });
 });
