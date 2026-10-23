@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
-import { AlertCircle, Plus, ArrowLeft, Loader2, ArrowUp, ArrowDown, MessageSquare, Send } from 'lucide-react';
+import { AlertCircle, Plus, ArrowLeft, Loader2, ArrowUp, ArrowDown, MessageSquare, Send, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface FeedbackModalProps {
@@ -240,11 +240,11 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
-        className="w-screen h-screen max-w-none max-h-none rounded-none flex flex-col p-0 gap-0 bg-[#dae0e6] sm:w-screen sm:h-screen sm:max-w-none sm:rounded-none"
+        className="w-screen h-[100dvh] max-w-none max-h-none rounded-none flex flex-col p-0 gap-0 bg-[#dae0e6] sm:w-screen sm:h-[100dvh] sm:max-w-none sm:rounded-none [&>button]:hidden"
         data-testid="dialog-feedback"
       >
         {/* Reddit-style header bar */}
-        <div className="bg-white border-b border-[#edeff1] px-4 py-2 flex items-center gap-3 flex-shrink-0">
+        <div className="bg-white border-b border-[#edeff1] px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {view !== 'board' && (
             <button onClick={() => setView('board')} className="p-1 rounded hover:bg-[#f6f7f8] transition-colors" aria-label="Back">
               <ArrowLeft className="w-4 h-4 text-[#878a8c]" />
@@ -275,6 +275,17 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               </button>
             </>
           )}
+          <DialogClose asChild>
+            <button
+              type="button"
+              aria-label="Close feedback"
+              className="ml-auto flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold text-[#1c1c1c] hover:bg-[#f6f7f8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0079d3]"
+              data-testid="button-close-feedback"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Close
+            </button>
+          </DialogClose>
         </div>
 
         {/* Board view */}
