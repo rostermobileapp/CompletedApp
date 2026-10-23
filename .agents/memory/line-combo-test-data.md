@@ -14,3 +14,15 @@ When backfilling a baseline from “current lines,” copy the same saved lineup
 **Why:** The owner corrected the initial varied backfill: “All dates should have current lines.” The intended experiment is for the owner to mix players afterward, not for the baseline history to contain invented variations.
 
 **How to apply:** Preserve positions and player groupings exactly across the requested dates unless the owner explicitly supplies different historical lineups.
+
+The line tool must estimate previously unseen combinations immediately while players are rearranged, without requiring Save.
+
+**Why:** The owner explicitly corrected the exact-match-only behavior after swapping players: a recorded-average lookup is not the mathematical prediction they need.
+
+**How to apply:** Distinguish recorded group averages from predictions and preserve unsaved preview behavior. Missing exact-group history must not suppress an estimate when the constituent players have usable scoring history.
+
+With no varied historical combinations, use a transparent additive player-PPG baseline rather than claiming learned chemistry.
+
+**Why:** Identical historical groupings cannot establish how an unseen combination interacts. Summing individual scorekeeper-derived goals-plus-assists rates gives a defensible, explainable baseline without inventing interaction evidence.
+
+**How to apply:** Label estimates explicitly, expose their historical basis and sample size, and do not describe them as tracked on-ice scoring or learned synergy. A richer model needs evidence from genuinely different historical combinations.

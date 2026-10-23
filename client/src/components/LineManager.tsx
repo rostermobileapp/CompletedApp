@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { projectLineCombo, type LineComboStats } from '@shared/lineComboPredictions';
+import { LineComboPredictionBadge } from './LineComboPredictionBadge';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   Users, UserPlus, Plus, Upload, Clock, Coffee,
-  Flame, Snowflake, X, Save, TrendingUp, Minus, UserRound,
+  Flame, Snowflake, X, Save, UserRound,
 } from 'lucide-react';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -40,14 +42,6 @@ type PickerTarget = {
   lineType: 'forward' | 'defense';
   lineIdx: number;
   position: string;
-};
-
-type ComboStat = {
-  playerIds: string[];
-  lineType: string;
-  gamesTogether: number;
-  goalsFor: number;
-  goalsForPerGame: number;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -201,59 +195,6 @@ function SlotButton({
         </div>
       )}
     </button>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Combo trend badge
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Inline combo rating badge shown next to "Line N" / "Pair N" in the header row.
- *
- * Rules:
- *  - combo === undefined → players have never played together → "New Line Combo"
- *  - combo exists but < 3 games → show PPG with game count (low-confidence indicator)
- *  - combo ≥ 3 games → show PPG with fire/snowflake/trending icon
- *
- * Pass `filledCount` so we only render something when ≥ 2 players are assigned.
- */
-function ComboTrend({ combo, filledCount }: { combo: ComboStat | undefined; filledCount: number }) {
-  if (filledCount < 2) return null;
-
-  if (!combo) {
-    // Never played together
-    return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-        New Line Combo
-      </span>
-    );
-  }
-
-  const gpg = combo.goalsForPerGame;
-  const MIN_GAMES = 3;
-
-  if (combo.gamesTogether < MIN_GAMES) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-        <Minus className="w-2.5 h-2.5" />
-        {gpg.toFixed(1)} PPG
-        <span className="opacity-60">({combo.gamesTogether}g)</span>
-      </span>
-    );
-  }
-
-  const icon =
-    gpg >= 1.5 ? <Flame className="w-2.5 h-2.5 text-orange-500" /> :
-    gpg <= 0.5 ? <Snowflake className="w-2.5 h-2.5 text-blue-400" /> :
-    <TrendingUp className="w-2.5 h-2.5 text-green-500" />;
-
-  return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-muted px-1.5 py-0.5 rounded-full">
-      {icon}
-      <span>{gpg.toFixed(1)} PPG</span>
-      <span className="font-normal text-muted-foreground opacity-70">({combo.gamesTogether}g)</span>
-    </span>
   );
 }
 
@@ -428,14 +369,19 @@ export function LineManager({
     staleTime: 60 * 1000,
   });
 
-  const { data: comboStats } = useQuery<{ forward: ComboStat[]; defense: ComboStat[] }>({
-    queryKey: ['/api/teams', teamId, 'line-combos', 'stats'],
+  const { data: comboStats, isLoading: comboStatsLoading, isError: comboStatsFailed } = useQuery<LineComboStats>({
+    queryKey: ['/api/teams', teamId, 'line-combos', 'stats', 'points-v1'],
     queryFn: async () => {
-      const res = await apiRequest('GET', `/api/teams/${teamId}/line-combos/stats`);
-      return res.json();
+      const res = await apiRequest('GET', `/api/teams/${teamId}/line-combos/stats?model=points-v1`);
+      const stats: LineComboStats = await res.json();
+      if (stats.model !== 'sum-player-ppg-v1' || !Array.isArray(stats.players)) {
+        throw new Error('The line-combo prediction model is unavailable.');
+      }
+      return stats;
     },
     enabled: !!teamId && view === 'lines',
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: 'always',
   });
 
   // ── Sync DB template → editor state ──────────────────────────
@@ -688,14 +634,9 @@ export function LineManager({
     }
   }
 
-  function findCombo(line: LineEditor): ComboStat | undefined {
-    if (!comboStats) return undefined;
+  function findCombo(line: LineEditor) {
     const playerIds = Object.values(line.slots).map((s) => s.playerId).filter(Boolean) as string[];
-    const sorted = [...playerIds].sort();
-    const statsArr = line.lineType === 'forward' ? comboStats.forward : comboStats.defense;
-    return statsArr.find(
-      (c) => c.playerIds.length === sorted.length && c.playerIds.every((id, i) => id === sorted[i]),
-    );
+    return projectLineCombo(comboStats, line.lineType, playerIds);
   }
 
   // ── Sorted roster members ─────────────────────────────────────
@@ -935,7 +876,7 @@ export function LineManager({
                             <div className="flex items-center justify-between mb-1.5">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-[11px] font-semibold text-muted-foreground shrink-0">Line {idx + 1}</span>
-                                <ComboTrend combo={findCombo(line)} filledCount={filledCount} />
+                                <LineComboPredictionBadge projection={findCombo(line)} filledCount={filledCount} loading={comboStatsLoading} failed={comboStatsFailed} />
                               </div>
                               {isTeamCaptain && forwardLines.length > 1 && (
                                 <button
@@ -993,7 +934,7 @@ export function LineManager({
                             <div className="flex items-center justify-between mb-1.5">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-[11px] font-semibold text-muted-foreground shrink-0">Pair {idx + 1}</span>
-                                <ComboTrend combo={findCombo(line)} filledCount={filledCount} />
+                                <LineComboPredictionBadge projection={findCombo(line)} filledCount={filledCount} loading={comboStatsLoading} failed={comboStatsFailed} />
                               </div>
                               {isTeamCaptain && defensePairs.length > 1 && (
                                 <button

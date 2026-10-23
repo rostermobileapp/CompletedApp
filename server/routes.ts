@@ -48,6 +48,8 @@ import { db, pool } from "./db";
 import { gamePenalties } from "@shared/schema";
 import { dutyAssignments, dutyTemplates } from "@shared/schema";
 import { withBeverageDutyAssignments } from "@shared/beverageDutyCounts";
+import { buildLineComboStats, type ComboHistoryRow } from "@shared/lineComboPredictions";
+import { lineComboHistoryQuery } from "./lineComboPredictions";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
@@ -10462,6 +10464,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!isMember && !isCaptain && !isCreator && !isCommissioner) {
         return res.status(403).json({ message: 'Not a member of this team' });
+      }
+
+      // Versioned points model: old clients retain their existing goals-only contract.
+      if (req.query.model === "points-v1") {
+        const history = await db.execute(lineComboHistoryQuery(teamId));
+        return res.json(buildLineComboStats(history.rows as ComboHistoryRow[]));
       }
 
       // SQL: for each current template combo (sorted player-ID set), find historical
