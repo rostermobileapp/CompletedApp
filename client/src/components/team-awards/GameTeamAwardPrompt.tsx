@@ -44,6 +44,7 @@ export function GameTeamAwardPrompt({ teamIds, gameId }: { teamIds: string[]; ga
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['/api/teams', choice.teamId, 'awards'] }),
         qc.invalidateQueries({ queryKey: ['/api/team-awards/holders'] }),
+        qc.invalidateQueries({ queryKey: ['/api/team-awards/events/pending'] }),
       ]);
       toast({ title: result.changed ? 'Award passed on' : 'No change', description: result.changed ? 'The game’s award holder has been updated.' : 'That player already holds the award.' });
       setChoice(null);

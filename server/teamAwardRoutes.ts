@@ -44,7 +44,8 @@ function errorResponse(res: any, error: any) {
   const status = codes[error?.code] ?? 500;
   return res.status(status).json({ message: status === 500 ? "Unable to complete this award request. Please try again." : error.message });
 }
-export function registerTeamAwardRoutes(app: Express, auth: RequestHandler, clientFor = caller) {
+export function registerTeamAwardRoutes(app: Express, auth: RequestHandler, clientFor = caller,
+  notifyRecipient: (userId: string) => void = () => {}) {
   const route = (work: (req: any, res: any, client: SupabaseClient) => Promise<unknown>): RequestHandler =>
     async (req: any, res) => {
       // Demo replaces the app identity, not the bearer JWT. Never cross that boundary.
@@ -62,6 +63,22 @@ export function registerTeamAwardRoutes(app: Express, auth: RequestHandler, clie
   app.get("/api/team-awards/holders", auth, route(async (_req, res, client) => {
     const awards = await rpc(client, "team_award_holders");
     await signImages(client, awards); res.json(awards);
+  }));
+  app.get("/api/team-awards/events/pending", auth, route(async (_req, res, client) => {
+    try {
+      const events = await rpc(client, "team_award_pending_celebrations");
+      // Stored identity is awardId, while the signing boundary expects id.
+      const artwork = events.map((event: any) => ({ ...event, id: event.awardId }));
+      await signImages(client, artwork);
+      res.json({ events: events.map((event: any, index: number) => ({ ...event, imageUrl: artwork[index].imageUrl })) });
+    } catch (error) {
+      if (setupMissing(error)) return res.json({ events: [], setupRequired: true });
+      throw error;
+    }
+  }));
+  app.post("/api/team-awards/events/:eventId/acknowledge", auth, route(async (req, res, client) => {
+    await rpc(client, "team_award_acknowledge_celebration", { p_event: id.parse(req.params.eventId) });
+    res.json({ ok: true });
   }));
   app.get("/api/teams/:teamId/awards", auth, route(async (req, res, client) => {
     const bundle = await rpc(client, "team_award_list", { p_team: teamId.parse(req.params.teamId) });
@@ -87,10 +104,15 @@ export function registerTeamAwardRoutes(app: Express, auth: RequestHandler, clie
   }));
   app.post("/api/teams/:teamId/awards/:awardId/grants", auth, route(async (req, res, client) => {
     const body = z.object({ playerId: z.string().min(1).max(100), periodKey: z.string().min(1).max(100), reassign: z.boolean().default(false) }).strict().parse(req.body);
-    res.json(await rpc(client, "team_award_grant", {
+    const result = await rpc(client, "team_award_grant", {
       p_team: teamId.parse(req.params.teamId), p_id: id.parse(req.params.awardId),
       p_player: body.playerId, p_period: body.periodKey, p_reassign: body.reassign,
-    }));
+    });
+    if (result.changed) {
+      try { notifyRecipient(body.playerId); }
+      catch { console.error("[TeamAwards] Live refresh unavailable; recognition remains queued."); }
+    }
+    res.json(result);
   }));
   app.post("/api/teams/:teamId/awards/:awardId/image", auth, route(async (req, res, client) => {
     const t = teamId.parse(req.params.teamId), a = id.parse(req.params.awardId);

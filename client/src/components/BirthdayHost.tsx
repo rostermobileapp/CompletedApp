@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDemo } from "@/context/DemoContext";
 import { BirthdayConfettiOverlay } from "./BirthdayConfettiOverlay";
 import { shouldShowBirthdayGreeting, type BirthdayStatus } from "./birthdayVisibility";
+import { useTeamAwardCelebrations } from "./team-awards/useTeamAwardCelebrations";
 
 export function BirthdayHost() {
   const { user } = useAuth();
@@ -32,6 +33,8 @@ export function BirthdayHost() {
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
+  const { data: pendingTeamAwards, isError: teamAwardCheckFailed } =
+    useTeamAwardCelebrations(user?.id, !demoActive && !!status?.eligible);
 
   useEffect(() => {
     if (!user || demoActive) return;
@@ -67,6 +70,8 @@ export function BirthdayHost() {
   }, []);
 
   const open = !!user && !demoActive && !triviaOpen
+    && (teamAwardCheckFailed || !!pendingTeamAwards)
+    && !pendingTeamAwards?.events.length
     && (badgeCheckFailed || Array.isArray(pendingBadges))
     && shouldShowBirthdayGreeting(status, now, badgeCheckFailed ? [] : pendingBadges);
   async function dismiss() {

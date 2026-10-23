@@ -39,6 +39,12 @@ Custom team awards are transferable current-holder recognition, not permanent Tr
 
 **How to apply:** Do not convert custom grants into permanent patch unlocks or introduce a paid-tier requirement without a new product decision.
 
+Recipients should get a current-screen celebration like earning a patch when awarded a custom team award.
+
+**Why:** The user explicitly asked for an on-screen award celebration “like when a patch is earned.”
+
+**How to apply:** Reuse patch celebration presentation/confetti while keeping custom recognition independent of permanent patches. Preserve transparent artwork and avoid stacking celebrations or replaying historical awards on rollout.
+
 Preserved award history includes earlier holders within the same period, not only the latest recipient for each period.
 
 **Why:** Updating the authoritative period record on reassignment would otherwise erase a valid recognition; historical recipients, captains and timestamps must remain visible after archiving.

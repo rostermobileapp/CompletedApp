@@ -32,3 +32,14 @@ export interface SaveTeamAward {
   id?: string; name: string; description: string; cadence: AwardCadence; presetIcon: AwardPreset;
   removeImage?: boolean;
 }
+
+/** A recipient-only, unacknowledged recognition event, not a permanent patch. */
+export interface TeamAwardCelebration {
+  id: string; teamId: string; teamName: string; awardId: string; name: string;
+  description: string; presetIcon: AwardPreset; imageUrl: string | null;
+  imageVersion: string; grantedAt: string; grantedByName: string;
+}
+export interface TeamAwardCelebrations {
+  events: TeamAwardCelebration[];
+  setupRequired?: boolean;
+}

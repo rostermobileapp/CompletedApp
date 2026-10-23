@@ -49,6 +49,7 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
       qc.invalidateQueries({ queryKey: ['/api/teams'] }),
       qc.invalidateQueries({ queryKey: ['/api/team-awards/holders'] }),
       qc.invalidateQueries({ queryKey: bundleKey(teamId) }),
+      qc.invalidateQueries({ queryKey: ['/api/team-awards/events/pending'] }),
     ]);
   };
   const mutation = useMutation({

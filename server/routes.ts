@@ -1146,7 +1146,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── Badge catalog, trophy case, and scoped award APIs ───────────────────
   const badgeAdmin = requireSpecialPermission('admin');
   const currentUserId = (req: any) => req.user?.claims?.sub as string;
-  registerTeamAwardRoutes(app, isAuthenticated);
+  registerTeamAwardRoutes(app, isAuthenticated, undefined,
+    userId => { broadcastToUser(userId, { type: "team_award_earned" }); });
   const canAwardInScope = async (actorId: string, category: string, scope: any) => {
     const actor = await storage.getUser(actorId);
     if (actor?.isPrimaryCommissioner || actor?.specialPermissions?.includes('admin')) return true;

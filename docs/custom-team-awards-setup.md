@@ -12,9 +12,10 @@ An authorized operator must review and apply the following to the intended Supab
 
 1. Apply `migrations/0044_custom_team_awards.sql` once. It creates the tables, RLS, validating RPCs, grant constraints, roster-removal triggers, persistent push outbox and configurable limits. It does not alter existing teams or badges, or enable the feature.
 2. Apply `migrations/0044_custom_team_award_storage.sql` once in Supabase. This creates a private `team-award-images` bucket and JWT-scoped object policies. These are manual migrations, not startup DDL; do not substitute `db:push`, which does not install the security functions/policies.
-3. Confirm the existing app's Supabase URL and anonymous key target that same project. The Express award endpoints forward each caller's JWT to RPC/Storage instead of using the service role. Existing OneSignal configuration supplies push delivery.
-4. Reload the Supabase API schema cache after installation if needed (`NOTIFY pgrst, 'reload schema';`).
-5. After verifying RLS and the flows below, explicitly enable the feature with `UPDATE public.team_award_config SET enabled = true WHERE id = true;`. Setting it false disables access and stops the push worker from claiming new notifications.
+3. Apply `migrations/0045_team_award_celebrations.sql` once to enable recipient-only on-screen celebrations. It marks existing recognition as historical (no mass replay), then leaves new recognition pending until acknowledged. It does not require an Edge Function, provider account or secret.
+4. Confirm the existing app's Supabase URL and anonymous key target that same project. The Express award endpoints forward each caller's JWT to RPC/Storage instead of using the service role. Existing OneSignal configuration supplies push delivery.
+5. Reload the Supabase API schema cache after installation if needed (`NOTIFY pgrst, 'reload schema';`).
+6. After verifying RLS and the flows below, explicitly enable the feature with `UPDATE public.team_award_config SET enabled = true WHERE id = true;`. Setting it false disables access and stops the push worker from claiming new notifications.
 
 No new environment variables, background-removal provider, or Edge Function are needed. Image upload saves the selected image as a bounded PNG without removing its background. The active award limit is configurable in the singleton config row (default 5).
 
@@ -37,6 +38,16 @@ Background removal has been retired. An operator may delete any previously deplo
 Grant/reassignment and a fresh push-outbox row commit together. No-op reassignment creates no additional push, and a later reassignment discards older unsent revisions. The worker checks that the recipient is still the current rostered holder before attempting delivery.
 
 Delivery uses each outbox UUID as the stable OneSignal idempotency key. A successful send is recorded persistently; unconfirmed sends may retry with the same key. Attempts are bounded to six within one day, safely inside OneSignal's retention window. If the recipient has no push subscription or disabled pushes, the award still saves; no delivery is falsely recorded. Clicking the push opens My Team with an authorized team selector hint.
+
+## On-screen award celebrations
+
+New recognition events appear to the recipient over their current screen using the patch celebration styling and confetti, without granting a permanent patch or requiring a paid subscription. Uploaded art stays transparent and uncropped. The user can dismiss or acknowledge and open My Team for the corresponding team.
+
+The global earned-event host gives patches priority and shows only one patch/team-award celebration at a time. Trivia pauses the host, and birthday greetings defer while award celebrations are pending. Live grant messages refresh the recipient's queue; visible-page polling, reconnect, focus and page-show refresh cover missed messages and offline returns.
+
+A caller-scoped Supabase RPC returns at most 20 pending events for the signed-in recipient, only while the award is unarchived, the grant is still the current valid holder revision, and the recipient is still rostered. A separate recipient-only acknowledgement persists across sessions/devices and does not affect push state or recognition history. Failed acknowledgements keep the card open with retry controls.
+
+Until the celebration migration is installed, the pending API explicitly returns `setupRequired: true` and no celebration, without disabling ordinary awards. The migration is prepared in the repo, not automatically applied to hosted Supabase.
 
 ## Repeatable local checks
 
@@ -61,9 +72,12 @@ npx tsx scripts/team-awards-browser-fixture.ts
 # separately, a tracked temporary Chromium process:
 chromium --headless --no-sandbox --disable-dev-shm-usage --remote-debugging-port=9222 --user-data-dir=/tmp/award-fixture-chromium about:blank
 node scripts/test-team-awards-browser.mjs
+node scripts/test-team-award-celebrations-browser.mjs
 ```
 
 Stop both temporary processes after verification. These checks cover mobile/desktop setup, create/edit, image upload/save without background-removal controls or requests, self-grant, reassignment confirmation, history retention, holder refresh/overflow and noncaptain controls.
+
+The celebration checks cover live refresh, transparency, keyboard focus, trivia suspension, persistent acknowledgement/retry, queued awards, patch priority, return/resume refresh, account-switch isolation, team navigation, phone/desktop fit and reduced motion. Fixture confetti deliberately uses an unavailable video to verify the card-only fallback; actual confetti uses the same established media as patches.
 
 ## Still requires external verification
 

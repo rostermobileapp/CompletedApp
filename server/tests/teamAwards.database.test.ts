@@ -205,6 +205,56 @@ test("team awards isolated database behavior", async t => {
       await assert.rejects(actor(player,tx => tx`INSERT INTO storage.objects(bucket_id,name) VALUES('team-award-images',${path})`),/row-level security/);
       await assert.rejects(actor(captain,tx => tx`INSERT INTO storage.objects(bucket_id,name) VALUES('team-award-images','team-b/bogus.png')`),/row-level security/);
     });
+    await t.test("recipient celebrations persist independently, skip history, and reject stale or foreign recognition",async () => {
+      const [a]=await db`SELECT id FROM team_awards WHERE NOT archived LIMIT 1`;
+      const [w]=await db`SELECT team_award_window('team-a','week')->>'periodKey' AS key`;
+      const grant=(recipient:string)=>actor(captain,tx=>tx`SELECT team_award_grant('team-a',${a.id},${recipient},${w.key},true)`);
+      await grant(player);
+      const migration=await db.reserve();
+      try { await migration.unsafe(await readFile("migrations/0045_team_award_celebrations.sql","utf8")); }
+      catch(error) { await migration.unsafe("ROLLBACK");throw error; }
+      finally { migration.release(); }
+      const pending=(who:string):Promise<any[]>=>actor(who,async tx=>(await tx`SELECT team_award_pending_celebrations() AS events`)[0].events);
+      assert.deepEqual(await pending(player),[],"Installing does not replay historical recognition");
+      await grant(captain);
+      let events=await pending(captain);
+      assert.equal(events.length,1);
+      assert.equal(events[0].awardId,a.id);
+      assert.equal(events[0].teamName,"Ice Owls");
+      assert.equal(events[0].grantedByName,"Captain One");
+      assert.deepEqual(await pending(player),[]);
+      assert.deepEqual(await pending(stranger),[]);
+      await assert.rejects(actor(stranger,tx=>tx`SELECT team_award_acknowledge_celebration(${events[0].id})`),/not found/);
+      await assert.rejects(actor(captain,tx=>tx`UPDATE award_grant_events SET celebration_acknowledged_at=now()`),/permission denied/);
+      await assert.rejects(db.begin(async tx=>{
+        await tx.unsafe("SET LOCAL ROLE anon");return tx`SELECT team_award_pending_celebrations()`;
+      }),/permission denied/);
+      await grant(captain);
+      assert.equal((await pending(captain)).length,1,"No-op reassignment never repeats recognition");
+      const eventId=events[0].id;
+      const [pushBefore]=await db`SELECT count(*)::int AS n FROM team_award_pushes`;
+      await actor(captain,tx=>tx`SELECT team_award_acknowledge_celebration(${eventId})`);
+      await actor(captain,tx=>tx`SELECT team_award_acknowledge_celebration(${eventId})`);
+      assert.deepEqual(await pending(captain),[],"Ack persists across fresh caller transactions and can be retried");
+      const [pushAfter]=await db`SELECT count(*)::int AS n FROM team_award_pushes`;
+      assert.equal(pushAfter.n,pushBefore.n,"Celebration acknowledgement never changes push delivery");
+      await grant(player);
+      assert.equal((await pending(player)).length,1);
+      await grant(captain);
+      assert.deepEqual(await pending(player),[],"A previous holder cannot celebrate a replaced grant");
+      assert.equal((await pending(captain)).length,1);
+      await db`UPDATE team_award_config SET enabled=false`;
+      assert.deepEqual(await pending(captain),[]);
+      await db`UPDATE team_award_config SET enabled=true`;
+      await db`DELETE FROM team_memberships WHERE id='m1'`;
+      assert.deepEqual(await pending(captain),[],"Roster removal cancels pending celebration eligibility");
+      await db`INSERT INTO team_memberships VALUES('m1','team-a',${captain},'approved',true)`;
+      assert.deepEqual(await pending(captain),[],"Rejoining does not restore invalidated recognition");
+      await grant(player);
+      assert.equal((await pending(player)).length,1);
+      await actor(captain,tx=>tx`SELECT team_award_archive('team-a',${a.id})`);
+      assert.deepEqual(await pending(player),[],"Archived awards never interrupt a recipient");
+    });
     await t.test("background quota is atomic and restricted to service-only authorized reservations",async () => {
       const [a] = await db`SELECT id FROM team_awards WHERE NOT archived LIMIT 1`;
       await assert.rejects(actor(captain,tx => tx`SELECT team_award_reserve_removal('team-a',${a.id},${captain})`),/permission denied/);

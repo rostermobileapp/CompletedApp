@@ -5,6 +5,9 @@ import { Lock, X } from "lucide-react";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useWebSocket } from "@/context/WebSocketContext";
 import confettiVideo from "@/assets/badge-confetti.webm";
+import { TeamAwardEarnedAnnouncement } from "./team-awards/TeamAwardEarnedAnnouncement";
+import { teamAwardCelebrationKey, useTeamAwardCelebrations } from "./team-awards/useTeamAwardCelebrations";
+import type { TeamAwardCelebrations } from "@shared/teamAwards";
 
 type EarnedEvent = {
   id?: string;
@@ -150,6 +153,12 @@ export function BadgeEarnedHost() {
   const queryClient = useQueryClient();
   const [queue, setQueue] = useState<EarnedEvent[]>([]);
   const [triviaOpen, setTriviaOpen] = useState(false);
+  const { data: user } = useQuery<{ id: string }>({ queryKey: ["/api/user"] });
+  const { data: awardPending } = useTeamAwardCelebrations(user?.id);
+  const [awardBusy, setAwardBusy] = useState(false);
+  const awardBusyRef = useRef(false);
+  const [awardError, setAwardError] = useState("");
+  const currentAward = user ? awardPending?.events[0] : undefined;
   const current = queue[0];
   const { data: pending } = useQuery<EarnedEvent[]>({
     queryKey: ["/api/badges/events/pending"],
@@ -161,6 +170,27 @@ export function BadgeEarnedHost() {
   useEffect(() => {
     if (pending) setQueue(pending);
   }, [pending]);
+
+  useEffect(() => { setAwardError(""); }, [currentAward?.id, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: teamAwardCelebrationKey(user.id), exact: true });
+    };
+    const visible = () => { if (!document.hidden) refresh(); };
+    const unsubscribe = subscribe("team_award_earned", refresh);
+    const disconnect = onConnected(refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      unsubscribe(); disconnect();
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [user?.id, subscribe, onConnected, queryClient]);
 
   useEffect(() => subscribe("badge_earned", () => {
     // The server validates current thresholds before returning an event.
@@ -187,7 +217,38 @@ export function BadgeEarnedHost() {
     return () => window.removeEventListener("roster:trivia-modal", onTriviaModal);
   }, [queryClient]);
 
-  if (!current || triviaOpen) return null;
+  if (triviaOpen) return null;
+  if (!current && currentAward && user) {
+    const dismissAward = async (viewTeam = false) => {
+      if (awardBusyRef.current) return;
+      awardBusyRef.current = true;
+      setAwardBusy(true); setAwardError("");
+      const key = teamAwardCelebrationKey(user.id);
+      try {
+        await queryClient.cancelQueries({ queryKey: key, exact: true });
+        await apiRequest("POST", `/api/team-awards/events/${currentAward.id}/acknowledge`);
+        queryClient.setQueryData<TeamAwardCelebrations>(key, old => old
+          ? { ...old, events: old.events.filter(event => event.id !== currentAward.id) } : old);
+        void queryClient.invalidateQueries({ queryKey: key, exact: true });
+        if (viewTeam) navigate(`/teams?awardTeam=${encodeURIComponent(currentAward.teamId)}`);
+      } catch {
+        setAwardError("Your celebration could not be dismissed. Please try again.");
+      } finally {
+        awardBusyRef.current = false;
+        setAwardBusy(false);
+      }
+    };
+    return <TeamAwardEarnedAnnouncement
+      key={`${user.id}:${currentAward.id}`}
+      award={currentAward}
+      busy={awardBusy}
+      error={awardError}
+      onDismiss={() => dismissAward()}
+      onViewTeam={() => dismissAward(true)}
+      confetti={<BadgeConfettiOverlay />}
+    />;
+  }
+  if (!current) return null;
   const payload = current.payload || current.badge || {};
   const badgeDefinition = current.badge || current.definition || {};
   const badge = payload.imagePath

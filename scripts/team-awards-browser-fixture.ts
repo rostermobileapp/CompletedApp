@@ -16,12 +16,20 @@ const bundle: TeamAwardsBundle = {
 };
 const requests: any[]=[];
 let configError=false, configDelay=0, enabled=true;
+let celebrations:any[]=[], patchEvents:any[]=[], ackError=false, ackDelay=0;
+let viewerId="captain";
 const state = `
 import React from 'react';import {QueryClient} from '@tanstack/react-query';
-export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false}}});
+export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false,queryFn:async({queryKey})=>{const r=await fetch(queryKey[0]);if(!r.ok)throw new Error('Fixture request failed');return r.json()}}}});
 export async function apiRequest(method,url,data){const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},...(data?{body:JSON.stringify(data)}:{})});if(!r.ok){const d=await r.json();throw new Error(d.message)}return r}
 export function useToast(){return {toast:(d)=>{document.getElementById('notice').textContent=d.description||d.title}}}
 export function useAuth(){return {user:{id:'captain'},isAuthenticated:true,isLoading:false}}
+export function getImageUrl(path){return path||undefined}
+const eventListeners=new Map();
+const subscribe=(type,handler)=>{if(!eventListeners.has(type))eventListeners.set(type,new Set());eventListeners.get(type).add(handler);return()=>eventListeners.get(type).delete(handler)};
+const onConnected=()=>()=>{};
+export function useWebSocket(){return {subscribe,onConnected}}
+window.fixtureEmit=type=>eventListeners.get(type)?.forEach(handler=>handler({type}));
 `;
 const built=await build({
   stdin:{contents:`
@@ -30,12 +38,15 @@ const built=await build({
     import {TeamAwardsSection} from './client/src/components/team-awards/TeamAwardsSection';
     import {TeamAwardHolderStrip,PlayerAwardBadges,useTeamAwardHolders} from './client/src/components/team-awards/TeamAwardHolders';
     import {GameTeamAwardPrompt} from './client/src/components/team-awards/GameTeamAwardPrompt';
+    import {BadgeEarnedHost} from './client/src/components/BadgeEarnedHost';
+    const celebrationFixture=window.location.pathname.startsWith('/celebrations');
     window.fixtureQueryClient=queryClient;
     function App(){
       const h=useTeamAwardHolders();
       const[teamId,setTeamId]=React.useState('team-a');
       window.fixtureSetTeamId=setTeamId;
       return <main className="mx-auto max-w-3xl space-y-6 p-4">
+        {celebrationFixture&&<BadgeEarnedHost/>}
         <header className="flex justify-between"><h1 className="text-2xl font-bold">My Team</h1><TeamAwardHolderStrip playerId="captain"/></header>
         <div id="notice" role="status"/>
         <TeamAwardsSection key={teamId} teamId={teamId}/>
@@ -47,8 +58,10 @@ const built=await build({
   `,resolveDir:process.cwd(),loader:"tsx"},
   bundle:true,write:false,format:"esm",jsx:"automatic",
   plugins:[{name:"fixture",setup(b){
-    b.onResolve({filter:/^(fixture-state|@\/lib\/queryClient|@\/hooks\/use-toast|@\/hooks\/useAuth)$/},()=>({path:"state",namespace:"fixture"}));
+    b.onResolve({filter:/^(fixture-state|@\/lib\/queryClient|@\/hooks\/use-toast|@\/hooks\/useAuth|@\/context\/WebSocketContext)$/},()=>({path:"state",namespace:"fixture"}));
     b.onLoad({filter:/.*/,namespace:"fixture"},()=>({contents:state,loader:"tsx",resolveDir:process.cwd()}));
+    b.onResolve({filter:/\.webm$/},()=>({path:"confetti",namespace:"fixture-video"}));
+    b.onLoad({filter:/.*/,namespace:"fixture-video"},()=>({contents:'export default "data:video/webm;base64,";',loader:"js"}));
   }}],
 });
 const css=await postcss([tailwindcss("./tailwind.config.ts")]).process(await readFile("client/src/index.css","utf8"),{from:"client/src/index.css"});
@@ -66,7 +79,15 @@ createServer(async(req,res)=>{
   let raw="";for await(const chunk of req)raw+=chunk;
   const data=raw?JSON.parse(raw):{};
   const respond=(body:any,status=200)=>{res.statusCode=status;res.end(JSON.stringify(body));};
-  if(path==="/__reset"){bundle.awards=[];bundle.canManage=true;configError=false;configDelay=0;enabled=true;requests.length=0;return respond({ok:true});}
+  if(path==="/__reset"){bundle.awards=[];bundle.canManage=true;configError=false;configDelay=0;enabled=true;requests.length=0;celebrations=[];patchEvents=[];ackError=false;ackDelay=0;viewerId="captain";return respond({ok:true});}
+  if(path==="/__celebrations"){
+    if(data.events!==undefined)celebrations=data.events;
+    if(data.patches!==undefined)patchEvents=data.patches;
+    if(data.ackError!==undefined)ackError=data.ackError;
+    if(data.ackDelay!==undefined)ackDelay=data.ackDelay;
+    if(data.viewerId!==undefined)viewerId=data.viewerId;
+    return respond({ok:true});
+  }
   if(path==="/__requests")return respond(requests);
   if(path==="/__mode"){if(data.captain!==undefined)bundle.canManage=data.captain;if(data.configError!==undefined)configError=data.configError;if(data.configDelay!==undefined)configDelay=data.configDelay;if(data.enabled!==undefined)enabled=data.enabled;return respond({ok:true});}
   if(path==="/__seed"){
@@ -75,6 +96,17 @@ createServer(async(req,res)=>{
     return respond({ok:true});
   }
   requests.push({path,method:req.method,data});
+  if(path==="/api/user")return respond({id:viewerId});
+  if(path==="/api/team-awards/events/pending")return respond({events:celebrations.filter(e=>!e.recipientId||e.recipientId===viewerId)});
+  const ack=path.match(/^\/api\/team-awards\/events\/([^/]+)\/acknowledge$/);
+  if(ack){
+    if(ackDelay)await new Promise(resolve=>setTimeout(resolve,ackDelay));
+    if(ackError)return respond({message:"Fixture acknowledgement unavailable"},503);
+    celebrations=celebrations.filter(e=>e.id!==ack[1]);return respond({ok:true});
+  }
+  if(path==="/api/badges/events/pending")return respond(patchEvents);
+  const patchAck=path.match(/^\/api\/badges\/events\/([^/]+)\/acknowledge$/);
+  if(patchAck){patchEvents=patchEvents.filter(e=>e.id!==patchAck[1]);return respond({ok:true});}
   if(path==="/api/team-awards/config"){
     if(configDelay)await new Promise(resolve=>setTimeout(resolve,configDelay));
     return configError?respond({message:"Fixture config unavailable"},503):respond({enabled});
