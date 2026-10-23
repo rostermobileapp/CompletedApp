@@ -653,7 +653,7 @@ export function LineManager({
     <>
       <Card className="rounded-lg hairline elev-rest text-card-foreground bg-[#e2e2e2] dark:bg-[#212121] mt-[4px] mb-[4px]">
         {/* ── Header ── */}
-        <CardHeader className="flex flex-col space-y-1.5 p-6 pl-[12px] pr-[12px] pt-[8px] pb-[4px]">
+        <CardHeader className="flex flex-col space-y-1.5 p-6 pl-[12px] pr-[12px] pt-[2px] pb-[2px]">
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5 shrink-0" />
 
