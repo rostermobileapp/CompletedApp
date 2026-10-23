@@ -13,6 +13,10 @@ async function ev(expression){const r=await send("Runtime.evaluate",{expression,
 async function wait(expression){const end=Date.now()+10000;while(Date.now()<end){if(await ev(expression))return;await new Promise(r=>setTimeout(r,40));}throw new Error(`Timeout: ${expression}\n${await ev("document.body.innerText")}`);}
 const click=text=>ev(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)});if(!b)throw new Error('Button missing: '+${JSON.stringify(text)});b.click()})()`);
 const fill=(selector,value)=>ev(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})()`);
+async function assertFrameless(selector) {
+  const result=await ev(`(()=>{const img=document.querySelector(${JSON.stringify(selector)});if(!img)throw new Error('Artwork missing');const s=getComputedStyle(img.parentElement);return {background:s.backgroundColor,border:s.borderTopWidth,shadow:s.boxShadow,radius:s.borderTopLeftRadius,overflow:s.overflow,fit:getComputedStyle(img).objectFit};})()`);
+  assert.deepEqual(result,{background:"rgba(0, 0, 0, 0)",border:"0px",shadow:"none",radius:"0px",overflow:"visible",fit:"contain"});
+}
 const disclosure = `[...document.querySelectorAll('button[aria-expanded]')].find(b=>b.textContent.trim()==='Custom Team Awards')`;
 const toggle = () => ev(`${disclosure}.click()`);
 const press = async (key,code,n) => {
@@ -56,12 +60,17 @@ try {
   await wait(`document.querySelector('[role=dialog]')?.innerText.includes('Saved. Choose Done')`);
   assert.equal(await ev(`!!document.querySelector('input[type=file]')`),true);
   pass("create persists and reveals optional image setup without leaving My Team");
-  const png=await new Jimp({width:32,height:32,color:0x22aaffff}).getBuffer("image/png");
+  const transparentArtwork=new Jimp({width:512,height:256,color:0x00000000});
+  transparentArtwork.scan(128,64,128,128,function(x,y){this.setPixelColor(0x22aaffff,x,y);});
+  transparentArtwork.scan(320,64,64,128,function(x,y){this.setPixelColor(0x22aaff80,x,y);});
+  const png=await transparentArtwork.getBuffer("image/png");
   await writeFile("/tmp/team-award-fixture.png",png);
   const {root}=await send("DOM.getDocument");
   const input=await send("DOM.querySelector",{nodeId:root.nodeId,selector:"input[type=file]"});
   await send("DOM.setFileInputFiles",{nodeId:input.nodeId,files:["/tmp/team-award-fixture.png"]});
   await wait(`!!document.querySelector('img[alt="Award image preview"]')`);
+  await assertFrameless('img[alt="Award image preview"]');
+  pass("transparent image preview has no background, border, shadow or rounded clipping");
    assert.equal(await ev(`/Remove background|Use original|Use edited image|Background cleanup/.test(document.querySelector('[role=dialog]').innerText)`),false);
    pass("award image editor has no background removal controls or provider instructions");
   await click("Save image");await wait(`document.body.innerText.includes('Image saved to this award')`);
@@ -69,10 +78,20 @@ try {
   const imageCalls=(await(await fetch("http://127.0.0.1:3001/__requests")).json()).filter(r=>r.path.endsWith("/image"));
    assert.equal(imageCalls.length,1);
    assert.equal(imageCalls[0].data.image,await ev(`document.querySelector('img[alt="Award image preview"]').src.split(',')[1]`));
+  const savedPng=await Jimp.read(Buffer.from(imageCalls[0].data.image,"base64"));
+  assert.equal(savedPng.width,256);assert.equal(savedPng.height,128);
+  assert.equal(savedPng.getPixelColor(0,0)&255,0);
+  assert.equal(savedPng.getPixelColor(96,64),0x22aaffff);
+  assert.equal(savedPng.getPixelColor(176,64)&255,128);
+  pass("browser upload and saved PNG preserve transparent and translucent alpha after resizing");
    assert.equal((await(await fetch("http://127.0.0.1:3001/__requests")).json()).some(r=>r.path.endsWith("/remove-background")),false);
    pass("save sends exactly the previewed image and makes no background removal requests");
   await click("Done");await wait(`!document.querySelector('[role=dialog]')`);
+  await assertFrameless('article img');
+  await assertFrameless('[aria-label="Game award prompts"] img');
   await click("Edit");await wait(`!!document.querySelector('#award-name')`);
+  await assertFrameless('img[alt="Current award artwork"]');
+  pass("saved artwork stays unframed in award rows and on reopening the editor");
   await fill("#award-name","Locker Spark");await click("Save changes");
   await wait(`document.querySelector('[role=dialog]')?.innerText.includes('Saved. Choose Done')`);
   await click("Done");await wait(`document.querySelector('article')?.innerText.includes('Locker Spark')`);
@@ -85,6 +104,17 @@ try {
   await wait(`!!document.querySelector('[aria-label="Your team awards"] button')`);
   assert.ok(await ev(`document.querySelector('[aria-label="Roster"]').innerText.includes('captain')`));
   pass("self-grant updates current holder and Home icons without restart");
+  await assertFrameless('[aria-label="Your team awards"] img');
+  await assertFrameless('[aria-label="Roster"] img');
+  await ev(`document.querySelector('[aria-label="Your team awards"] button').click()`);
+  await wait(`!!document.querySelector('[role=dialog] li img')`);
+  await assertFrameless('[role=dialog] li img');
+  await click("Close");
+  await ev(`document.querySelector('[aria-label="Roster"] button').click()`);
+  await wait(`!!document.querySelector('[role=dialog] li img')`);
+  await assertFrameless('[role=dialog] li img');
+  await click("Close");
+  pass("Home, roster and both holder dialogs display artwork without an added tile or frame");
   await click("Award");await wait(`!!document.querySelector('[role=dialog] input[type=checkbox]')`);
   await fill("[role=dialog] select","player");
   assert.equal(await ev(`[...document.querySelectorAll('[role=dialog] button')].find(b=>b.textContent.trim()==='Grant award').disabled`),true);

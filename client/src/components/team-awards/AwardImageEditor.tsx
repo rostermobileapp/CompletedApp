@@ -45,7 +45,7 @@ export function AwardImageEditor({ teamId, awardId, imageUrl, onSaved, onError, 
   }
   return <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
     <div className="flex items-center gap-3">
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background ring-1 ring-border/70">
+      <div className={`flex h-16 w-16 shrink-0 items-center justify-center ${image || imageUrl ? 'bg-transparent' : 'overflow-hidden rounded-xl bg-background ring-1 ring-border/70'}`}>
         {image ? <img src={`data:image/png;base64,${image}`} alt="Award image preview" className="h-full w-full object-contain" />
           : imageUrl ? <img src={imageUrl} alt="Current award artwork" className="h-full w-full object-contain" /> : <ImagePlus className="h-6 w-6 text-muted-foreground" />}
       </div>

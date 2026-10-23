@@ -56,7 +56,7 @@ export function GameTeamAwardPrompt({ teamIds, gameId }: { teamIds: string[]; ga
       <div className="mb-3 flex items-center gap-2"><Trophy className="h-4 w-4 text-primary" /><h2 className="font-semibold">Team award moments</h2></div>
       <div className="grid gap-2 sm:grid-cols-2">{promptAwards.map(({ teamId, award, canManage }) => {
         return <article key={`${teamId}-${award.id}`} className="flex items-center gap-3 rounded-lg bg-background/80 p-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-primary"><AwardMark imageUrl={award.imageUrl} presetIcon={award.presetIcon} /></span>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center text-primary ${award.imageUrl ? 'bg-transparent' : 'overflow-hidden rounded-lg bg-primary/10'}`}><AwardMark imageUrl={award.imageUrl} presetIcon={award.presetIcon} /></span>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{award.name}</p><p className="truncate text-xs text-muted-foreground">{getAwardHolderLabel(award.holder?.name)}</p></div>
           {canManage && <Button size="sm" variant="outline" onClick={() => { setChoice({ teamId, award, roster: promptAwards.find((x) => x.teamId === teamId)?.roster ?? [] }); setSelectedPlayer(''); setReassign(false); }}>Choose holder</Button>}
         </article>;

@@ -21,6 +21,12 @@ Do not offer background removal for custom team award artwork.
 
 **How to apply:** Keep ordinary image upload/save, including already-transparent PNGs, without adding a background-removal provider or requiring provider credentials. Do not reintroduce the feature unless requested.
 
+Uploaded award artwork must display without an added frame or background, preserving PNG transparency.
+
+**Why:** The user explicitly requires background-free uploaded PNGs to show through naturally, rather than appearing on an app-generated tile.
+
+**How to apply:** Preserve alpha through resizing/saving, fit the full image without clipping, and omit decorative backgrounds/borders/shadows behind uploaded art in previews, award lists and holder displays. Preset icons can retain their styled tiles.
+
 The entire My Team Custom Team Awards section must start minimized and expand only on an explicit click.
 
 **Why:** The user said the always-expanded section was "WAY TOO BIG" and requested a minimized dropdown for the entire section, not merely the award list.

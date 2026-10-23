@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AwardPreset } from '@shared/teamAwards';
 import { awardIcons } from './icons';
 
-export function AwardMark({ imageUrl, presetIcon, className = 'h-full w-full object-cover', iconClassName = 'h-5 w-5' }: {
+export function AwardMark({ imageUrl, presetIcon, className = 'h-full w-full object-contain', iconClassName = 'h-5 w-5' }: {
   imageUrl?: string | null;
   presetIcon: AwardPreset;
   className?: string;
