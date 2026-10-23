@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ChevronDown, Clock3, History, Plus, Trophy, Users } from 'lucide-react';
+import { Archive, ChevronDown, Clock3, History, Pencil, Plus, Settings2, Trophy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -30,6 +30,7 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
   const [creating, setCreating] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [timezone, setTimezone] = useState('');
+  const [timezoneOpen, setTimezoneOpen] = useState(false);
   const [grantAward, setGrantAward] = useState<TeamAward | null>(null);
   const [grantPlayer, setGrantPlayer] = useState('');
   const [reassign, setReassign] = useState(false);
@@ -82,7 +83,7 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
   return (
     <section aria-label="Custom team awards">
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
+          <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
           <CardHeader className="p-0">
             <CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5 pt-[2px] pb-[2px]">
               <span className="text-sm font-semibold">Custom Team Awards</span>
@@ -90,34 +91,26 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
             </CollapsibleTrigger>
           </CardHeader>
           <CollapsibleContent>
-            <CardContent className="space-y-4 border-t border-border/60 p-4 sm:p-5">
+            <CardContent className="space-y-2.5 border-t border-border/60 p-3 sm:p-4">
               {config.isLoading && <div aria-label="Loading award settings" className="space-y-2 animate-pulse"><div className="h-4 w-48 rounded bg-muted" /><div className="h-14 rounded-xl bg-muted" /></div>}
               {config.isError && <ErrorLine message="Award settings could not be loaded." retry={() => void config.refetch()} />}
-              {config.data?.enabled && config.data.setupRequired && !bundle.data && !bundle.isError && <div className="flex items-start gap-3 rounded-xl border border-dashed border-border p-4"><Clock3 className="mt-0.5 h-5 w-5 text-muted-foreground" /><div><p className="font-medium">Team awards are getting set up</p><p className="text-sm text-muted-foreground">They’ll be ready here once this team’s award setup is complete.</p></div></div>}
+              {config.data?.enabled && config.data.setupRequired && !bundle.data && !bundle.isError && <div className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2"><Clock3 className="h-4 w-4 shrink-0 text-muted-foreground" /><p className="text-sm text-muted-foreground">Team award setup is in progress.</p></div>}
               {config.data?.enabled && (!config.data.setupRequired || !!bundle.data || bundle.isError) && <>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">Little traditions, made by your team.</p>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowArchived((v) => !v)}><History className="mr-1.5 h-4 w-4" />{showArchived ? 'Active awards' : 'History'}</Button>
-                    {bundle.data?.canManage && !showArchived && <Button size="sm" onClick={() => setCreating(true)} disabled={activeCount >= (bundle.data?.activeLimit ?? 5)}><Plus className="mr-1.5 h-4 w-4" />Create Award</Button>}
+                {bundle.data && <div className="flex min-h-10 items-center justify-between gap-1">
+                  <div className="min-w-0 text-xs text-muted-foreground" aria-label={`${activeCount} of ${bundle.data.activeLimit ?? 5} active awards`}>
+                    <span className="font-medium tabular-nums text-foreground">{activeCount}/{bundle.data.activeLimit ?? 5}</span><span> active</span>
                   </div>
-                </div>
-                {bundle.isLoading && <div className="space-y-2 animate-pulse"><div className="h-16 rounded-xl bg-muted" /><div className="h-16 rounded-xl bg-muted" /></div>}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {bundle.data.canManage && <Button className="h-10 w-10" variant="ghost" size="icon" onClick={() => setTimezoneOpen(true)} aria-label="Award timezone settings" title="Award timezone settings"><Settings2 className="h-4 w-4" /></Button>}
+                    <Button className="h-10 w-10" variant="ghost" size="icon" onClick={() => setShowArchived((v) => !v)} aria-label={showArchived ? 'Show active awards' : 'Show award history'} title={showArchived ? 'Show active awards' : 'Show award history'}><History className="h-4 w-4" /></Button>
+                    {bundle.data.canManage && !showArchived && <Button className="h-10 w-10" size="icon" onClick={() => setCreating(true)} disabled={activeCount >= (bundle.data?.activeLimit ?? 5)} aria-label="Create Award" title="Create Award"><Plus className="h-4 w-4" /></Button>}
+                  </div>
+                </div>}
+                {bundle.isLoading && <div aria-label="Loading awards" className="space-y-1.5 animate-pulse"><div className="h-12 rounded-lg bg-muted" /><div className="h-12 rounded-lg bg-muted" /></div>}
                 {bundle.isError && <ErrorLine message="Awards could not be loaded." retry={() => void bundle.refetch()} />}
                 {bundle.data && <>
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span>{activeCount} of {bundle.data.activeLimit ?? 5} active awards</span>
-              <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{bundle.data.roster.length} players</span>
-            </div>
-            {bundle.data.canManage && <div className="flex flex-wrap items-end gap-2 rounded-lg bg-muted/30 p-3">
-              <div className="min-w-[220px] flex-1"><Label htmlFor={`award-zone-${teamId}`} className="text-xs">Award timezone</Label>
-                <Input id={`award-zone-${teamId}`} list={`award-zones-${teamId}`} value={timezone || bundle.data.timezone} onChange={(e) => setTimezone(e.target.value)} className="mt-1 h-9" placeholder="America/New_York" />
-                <datalist id={`award-zones-${teamId}`}>{zones.map((zone) => <option key={zone} value={zone} />)}</datalist>
-              </div>
-              <Button size="sm" variant="outline" disabled={!timezone || timezone === bundle.data.timezone || mutation.isPending} onClick={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/award-settings`, data: { timezone } })}>Save timezone</Button>
-            </div>}
-            {!visibleAwards.length && <div className="rounded-xl border border-dashed border-border px-5 py-8 text-center"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-5 w-5" /></div><h3 className="font-semibold">{showArchived ? 'No awards in the archives' : 'Start a team tradition'}</h3><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{showArchived ? 'Archived awards will live here.' : 'Create a custom award and pass it around after games, weeks, months, or seasons.'}</p></div>}
-            <div className="grid gap-3">
+            {!visibleAwards.length && <div className="flex items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-4 w-4" /></div><div><h3 className="text-sm font-semibold">{showArchived ? 'No awards in the archives' : 'No awards yet'}</h3><p className="text-xs text-muted-foreground">{showArchived ? 'Archived awards will appear here.' : 'Create an award to start a team tradition.'}</p></div></div>}
+            <div className="grid gap-1.5">
               {visibleAwards.map((award) => <AwardRow key={award.id} award={award} canManage={bundle.data!.canManage} onEdit={() => setEditing(award)} onArchive={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/awards/${award.id}`, data: { archived: true } })} onGrant={() => { setGrantAward(award); setGrantPlayer(''); setReassign(false); }} />)}
             </div>
                 </>}
@@ -126,6 +119,13 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+      {timezoneOpen && bundle.data?.canManage && <Dialog open onOpenChange={setTimezoneOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-xl p-4 sm:p-5">
+          <DialogHeader><DialogTitle>Award timezone</DialogTitle><DialogDescription>Sets the timezone used for award periods. Current: {bundle.data.timezone}</DialogDescription></DialogHeader>
+          <div><Label htmlFor={`award-zone-${teamId}`}>Timezone</Label><Input id={`award-zone-${teamId}`} list={`award-zones-${teamId}`} value={timezone || bundle.data.timezone} onChange={(e) => setTimezone(e.target.value)} className="mt-1 h-10" placeholder="America/New_York" /><datalist id={`award-zones-${teamId}`}>{zones.map((zone) => <option key={zone} value={zone} />)}</datalist></div>
+          <div className="flex justify-end gap-2"><Button variant="ghost" className="min-h-10" onClick={() => setTimezoneOpen(false)}>Cancel</Button><Button className="min-h-10" disabled={!timezone || timezone === bundle.data.timezone || mutation.isPending} onClick={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/award-settings`, data: { timezone } })}>{mutation.isPending ? 'Saving…' : 'Save timezone'}</Button></div>
+        </DialogContent>
+      </Dialog>}
       {(creating || editing) && <AwardDialog teamId={teamId} award={editing} onClose={() => { setEditing(null); setCreating(false); }} onSave={save} onImageSaved={refresh} onError={(message) => toast({ title: 'Image update', description: message, variant: 'destructive' })} />}
       {grantAward && bundle.data && <Dialog open onOpenChange={(open) => { if (!open) setGrantAward(null); }}>
         <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl p-5 sm:p-6">
@@ -144,20 +144,31 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
 }
 
 function AwardRow({ award, canManage, onEdit, onArchive, onGrant }: { award: TeamAward; canManage: boolean; onEdit: () => void; onArchive: () => void; onGrant: () => void }) {
-    return <article className="flex flex-col gap-3 rounded-xl border border-border/70 p-3 sm:flex-row sm:items-center sm:p-4">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className={`flex h-12 w-12 shrink-0 items-center justify-center text-primary ${award.imageUrl ? 'bg-transparent' : 'overflow-hidden rounded-xl bg-primary/10'}`}><AwardMark imageUrl={award.imageUrl} presetIcon={award.presetIcon} iconClassName="h-6 w-6" /></div>
-        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{award.name}</h3><span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{cadenceLabels[award.cadence]}</span></div><p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{award.description}</p><p className="mt-1 text-xs text-muted-foreground">{getAwardHolderLabel(award.holder?.name)}{award.window.closesAt ? ` · closes ${new Date(award.window.closesAt).toLocaleDateString()}` : ''}</p></div>
-      </div>
-       <div className="flex shrink-0 gap-2">{canManage && !award.archived && <><Button size="sm" variant="outline" onClick={onGrant} disabled={!award.window.periodKey}><Users className="mr-1.5 h-4 w-4" />Award</Button><Button size="sm" variant="ghost" onClick={onEdit}>Edit</Button><Button size="icon" variant="ghost" aria-label={`Archive ${award.name}`} onClick={onArchive}><Archive className="h-4 w-4" /></Button></>}</div>
-      <HistoryList award={award} />
-    </article>;
-}
-
-function HistoryList({ award }: { award: TeamAward }) {
   const [open, setOpen] = useState(false);
-  if (!award.history.length) return null;
-  return <div className="basis-full border-t border-border/60 pt-2 sm:basis-auto sm:border-0 sm:pt-0"><button onClick={() => setOpen((v) => !v)} className="text-xs font-medium text-primary underline-offset-2 hover:underline" aria-expanded={open}>{open ? 'Hide' : 'View'} history ({award.history.length})</button>{open && <ul className="mt-2 space-y-1 text-xs text-muted-foreground">{award.history.map((grant) => <li key={grant.id}><span className="font-medium text-foreground">{grant.periodKey}</span> · {grant.playerName} · <time dateTime={grant.grantedAt}>{new Date(grant.grantedAt).toLocaleString()}</time>{grant.grantedByName && <> · by {grant.grantedByName}</>}</li>)}</ul>}</div>;
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  return <article className="flex min-w-0 flex-wrap items-center gap-1 rounded-lg border border-border/70 px-1.5 py-1 sm:gap-2 sm:px-2">
+    <div className={`flex h-8 w-8 shrink-0 items-center justify-center text-primary ${award.imageUrl ? 'bg-transparent' : 'overflow-hidden rounded-md bg-primary/10'}`}><AwardMark imageUrl={award.imageUrl} presetIcon={award.presetIcon} iconClassName="h-4 w-4" /></div>
+    <button type="button" className="min-h-10 min-w-0 flex-1 rounded py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setDetailsOpen(true)} aria-label={`View details for ${award.name}`} title="View award details">
+      <span className="block truncate text-xs font-semibold leading-4 sm:text-sm">{award.name}</span>
+      <span className="block truncate text-[10px] leading-4 text-muted-foreground sm:text-[11px]">{getAwardHolderLabel(award.holder?.name)} · {cadenceLabels[award.cadence]}</span>
+    </button>
+    <div className="flex shrink-0 items-center gap-0 sm:gap-0.5">
+      {canManage && !award.archived && <>
+        <Button className="h-10 w-10" size="icon" variant="ghost" onClick={onGrant} disabled={!award.window.periodKey} aria-label="Grant" title="Grant"><Users className="h-4 w-4" /></Button>
+        <Button className="h-10 w-10" size="icon" variant="ghost" onClick={onEdit} aria-label="Edit" title="Edit"><Pencil className="h-4 w-4" /></Button>
+        <Button className="h-10 w-10" size="icon" variant="ghost" aria-label={`Archive ${award.name}`} title={`Archive ${award.name}`} onClick={onArchive}><Archive className="h-4 w-4" /></Button>
+      </>}
+      {!!award.history.length && <Button className="h-10 w-10" size="icon" variant="ghost" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={open ? 'Hide award history' : 'Show award history'} title={open ? 'Hide award history' : 'Show award history'}><History className="h-4 w-4" /></Button>}
+    </div>
+    {open && <ul className="basis-full border-t border-border/60 px-2 pt-1 text-xs text-muted-foreground">{award.history.map((grant) => <li className="py-1" key={grant.id}><span className="font-medium text-foreground">{grant.periodKey}</span> · {grant.playerName} · <time dateTime={grant.grantedAt}>{new Date(grant.grantedAt).toLocaleString()}</time>{grant.grantedByName && <> · by {grant.grantedByName}</>}</li>)}</ul>}
+    <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+      <DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-xl">
+        <DialogHeader><DialogTitle>{award.name}</DialogTitle><DialogDescription>{cadenceLabels[award.cadence]} · {getAwardHolderLabel(award.holder?.name)}</DialogDescription></DialogHeader>
+        {award.description && <p className="whitespace-pre-wrap break-words text-sm">{award.description}</p>}
+        {award.window.closesAt && <p className="text-xs text-muted-foreground">Award window closes {new Date(award.window.closesAt).toLocaleString()}</p>}
+      </DialogContent>
+    </Dialog>
+  </article>;
 }
 
 function AwardDialog({ teamId, award, onClose, onSave, onImageSaved, onError }: { teamId: string; award: TeamAward | null; onClose: () => void; onSave: (data: SaveTeamAward) => Promise<{ id: string } | null>; onImageSaved: () => void; onError: (message: string) => void }) {

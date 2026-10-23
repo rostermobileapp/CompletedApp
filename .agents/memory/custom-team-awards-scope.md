@@ -33,11 +33,11 @@ Uploaded award artwork must display without an added frame or background, preser
 
 **How to apply:** Preserve alpha through resizing/saving, fit the full image without clipping, and omit decorative backgrounds/borders/shadows behind uploaded art in previews, award lists and holder displays. Preset icons can retain their styled tiles.
 
-The entire My Team Custom Team Awards section must start minimized and expand only on an explicit click.
+The entire My Team Custom Team Awards section must start minimized, and its expanded content must also remain highly condensed.
 
-**Why:** The user said the always-expanded section was "WAY TOO BIG" and requested a minimized dropdown for the entire section, not merely the award list.
+**Why:** The user said the always-expanded section was "WAY TOO BIG" and requested a minimized dropdown for the entire section. They subsequently emphasized that the open content also takes up far too much space and needs to be "far more condensed."
 
-**How to apply:** Keep settings, descriptions, counts and management controls inside the disclosure; do not automatically open it as data loads or changes.
+**How to apply:** Do not automatically open it as data loads or changes. Keep expanded awards and actions compact on phones as well as desktop; avoid permanent introductory copy or large configuration blocks. Settings and full details can open on demand, but all management actions and complete award information must remain accessible.
 
 Custom team awards are transferable current-holder recognition, not permanent Trophy Case progression. Paid-tier gating remains undecided.
 

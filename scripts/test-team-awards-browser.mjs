@@ -11,7 +11,7 @@ ws.on("message",raw=>{const m=JSON.parse(String(raw));if(m.id){const p=pending.g
 const send=(method,params={})=>new Promise((resolve,reject)=>{const n=++id;pending.set(n,{resolve,reject});ws.send(JSON.stringify({id:n,method,params}));});
 async function ev(expression){const r=await send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
 async function wait(expression){const end=Date.now()+10000;while(Date.now()<end){if(await ev(expression))return;await new Promise(r=>setTimeout(r,40));}throw new Error(`Timeout: ${expression}\n${await ev("document.body.innerText")}`);}
-const click=text=>ev(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)});if(!b)throw new Error('Button missing: '+${JSON.stringify(text)});b.click()})()`);
+const click=text=>ev(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)}||b.getAttribute('aria-label')===${JSON.stringify(text)});if(!b)throw new Error('Button missing: '+${JSON.stringify(text)});b.click()})()`);
 const fill=(selector,value)=>ev(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})()`);
 async function assertFrameless(selector) {
   const result=await ev(`(()=>{const img=document.querySelector(${JSON.stringify(selector)});if(!img)throw new Error('Artwork missing');const s=getComputedStyle(img.parentElement);return {background:s.backgroundColor,border:s.borderTopWidth,shadow:s.boxShadow,radius:s.borderTopLeftRadius,overflow:s.overflow,fit:getComputedStyle(img).objectFit};})()`);
@@ -48,16 +48,22 @@ try {
   assert.equal(await ev(`document.activeElement===(${disclosure})`),true);
   await press("Enter","Enter",13);
   await wait(`${disclosure}.getAttribute('aria-expanded')==='true'`);
-  await wait(`document.body?.innerText.includes('Create Award')`);
+  await wait(`!!document.querySelector('button[aria-label="Create Award"]')`);
   await press(" ","Space",32);
   await wait(`${disclosure}.getAttribute('aria-expanded')==='false'`);
   assert.equal(await ev(`document.querySelector('section[aria-label="Custom team awards"]').querySelectorAll('button,input,select,a').length`),1);
   pass("Enter and Space toggle the disclosure and remove hidden tab stops");
   await toggle();
-  await wait(`document.body?.innerText.includes('Create Award')`);
+  await wait(`!!document.querySelector('button[aria-label="Create Award"]')`);
   await ev(`window.fixtureQueryClient.invalidateQueries({queryKey:['/api/teams','team-a','awards']})`);
   assert.equal(await ev(`${disclosure}.getAttribute('aria-expanded')`),"true");
   assert.equal(await ev("document.documentElement.scrollWidth<=innerWidth"),true);pass("My Team setup fits a phone viewport");
+  assert.equal(await ev(`!!document.querySelector('input[id^="award-zone"]')`),false);
+  await click("Award timezone settings");await wait(`!!document.querySelector('input[id^="award-zone"]')`);
+  await fill('input[id^="award-zone"]',"America/Chicago");await click("Save timezone");
+  await wait(`window.fixtureQueryClient.getQueryData(['/api/teams','team-a','awards'])?.timezone==='America/Chicago'`);
+  await click("Cancel");
+  pass("timezone settings stay out of the compact layout and still save from their dialog");
   await click("Create Award");await wait(`!!document.querySelector('#award-name')`);
   await fill("#award-name","Team Spark");await click("Save award");
   await wait(`document.querySelector('[role=dialog]')?.innerText.includes('Saved. Choose Done')`);
@@ -101,7 +107,7 @@ try {
   const requests=await(await fetch("http://127.0.0.1:3001/__requests")).json();
   assert.ok(requests.some(r=>r.path==="/api/teams/team-a/awards"&&r.method==="POST"&&r.data.id&&r.data.name==="Locker Spark"));
   pass("editing saves through the real client contract");
-  await click("Award");await wait(`!!document.querySelector('[role=dialog] select')`);
+  await click("Grant");await wait(`!!document.querySelector('[role=dialog] select')`);
   await fill("[role=dialog] select","captain");await click("Grant award");
   await wait(`document.querySelector('article')?.innerText.includes('Alex Captain')`);
   await wait(`!!document.querySelector('[aria-label="Your team awards"] button')`);
@@ -118,7 +124,7 @@ try {
   await assertFrameless('[role=dialog] li img');
   await click("Close");
   pass("Home, roster and both holder dialogs display artwork without an added tile or frame");
-  await click("Award");await wait(`!!document.querySelector('[role=dialog] input[type=checkbox]')`);
+  await click("Grant");await wait(`!!document.querySelector('[role=dialog] input[type=checkbox]')`);
   await fill("[role=dialog] select","player");
   assert.equal(await ev(`[...document.querySelectorAll('[role=dialog] button')].find(b=>b.textContent.trim()==='Grant award').disabled`),true);
   await ev(`document.querySelector('[role=dialog] input[type=checkbox]').click()`);await click("Grant award");
@@ -126,8 +132,8 @@ try {
   pass("reassignment requires explicit confirmation and refreshes holder");
   await ev(`document.querySelector('button[aria-label="Archive Locker Spark"]').click()`);
   await wait(`!document.querySelector('article')`);
-  await click("History");await wait(`document.querySelector('article')?.innerText.includes('Locker Spark')`);
-  await ev(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('View history')).click()`);
+  await click("Show award history");await wait(`document.querySelector('article')?.innerText.includes('Locker Spark')`);
+  await ev(`document.querySelector('article button[aria-label="Show award history"]').click()`);
   await wait(`document.querySelector('article').innerText.includes('game-a')`);
   const archivedHistory=await ev(`Array.from(document.querySelectorAll('article li')).map(li=>({text:li.innerText,time:li.querySelector('time')?.dateTime}))`);
   assert.equal(archivedHistory.length,2);
@@ -162,7 +168,7 @@ try {
   assert.equal(await ev(`${disclosure}.getAttribute('aria-expanded')`),"false");
   await toggle();
   await wait(`document.querySelectorAll('article').length>0`);
-  assert.equal(await ev(`[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Create Award'||b.textContent.trim()==='Edit')`),false);
+  assert.equal(await ev(`[...document.querySelectorAll('button')].some(b=>['Create Award','Edit','Grant','Award timezone settings'].includes(b.getAttribute('aria-label')))`),false);
   pass("noncaptain sees awards but no setup/grant controls");
   await fetch("http://127.0.0.1:3001/__mode",{method:"POST",body:JSON.stringify({configError:true})});
   await send("Page.reload");await wait(`!!(${disclosure})`);

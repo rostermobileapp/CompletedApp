@@ -6,6 +6,7 @@ import { build } from "esbuild";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import postcss from "postcss";
 import tailwindcss from "tailwindcss";
 import type { TeamAward, TeamAwardsBundle } from "../shared/teamAwards";
@@ -15,6 +16,7 @@ const bundle: TeamAwardsBundle = {
   roster:[{id:"captain",name:"Alex Captain"},{id:"player",name:"Jordan Player"}],awards:[],
 };
 const requests: any[]=[];
+const baseline = process.argv.includes("--baseline");
 let configError=false, configDelay=0, enabled=true;
 let celebrations:any[]=[], patchEvents:any[]=[], ackError=false, ackDelay=0;
 let viewerId="captain";
@@ -47,6 +49,9 @@ const built=await build({
     function App(){
       const h=useTeamAwardHolders();
       const[teamId,setTeamId]=React.useState('team-a');
+      React.useEffect(()=>{
+        if(location.pathname==='/expanded')document.querySelector('section[aria-label="Custom team awards"] button')?.click();
+      },[]);
       window.fixtureSetTeamId=setTeamId;
       return <main className={${JSON.stringify(`mx-auto max-w-3xl p-4 ${teamPanelClass}`)}}>
         {celebrationFixture&&<BadgeEarnedHost/>}
@@ -61,6 +66,10 @@ const built=await build({
   `,resolveDir:process.cwd(),loader:"tsx"},
   bundle:true,write:false,format:"esm",jsx:"automatic",
   plugins:[{name:"fixture",setup(b){
+    if(baseline)b.onLoad({filter:/\/team-awards\/TeamAwardsSection\.tsx$/},()=>({
+      contents:execFileSync("git",["show","HEAD:client/src/components/team-awards/TeamAwardsSection.tsx"],{encoding:"utf8"}),
+      loader:"tsx",resolveDir:process.cwd()+"/client/src/components/team-awards",
+    }));
     b.onResolve({filter:/^(fixture-state|@\/lib\/queryClient|@\/hooks\/use-toast|@\/hooks\/useAuth|@\/context\/WebSocketContext)$/},()=>({path:"state",namespace:"fixture"}));
     b.onLoad({filter:/.*/,namespace:"fixture"},()=>({contents:state,loader:"tsx",resolveDir:process.cwd()}));
     b.onResolve({filter:/\.webm$/},()=>({path:"confetti",namespace:"fixture-video"}));
@@ -135,7 +144,7 @@ createServer(async(req,res)=>{
   if(path.endsWith("/image")&&award){award.imageUrl=`data:image/png;base64,${data.image}`;return respond({ok:true});}
   if(req.method==="PATCH"&&award){award.archived=true;return respond({ok:true});}
   respond({message:"Unknown fixture API"},404);
-}).listen(3001,"0.0.0.0",()=>console.log("Isolated awards fixture ready"));
+}).listen(baseline?3003:3001,"0.0.0.0",()=>console.log(`Isolated awards fixture ready on ${baseline?3003:3001}`));
 function makeAward(data:any):TeamAward {
   return {id:randomUUID(),teamId:"team-a",name:data.name,description:data.description||"",presetIcon:data.presetIcon||"star",imageUrl:null,imageVersion:"1",
     cadence:data.cadence||"game",archived:false,holder:data.holder||null,
