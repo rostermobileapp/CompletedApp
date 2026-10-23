@@ -915,7 +915,7 @@ export function LineManager({
                     {isTeamCaptain && forwardLines.length < 4 && (
                       <button
                         onClick={() => addLine('forward')}
-                        className="mt-1.5 w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+                        className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:bg-muted/50 transition-colors mt-[2px] pt-[2px] pb-[2px]"
                         data-testid="button-add-forward-line"
                       >
                         <Plus className="w-3 h-3" /> Add Line
