@@ -14,3 +14,9 @@ Do not attribute service-wide Railway logs to the latest deployment merely becau
 **Why:** A merge review appeared to fail after its fix was deployed, but deployment-scoped logs showed the last review ran on the old server before the replacement began serving. The service-wide response displayed the latest successful deployment above those older requests.
 
 **How to apply:** For reports that a deployed fix still fails, compare request timestamps with the new server's startup time and query logs scoped to its deployment ID before assuming another code defect or asking for another publish.
+
+Check frontend/backend release compatibility before changing working feature code.
+
+**Why:** A newer mobile frontend displayed award-loading errors and unavailable predictions while the live Railway backend still lacked the awards endpoint and the newer prediction model. Successful Replit preview requests did not validate that live backend.
+
+**How to apply:** Check the actual production API for newly introduced routes and response contracts. A frontend-only release cannot enable features that require a newer Railway backend; do not hide that mismatch with synthetic stats or disabled-feature fallbacks.
