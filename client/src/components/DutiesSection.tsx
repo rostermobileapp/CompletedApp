@@ -139,6 +139,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
       );
 
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey as unknown[];
@@ -204,6 +205,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey as unknown[];

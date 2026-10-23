@@ -46,6 +46,8 @@ import {
 } from "./permissionMiddleware";
 import { db, pool } from "./db";
 import { gamePenalties } from "@shared/schema";
+import { dutyAssignments, dutyTemplates } from "@shared/schema";
+import { withBeverageDutyAssignments } from "@shared/beverageDutyCounts";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
@@ -8752,7 +8754,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (leagueGamesSeasonId && game.seasonId !== leagueGamesSeasonId) return false;
         return true;
       });
-      const formattedGames = filteredGames.map(formatGameForResponse);
+      const beverageAssignments = filteredGames.length ? await db
+        .select({ gameId: dutyAssignments.gameId, teamId: dutyAssignments.teamId, userId: dutyAssignments.userId })
+        .from(dutyAssignments)
+        .innerJoin(dutyTemplates, and(
+          eq(dutyTemplates.id, dutyAssignments.dutyTemplateId),
+          eq(dutyTemplates.teamId, dutyAssignments.teamId),
+          eq(dutyTemplates.isDefault, true),
+        ))
+        .where(inArray(dutyAssignments.gameId, filteredGames.map(game => game.id))) : [];
+      const formattedGames = withBeverageDutyAssignments(filteredGames, beverageAssignments).map(formatGameForResponse);
       res.json(formattedGames);
     } catch (error) {
       console.error("Error fetching league games:", error);

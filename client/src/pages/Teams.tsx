@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { countRecordedBeverageDuties } from '@shared/beverageDutyCounts';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -189,6 +190,7 @@ export default function Teams() {
       return response.json();
     },
     enabled: !!currentTeam?.leagueId && location === '/teams',
+    refetchOnWindowFocus: true,
   });
 
   // Get user's league memberships (for league data, captain status now via teams.captainId)
@@ -447,20 +449,7 @@ export default function Teams() {
     currentTeam && (game.homeTeamId === currentTeam.id || game.awayTeamId === currentTeam.id)
   );
 
-  const beverageDutyCounts: Record<string, number> = {};
-  if (currentTeam) {
-    for (const game of leagueGames ?? []) {
-      const claimantIds = [
-        game.homeTeamId === currentTeam.id ? game.homeBeverageDutyUserId : null,
-        game.awayTeamId === currentTeam.id ? game.awayBeverageDutyUserId : null,
-      ];
-      for (const claimantId of claimantIds) {
-        if (typeof claimantId === 'string' && claimantId) {
-          beverageDutyCounts[claimantId] = (beverageDutyCounts[claimantId] || 0) + 1;
-        }
-      }
-    }
-  }
+  const beverageDutyCounts = countRecordedBeverageDuties(leagueGames ?? [], currentTeam?.id);
 
   // Helper functions (after all hooks, before early returns)
   const handleClaimBeverageDuty = (gameId: string) => {
