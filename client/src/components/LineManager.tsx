@@ -924,7 +924,7 @@ export function LineManager({
                   </div>
 
                   {/* Defense Pairs */}
-                  <div>
+                  <div className="mt-[2px]">
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                       Defense Pairs
                     </p>
