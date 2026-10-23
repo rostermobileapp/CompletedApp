@@ -1,8 +1,13 @@
 import type { Pool, PoolClient } from "pg";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { buildLineComboStats, projectLineCombo, type ComboHistoryRow, type ComboLineType } from "../shared/lineComboPredictions";
-import { learnLineComboCalibration, LINE_COMBO_LEARNING_VERSION, type ScoredLineForecast } from "../shared/lineComboLearning";
+import { learnLineComboCalibration, type ScoredLineForecast } from "../shared/lineComboLearning";
 import { lineComboHistoryQuery } from "./lineComboPredictions";
+import { loadLineComboOpponent } from "./lineComboOpponent";
+import { opponentAdjustedBaseline } from "../shared/lineComboOpponent";
+
+// Do not mix old unadjusted baselines with matchup-adjusted learning evidence.
+export const LINE_COMBO_FORECAST_VERSION = "opponent-context-v2";
 
 type Queryable = Pick<Pool, "query">;
 
@@ -49,7 +54,7 @@ export const evaluateLineForecastsSql = `
         WHEN f.starts_at IS DISTINCT FROM g.scheduled_at AT TIME ZONE COALESCE(l.timezone,'America/New_York')
           THEN 'game-rescheduled'
         WHEN f.captured_at >= f.starts_at THEN 'late-forecast'
-        WHEN f.model_version <> '${LINE_COMBO_LEARNING_VERSION}' THEN 'different-model'
+        WHEN f.model_version <> '${LINE_COMBO_FORECAST_VERSION}' THEN 'different-model'
         WHEN EXISTS (SELECT 1 FROM line_combinations test WHERE test.game_id=f.game_id AND test.team_id=f.team_id
           AND test.name ILIKE '[TEST]%') THEN 'test-lineup'
         WHEN (CASE WHEN g.home_team_id=f.team_id THEN g.home_score ELSE g.away_score END) IS NULL
@@ -96,7 +101,7 @@ export async function loadLineComboCalibration(connection: Queryable, teamId: st
           AND captured_at<starts_at AND model_version=$2
       )
       SELECT * FROM ranked WHERE game_rank<=60 ORDER BY starts_at DESC,"gameId", "lineType"
-    `, [teamId, LINE_COMBO_LEARNING_VERSION]);
+    `, [teamId, LINE_COMBO_FORECAST_VERSION]);
     return learnLineComboCalibration(rows as ScoredLineForecast[]);
   } catch (error: any) {
     if (error?.code !== "42P01") throw error;
@@ -113,6 +118,7 @@ type Candidate = {
 export async function captureUpcomingLineForecasts(client: PoolClient) {
   const { rows } = await client.query(upcomingLineForecastsSql);
   const historyByTeam = new Map<string, ReturnType<typeof buildLineComboStats>>();
+  const opponents = new Map<string, Awaited<ReturnType<typeof loadLineComboOpponent>>>();
   for (const candidate of rows as Candidate[]) {
     let stats = historyByTeam.get(candidate.teamId);
     if (!stats) {
@@ -124,8 +130,14 @@ export async function captureUpcomingLineForecasts(client: PoolClient) {
     }
     const players = candidate.playerIds.map(id => stats!.players.find(player => player.playerId === id));
     if (players.some(player => !player || player.gamesPlayed < 1)) continue;
-    const base = players.reduce((sum, player) => sum + player!.pointsPerGame, 0);
-    const projection = projectLineCombo(stats, candidate.lineType, candidate.playerIds);
+    const matchupKey = JSON.stringify([candidate.teamId, candidate.gameId]);
+    let opponent = opponents.get(matchupKey);
+    if (!opponent) {
+      opponent = await loadLineComboOpponent(client, candidate.teamId, candidate.gameId);
+      opponents.set(matchupKey, opponent);
+    }
+    const base = opponentAdjustedBaseline(players.reduce((sum, player) => sum + player!.pointsPerGame, 0), opponent);
+    const projection = projectLineCombo({ ...stats, opponent }, candidate.lineType, candidate.playerIds);
     if (!projection) continue;
     await client.query(`
       INSERT INTO line_combo_forecasts(game_id,team_id,line_type,line_number,player_ids,source,
@@ -140,7 +152,7 @@ export async function captureUpcomingLineForecasts(client: PoolClient) {
         captured_at=excluded.captured_at,base_ppg=excluded.base_ppg,predicted_ppg=excluded.predicted_ppg,
         model_version=excluded.model_version,actual_points=NULL,evaluated_at=NULL,exclusion_reason=NULL
     `, [candidate.gameId, candidate.teamId, candidate.lineType, candidate.lineNumber, candidate.playerIds,
-      candidate.source, candidate.startsAt, base, projection.pointsPerGame, LINE_COMBO_LEARNING_VERSION]);
+      candidate.source, candidate.startsAt, base, projection.pointsPerGame, LINE_COMBO_FORECAST_VERSION]);
   }
   // Remove stale, still-future plans if their slot was cleared/renumbered/replaced.
   // Finished-game forecasts are never rewritten or retrospectively manufactured.

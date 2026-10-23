@@ -1,4 +1,5 @@
 import { applyLineComboCalibration, type LineComboCalibration } from "./lineComboLearning";
+import { opponentAdjustedBaseline, type LineComboOpponent } from "./lineComboOpponent";
 
 export type ComboLineType = "forward" | "defense";
 export type ComboHistoryRow = {
@@ -21,6 +22,7 @@ export type LineComboStats = {
   players: { playerId: string; gamesPlayed: number; points: number; pointsPerGame: number }[];
   model: "sum-player-ppg-v1";
   learning?: LineComboCalibration;
+  opponent?: LineComboOpponent;
 };
 export type ComboProjection = {
   kind: "recorded" | "predicted";
@@ -30,6 +32,7 @@ export type ComboProjection = {
   learningAvailable?: boolean;
   recordedPointsPerGame?: number;
   recordedGames?: number;
+  opponent?: LineComboOpponent;
 };
 
 /** One player-game contributes once, even if a saved lineup has duplicate slots/lines. */
@@ -80,16 +83,17 @@ export function projectLineCombo(
   const ids = [...selectedPlayerIds].sort();
   const recorded = stats[lineType].find(combo =>
     combo.playerIds.length === ids.length && combo.playerIds.every((id, index) => id === ids[index]));
-  if (recorded && !stats.learning) return { kind: "recorded", pointsPerGame: recorded.pointsPerGame, sampleGames: recorded.gamesTogether };
+  if (recorded && !stats.learning && !stats.opponent) return { kind: "recorded", pointsPerGame: recorded.pointsPerGame, sampleGames: recorded.gamesTogether };
   const players = ids.map(id => stats.players.find(player => player.playerId === id));
   if (players.some(player => !player || player.gamesPlayed < 1)) return;
-  const base = players.reduce((sum, player) => sum + player!.pointsPerGame, 0);
+  const base = opponentAdjustedBaseline(players.reduce((sum, player) => sum + player!.pointsPerGame, 0), stats.opponent);
   if (stats.learning) {
     return {
       kind: "predicted",
       ...applyLineComboCalibration(base, lineType, ids, stats.learning),
       sampleGames: Math.min(...players.map(player => player!.gamesPlayed)),
       learningAvailable: stats.learning.available,
+      ...(stats.opponent ? { opponent: stats.opponent } : {}),
       ...(recorded ? { recordedPointsPerGame: recorded.pointsPerGame, recordedGames: recorded.gamesTogether } : {}),
     };
   }
@@ -97,5 +101,7 @@ export function projectLineCombo(
     kind: "predicted",
     pointsPerGame: base,
     sampleGames: Math.min(...players.map(player => player!.gamesPlayed)),
+    ...(stats.opponent ? { opponent: stats.opponent } : {}),
+    ...(recorded && stats.opponent ? { recordedPointsPerGame: recorded.pointsPerGame, recordedGames: recorded.gamesTogether } : {}),
   };
 }

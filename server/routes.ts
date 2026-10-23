@@ -51,6 +51,7 @@ import { withBeverageDutyAssignments } from "@shared/beverageDutyCounts";
 import { buildLineComboStats, type ComboHistoryRow } from "@shared/lineComboPredictions";
 import { lineComboHistoryQuery } from "./lineComboPredictions";
 import { loadLineComboCalibration } from "./lineComboLearning";
+import { loadLineComboOpponent } from "./lineComboOpponent";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
@@ -10468,11 +10469,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Versioned points model: old clients retain their existing goals-only contract.
-      if (req.query.model === "points-v1" || req.query.model === "adaptive-v1") {
-        const learning = req.query.model === "adaptive-v1" ? await loadLineComboCalibration(pool, teamId) : undefined;
+      if (req.query.model === "points-v1" || req.query.model === "adaptive-v1" || req.query.model === "adaptive-v2") {
+        const learning = req.query.model !== "points-v1" ? await loadLineComboCalibration(pool, teamId) : undefined;
         const history = await db.execute(lineComboHistoryQuery(teamId, learning?.available === true));
         const stats = buildLineComboStats(history.rows as ComboHistoryRow[]);
         if (learning) stats.learning = learning;
+        if (req.query.model === "adaptive-v2") stats.opponent = await loadLineComboOpponent(pool, teamId);
         return res.json(stats);
       }
 

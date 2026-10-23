@@ -6,6 +6,7 @@ import postcss from "postcss";
 import tailwindcss from "tailwindcss";
 import { buildLineComboStats, type ComboHistoryRow } from "../shared/lineComboPredictions";
 import { learnLineComboCalibration } from "../shared/lineComboLearning";
+import { buildOpponentAdjustment } from "../shared/lineComboOpponent";
 
 const players = ["a", "b", "c", "d", "e", "f"].map(id => ({
   userId: id, position: "C", user: { id, firstName: "Player", lastName: id.toUpperCase() },
@@ -19,6 +20,10 @@ for (let game = 1; game <= 6; game++) for (const [line, ids] of [[1, ["a", "b", 
 }
 const stats = buildLineComboStats(rows);
 stats.learning = learnLineComboCalibration([]);
+stats.opponent = buildOpponentAdjustment({
+  gameId: "next", opponentId: "other", opponentName: "Ice Owls", gamesPlayed: 6,
+  goalsForPerGame: 4, goalsAgainstPerGame: 5, leagueGoalsPerTeam: 3,
+});
 const lines = [[1, ["a", "b", "c"]], [2, ["d", "e", "f"]]].map(([number, ids]) => ({
   id: `line-${number}`, name: `Line ${number}`, lineType: "forward", lineNumber: number,
   assignments: (ids as string[]).map((id, index) => ({
@@ -64,8 +69,8 @@ createServer(async (req, res) => {
   if (req.url === "/__learn") {
     const corrected = req.method === "DELETE";
     stats.learning = learnLineComboCalibration(Array.from({length:4},(_,i)=>[
-      {gameId:'future'+i,lineType:'forward' as const,playerIds:['a','b','c'],basePointsPerGame:3,actualPoints:corrected?3:5},
-      {gameId:'future'+i,lineType:'forward' as const,playerIds:['d','e','f'],basePointsPerGame:4,actualPoints:corrected?4:6},
+      {gameId:'future'+i,lineType:'forward' as const,playerIds:['a','b','c'],basePointsPerGame:3*stats.opponent!.multiplier,actualPoints:3*stats.opponent!.multiplier+(corrected?0:2)},
+      {gameId:'future'+i,lineType:'forward' as const,playerIds:['d','e','f'],basePointsPerGame:4*stats.opponent!.multiplier,actualPoints:4*stats.opponent!.multiplier+(corrected?0:2)},
     ]).flat());
     res.setHeader("Content-Type","application/json");
     return res.end(JSON.stringify({ok:true}));

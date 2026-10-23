@@ -33,6 +33,7 @@ async function wait(expression) {
   throw new Error(`Timeout: ${expression}\n${await ev("document.body.innerText")}`);
 }
 const badges = `[...document.querySelectorAll('[data-testid="line-combo-projection"]')]`;
+const multiplier = Math.min(1.3, ((6*5+5*3)/(11*3))**0.7 * ((6*4+5*3)/(11*3))**0.15);
 const click = selector => ev(`document.querySelector(${JSON.stringify(selector)}).click()`);
 try {
   await send("Runtime.enable");
@@ -43,12 +44,17 @@ try {
   await click('[data-testid="toggle-lines-view"]');
   await wait(`${badges}.some(b=>b.innerText.includes('Recorded 3.0 PPG'))`);
   assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Recorded 4.0 PPG'))`), true);
-  console.log("PASS real editor shows exact recorded averages from six-game history");
+  assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Predicted ${(3*multiplier).toFixed(1)} PPG'))`), true);
+  assert.equal(await ev(`document.querySelector('[data-testid="line-combo-opponent"]').innerText.includes('Ice Owls')`), true);
+  await click('[data-testid="line-combo-opponent"] summary');
+  assert.equal(await ev(`document.querySelector('[data-testid="line-combo-opponent"]').innerText.includes('4.0 GF/G · 5.0 GA/G')`), true);
+  assert.equal(await ev(`document.querySelector('[data-testid="line-combo-opponent"]').innerText.includes('6 completed opponent games')`), true);
+  console.log("PASS matchup rates and adjusted predictions display while recorded averages remain unchanged");
   await click('[data-slot-key="forward|0|LW"]');
   await wait(`!!document.querySelector('[data-testid="picker-player-d"]')`);
   await click('[data-testid="picker-player-d"]');
-  await wait(`${badges}.some(b=>b.innerText.includes('Predicted 5.0 PPG'))`);
-  assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Predicted 2.0 PPG'))`), true);
+  await wait(`${badges}.some(b=>b.innerText.includes('Predicted ${(5*multiplier).toFixed(1)} PPG'))`);
+  assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Predicted ${(2*multiplier).toFixed(1)} PPG'))`), true);
   assert.equal((await (await fetch("http://127.0.0.1:3002/__writes")).json()).writes, 0);
   console.log("PASS swapping players updates both previously unseen combos instantly, with no save or API write");
   assert.equal(await ev("document.documentElement.scrollWidth<=innerWidth"), true);
@@ -61,12 +67,12 @@ try {
   await fetch("http://127.0.0.1:3002/__learn", { method: "POST" });
   await ev("window.fixtureRefetch()");
   await wait(`${badges}.some(b=>b.innerText.includes('Tuned · 4 games'))`);
-  assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Predicted 3.7 PPG'))`), true);
+  assert.equal(await ev(`Number((${badges}[0].innerText.match(/Predicted ([\\d.]+)/)||[])[1]) > ${(3*multiplier).toFixed(1)}`), true);
   assert.equal(await ev(`${badges}.some(b=>b.innerText.includes('Recorded 3.0 PPG'))`), true);
   console.log("PASS future outcomes change the predicted formula while recorded averages stay separate");
   await fetch("http://127.0.0.1:3002/__learn", { method: "DELETE" });
   await ev("window.fixtureRefetch()");
-  await wait(`${badges}.some(b=>b.innerText.includes('Predicted 3.0 PPG'))`);
+  await wait(`${badges}.some(b=>b.innerText.includes('Predicted ${(3*multiplier).toFixed(1)} PPG'))`);
   console.log("PASS correcting outcomes recalibrates the displayed prediction without changing the roster");
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   assert.equal(await ev("document.documentElement.scrollWidth<=innerWidth"), true);

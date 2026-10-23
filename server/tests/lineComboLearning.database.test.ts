@@ -7,6 +7,8 @@ import { ensureLineComboLearningDatabase } from "../lineComboLearningDb";
 import { captureUpcomingLineForecasts, evaluateLineForecastsSql, loadLineComboCalibration } from "../lineComboLearning";
 import { buildLineComboStats, projectLineCombo, type ComboHistoryRow } from "../../shared/lineComboPredictions";
 import { lineComboHistoryQuery } from "../lineComboPredictions";
+import { loadLineComboOpponent } from "../lineComboOpponent";
+import { learnLineComboCalibration } from "../../shared/lineComboLearning";
 
 test("future forecast capture, outcome validation and automatic recalibration", { timeout: 30000 }, async t => {
   const config = { host: "127.0.0.1", port: 55442, user: "award_test", password: "", ssl: false, max: 3 };
@@ -19,9 +21,10 @@ test("future forecast capture, outcome validation and automatic recalibration", 
     await pool.query(`
       CREATE TYPE line_type AS ENUM('forward','defense');
       CREATE TABLE leagues(id varchar PRIMARY KEY,timezone text);
-      CREATE TABLE teams(id varchar PRIMARY KEY);
+      CREATE TABLE teams(id varchar PRIMARY KEY,name text);
       CREATE TABLE games(id varchar PRIMARY KEY,league_id varchar,home_team_id varchar,away_team_id varchar,
-        scheduled_at timestamp,is_completed boolean,home_score integer,away_score integer);
+        scheduled_at timestamp,is_completed boolean,home_score integer,away_score integer,
+        season_id varchar,is_scrimmage boolean DEFAULT false,opponent_name text);
       CREATE TABLE line_combinations(id varchar PRIMARY KEY,team_id varchar,game_id varchar,name text,
         line_type line_type,line_number integer,is_active boolean DEFAULT true);
       CREATE TABLE line_combination_assignments(id serial PRIMARY KEY,line_combination_id varchar,player_id varchar,position text);
@@ -29,7 +32,7 @@ test("future forecast capture, outcome validation and automatic recalibration", 
         primary_assist_id varchar,secondary_assist_id varchar,is_submitted boolean DEFAULT true);
       CREATE TABLE game_attendance(game_id varchar,team_id varchar,user_id varchar);
       INSERT INTO leagues VALUES('league','America/New_York');
-      INSERT INTO teams VALUES('team'),('opponent');
+      INSERT INTO teams VALUES('team','Team'),('opponent','Opponent');
       INSERT INTO games SELECT 'old'||i,'league','team','opponent',
         timezone('America/New_York',clock_timestamp()-interval '7 days'),true,4,0 FROM generate_series(1,6)i;
       INSERT INTO games VALUES('future','league','team','opponent',
@@ -62,7 +65,8 @@ test("future forecast capture, outcome validation and automatic recalibration", 
       const forecasts = (await pool!.query("SELECT * FROM line_combo_forecasts ORDER BY line_number")).rows;
       assert.equal(forecasts.length, 2);
       assert.equal(forecasts[0].game_id, "future");
-      assert.equal(forecasts[0].base_ppg, 6);
+      const opponent = await loadLineComboOpponent(pool!, "team");
+      assert.equal(forecasts[0].base_ppg, 6 * opponent.multiplier);
       assert.ok(forecasts.every(f => f.captured_at < f.starts_at));
       assert.equal((await loadLineComboCalibration(pool!, "team")).evaluatedGames, 0);
     });
@@ -70,7 +74,7 @@ test("future forecast capture, outcome validation and automatic recalibration", 
       await pool!.query("UPDATE line_combination_assignments SET player_id=CASE player_id WHEN 'a' THEN 'd' ELSE 'a' END WHERE line_combination_id IN('template1','template2') AND player_id IN('a','d')");
       await capture();
       assert.deepEqual((await first()).player_ids, ["b", "c", "d"]);
-      assert.equal((await first()).base_ppg, 4);
+      assert.equal((await first()).base_ppg, 4 * (await loadLineComboOpponent(pool!, "team")).multiplier);
       await pool!.query("UPDATE line_combination_assignments SET player_id=CASE player_id WHEN 'a' THEN 'd' ELSE 'a' END WHERE line_combination_id IN('template1','template2') AND player_id IN('a','d')");
       await capture();
       assert.deepEqual((await first()).player_ids, ["a", "b", "c"]);
@@ -95,18 +99,22 @@ test("future forecast capture, outcome validation and automatic recalibration", 
       const projected = projectLineCombo(stats, "forward", ["a", "b", "c"])!;
       assert.equal(stats.learning.evaluatedGames, 1);
       assert.equal(projected.tuningGames, 1);
-      assert.ok(projected.pointsPerGame > base);
+      assert.notEqual(projected.pointsPerGame, base, "Verified outcomes change the estimate beyond player averages.");
       await capture();
       assert.equal((await first()).base_ppg, before.base_ppg, "A completed game's baseline must remain frozen.");
     });
-    await t.test("late score corrections replace outcomes and remove obsolete learned bias", async () => {
+    await t.test("late score corrections replace outcomes against the frozen opponent-adjusted baseline", async () => {
       await pool!.query("UPDATE game_goals SET scorer_id='d' WHERE id IN(SELECT id FROM game_goals WHERE game_id='future' ORDER BY id LIMIT 2)");
       await evaluate();
       assert.equal((await first()).actual_points, 6);
       const state = await loadLineComboCalibration(pool!, "team");
       assert.equal(state.evaluatedGames, 1);
-      assert.equal(state.groups[0].bias, 0);
-      assert.ok(state.groups[0].pairs.every(p => p.bias === 0));
+      const evidence = await pool!.query(`SELECT game_id AS "gameId",line_type AS "lineType",
+        player_ids AS "playerIds",base_ppg AS "basePointsPerGame",actual_points AS "actualPoints"
+        FROM line_combo_forecasts WHERE actual_points IS NOT NULL AND exclusion_reason IS NULL
+        ORDER BY starts_at DESC,game_id DESC,line_type`);
+      assert.deepEqual(state, learnLineComboCalibration(evidence.rows),
+        "Corrections use the original matchup baseline, not the former additive-only baseline.");
     });
     await t.test("unsubmitted or incomplete scoring does not teach false zero production", async () => {
       await pool!.query("UPDATE game_goals SET is_submitted=false WHERE id=(SELECT min(id) FROM game_goals WHERE game_id='future')");
