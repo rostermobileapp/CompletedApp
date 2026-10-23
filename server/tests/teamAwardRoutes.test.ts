@@ -38,5 +38,8 @@ test("award endpoints enforce auth, RPC authority, validation and explicit setup
     assert.equal(edit.status,200);
     assert.equal(calls.at(-1).name,"team_award_save");
     assert.equal(calls.at(-1).args.p_id,"00000000-0000-4000-8000-000000000001");
+    const beforeRemovedEndpoint=calls.length;
+    assert.equal((await request("/api/teams/a/awards/00000000-0000-4000-8000-000000000001/remove-background","POST",{image:"unused"})).status,404);
+    assert.equal(calls.length,beforeRemovedEndpoint,"Retired background removal never reaches Supabase");
   } finally { await new Promise<void>(resolve=>server.close(()=>resolve())); }
 });

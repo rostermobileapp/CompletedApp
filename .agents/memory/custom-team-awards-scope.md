@@ -15,6 +15,12 @@ Award setup and management belong on the My Team page.
 
 **How to apply:** Keep creation and configuration accessible from My Team for the selected team, not exclusively in Trophy Case, Home, or admin screens.
 
+Do not offer background removal for custom team award artwork.
+
+**Why:** The user explicitly removed this feature because the external provider account, setup and cost were not worth it.
+
+**How to apply:** Keep ordinary image upload/save, including already-transparent PNGs, without adding a background-removal provider or requiring provider credentials. Do not reintroduce the feature unless requested.
+
 The entire My Team Custom Team Awards section must start minimized and expand only on an explicit click.
 
 **Why:** The user said the always-expanded section was "WAY TOO BIG" and requested a minimized dropdown for the entire section, not merely the award list.

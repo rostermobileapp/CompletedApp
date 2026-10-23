@@ -15,7 +15,6 @@ const bundle: TeamAwardsBundle = {
   roster:[{id:"captain",name:"Alex Captain"},{id:"player",name:"Jordan Player"}],awards:[],
 };
 const requests: any[]=[];
-let providerSuccess=false;
 let configError=false, configDelay=0, enabled=true;
 const state = `
 import React from 'react';import {QueryClient} from '@tanstack/react-query';
@@ -67,9 +66,9 @@ createServer(async(req,res)=>{
   let raw="";for await(const chunk of req)raw+=chunk;
   const data=raw?JSON.parse(raw):{};
   const respond=(body:any,status=200)=>{res.statusCode=status;res.end(JSON.stringify(body));};
-  if(path==="/__reset"){bundle.awards=[];bundle.canManage=true;providerSuccess=false;configError=false;configDelay=0;enabled=true;requests.length=0;return respond({ok:true});}
+  if(path==="/__reset"){bundle.awards=[];bundle.canManage=true;configError=false;configDelay=0;enabled=true;requests.length=0;return respond({ok:true});}
   if(path==="/__requests")return respond(requests);
-  if(path==="/__mode"){if(data.captain!==undefined)bundle.canManage=data.captain;if(data.providerSuccess!==undefined)providerSuccess=data.providerSuccess;if(data.configError!==undefined)configError=data.configError;if(data.configDelay!==undefined)configDelay=data.configDelay;if(data.enabled!==undefined)enabled=data.enabled;return respond({ok:true});}
+  if(path==="/__mode"){if(data.captain!==undefined)bundle.canManage=data.captain;if(data.configError!==undefined)configError=data.configError;if(data.configDelay!==undefined)configDelay=data.configDelay;if(data.enabled!==undefined)enabled=data.enabled;return respond({ok:true});}
   if(path==="/__seed"){
     for(let n=0;n<3;n++)bundle.awards.push(makeAward({name:`Captain award ${n+1}`,cadence:"week",holder:{id:"captain",name:"Alex Captain"}}));
     bundle.awards.push(makeAward({name:"Teammate only",cadence:"week",holder:{id:"player",name:"Jordan Player"}}));
@@ -98,9 +97,6 @@ createServer(async(req,res)=>{
     const grant={id:award.currentGrant?.id||randomUUID(),playerId:p.id,playerName:p.name,periodKey:data.periodKey,grantedAt:new Date().toISOString(),grantedById:"captain",grantedByName:"Alex Captain"};
     award.holder=p;award.currentGrant=grant;award.history.unshift({...grant,id:randomUUID()});return respond({id:grant.id,changed:true});
   }
-  if(path.endsWith("/remove-background"))return providerSuccess
-    ? respond({image:"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=="})
-    : respond({message:"Provider unavailable. You can still save the original."},503);
   if(path.endsWith("/image")&&award){award.imageUrl=`data:image/png;base64,${data.image}`;return respond({ok:true});}
   if(req.method==="PATCH"&&award){award.archived=true;return respond({ok:true});}
   respond({message:"Unknown fixture API"},404);

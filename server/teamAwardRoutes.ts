@@ -108,26 +108,4 @@ export function registerTeamAwardRoutes(app: Express, auth: RequestHandler, clie
     await rpc(client, "team_award_attach_image", { p_team: t, p_id: a });
     res.json({ ok: true });
   }));
-  app.post("/api/teams/:teamId/awards/:awardId/remove-background", auth, route(async (req, res, client) => {
-    const t = teamId.parse(req.params.teamId), a = id.parse(req.params.awardId);
-    const bundle = await rpc(client, "team_award_list", { p_team: t });
-    if (!bundle.canManage || !bundle.awards.some((v: any) => v.id === a && !v.archived)) {
-      return res.status(403).json({ message: "Only the team captain can remove backgrounds." });
-    }
-    let image: Buffer;
-    try { image = await normalizeAwardImage(req.body?.image); }
-    catch { return res.status(400).json({ message: "Choose a valid PNG/JPG image up to 5 MB." }); }
-    const response = await fetch(`${process.env.SUPABASE_URL}/functions/v1/remove-award-bg`, {
-      method: "POST", headers: { Authorization: req.headers.authorization, "Content-Type": "application/json" },
-      body: JSON.stringify({ teamId: t, awardId: a, image: image.toString("base64") }),
-      signal: AbortSignal.timeout(35_000),
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.image) {
-      return res.status(response.status === 429 ? 429 : 503).json({
-        message: data?.message ?? "Background removal is unavailable. You can still save the original image.",
-      });
-    }
-    res.json({ image: data.image });
-  }));
 }

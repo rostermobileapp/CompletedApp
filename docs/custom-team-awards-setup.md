@@ -12,16 +12,13 @@ An authorized operator must review and apply the following to the intended Supab
 
 1. Apply `migrations/0044_custom_team_awards.sql` once. It creates the tables, RLS, validating RPCs, grant constraints, roster-removal triggers, persistent push outbox and configurable limits. It does not alter existing teams or badges, or enable the feature.
 2. Apply `migrations/0044_custom_team_award_storage.sql` once in Supabase. This creates a private `team-award-images` bucket and JWT-scoped object policies. These are manual migrations, not startup DDL; do not substitute `db:push`, which does not install the security functions/policies.
-3. Deploy the `supabase/functions/remove-award-bg` Edge Function with JWT verification enabled. It uses the adjacent `_shared/award-background.ts` provider wrapper.
-4. Configure the Edge Function's **Supabase secrets**, not browser variables:
-   - `AWARD_BG_PROVIDER`: `removebg` (default) or `photoroom`.
-   - `AWARD_BG_API_KEY`: the selected provider's credential.
-   - Supabase supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the Edge Runtime. Never copy the service key or provider key into frontend settings.
-5. Confirm the existing app's Supabase URL and anonymous key target that same project. The Express award endpoints forward each caller's JWT to RPC/Storage instead of using the service role; the Edge Function verifies the caller and uses a service-only quota RPC. Existing OneSignal configuration supplies push delivery.
-6. Reload the Supabase API schema cache after installation if needed (`NOTIFY pgrst, 'reload schema';`).
-7. After verifying RLS and the flows below, explicitly enable the feature with `UPDATE public.team_award_config SET enabled = true WHERE id = true;`. Setting it false disables access and stops the push worker from claiming new notifications.
+3. Confirm the existing app's Supabase URL and anonymous key target that same project. The Express award endpoints forward each caller's JWT to RPC/Storage instead of using the service role. Existing OneSignal configuration supplies push delivery.
+4. Reload the Supabase API schema cache after installation if needed (`NOTIFY pgrst, 'reload schema';`).
+5. After verifying RLS and the flows below, explicitly enable the feature with `UPDATE public.team_award_config SET enabled = true WHERE id = true;`. Setting it false disables access and stops the push worker from claiming new notifications.
 
-No new Replit environment variables or a paid plan selection are needed for the feature flag. `active_limit` and `removal_limit` in the singleton config row are the authoritative adjustable database limits (defaults 5 and 10); the API returns these to the UI. Background-removal quota counts reserved provider attempts in the team's calendar month, including a provider failure after reservation, to bound external usage. Missing provider configuration does not reserve quota. Award/image saves remain independent of that quota.
+No new environment variables, background-removal provider, or Edge Function are needed. Image upload saves the selected image as a bounded PNG without removing its background. The active award limit is configurable in the singleton config row (default 5).
+
+Background removal has been retired. An operator may delete any previously deployed `remove-award-bg` Edge Function and its `AWARD_BG_PROVIDER` / `AWARD_BG_API_KEY` secrets; the app no longer calls it. Historical migrations and quota objects remain unchanged for compatibility; no database migration is needed for this removal.
 
 ## Time and identity rules
 
@@ -43,7 +40,7 @@ Delivery uses each outbox UUID as the stable OneSignal idempotency key. A succes
 
 ## Repeatable local checks
 
-Pure API/image/provider/presentation/notification checks:
+Pure API/image/presentation/notification checks:
 
 ```sh
 npx tsx --test server/tests/teamAwardImages.test.ts server/tests/teamAwardRoutes.test.ts server/notificationClickUrl.test.ts client/src/components/team-awards/*.test.ts
@@ -57,7 +54,7 @@ npx tsx --test server/tests/teamAwards.database.test.ts
 
 The tests only connect to 127.0.0.1:55442 as `award_test`, check the role, create a uniquely named temporary database, install the actual SQL migrations into minimal fixtures, and drop that database afterward. They never import the app database module, credentials, or workspace database environment variables. Stop the temporary PostgreSQL process afterward.
 
-The isolated browser fixture uses **real award components and styling with synthetic auth/API responses**; it never calls the app database, OneSignal or a removal provider:
+The isolated browser fixture uses **real award components and styling with synthetic auth/API responses**; it never calls the app database or OneSignal:
 
 ```sh
 npx tsx scripts/team-awards-browser-fixture.ts
@@ -66,8 +63,8 @@ chromium --headless --no-sandbox --disable-dev-shm-usage --remote-debugging-port
 node scripts/test-team-awards-browser.mjs
 ```
 
-Stop both temporary processes after verification. These checks cover mobile/desktop setup, create/edit, image-save recovery after provider failure, self-grant, reassignment confirmation, history retention, holder refresh/overflow and noncaptain controls.
+Stop both temporary processes after verification. These checks cover mobile/desktop setup, create/edit, image upload/save without background-removal controls or requests, self-grant, reassignment confirmation, history retention, holder refresh/overflow and noncaptain controls.
 
 ## Still requires external verification
 
-The local checks do not prove that the hosted Supabase Edge Runtime can reach the configured provider, that a real Supabase Storage bucket has been provisioned, or that OneSignal delivers on installed iOS/Android builds. After authorized external setup, use controlled test accounts to confirm these boundaries without notifying unrelated users. No real signed-in production screen, live provider call, or OS push is claimed as verified by the fixture tests.
+The local checks do not prove that a real Supabase Storage bucket has been provisioned or that OneSignal delivers on installed iOS/Android builds. After authorized external setup, use controlled test accounts to confirm these boundaries without notifying unrelated users. No real signed-in production screen or OS push is claimed as verified by the fixture tests.
