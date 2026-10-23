@@ -498,7 +498,7 @@ export default function Teams() {
           /* User has league teams but a tournament is selected — they are an
              admin/observer of this tournament (not a player on any team in it).
              Players would have been redirected by the effect above. */
-          <Card className="hairline elev-rest">
+          (<Card className="hairline elev-rest">
             <CardContent className="p-6 text-center">
               <Trophy className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">Tournament View</h3>
@@ -513,12 +513,12 @@ export default function Teams() {
                 View Tournament Details
               </Button>
             </CardContent>
-          </Card>
+          </Card>)
         ) : isNewSeasonNoTeam ? (
           /* A new season is active for this league but the user hasn't been
              assigned to a team yet. Show a clear empty state instead of
              leaking old-season team data. */
-          <Card className="hairline elev-rest">
+          (<Card className="hairline elev-rest">
             <CardContent className="p-6 text-center">
               <Trophy className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">New Season Starting</h3>
@@ -526,7 +526,7 @@ export default function Teams() {
                 A new season has begun for this league. Team assignments haven't been set up yet — check back once the commissioner has drafted teams.
               </p>
             </CardContent>
-          </Card>
+          </Card>)
         ) : (userTeams as any[]).length === 0 ? (
           <>
             {/* Tournament team cards for tournament-only players who have no
@@ -819,7 +819,7 @@ export default function Teams() {
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="p-6 pt-[5px] pb-[5px] bg-[212121]">
+                  <CardContent className="p-6 bg-[212121] pt-[2px] pb-[2px]">
                     {teamStanding ? (
                       <div className="flex justify-between items-center gap-2">
                         <div className="text-center flex-1">
