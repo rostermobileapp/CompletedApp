@@ -4,7 +4,7 @@
 
 The implementation is in the app, with **all setup on My Team** for the selected team. Existing captains create, edit, archive, grant and reassign; there is no assistant-captain role or subscription-tier gate. Custom awards track a current holder separately from permanent Trophy Case achievements.
 
-The feature is deliberately **disabled until its Supabase setup is installed and explicitly enabled**. No migration, Storage bucket, Edge Function, secrets, production settings, or native configuration is automatically deployed by this change. Missing installation is reported by `/api/team-awards/config` as `enabled: false, setupRequired: true`, not as working data.
+The feature is deliberately **disabled until its original Supabase tables and Storage bucket are installed and explicitly enabled**. Once that base setup exists, routine team-award database updates are applied automatically at app startup. No Edge Function, provider secret, or native configuration is required. Missing base installation is reported by `/api/team-awards/config` as `enabled: false, setupRequired: true`, not as working data.
 
 ## Authorized Supabase setup
 
@@ -12,7 +12,7 @@ An authorized operator must review and apply the following to the intended Supab
 
 1. Apply `migrations/0044_custom_team_awards.sql` once. It creates the tables, RLS, validating RPCs, grant constraints, roster-removal triggers, persistent push outbox and configurable limits. It does not alter existing teams or badges, or enable the feature.
 2. Apply `migrations/0044_custom_team_award_storage.sql` once in Supabase. This creates a private `team-award-images` bucket and JWT-scoped object policies. These are manual migrations, not startup DDL; do not substitute `db:push`, which does not install the security functions/policies.
-3. Apply `migrations/0045_team_award_celebrations.sql` once to enable recipient-only on-screen celebrations. It marks existing recognition as historical (no mass replay), then leaves new recognition pending until acknowledged. It does not require an Edge Function, provider account or secret.
+3. Start the updated app. Its startup initializer automatically installs the celebration update, records successful completion, and skips it on subsequent starts. A transaction-scoped lock handles simultaneous app instances. It marks existing recognition as historical (no mass replay), then leaves new recognition pending until acknowledged. No manual SQL, Edge Function, provider account or secret is needed for this update.
 4. Confirm the existing app's Supabase URL and anonymous key target that same project. The Express award endpoints forward each caller's JWT to RPC/Storage instead of using the service role. Existing OneSignal configuration supplies push delivery.
 5. Reload the Supabase API schema cache after installation if needed (`NOTIFY pgrst, 'reload schema';`).
 6. After verifying RLS and the flows below, explicitly enable the feature with `UPDATE public.team_award_config SET enabled = true WHERE id = true;`. Setting it false disables access and stops the push worker from claiming new notifications.
@@ -47,14 +47,16 @@ The global earned-event host gives patches priority and shows only one patch/tea
 
 A caller-scoped Supabase RPC returns at most 20 pending events for the signed-in recipient, only while the award is unarchived, the grant is still the current valid holder revision, and the recipient is still rostered. A separate recipient-only acknowledgement persists across sessions/devices and does not affect push state or recognition history. Failed acknowledgements keep the card open with retry controls.
 
-Until the celebration migration is installed, the pending API explicitly returns `setupRequired: true` and no celebration, without disabling ordinary awards. The migration is prepared in the repo, not automatically applied to hosted Supabase.
+The app automatically applies `migrations/0045_team_award_celebrations.sql` through `server/teamAwardDbInit.ts` before accepting requests. The update and its applied-version record commit together; an interrupted/failed update rolls back and is retried on the next start. Previously installed/manual celebration setups are adopted safely without resetting pending or acknowledged events. Routine restarts skip the recorded update. Future team-award updates should be appended to the startup registry with new version keys.
+
+Missing original awards setup is left untouched and never auto-enabled. If startup setup fails, a sanitized error is logged and unrelated features still start; the pending API explicitly returns `setupRequired: true` when the celebration functions are missing.
 
 ## Repeatable local checks
 
 Pure API/image/presentation/notification checks:
 
 ```sh
-npx tsx --test server/tests/teamAwardImages.test.ts server/tests/teamAwardRoutes.test.ts server/notificationClickUrl.test.ts client/src/components/team-awards/*.test.ts
+npx tsx --test server/tests/teamAwardDbInit.test.ts server/tests/teamAwardImages.test.ts server/tests/teamAwardRoutes.test.ts server/notificationClickUrl.test.ts client/src/components/team-awards/*.test.ts
 ```
 
 Database/RLS/concurrency checks require a **disposable local PostgreSQL cluster**, not `DATABASE_URL`. Initialize it with `initdb -D /tmp/<new-fixture-dir> -U award_test --auth=trust --no-locale`, run `postgres -D /tmp/<new-fixture-dir> -h 127.0.0.1 -p 55442 -k /tmp` as a tracked temporary process, then run:

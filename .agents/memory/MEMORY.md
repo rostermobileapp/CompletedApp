@@ -82,4 +82,4 @@
 - [Static marketing prerender runtime](public-seo-prerender.md) — isolate Node 20 static rendering from Supabase realtime and Wouter's client-only memory location.
 - [Public launch and review policy](public-launch-review-policy.md) — hockey is live in both stores; soccer/baseball stay reachable but unindexed; no invented marketing testimonials.
 - [Mobile entry routing](mobile-entry-routing.md) — explicit push intent beats saved-screen restoration, even at Home; preserve destinations through authentication.
-- [Custom team awards scope](custom-team-awards-scope.md) — existing captains manage and grant awards; assistant-captain support is explicitly deferred.
+- [Custom team awards scope](custom-team-awards-scope.md) — captain-only grants, transparent art, recipient celebrations, and automatic routine database updates.

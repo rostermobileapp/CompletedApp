@@ -1,15 +1,16 @@
--- Run once AFTER 0044_custom_team_awards.sql, in the same Supabase project.
+-- Applied automatically at startup after the original awards setup is present.
+-- Idempotent for deployments that already installed the standalone SQL file.
 -- Existing recognition is historical; only NEW grants should celebrate.
 BEGIN;
 ALTER TABLE public.award_grant_events
-  ADD COLUMN celebration_acknowledged_at timestamptz DEFAULT now();
+  ADD COLUMN IF NOT EXISTS celebration_acknowledged_at timestamptz DEFAULT now();
 ALTER TABLE public.award_grant_events
   ALTER COLUMN celebration_acknowledged_at DROP DEFAULT;
-CREATE INDEX award_grant_events_pending_celebration
+CREATE INDEX IF NOT EXISTS award_grant_events_pending_celebration
   ON public.award_grant_events(player_id,granted_at,id)
   WHERE celebration_acknowledged_at IS NULL;
 
-CREATE FUNCTION public.team_award_pending_celebrations() RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.team_award_pending_celebrations() RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
 BEGIN
  IF auth.uid() IS NULL THEN
@@ -41,7 +42,7 @@ BEGIN
  );
 END $$;
 
-CREATE FUNCTION public.team_award_acknowledge_celebration(p_event uuid) RETURNS void
+CREATE OR REPLACE FUNCTION public.team_award_acknowledge_celebration(p_event uuid) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 BEGIN
  IF auth.uid() IS NULL THEN

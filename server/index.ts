@@ -16,6 +16,8 @@ import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
 import { startDailyTriviaPushJob } from "./triviaPushJob";
 import { checkAppleSigningReadiness } from "./appleSigningReadiness";
 import { startTeamAwardPushJob } from "./teamAwardPushJob";
+import { ensureTeamAwardDatabaseUpdates } from "./teamAwardDbInit";
+import { pool } from "./db";
 
 const app = express();
 startTeamAwardPushJob();
@@ -113,6 +115,15 @@ app.use((req, res, next) => {
   await initGoogleIapClaimsDb();
   await initApplePurchaseLinks();
   await initAccountUserMergeDb();
+  try {
+    const awardSetup = await ensureTeamAwardDatabaseUpdates(pool);
+    if (awardSetup.applied.length) console.info("[TeamAwards] Automatic database update installed.");
+  } catch (error: any) {
+    // Do not expose SQL, connection details or user data, or take unrelated app features down.
+    console.error("[TeamAwards] Automatic setup failed; retrying on the next start.", {
+      code: typeof error?.code === "string" ? error.code : "unknown",
+    });
+  }
 
   const server = await registerRoutes(app);
   await reconcileApplePurchaseLinks();

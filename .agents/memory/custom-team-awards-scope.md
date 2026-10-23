@@ -15,6 +15,12 @@ Award setup and management belong on the My Team page.
 
 **How to apply:** Keep creation and configuration accessible from My Team for the selected team, not exclusively in Trophy Case, Home, or admin screens.
 
+Routine database updates should install automatically through the app, like patches, rather than requiring the owner to paste SQL for each feature.
+
+**Why:** After the celebration update was initially prepared as manual SQL, the user explicitly said, “I don't want to have to do this every time.”
+
+**How to apply:** Use tracked, transactional, idempotent startup updates for routine additions; preserve existing records and safely skip completed updates. Obtain explicit approval for destructive changes or externally managed infrastructure, rather than interpreting this as permission to delete data.
+
 Do not offer background removal for custom team award artwork.
 
 **Why:** The user explicitly removed this feature because the external provider account, setup and cost were not worth it.

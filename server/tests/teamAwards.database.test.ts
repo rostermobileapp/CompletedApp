@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { TEAM_AWARD_LIMITS } from "../../shared/teamAwards";
 import { deliverTeamAwardPushBatch } from "../teamAwardPushDelivery";
+import { ensureTeamAwardDatabaseUpdates } from "../teamAwardDbInit";
 
 const options = { host:"127.0.0.1",port:55442,username:"award_test",password:"",ssl:false as const,max:10 };
 const admin = postgres({ ...options,database:"postgres" });
@@ -23,6 +24,16 @@ test("team awards isolated database behavior", async t => {
   assert.equal(who.name,"award_test","Refusing to use a non-fixture PostgreSQL role");
   await admin.unsafe(`CREATE DATABASE ${dbName}`);
   const db = postgres({ ...options,database:dbName });
+  const migrationPool = { connect: async () => {
+    const connection = await db.reserve();
+    return {
+      query: async (text:string,values:any[]=[]) => {
+        const rows=await connection.unsafe(text,values);
+        return { rows };
+      },
+      release: () => connection.release(),
+    };
+  }};
   async function actor<T>(user: string, work: (sql: any) => Promise<T>): Promise<T> {
     return db.begin(async tx => {
       await tx.unsafe("SET LOCAL ROLE authenticated");
@@ -210,10 +221,12 @@ test("team awards isolated database behavior", async t => {
       const [w]=await db`SELECT team_award_window('team-a','week')->>'periodKey' AS key`;
       const grant=(recipient:string)=>actor(captain,tx=>tx`SELECT team_award_grant('team-a',${a.id},${recipient},${w.key},true)`);
       await grant(player);
-      const migration=await db.reserve();
-      try { await migration.unsafe(await readFile("migrations/0045_team_award_celebrations.sql","utf8")); }
-      catch(error) { await migration.unsafe("ROLLBACK");throw error; }
-      finally { migration.release(); }
+      const startups=await Promise.all([
+        ensureTeamAwardDatabaseUpdates(migrationPool),
+        ensureTeamAwardDatabaseUpdates(migrationPool),
+      ]);
+      assert.deepEqual(startups.map(result=>result.applied.length).sort(),[0,1],
+        "Concurrent app starts install once and record the update transactionally");
       const pending=(who:string):Promise<any[]>=>actor(who,async tx=>(await tx`SELECT team_award_pending_celebrations() AS events`)[0].events);
       assert.deepEqual(await pending(player),[],"Installing does not replay historical recognition");
       await grant(captain);
@@ -222,6 +235,12 @@ test("team awards isolated database behavior", async t => {
       assert.equal(events[0].awardId,a.id);
       assert.equal(events[0].teamName,"Ice Owls");
       assert.equal(events[0].grantedByName,"Captain One");
+      const eventBeforeAdoption=events[0].id;
+      await db`DELETE FROM team_award_schema_updates`;
+      const adopted=await ensureTeamAwardDatabaseUpdates(migrationPool);
+      assert.equal(adopted.applied.length,1);
+      assert.equal((await pending(captain))[0].id,eventBeforeAdoption,
+        "Adopting existing/manual setup must not acknowledge or reset pending recognition");
       assert.deepEqual(await pending(player),[]);
       assert.deepEqual(await pending(stranger),[]);
       await assert.rejects(actor(stranger,tx=>tx`SELECT team_award_acknowledge_celebration(${events[0].id})`),/not found/);
@@ -236,6 +255,8 @@ test("team awards isolated database behavior", async t => {
       await actor(captain,tx=>tx`SELECT team_award_acknowledge_celebration(${eventId})`);
       await actor(captain,tx=>tx`SELECT team_award_acknowledge_celebration(${eventId})`);
       assert.deepEqual(await pending(captain),[],"Ack persists across fresh caller transactions and can be retried");
+      assert.deepEqual((await ensureTeamAwardDatabaseUpdates(migrationPool)).applied,[]);
+      assert.deepEqual(await pending(captain),[],"A routine app restart never resets acknowledgements");
       const [pushAfter]=await db`SELECT count(*)::int AS n FROM team_award_pushes`;
       assert.equal(pushAfter.n,pushBefore.n,"Celebration acknowledgement never changes push delivery");
       await grant(player);
