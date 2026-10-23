@@ -874,7 +874,7 @@ export function LineManager({
                       {forwardLines.map((line, idx) => {
                         const filledCount = Object.values(line.slots).filter(s => s.playerId).length;
                         return (
-                          <div key={idx} className="bg-background rounded-xl border border-border p-2">
+                          <div key={idx} className="bg-background rounded-xl border border-border p-2 pt-[2px] pb-[2px]">
                             <div className="flex items-center justify-between mb-1.5">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-[11px] font-semibold text-muted-foreground shrink-0">Line {idx + 1}</span>
