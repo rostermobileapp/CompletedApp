@@ -16,6 +16,7 @@ import { LineManager } from '@/components/LineManager';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import type { UploadResult } from '@uppy/core';
+import { TeamAwardsSection } from '@/components/team-awards/TeamAwardsSection';
 
 export default function Teams() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -148,6 +149,19 @@ export default function Teams() {
   const currentTeam = selectedType === 'tournament'
     ? null
     : (selectedTeamId ? displayedTeams.find((t: any) => t.id === selectedTeamId) : primaryTeam);
+
+  // Award holder links from Dashboard land on My Team with an explicit team
+  // scope. Only consume the link after the membership list is authoritative.
+  useEffect(() => {
+    if (location.split('?')[0] !== '/teams' || userTeamsLoading || typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const targetId = url.searchParams.get('awardTeam');
+    if (!targetId) return;
+    const authorizedTeam = (userTeams as any[]).find((team: any) => String(team.id) === targetId);
+    if (authorizedTeam) setTeamSelection(String(authorizedTeam.id));
+    url.searchParams.delete('awardTeam');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [location, userTeamsLoading, userTeams, setTeamSelection]);
 
   // Get selected team members
   const { data: teamMembers = [] } = useQuery({
@@ -900,6 +914,8 @@ export default function Teams() {
                     )}
                   </div>
                 </div>
+
+                {currentTeam?.id === team.id && <TeamAwardsSection teamId={team.id} />}
 
                 {/* Line Combinations Manager (Roster + inline line editor) */}
                 <LineManager 

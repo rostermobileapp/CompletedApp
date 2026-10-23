@@ -15,8 +15,10 @@ import { runHistoricalBadgeBackfills } from "./badgeDbInit";
 import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
 import { startDailyTriviaPushJob } from "./triviaPushJob";
 import { checkAppleSigningReadiness } from "./appleSigningReadiness";
+import { startTeamAwardPushJob } from "./teamAwardPushJob";
 
 const app = express();
+startTeamAwardPushJob();
 
 // CORS configuration for Vercel frontend
 const allowedOriginsEnv = process.env.FRONTEND_URL 
@@ -52,6 +54,7 @@ app.use(cookieParser());
 app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
 
 // All other routes use JSON parsing
+app.use('/api/teams/:teamId/awards/:awardId', express.json({ limit: '8mb' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -80,7 +83,9 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse && !path.startsWith('/api/iap/')) {
+      // Award responses may contain private signed artwork URLs or base64 images.
+      const privateAwardResponse = path.includes('/awards') || path.startsWith('/api/team-awards/');
+      if (capturedJsonResponse && !path.startsWith('/api/iap/') && !privateAwardResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

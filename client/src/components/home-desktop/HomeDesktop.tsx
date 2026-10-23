@@ -7,6 +7,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
 import { Button } from '@/components/ui/button';
 import { getImageUrl } from '@/lib/queryClient';
+import { TeamAwardHolderStrip } from '@/components/team-awards/TeamAwardHolders';
 import { PAGE_BG, cardClass, cardStyle, sectionTitleClass } from './cardStyles';
 import { UpNextCard } from './UpNextCard';
 import { AlertsExpanded } from './AlertsExpanded';
@@ -46,6 +47,11 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
     selectedLeagueId,
     selectedTournamentId,
   } = useDashboardSelection();
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
   const isTournamentScope = selectedType === 'tournament' && !!selectedTournamentId;
 
   const { data: userTeams } = useQuery<UserTeam[]>({
@@ -180,6 +186,20 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
               </select>
             </div>
           )}
+          <div className="flex items-center gap-2" data-testid="desktop-home-profile-controls">
+            <TeamAwardHolderStrip playerId={currentUser?.id ? String(currentUser.id) : undefined} />
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              aria-label="Open your profile"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 ${currentUser?.profileImageUrl ? 'bg-transparent' : 'bg-primary text-primary-foreground'}`}
+              data-testid="desktop-home-profile"
+            >
+              {currentUser?.profileImageUrl
+                ? <img src={getImageUrl(currentUser.profileImageUrl) || ''} alt="" className="h-full w-full object-cover" />
+                : <span className="font-semibold">{currentUser?.firstName?.[0] || 'U'}</span>}
+            </button>
+          </div>
         </div>
 
         {isTournamentScope ? (

@@ -491,6 +491,70 @@ export const teams = pgTable("teams", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Opt-in Custom Team Awards; install manual migration before enabling the flag.
+// Team-zone storage stays separate so an uninstalled feature cannot break team queries.
+export const teamAwardConfig = pgTable("team_award_config", {
+  id: boolean("id").primaryKey().default(true),
+  enabled: boolean("enabled").notNull().default(false),
+  activeLimit: integer("active_limit").notNull().default(5),
+  removalLimit: integer("removal_limit").notNull().default(10),
+}, t => [check("team_award_singleton", sql`${t.id}`),
+  check("team_award_positive_limits", sql`${t.activeLimit}>0 AND ${t.removalLimit}>0`)]);
+export const teamAwardSettings = pgTable("team_award_settings", {
+  teamId: varchar("team_id").primaryKey().references(() => teams.id, { onDelete:"cascade" }),
+  timezone: text("timezone").notNull().default("America/New_York"),
+});
+export const teamAwards = pgTable("team_awards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  teamId: varchar("team_id").notNull().references(() => teams.id, { onDelete:"cascade" }),
+  name: text("name").notNull(), description: text("description").notNull().default(""),
+  presetIcon: text("preset_icon").notNull().default("trophy"),
+  imageUrl: text("image_url"), imageVersion: uuid("image_version").notNull().defaultRandom(),
+  cadence: text("cadence").notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete:"set null" }),
+  archived: boolean("archived").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone:true }).notNull().defaultNow(),
+}, t => [index("team_awards_team_idx").on(t.teamId),
+  check("team_award_name_length", sql`length(trim(${t.name})) BETWEEN 1 AND 40`),
+  check("team_award_description_length", sql`length(${t.description})<=140`),
+  check("team_award_cadence", sql`${t.cadence} IN ('game','week','month','season')`),
+  check("team_award_preset", sql`${t.presetIcon} IN ('trophy','puck','star','skate','shield','flame')`)]);
+export const awardGrants = pgTable("award_grants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  awardId: uuid("award_id").notNull().references(() => teamAwards.id, { onDelete:"cascade" }),
+  playerId: varchar("player_id").references(() => users.id, { onDelete:"set null" }),
+  grantedBy: varchar("granted_by").references(() => users.id, { onDelete:"set null" }),
+  periodKey: text("period_key").notNull(),
+  grantedAt: timestamp("granted_at", { withTimezone:true }).notNull().defaultNow(),
+  holderValid: boolean("holder_valid").notNull().default(true),
+}, t => [unique("award_grants_award_period_key").on(t.awardId,t.periodKey),
+  index("award_grants_history_idx").on(t.awardId,t.grantedAt)]);
+export const awardGrantEvents = pgTable("award_grant_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  grantId: uuid("grant_id").notNull().references(() => awardGrants.id, { onDelete:"cascade" }),
+  awardId: uuid("award_id").notNull().references(() => teamAwards.id, { onDelete:"cascade" }),
+  playerId: varchar("player_id").references(() => users.id, { onDelete:"set null" }),
+  grantedBy: varchar("granted_by").references(() => users.id, { onDelete:"set null" }),
+  periodKey: text("period_key").notNull(),
+  grantedAt: timestamp("granted_at", { withTimezone:true }).notNull(),
+}, t => [index("award_grant_events_history_idx").on(t.awardId,t.grantedAt)]);
+export const bgRemovalUsage = pgTable("bg_removal_usage", {
+  teamId: varchar("team_id").notNull().references(() => teams.id, { onDelete:"cascade" }),
+  monthKey: text("month_key").notNull(), used: integer("used").notNull().default(0),
+}, t => [primaryKey({ columns:[t.teamId,t.monthKey] })]);
+export const teamAwardPushes = pgTable("team_award_pushes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  grantId: uuid("grant_id").notNull().references(() => awardGrants.id, { onDelete:"cascade" }),
+  playerId: varchar("player_id").notNull().references(() => users.id, { onDelete:"cascade" }),
+  awardName: text("award_name").notNull(),
+  teamId: varchar("team_id").notNull().references(() => teams.id, { onDelete:"cascade" }),
+  createdAt: timestamp("created_at", { withTimezone:true }).notNull().defaultNow(),
+  claimedAt: timestamp("claimed_at", { withTimezone:true }),
+  sentAt: timestamp("sent_at", { withTimezone:true }),
+  discardedAt: timestamp("discarded_at", { withTimezone:true }),
+  attempts: integer("attempts").notNull().default(0),
+});
+
 // League memberships table
 export const leagueMemberships = pgTable("league_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

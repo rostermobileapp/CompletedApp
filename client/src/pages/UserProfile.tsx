@@ -8,6 +8,7 @@ import { getImageUrl, apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import placeholderAccountGif from '@assets/giphy_1789318557684.gif';
+import { PlayerAwardBadges, useTeamAwardHolders } from '@/components/team-awards/TeamAwardHolders';
 
 interface UserProfileData {
   id: string;
@@ -34,6 +35,7 @@ export default function UserProfile() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const { selectedLeagueId, selectedTeamId, selectedTournamentId } = useDashboardSelection();
+  const teamAwardHolders = useTeamAwardHolders();
 
   const { data: user, isLoading } = useQuery<UserProfileData>({
     queryKey: ['/api/users', userId],
@@ -236,6 +238,12 @@ export default function UserProfile() {
                 </span>
               )}
             </div>
+            <PlayerAwardBadges
+              playerId={String(user.id)}
+              teamId={selectedTeamId ?? undefined}
+              holders={teamAwardHolders.data ?? []}
+              isError={teamAwardHolders.isError}
+            />
           </div>
           
           <div className="flex-1">

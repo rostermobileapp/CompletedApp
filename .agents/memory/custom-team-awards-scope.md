@@ -14,3 +14,15 @@ Award setup and management belong on the My Team page.
 **Why:** The user explicitly reaffirmed that the setup must be in “My Team.”
 
 **How to apply:** Keep creation and configuration accessible from My Team for the selected team, not exclusively in Trophy Case, Home, or admin screens.
+
+Custom team awards are transferable current-holder recognition, not permanent Trophy Case progression. Paid-tier gating remains undecided.
+
+**Why:** The supplied product brief defines one holder per award, recurring periods, preserved history, and a feature flag rather than a chosen subscription policy.
+
+**How to apply:** Do not convert custom grants into permanent patch unlocks or introduce a paid-tier requirement without a new product decision.
+
+Preserved award history includes earlier holders within the same period, not only the latest recipient for each period.
+
+**Why:** Updating the authoritative period record on reassignment would otherwise erase a valid recognition; historical recipients, captains and timestamps must remain visible after archiving.
+
+**How to apply:** Keep immutable recognition history separate from the mutable current-holder record. A no-op retry must not create another event.

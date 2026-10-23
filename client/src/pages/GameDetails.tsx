@@ -30,6 +30,7 @@ import { isBeerLoggingWindowOpen } from "@shared/beerLoggingWindow";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
 import { PaymentMethodPicker, type PaymentMethod } from "@/components/PaymentMethodPicker";
+import { GameTeamAwardPrompt } from "@/components/team-awards/GameTeamAwardPrompt";
 
 interface ApprovedScrimmagePlayer extends ScrimmageRequest {
   player?: Pick<User, 'id' | 'firstName' | 'lastName'> | null;
@@ -1416,6 +1417,12 @@ export default function GameDetails() {
       </div>
       {/* Game Info */}
       <div className="px-6 py-6 space-y-6 pt-[4px] pb-[4px] pl-[12px] pr-[12px]">
+        <GameTeamAwardPrompt
+          gameId={String(game.id)}
+          teamIds={(Array.isArray(userTeams) ? userTeams : [])
+            .filter((team: any) => team.id === game.homeTeamId || team.id === game.awayTeamId)
+            .map((team: any) => String(team.id))}
+        />
         <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center gap-4 mb-4">
             <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>

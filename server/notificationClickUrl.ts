@@ -19,6 +19,8 @@ export function getNotificationClickUrl(data: NotificationData, appBaseUrl: stri
   };
 
   switch (data?.type) {
+    case 'team_award':
+      return urlFor(id('teamId') ? `/teams?awardTeam=${id('teamId')}` : '/teams');
     case 'daily_trivia':
       return urlFor('/?trivia=1');
     case 'message':

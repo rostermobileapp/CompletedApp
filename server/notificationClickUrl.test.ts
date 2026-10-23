@@ -6,6 +6,7 @@ const APP_URL = 'https://www.roster-app.com';
 
 describe('push notification click destinations', () => {
   const cases: Array<[string, Record<string, string>, string]> = [
+    ['team award selects My Team', { type: 'team_award', teamId: 'team-1' }, `${APP_URL}/teams?awardTeam=team-1`],
     ['message thread', { type: 'message', conversationId: 'conv-1' }, `${APP_URL}/messages/conv-1`],
     ['payment request', { type: 'payment_request', paymentRequestId: 'pay-1' }, `${APP_URL}/payment-requests/pay-1`],
     ['tournament', { type: 'tournament_access_open', tournamentId: 't-1' }, `${APP_URL}/tournaments/t-1`],

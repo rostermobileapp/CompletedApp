@@ -48,6 +48,7 @@ import Announcements from '@/pages/Announcements';
 import MediaGalleryPage from '@/pages/MediaGallery';
 import StatsPage from '@/pages/Stats';
 import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
+import { TeamAwardHolderStrip } from '@/components/team-awards/TeamAwardHolders';
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
 
@@ -2566,6 +2567,7 @@ function DashboardMobile() {
                 />
               </div>
               <div className="flex items-center gap-3">
+                <TeamAwardHolderStrip playerId={(userProfile as any)?.id ? String((userProfile as any).id) : undefined} />
                 <button 
                   onClick={() => navigate('/profile')}
                   className={`w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden ${(userProfile as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}

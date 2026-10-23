@@ -6,6 +6,7 @@ import { getSeasonPatchCounts } from "./seasonPatchStats";
 import { getTeamRosterStats } from "./teamRosterStats";
 import { leagueStatsPlayerEligible } from "./leagueStatsEligibility";
 import { registerTeamStatsRoute } from "./teamStatsRoute";
+import { registerTeamAwardRoutes } from "./teamAwardRoutes";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, previewLeaguePlaceholderMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
@@ -1145,6 +1146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── Badge catalog, trophy case, and scoped award APIs ───────────────────
   const badgeAdmin = requireSpecialPermission('admin');
   const currentUserId = (req: any) => req.user?.claims?.sub as string;
+  registerTeamAwardRoutes(app, isAuthenticated);
   const canAwardInScope = async (actorId: string, category: string, scope: any) => {
     const actor = await storage.getUser(actorId);
     if (actor?.isPrimaryCommissioner || actor?.specialPermissions?.includes('admin')) return true;

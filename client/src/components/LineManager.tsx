@@ -16,6 +16,7 @@ import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthHeaders, queryClient, apiRequest, getImageUrl } from '@/lib/queryClient';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { PlayerAwardBadges, useTeamAwardHolders } from '@/components/team-awards/TeamAwardHolders';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -286,6 +287,7 @@ export function LineManager({
   seasonId,
 }: LineManagerProps) {
   const { toast } = useToast();
+  const teamAwardHolders = useTeamAwardHolders();
 
   // ── View toggle ───────────────────────────────────────────────
   const [view, setView] = useState<'roster' | 'lines'>('roster');
@@ -837,6 +839,7 @@ export function LineManager({
                               <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                             </AvatarFallback>
                           </Avatar>
+                          {!isPlaceholder && playerId && <PlayerAwardBadges playerId={String(playerId)} teamId={teamId} holders={teamAwardHolders.data ?? []} isError={teamAwardHolders.isError} />}
                           {isPlaceholder ? (
                             <div className="flex items-center gap-1 min-w-0 flex-1">
                               {nameContent}
