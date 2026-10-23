@@ -15,6 +15,12 @@ Award setup and management belong on the My Team page.
 
 **How to apply:** Keep creation and configuration accessible from My Team for the selected team, not exclusively in Trophy Case, Home, or admin screens.
 
+The entire My Team Custom Team Awards section must start minimized and expand only on an explicit click.
+
+**Why:** The user said the always-expanded section was "WAY TOO BIG" and requested a minimized dropdown for the entire section, not merely the award list.
+
+**How to apply:** Keep settings, descriptions, counts and management controls inside the disclosure; do not automatically open it as data loads or changes.
+
 Custom team awards are transferable current-holder recognition, not permanent Trophy Case progression. Paid-tier gating remains undecided.
 
 **Why:** The supplied product brief defines one holder per award, recurring periods, preserved history, and a feature flag rather than a chosen subscription policy.

@@ -16,6 +16,7 @@ const bundle: TeamAwardsBundle = {
 };
 const requests: any[]=[];
 let providerSuccess=false;
+let configError=false, configDelay=0, enabled=true;
 const state = `
 import React from 'react';import {QueryClient} from '@tanstack/react-query';
 export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false}}});
@@ -30,7 +31,19 @@ const built=await build({
     import {TeamAwardsSection} from './client/src/components/team-awards/TeamAwardsSection';
     import {TeamAwardHolderStrip,PlayerAwardBadges,useTeamAwardHolders} from './client/src/components/team-awards/TeamAwardHolders';
     import {GameTeamAwardPrompt} from './client/src/components/team-awards/GameTeamAwardPrompt';
-    function App(){const h=useTeamAwardHolders();return <main className="mx-auto max-w-3xl space-y-6 p-4"><header className="flex justify-between"><h1 className="text-2xl font-bold">My Team</h1><TeamAwardHolderStrip playerId="captain"/></header><div id="notice" role="status"/><TeamAwardsSection teamId="team-a"/><section aria-label="Roster"><h2>Roster</h2>{['captain','player'].map(id=><div key={id} className="flex gap-3 p-3">{id}<PlayerAwardBadges playerId={id} teamId="team-a" holders={h.data||[]}/></div>)}</section><GameTeamAwardPrompt teamIds={['team-a']} gameId="game-a"/></main>}
+    window.fixtureQueryClient=queryClient;
+    function App(){
+      const h=useTeamAwardHolders();
+      const[teamId,setTeamId]=React.useState('team-a');
+      window.fixtureSetTeamId=setTeamId;
+      return <main className="mx-auto max-w-3xl space-y-6 p-4">
+        <header className="flex justify-between"><h1 className="text-2xl font-bold">My Team</h1><TeamAwardHolderStrip playerId="captain"/></header>
+        <div id="notice" role="status"/>
+        <TeamAwardsSection key={teamId} teamId={teamId}/>
+        <section aria-label="Roster"><h2>Roster</h2>{['captain','player'].map(id=><div key={id} className="flex gap-3 p-3">{id}<PlayerAwardBadges playerId={id} teamId="team-a" holders={h.data||[]}/></div>)}</section>
+        <GameTeamAwardPrompt teamIds={['team-a']} gameId="game-a"/>
+      </main>;
+    }
     createRoot(document.getElementById('root')).render(<QueryClientProvider client={queryClient}><App/></QueryClientProvider>);
   `,resolveDir:process.cwd(),loader:"tsx"},
   bundle:true,write:false,format:"esm",jsx:"automatic",
@@ -54,18 +67,22 @@ createServer(async(req,res)=>{
   let raw="";for await(const chunk of req)raw+=chunk;
   const data=raw?JSON.parse(raw):{};
   const respond=(body:any,status=200)=>{res.statusCode=status;res.end(JSON.stringify(body));};
-  if(path==="/__reset"){bundle.awards=[];bundle.canManage=true;providerSuccess=false;requests.length=0;return respond({ok:true});}
+  if(path==="/__reset"){bundle.awards=[];bundle.canManage=true;providerSuccess=false;configError=false;configDelay=0;enabled=true;requests.length=0;return respond({ok:true});}
   if(path==="/__requests")return respond(requests);
-  if(path==="/__mode"){if(data.captain!==undefined)bundle.canManage=data.captain;if(data.providerSuccess!==undefined)providerSuccess=data.providerSuccess;return respond({ok:true});}
+  if(path==="/__mode"){if(data.captain!==undefined)bundle.canManage=data.captain;if(data.providerSuccess!==undefined)providerSuccess=data.providerSuccess;if(data.configError!==undefined)configError=data.configError;if(data.configDelay!==undefined)configDelay=data.configDelay;if(data.enabled!==undefined)enabled=data.enabled;return respond({ok:true});}
   if(path==="/__seed"){
     for(let n=0;n<3;n++)bundle.awards.push(makeAward({name:`Captain award ${n+1}`,cadence:"week",holder:{id:"captain",name:"Alex Captain"}}));
     bundle.awards.push(makeAward({name:"Teammate only",cadence:"week",holder:{id:"player",name:"Jordan Player"}}));
     return respond({ok:true});
   }
   requests.push({path,method:req.method,data});
-  if(path==="/api/team-awards/config")return respond({enabled:true});
+  if(path==="/api/team-awards/config"){
+    if(configDelay)await new Promise(resolve=>setTimeout(resolve,configDelay));
+    return configError?respond({message:"Fixture config unavailable"},503):respond({enabled});
+  }
   if(path==="/api/team-awards/holders")return respond(holders());
   if(path==="/api/teams/team-a/awards"&&req.method==="GET")return respond(bundle);
+  if(path==="/api/teams/team-b/awards"&&req.method==="GET")return respond({...bundle,awards:[],canManage:false});
   if(path==="/api/teams/team-a/award-settings"){bundle.timezone=data.timezone;return respond({ok:true});}
   const award=bundle.awards.find(a=>path.includes(a.id));
   if(req.method==="POST"&&path==="/api/teams/team-a/awards"){

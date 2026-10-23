@@ -915,7 +915,7 @@ export default function Teams() {
                   </div>
                 </div>
 
-                {currentTeam?.id === team.id && <TeamAwardsSection teamId={team.id} />}
+                {currentTeam?.id === team.id && <TeamAwardsSection key={team.id} teamId={team.id} />}
 
                 {/* Line Combinations Manager (Roster + inline line editor) */}
                 <LineManager 

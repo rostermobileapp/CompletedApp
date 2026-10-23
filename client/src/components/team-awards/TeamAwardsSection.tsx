@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, Clock3, History, Plus, Trophy, Users } from 'lucide-react';
+import { Archive, ChevronDown, Clock3, History, Plus, Trophy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -32,6 +33,7 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
   const [grantAward, setGrantAward] = useState<TeamAward | null>(null);
   const [grantPlayer, setGrantPlayer] = useState('');
   const [reassign, setReassign] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const config = useQuery<{ enabled: boolean; setupRequired?: boolean }>({
     queryKey: configKey, queryFn: async () => (await apiRequest('GET', '/api/team-awards/config')).json(),
     staleTime: 60_000,
@@ -74,24 +76,33 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
   const zones = useMemo(() => {
     try { return (Intl as any).supportedValuesOf?.('timeZone') as string[] ?? []; } catch { return []; }
   }, []);
-  if (config.isLoading) return <section aria-label="Team awards" className="animate-pulse rounded-2xl bg-muted/40 p-6"><div className="h-5 w-48 rounded bg-muted" /><div className="mt-4 h-20 rounded-xl bg-muted" /></section>;
-  if (config.isError) return <section className="rounded-xl border border-border p-4"><ErrorLine message="Award settings could not be loaded." retry={() => void config.refetch()} /></section>;
-  if (!config.data?.enabled) return null;
-  if (config.data.setupRequired && !bundle.data && !bundle.isError) return <Card className="border-dashed"><CardContent className="flex items-start gap-3 p-4"><Clock3 className="mt-0.5 h-5 w-5 text-muted-foreground" /><div><p className="font-medium">Team awards are getting set up</p><p className="text-sm text-muted-foreground">They’ll be ready here once this team’s award setup is complete.</p></div></CardContent></Card>;
+  if (config.data && !config.data.enabled) return null;
 
-  return <section className="space-y-4" aria-label="Custom team awards">
-    <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
-      <CardHeader className="flex flex-col items-stretch gap-3 border-b border-border/60 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Trophy className="h-5 w-5" /></div><div><CardTitle className="text-lg">Custom Team Awards</CardTitle><p className="mt-0.5 text-sm text-muted-foreground">Little traditions, made by your team.</p></div></div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowArchived((v) => !v)}><History className="mr-1.5 h-4 w-4" />{showArchived ? 'Active awards' : 'History'}</Button>
-          {bundle.data?.canManage && !showArchived && <Button size="sm" onClick={() => setCreating(true)} disabled={activeCount >= (bundle.data?.activeLimit ?? 5)}><Plus className="mr-1.5 h-4 w-4" />Create Award</Button>}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 p-4 sm:p-6">
-        {bundle.isLoading && <div className="space-y-2 animate-pulse"><div className="h-16 rounded-xl bg-muted" /><div className="h-16 rounded-xl bg-muted" /></div>}
-        {bundle.isError && <ErrorLine message="Awards could not be loaded." retry={() => void bundle.refetch()} />}
-        {bundle.data && <>
+  return <section aria-label="Custom team awards">
+    <Collapsible open={expanded} onOpenChange={setExpanded}>
+      <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
+        <CardHeader className="p-0">
+          <CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5">
+            <span className="text-sm font-semibold">Custom Team Awards</span>
+            <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="space-y-4 border-t border-border/60 p-4 sm:p-5">
+            {config.isLoading && <div aria-label="Loading award settings" className="space-y-2 animate-pulse"><div className="h-4 w-48 rounded bg-muted" /><div className="h-14 rounded-xl bg-muted" /></div>}
+            {config.isError && <ErrorLine message="Award settings could not be loaded." retry={() => void config.refetch()} />}
+            {config.data?.enabled && config.data.setupRequired && !bundle.data && !bundle.isError && <div className="flex items-start gap-3 rounded-xl border border-dashed border-border p-4"><Clock3 className="mt-0.5 h-5 w-5 text-muted-foreground" /><div><p className="font-medium">Team awards are getting set up</p><p className="text-sm text-muted-foreground">They’ll be ready here once this team’s award setup is complete.</p></div></div>}
+            {config.data?.enabled && (!config.data.setupRequired || !!bundle.data || bundle.isError) && <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">Little traditions, made by your team.</p>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowArchived((v) => !v)}><History className="mr-1.5 h-4 w-4" />{showArchived ? 'Active awards' : 'History'}</Button>
+                  {bundle.data?.canManage && !showArchived && <Button size="sm" onClick={() => setCreating(true)} disabled={activeCount >= (bundle.data?.activeLimit ?? 5)}><Plus className="mr-1.5 h-4 w-4" />Create Award</Button>}
+                </div>
+              </div>
+              {bundle.isLoading && <div className="space-y-2 animate-pulse"><div className="h-16 rounded-xl bg-muted" /><div className="h-16 rounded-xl bg-muted" /></div>}
+              {bundle.isError && <ErrorLine message="Awards could not be loaded." retry={() => void bundle.refetch()} />}
+              {bundle.data && <>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>{activeCount} of {bundle.data.activeLimit ?? 5} active awards</span>
             <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{bundle.data.roster.length} players</span>
@@ -107,9 +118,12 @@ export function TeamAwardsSection({ teamId }: { teamId: string }) {
           <div className="grid gap-3">
             {visibleAwards.map((award) => <AwardRow key={award.id} award={award} canManage={bundle.data!.canManage} onEdit={() => setEditing(award)} onArchive={() => mutation.mutate({ method: 'PATCH', path: `/api/teams/${teamId}/awards/${award.id}`, data: { archived: true } })} onGrant={() => { setGrantAward(award); setGrantPlayer(''); setReassign(false); }} />)}
           </div>
-        </>}
-      </CardContent>
-    </Card>
+              </>}
+            </>}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
     {(creating || editing) && <AwardDialog teamId={teamId} award={editing} onClose={() => { setEditing(null); setCreating(false); }} onSave={save} onImageSaved={refresh} onError={(message) => toast({ title: 'Image update', description: message, variant: 'destructive' })} />}
     {grantAward && bundle.data && <Dialog open onOpenChange={(open) => { if (!open) setGrantAward(null); }}>
       <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl p-5 sm:p-6">
