@@ -10,23 +10,29 @@ import {
 import { db } from './db';
 import { formatFullDateTime } from './dateUtils';
 import { sendGameScheduleChangedPushNotification } from './oneSignalNotifications';
-import { hasGameScheduleTimeChanged } from './gameScheduleTime';
+import {
+  buildGameScheduleChangeMessage,
+  hasGameScheduleDetailsChanged,
+  hasGameScheduleTimeChanged,
+  hasGameVenueChanged,
+} from './gameScheduleTime';
 
 type GameScheduleSnapshot = Pick<
   Game,
-  'id' | 'leagueId' | 'homeTeamId' | 'awayTeamId' | 'opponentName' | 'scheduledAt'
+  'id' | 'leagueId' | 'homeTeamId' | 'awayTeamId' | 'opponentName' | 'scheduledAt' | 'venue'
 >;
 
 /**
  * Notifies the approved roster members, league-assigned members, game RSVPs,
- * and team leads associated with either the old or new teams. The caller should
- * invoke this only after the game update has been committed.
+ * and team leads associated with either the old or new teams when the game time
+ * or venue changes. The caller should invoke this only after the game update
+ * has been committed.
  */
 export async function notifyAffectedMembersOfGameScheduleChange(
   before: GameScheduleSnapshot,
   after: GameScheduleSnapshot,
 ): Promise<void> {
-  if (!hasGameScheduleTimeChanged(before, after)) return;
+  if (!hasGameScheduleDetailsChanged(before, after)) return;
 
   const teamIds = Array.from(new Set(
     [before.homeTeamId, before.awayTeamId, after.homeTeamId, after.awayTeamId]
@@ -87,10 +93,17 @@ export async function notifyAffectedMembersOfGameScheduleChange(
     ? teamById.get(after.awayTeamId)?.name || 'Away team'
     : after.opponentName;
   const matchup = awayName ? `${awayName} at ${homeName}` : `${homeName} game`;
-  const newScheduledTime = formatFullDateTime(
-    after.scheduledAt,
-    leagueRows[0]?.timezone,
-  );
+  const timeChanged = hasGameScheduleTimeChanged(before, after);
+  const venueChanged = hasGameVenueChanged(before, after);
+  const newScheduledTime = timeChanged
+    ? formatFullDateTime(after.scheduledAt, leagueRows[0]?.timezone)
+    : null;
+  const message = buildGameScheduleChangeMessage(matchup, {
+    timeChanged,
+    venueChanged,
+    newScheduledTime: newScheduledTime ?? undefined,
+    newVenue: after.venue,
+  });
 
   const recipientIds = Array.from(recipients);
   const deliveryResults: boolean[] = [];
@@ -102,8 +115,7 @@ export async function notifyAffectedMembersOfGameScheduleChange(
         deliveryResults.push(await sendGameScheduleChangedPushNotification(
           userId,
           after.id,
-          matchup,
-          newScheduledTime,
+        message,
         ));
       } catch (error) {
         deliveryResults.push(false);

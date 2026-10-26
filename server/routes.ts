@@ -13,7 +13,7 @@ import { storage } from "./storage";
 import {
   notifyAffectedMembersOfGameScheduleChange,
 } from "./gameScheduleNotifications";
-import { hasGameScheduleTimeChanged } from "./gameScheduleTime";
+import { hasGameScheduleDetailsChanged } from "./gameScheduleTime";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, previewLeaguePlaceholderMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
 import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
 import { hasAccountMergeOperatorContext, hasRealAccountMergeActor, assertAccountMergeAccess } from "./accountMergeAuthorization";
@@ -10707,7 +10707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // No conversion needed - string is passed through directly to storage
       
       const updatedGame = await storage.updateGame(gameId, updates);
-      if (hasGameScheduleTimeChanged(existingGame, updatedGame)) {
+      if (hasGameScheduleDetailsChanged(existingGame, updatedGame)) {
         void notifyAffectedMembersOfGameScheduleChange(existingGame, updatedGame).catch(error => {
           console.error(`[GameScheduleChange] Failed to notify members for game ${gameId}:`, error);
         });
@@ -27529,7 +27529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (
               previousLinkedGame &&
               updatedLinkedGame &&
-              hasGameScheduleTimeChanged(previousLinkedGame, updatedLinkedGame)
+              hasGameScheduleDetailsChanged(previousLinkedGame, updatedLinkedGame)
             ) {
               void notifyAffectedMembersOfGameScheduleChange(
                 previousLinkedGame,

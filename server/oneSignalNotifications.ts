@@ -422,13 +422,12 @@ export async function sendScheduleReminderPushNotification(
 export async function sendGameScheduleChangedPushNotification(
   recipientId: string,
   gameId: string,
-  matchup: string,
-  newScheduledTime: string,
+  message: string,
 ): Promise<boolean> {
   return sendPushNotificationToUser({
     userId: recipientId,
-    title: 'Game schedule changed',
-    message: `${matchup} is now scheduled for ${newScheduledTime}.`,
+    title: 'Game details changed',
+    message,
     data: {
       type: 'game_schedule_changed',
       gameId,
