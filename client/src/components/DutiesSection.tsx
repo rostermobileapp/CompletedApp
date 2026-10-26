@@ -14,6 +14,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Pizza,
   Coffee,
   UtensilsCrossed,
@@ -81,6 +96,8 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
   const [editingDuty, setEditingDuty] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingDuty, setDeletingDuty] = useState<any>(null);
+  const [assigningDuty, setAssigningDuty] = useState<any>(null);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
 
   const { data: dutyTemplates = [] } = useQuery({
     queryKey: ['/api/games', gameId, 'teams', teamId, 'duties'],
@@ -97,6 +114,57 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
       return response.json();
     },
     refetchOnMount: 'always',
+  });
+
+  const {
+    data: dutyPlayers = [],
+    isLoading: isLoadingDutyPlayers,
+    isError: isDutyPlayersError,
+    error: dutyPlayersError,
+    refetch: refetchDutyPlayers,
+  } = useQuery({
+    queryKey: ['/api/games', gameId, 'teams', teamId, 'duty-players'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/games/${gameId}/teams/${teamId}/duty-players`);
+      return response.json();
+    },
+    enabled: isCaptain && !!assigningDuty,
+  });
+
+  const assignmentMutation = useMutation({
+    mutationFn: async ({ dutyTemplateId, userId }: { dutyTemplateId: string; userId: string | null }) => {
+      const response = await apiRequest(
+        'PUT',
+        `/api/games/${gameId}/duties/${dutyTemplateId}/assignment`,
+        { teamId, userId },
+      );
+      return response.json();
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'teams', teamId, 'duties'] }),
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey as unknown[];
+            return Array.isArray(key) && key[0] === '/api/duty-assignments';
+          },
+        }),
+        // League/game summaries include beverage-duty counts and team game data.
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/teams', teamId] }),
+      ]);
+      toast({ title: 'Success', description: 'Duty assignment updated' });
+      setAssigningDuty(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update duty assignment',
+        variant: 'destructive',
+      });
+    },
   });
 
   const claimDutyMutation = useMutation({
@@ -291,6 +359,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
   const getAssignment = (dutyTemplateId: string, template: any) => {
     // Match by duty template ID and the template's actual team ID (handles tournament team -> regular team mapping)
     // The template.teamId is always the regular team ID since the backend resolves tournament teams
+    if (!dutyTemplateId || !template?.teamId) return undefined;
     return dutyAssignments.find((a: any) => a.dutyTemplateId === dutyTemplateId && a.teamId === template.teamId);
   };
 
@@ -302,6 +371,12 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
   const handleDeleteClick = (template: any) => {
     setDeletingDuty(template);
     setShowDeleteDialog(true);
+  };
+
+  const handleAssignClick = (template: any, assignment: any) => {
+    setSelectedAssigneeId(assignment?.userId || '');
+    assignmentMutation.reset();
+    setAssigningDuty(template);
   };
 
   const renderIcon = (template: any) => {
@@ -352,26 +427,37 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
           return (
             <div
               key={template.id}
-              className="flex items-center justify-between p-3 rounded-lg border bg-card"
+              className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg border bg-card"
               data-testid={`duty-${template.id}`}
             >
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-8 h-8">
                   {renderIcon(template)}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium">{template.name}</p>
                   {isClaimed && (
                     <p className="text-sm text-muted-foreground">
                       {isClaimedByMe
-                        ? 'You claimed this'
-                        : `Claimed by ${assignment.user?.firstName} ${assignment.user?.lastName}`}
+                        ? 'Assigned to you'
+                        : `Assigned to ${[assignment.user?.firstName, assignment.user?.lastName].filter(Boolean).join(' ') || 'a player'}`}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
+                {isCaptain && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAssignClick(template, assignment)}
+                    data-testid={`button-assign-duty-${template.id}`}
+                  >
+                    {isClaimed ? 'Reassign' : 'Assign'}
+                  </Button>
+                )}
+
                 {/* Captain edit/delete buttons */}
                 {isCaptain && (
                   <>
@@ -475,6 +561,107 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={!!assigningDuty}
+        onOpenChange={(open) => {
+          if (!open && !assignmentMutation.isPending) setAssigningDuty(null);
+        }}
+      >
+        <DialogContent className="w-[calc(100%_-_2rem)] max-w-md">
+          <DialogHeader>
+            <DialogTitle>{getAssignment(assigningDuty?.id, assigningDuty)?.userId ? 'Reassign duty' : 'Assign duty'}</DialogTitle>
+            <DialogDescription>
+              Choose a roster player or approved substitute for {assigningDuty?.name}.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingDutyPlayers ? (
+            <div className="space-y-2 py-2" aria-live="polite" aria-label="Loading eligible players">
+              <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+              <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+            </div>
+          ) : isDutyPlayersError ? (
+            <div className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-3" role="alert">
+              <p className="text-sm text-destructive">
+                {(dutyPlayersError as Error)?.message || 'Could not load eligible players.'}
+              </p>
+              <Button type="button" size="sm" variant="outline" onClick={() => refetchDutyPlayers()}>
+                Try again
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {dutyPlayers.length === 0 ? (
+                <p className="rounded-md border p-3 text-sm text-muted-foreground">
+                  No roster players or approved substitutes are available for this game.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <label htmlFor="duty-assignee" className="text-sm font-medium">Player</label>
+                  <Select value={selectedAssigneeId} onValueChange={setSelectedAssigneeId}>
+                    <SelectTrigger id="duty-assignee" className="w-full">
+                      <SelectValue placeholder="Select a player" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dutyPlayers.map((player: any) => (
+                        <SelectItem key={player.userId} value={player.userId}>
+                          {[player.firstName, player.lastName].filter(Boolean).join(' ') || 'Team player'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {getAssignment(assigningDuty?.id, assigningDuty) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-start text-destructive hover:text-destructive"
+                  onClick={() => setSelectedAssigneeId('')}
+                  aria-pressed={selectedAssigneeId === ''}
+                >
+                  Clear current assignment
+                </Button>
+              )}
+              {assignmentMutation.isError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {(assignmentMutation.error as Error)?.message || 'Could not save this assignment. Please try again.'}
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setAssigningDuty(null)}
+              disabled={assignmentMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => assigningDuty && assignmentMutation.mutate({
+                dutyTemplateId: assigningDuty.id,
+                userId: selectedAssigneeId || null,
+              })}
+              disabled={
+                assignmentMutation.isPending ||
+                isLoadingDutyPlayers ||
+                isDutyPlayersError ||
+                (selectedAssigneeId === '' && !getAssignment(assigningDuty?.id, assigningDuty))
+              }
+              data-testid="button-save-duty-assignment"
+            >
+              {assignmentMutation.isPending ? 'Saving…' : 'Save assignment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

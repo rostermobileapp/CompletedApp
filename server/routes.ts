@@ -7,6 +7,7 @@ import { getTeamRosterStats } from "./teamRosterStats";
 import { leagueStatsPlayerEligible } from "./leagueStatsEligibility";
 import { registerTeamStatsRoute } from "./teamStatsRoute";
 import { registerTeamAwardRoutes } from "./teamAwardRoutes";
+import { registerDutyAssignmentRoutes } from "./dutyAssignmentRoutes";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, previewLeaguePlaceholderMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
@@ -12094,6 +12095,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Custom duty routes
+  registerDutyAssignmentRoutes(app, isAuthenticated, db, storage);
+
   app.post('/api/teams/:teamId/duties', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -12421,7 +12424,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
 
-      await storage.releaseDuty(dutyTemplateId, gameId, effectiveTeamId);
+      // A stale self-release must not clear a captain's reassignment to someone else.
+      await storage.releaseDuty(dutyTemplateId, gameId, effectiveTeamId, userId);
       res.json({ success: true });
     } catch (error) {
       console.error('Error releasing duty:', error);

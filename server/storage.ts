@@ -515,7 +515,7 @@ export interface IStorage {
   deleteDutyTemplate(id: string): Promise<void>;
   deleteDutyAssignmentsForGameAndTemplate(gameId: string, dutyTemplateId: string, teamId: string, excludedBy: string): Promise<void>;
   claimDuty(assignment: InsertDutyAssignment): Promise<DutyAssignment>;
-  releaseDuty(dutyTemplateId: string, gameId: string, teamId: string): Promise<void>;
+  releaseDuty(dutyTemplateId: string, gameId: string, teamId: string, claimantUserId?: string): Promise<void>;
   getDutyAssignmentsByGame(gameId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; user: User })[]>;
   getDutyAssignmentsByUser(userId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; game: Game })[]>;
   
@@ -6697,7 +6697,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async releaseDuty(dutyTemplateId: string, gameId: string, teamId: string): Promise<void> {
+  async releaseDuty(dutyTemplateId: string, gameId: string, teamId: string, claimantUserId?: string): Promise<void> {
     // Validate that the template belongs to the supplied team
     const template = await this.getDutyTemplateById(dutyTemplateId);
     if (template && template.teamId !== teamId) {
@@ -6710,7 +6710,8 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(dutyAssignments.dutyTemplateId, dutyTemplateId),
           eq(dutyAssignments.gameId, gameId),
-          eq(dutyAssignments.teamId, teamId)
+          eq(dutyAssignments.teamId, teamId),
+          claimantUserId ? eq(dutyAssignments.userId, claimantUserId) : undefined
         )
       );
   }
