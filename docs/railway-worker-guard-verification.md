@@ -24,6 +24,62 @@ The service/environment IDs above are verified **Railway metadata**, not a claim
 that the connector read those generated variables inside the running container.
 Presence of a variable name alone is not evidence of its value.
 
+## Pending source changes and production behavior
+
+Railway's live source is GitHub repo `rostermobileapp/CompletedApp`, branch
+`10_1_2026`, with deployed commit `adfd012b0e9b0faacd77ce785c74ea5cda5457fa`.
+The Replit workspace branch currently has **7 commits ahead** of its
+`origin/10_1_2026`. No push was made. Pushing that branch is not a one-commit
+release; it would send all seven commits.
+
+The pending server production-path files are:
+
+- `server/runtimeBootstrap.ts` and `server/runtimePolicy.ts`: verify the
+  runtime identity before application startup and emit a sanitized startup line.
+- `server/index.ts` and `server/routes.ts`: guard existing startup initializers,
+  provider construction, and job starters. With the verified production values,
+  these guards pass and the existing calls still run.
+- `server/resend.ts` and `server/oneSignalNotifications.ts`: guard direct
+  email/push delivery calls; both pass through for verified production.
+- `server/testDatabaseGuard.ts`: require verified production identity and then
+  keep using the existing `DATABASE_URL`.
+- `server/db.ts` and `server/supabaseStorage.ts`: import the early bootstrap.
+- `server/databasePool.ts`: adds a development-only pool; verified production
+  still uses the existing Neon pool.
+
+`client/src/hooks/useNativelyNotifications.ts`,
+`client/src/lib/firstRsvpTrigger.ts`, `client/src/lib/nativePurchases.ts`,
+`client/src/lib/nonproductionSafety.ts`, and `client/src/main.tsx` contain
+development-only client guards; a production Vite build does not activate them.
+`server/vite.ts`'s changes are development-only. Test launchers, schemas, scripts,
+and documentation are not app runtime changes.
+
+Therefore, for the exact verified Railway identity, the **intended functional
+production difference is the fail-fast identity check**, plus one sanitized
+startup log line; the existing worker and provider paths pass their guards.
+If a literal diff that touches only the startup-check files is required, the
+current seven-commit branch does not satisfy that constraint. Do not release it
+as if it were a one-file change.
+
+## Delivery trigger
+
+Railway reports a GitHub source and branch, but its read-only service
+configuration does not expose whether Auto Deploy is enabled or the active
+watch paths. The latest deployment's generic `reason=deploy` does not determine
+whether it came from a GitHub push or a manual action.
+
+Before release, open **Railway → Roster → CompletedApp → Settings** and inspect
+the source/deploy settings for the connected branch, the Auto Deploy setting,
+and any watch paths:
+
+- If Auto Deploy is on, a GitHub push to `10_1_2026` that matches its watch
+  paths can start a Railway build and deployment.
+- If Auto Deploy is off, pushing changes source but does not start deployment;
+  an explicit Railway Deploy/redeploy action starts it.
+
+The actual trigger has not been verified. Do not push or use Railway's Deploy
+action until the owner checks it and chooses the deployment time.
+
 ## Before approving the production release
 
 In Railway, open **Roster → production → CompletedApp**:
@@ -42,7 +98,7 @@ In Railway, open **Roster → production → CompletedApp**:
    and not a local `railway run` environment, to print only these non-secret IDs:
 
    ```sh
-   node -e 'console.log(JSON.stringify({RAILWAY_ENVIRONMENT_ID:process.env.RAILWAY_ENVIRONMENT_ID,RAILWAY_SERVICE_ID:process.env.RAILWAY_SERVICE_ID},null,2))'
+   node -e 'for (const k of ["RAILWAY_ENVIRONMENT_ID","RAILWAY_SERVICE_ID"]) console.log(`${k}=${process.env[k] ?? "<missing>"}`)'
    ```
 
    Do not dump the full environment or paste credentials. Resolve missing or
