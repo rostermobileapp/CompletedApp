@@ -33,6 +33,7 @@ function ScrollStory() {
   const [answerState, setAnswerState] = useState("");
   const [heroWordIndex, setHeroWordIndex] = useState(0);
   const [heroRotationEnabled, setHeroRotationEnabled] = useState(false);
+  const previousHeroWordIndex = useRef(0);
   const reduced = useRef(false);
 
   useEffect(() => {
@@ -68,6 +69,10 @@ function ScrollStory() {
     }, 2800);
     return () => window.clearInterval(interval);
   }, [heroRotationEnabled]);
+
+  useEffect(() => {
+    previousHeroWordIndex.current = heroWordIndex;
+  }, [heroWordIndex]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -154,7 +159,23 @@ function ScrollStory() {
           LESS ADMIN<br />
           <span className="rs-hero-final-line" aria-hidden="true">
             <span className="rs-hero-word-line">MORE&nbsp;
-              <span key={heroWordIndex} className="rs-hero-word-visible">{heroWords[heroWordIndex]}</span>
+              <span className="rs-hero-word-visible">
+                {heroWords[heroWordIndex].split("").map((letter, letterIndex) => {
+                  const previousWord = heroWords[previousHeroWordIndex.current];
+                  const changed = heroRotationEnabled
+                    && previousHeroWordIndex.current !== heroWordIndex
+                    && previousWord[letterIndex] !== letter;
+                  return (
+                    <span
+                      key={`${letterIndex}-${letter}`}
+                      className={`rs-hero-flap-letter${changed ? " is-flipping" : ""}`}
+                      style={{ animationDelay: `${letterIndex * 24}ms` }}
+                    >
+                      {letter === " " ? "\u00a0" : letter}
+                    </span>
+                  );
+                })}
+              </span>
             </span>
           </span>
           <span className="rs-sr-only">MORE HOCKEY</span>
