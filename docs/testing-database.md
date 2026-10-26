@@ -68,11 +68,12 @@ They do not measure application traffic, egress savings, or performance changes.
 
 ## Development status and reversal
 
-The development Supabase project is distinct from the current app project, and
-both supplied API keys passed its settings-endpoint check. SQL TLS validation
-with Supabase's published root CA proceeds to PostgreSQL authentication, which
-currently fails with `28P01`. A corrected **DEV_DATABASE_URL** is needed before
-schema setup, synthetic seeding, full dev delivery/worker isolation, or first boot.
+The corrected development Supabase connection passed a read-only SQL check with
+TLS certificate verification enabled and Supabase's published root CA. It is
+distinct from the current app project and contains zero public application
+tables and zero Auth users. Both supplied API keys passed its settings-endpoint
+check. Schema setup, synthetic fixtures, full dev delivery/worker isolation and
+first boot remain pending; validating credentials does not activate isolation.
 No production connection, records, hosted settings, or deployment were changed.
 
 Keep the application workflow stopped until Release 1 is verified. Reversing the
