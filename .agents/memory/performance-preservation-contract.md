@@ -21,7 +21,7 @@ For the Supabase egress effort, authentication stays unchanged and optimization 
 
 **How to apply:** Attribute queries independently to normalized routes and named worker cycles, measure calls/rows/approximate result bytes for a bounded 24–48-hour production window, remove instrumentation afterward, and propose byte-ranked batches for new approval. Do not treat application-query measurements as coverage of Supabase Auth internal SQL or as exact billed egress.
 
-Environment separation is its own first release. Development/test must use a new nonproduction Supabase project with synthetic data, must not run production workers, and must not send live pushes, emails or billing activity.
+Environment separation is its own first release. Development must use a new nonproduction Supabase project with synthetic data; tests use a distinct Replit-managed PostgreSQL database. Neither may run production workers or send live pushes, emails or billing activity.
 
 **Why:** The owner explicitly requires isolation before measurement; scheduled-job guards alone do not protect direct/manual provider calls or startup billing/backfill activity.
 

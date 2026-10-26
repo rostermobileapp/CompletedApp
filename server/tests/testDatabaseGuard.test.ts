@@ -36,3 +36,67 @@ test("normal app processes retain their configured database", () => {
     appUrl,
   );
 });
+
+test("tests reject the development database independently of the production reference", () => {
+  assert.throws(
+    () => getDatabaseConnectionString({
+      DATABASE_URL: appUrl,
+      DEV_DATABASE_URL: testUrl,
+      TEST_DATABASE_URL: "postgres://other:different@DB.EXAMPLE.COM/isolated_test?sslmode=require",
+    }, ["example.test.ts"]),
+    /same database as DEV_DATABASE_URL/,
+  );
+  assert.equal(
+    getDatabaseConnectionString({
+      DATABASE_URL: appUrl,
+      DEV_DATABASE_URL: "postgres://dev:password@dev.example.com/dev",
+      TEST_DATABASE_URL: testUrl,
+    }, ["example.test.ts"]),
+    testUrl,
+  );
+});
+
+test("Supabase direct and pooled aliases identify the same database across ports", () => {
+  const variants = [
+    "postgres://postgres:one@db.project-a.supabase.co/postgres",
+    "postgres://postgres.project-a:two@aws-0-region.pooler.supabase.com:6543/postgres",
+    "postgres://reader.project-a:three@aws-1-region.pooler.supabase.com:5432/postgres",
+  ];
+  for (const source of variants) {
+    for (const target of variants) {
+      assert.throws(
+        () => getDatabaseConnectionString({
+          DATABASE_URL: source,
+          TEST_DATABASE_URL: target,
+        }, ["example.test.ts"]),
+        /same database/,
+      );
+    }
+  }
+  assert.equal(
+    getDatabaseConnectionString({
+      DATABASE_URL: variants[0],
+      DEV_DATABASE_URL: variants[1],
+      TEST_DATABASE_URL: "postgres://postgres.project-b:other@aws-0-region.pooler.supabase.com:6543/postgres",
+    }, ["example.test.ts"]),
+    "postgres://postgres.project-b:other@aws-0-region.pooler.supabase.com:6543/postgres",
+  );
+});
+
+test("unknown or malformed database identities fail closed without leaking credentials", () => {
+  const invalid = [
+    "postgres://postgres:sensitive@aws-0-region.pooler.supabase.com/postgres",
+    "postgres://user:sensitive@host.example.com/",
+    "postgres://user:sensitive@host.example.com/%XX",
+    "postgres://user:sensitive@host.example.com:invalid/test",
+  ];
+  for (const connectionString of invalid) {
+    assert.throws(
+      () => getDatabaseConnectionString({
+        DATABASE_URL: appUrl,
+        TEST_DATABASE_URL: connectionString,
+      }, ["example.test.ts"]),
+      (error: unknown) => error instanceof Error && !error.message.includes("sensitive"),
+    );
+  }
+});
