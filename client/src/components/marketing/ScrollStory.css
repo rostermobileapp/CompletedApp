@@ -72,6 +72,14 @@
 .rs-hero h1 { margin:27px 0 22px; max-width:1100px;font-size:clamp(67px,10.1vw,140px);letter-spacing:.015em;text-shadow:0 4px 36px rgba(1,9,18,.35); }
 .rs-hero h1.rs-hero-title { margin-top:1px;color:#ffffff; }
 .rs-hero h1 span { color:var(--blue); }
+.rs-hero-final-line { display:inline-grid;grid-template-areas:"line";white-space:nowrap; }
+.rs-hero-final-line:after { content:"MORE FELLOWSHIP";grid-area:line;visibility:hidden; }
+.rs-hero-word-line { grid-area:line;justify-self:center;white-space:nowrap; }
+.rs-hero-word-visible { display:inline-block;animation:rs-hero-word-enter 420ms cubic-bezier(.2,.75,.25,1) both; }
+@keyframes rs-hero-word-enter {
+  from { opacity:0;transform:translateY(.2em); }
+  to { opacity:1;transform:translateY(0); }
+}
 .rs-hero-copy { max-width:700px; margin-top:100px; font-size:clamp(16px,1.6vw,20px); line-height:1.6; color:#ffffff;font-weight:600;text-shadow:0 2px 18px rgba(1,9,18,.62); }
 .rs-hero-features { display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;margin:12px auto 0;padding:0 18px;max-width:850px;list-style:disc;list-style-position:inside;color:#fff;font-size:14px;line-height:1.5;text-shadow:0 2px 18px rgba(1,9,18,.62); }
 .rs-hero-features li { padding:0; }
@@ -166,7 +174,7 @@
   .rs-mobile-menu { display:grid;position:absolute;top:calc(100% + 8px);left:0;right:0;padding:10px;border-radius:15px;border:1px solid #29445f;background:rgba(8,22,40,.97); }
   .rs-mobile-menu a { padding:13px 12px;min-height:44px; }
   .rs-hero { padding:85px 20px 38px;min-height:max(820px,100svh); }
-  .rs-hero h1 { font-size:clamp(59px,14.5vw,96px);line-height:.88;letter-spacing:.015em; }
+  .rs-hero h1 { font-size:clamp(36px,12vw,90px);line-height:.88;letter-spacing:.015em; }
   .rs-hero-copy { margin-top:80px;font-size:16px;max-width:35rem; }
   .rs-section { padding:88px 24px; }
   .rs-story,.rs-platform,.rs-trivia-grid { grid-template-columns:1fr;gap:42px; }
