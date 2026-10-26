@@ -7,7 +7,13 @@ The project uses Supabase for PostgreSQL hosting. The `DATABASE_URL` environment
 
 **Why:** replit.md previously said "Neon Database" but the user confirmed this was wrong — it is Supabase.
 
-**How to apply:** Use the same database connection source as the running app. Do not reference Neon in documentation or troubleshooting notes.
+**How to apply:** Use the same database connection source as the running app when diagnosing that environment. Do not reference Neon in documentation or troubleshooting notes.
+
+Tests must use separate Replit-managed PostgreSQL, not Supabase; development remains on its isolated Supabase project and production remains unchanged.
+
+**Why:** The owner explicitly requested Replit-managed PostgreSQL for tests only, with the test guard rejecting any target matching development or production.
+
+**How to apply:** Provision and securely wire the test connection without asking the owner for a Supabase test URL or replacing app connections. Audit Supabase-specific SQL fixtures and permissions separately; plain PostgreSQL does not provide hosted Auth/Storage services.
 
 Database health is transport-specific: a successful native PostgreSQL query does not establish that the running application's database connection is healthy.
 
