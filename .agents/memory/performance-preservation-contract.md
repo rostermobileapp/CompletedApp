@@ -20,3 +20,9 @@ For the Supabase egress effort, authentication stays unchanged and optimization 
 **Why:** The owner approved isolated development/production environments and temporary production measurement before any optimization batch, explicitly retaining the auth boundary.
 
 **How to apply:** Attribute queries independently to normalized routes and named worker cycles, measure calls/rows/approximate result bytes for a bounded 24–48-hour production window, remove instrumentation afterward, and propose byte-ranked batches for new approval. Do not treat application-query measurements as coverage of Supabase Auth internal SQL or as exact billed egress.
+
+Environment separation is its own first release. Development/test must use a new nonproduction Supabase project with synthetic data, must not run production workers, and must not send live pushes, emails or billing activity.
+
+**Why:** The owner explicitly requires isolation before measurement; scheduled-job guards alone do not protect direct/manual provider calls or startup billing/backfill activity.
+
+**How to apply:** Verify Railway's actual production environment before changing worker guards, preserve production behavior, and keep development stopped rather than reconnecting it to production during rollback. Measurement is a later release: exact calls/rows, about 1-in-20 sampled bytes, one aggregate log line per ten minutes to existing Railway logs, fixed expiry, then a separate removal release. No new sink.
