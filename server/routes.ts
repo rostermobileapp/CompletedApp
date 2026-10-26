@@ -10,6 +10,10 @@ import { registerTeamAwardRoutes } from "./teamAwardRoutes";
 import { registerDutyAssignmentRoutes } from "./dutyAssignmentRoutes";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import {
+  notifyAffectedMembersOfGameScheduleChange,
+} from "./gameScheduleNotifications";
+import { hasGameScheduleTimeChanged } from "./gameScheduleTime";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, previewLeaguePlaceholderMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
 import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
 import { hasAccountMergeOperatorContext, hasRealAccountMergeActor, assertAccountMergeAccess } from "./accountMergeAuthorization";
@@ -10703,6 +10707,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // No conversion needed - string is passed through directly to storage
       
       const updatedGame = await storage.updateGame(gameId, updates);
+      if (hasGameScheduleTimeChanged(existingGame, updatedGame)) {
+        void notifyAffectedMembersOfGameScheduleChange(existingGame, updatedGame).catch(error => {
+          console.error(`[GameScheduleChange] Failed to notify members for game ${gameId}:`, error);
+        });
+      }
       const formattedGame = formatGameForResponse(updatedGame);
       res.json(formattedGame);
     } catch (error) {
@@ -27505,7 +27514,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Schedule is set - create or update game
           if (match.gameId) {
             // Update existing game
-            await db
+            const previousLinkedGame = await storage.getGameById(match.gameId);
+            const [updatedLinkedGame] = await db
               .update(games)
               .set({
                 scheduledAt: scheduledTime,
@@ -27514,7 +27524,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 awayScore: team2Score !== undefined ? team2Score : match.team2Score,
                 isCompleted: status === 'completed'
               })
-              .where(eq(games.id, match.gameId));
+              .where(eq(games.id, match.gameId))
+              .returning();
+            if (
+              previousLinkedGame &&
+              updatedLinkedGame &&
+              hasGameScheduleTimeChanged(previousLinkedGame, updatedLinkedGame)
+            ) {
+              void notifyAffectedMembersOfGameScheduleChange(
+                previousLinkedGame,
+                updatedLinkedGame,
+              ).catch(error => {
+                console.error(
+                  `[GameScheduleChange] Failed to notify members for tournament game ${match.gameId}:`,
+                  error,
+                );
+              });
+            }
           } else {
             // Create new game
             const [newGame] = await db

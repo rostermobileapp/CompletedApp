@@ -32,6 +32,7 @@ export function getNotificationClickUrl(data: NotificationData, appBaseUrl: stri
       return urlFor(resourcePath('tournamentId', '/tournaments/'));
     case 'substitution':
     case 'player_rsvp':
+    case 'game_schedule_changed':
       return urlFor(resourcePath('gameId', '/game/'));
     case 'join_request':
       return urlFor(resourcePath('entityId', '/league-management/'));

@@ -13,6 +13,7 @@ describe('push notification click destinations', () => {
     ['changed tournament schedule', { type: 'tournament_schedule_changed', tournamentId: 't-1' }, `${APP_URL}/tournaments/t-1`],
     ['game substitution', { type: 'substitution', gameId: 'g-1' }, `${APP_URL}/game/g-1`],
     ['captain RSVP update', { type: 'player_rsvp', gameId: 'g-1', teamId: 'team-1' }, `${APP_URL}/game/g-1`],
+    ['game schedule change', { type: 'game_schedule_changed', gameId: 'g-1' }, `${APP_URL}/game/g-1`],
     ['team join request', { type: 'join_request', entityType: 'team', requestId: 'r-1', entityId: 'l-1' }, `${APP_URL}/league-management/l-1`],
     ['league join request', { type: 'join_request', entityType: 'league', requestId: 'r-1', entityId: 'l-1' }, `${APP_URL}/league-management/l-1`],
     ['league approval', { type: 'membership_approved', leagueId: 'l-1' }, `${APP_URL}/league-list`],

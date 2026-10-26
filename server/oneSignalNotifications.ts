@@ -419,6 +419,24 @@ export async function sendScheduleReminderPushNotification(
   });
 }
 
+export async function sendGameScheduleChangedPushNotification(
+  recipientId: string,
+  gameId: string,
+  matchup: string,
+  newScheduledTime: string,
+): Promise<boolean> {
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: 'Game schedule changed',
+    message: `${matchup} is now scheduled for ${newScheduledTime}.`,
+    data: {
+      type: 'game_schedule_changed',
+      gameId,
+    },
+    timeoutMs: 12_000,
+  });
+}
+
 export async function sendAnnouncementPushNotification(
   recipientId: string,
   authorName: string,
