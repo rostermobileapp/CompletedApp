@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { getAuthHeaders } from '@/lib/queryClient';
+import { assertClientDeliveryAllowed, isNonProductionClient } from "@/lib/nonproductionSafety";
 // Import Natively SDK from NPM package
 import { NativelyNotifications, NativelyInfo, useNatively } from 'natively';
 
@@ -122,6 +123,7 @@ export function useNativelyNotifications() {
 
   // Initialize Natively SDK instance using NPM package
   const getNativelyInstance = useCallback((): NativelyNotificationsSDK | null => {
+    assertClientDeliveryAllowed();
     if (nativelyInstanceRef.current) {
       return nativelyInstanceRef.current;
     }
@@ -185,6 +187,7 @@ export function useNativelyNotifications() {
 
   // Check for SDK on mount and when ready event fires
   useEffect(() => {
+    if (isNonProductionClient) return;
     // Initial check
     checkSDK();
     
@@ -240,6 +243,7 @@ export function useNativelyNotifications() {
 
   // Fetch user's displayId (the short ID like "LFB3Kf", NOT the UUID)
   useEffect(() => {
+    if (isNonProductionClient) return;
     if (!isAuthenticated || !user?.id) {
       setDisplayId(null);
       return;
@@ -498,6 +502,7 @@ export function useNativelyNotifications() {
 
   // Initialize and sync with OneSignal when user is authenticated
   useEffect(() => {
+    if (isNonProductionClient) return;
     // Don't proceed without a valid displayId (short ID like "LFB3Kf")
     if (!isAuthenticated || !user?.id || !displayId || hasInitialized.current) {
       if (!displayId && isAuthenticated && user?.id) {

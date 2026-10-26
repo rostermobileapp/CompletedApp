@@ -1,3 +1,4 @@
+import "./runtimeBootstrap";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Response } from "express";
 import { randomUUID } from "crypto";

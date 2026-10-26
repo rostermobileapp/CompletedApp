@@ -68,14 +68,13 @@ They do not measure application traffic, egress savings, or performance changes.
 
 ## Development status and reversal
 
-The corrected development Supabase connection passed a read-only SQL check with
-TLS certificate verification enabled and Supabase's published root CA. It is
-distinct from the current app project and contains zero public application
-tables and zero Auth users. Both supplied API keys passed its settings-endpoint
-check. Schema setup, synthetic fixtures, full dev delivery/worker isolation and
-first boot remain pending; validating credentials does not activate isolation.
-No production connection, records, hosted settings, or deployment were changed.
+Development now uses the separately verified Supabase project, synthetic
+identities/data, verified TLS, and explicit schema/catalog initialization.
+The guarded development workflow has booted successfully. Server and browser
+configuration point to the dev project; test PostgreSQL remains separate.
+See [development isolation](development-isolation.md) for commands, verified
+flows, restrictions, and reversal. No production records, hosted settings, or
+deployment were changed.
 
-Keep the application workflow stopped until Release 1 is verified. Reversing the
-test launcher/guard batch must not restart development against production. The
-test database can remain unused; do not drop it automatically during rollback.
+Reversal must leave development stopped, never reconnect it to production.
+Neither database should be dropped automatically during rollback.

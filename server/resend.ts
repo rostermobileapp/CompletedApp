@@ -57,6 +57,8 @@ async function getCredentials() {
 }
 
 export async function getUncachableResendClient() {
+  const { assertLiveDeliveryAllowed } = await import("./runtimePolicy");
+  assertLiveDeliveryAllowed();
   try {
     const {apiKey, fromEmail} = await getCredentials();
     return {

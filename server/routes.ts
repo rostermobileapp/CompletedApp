@@ -134,6 +134,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createHash, randomBytes } from 'crypto';
 import Stripe from "stripe";
+import { isVerifiedProductionRuntime, disabledProvider } from "./runtimePolicy";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail } from "./emails";
 import { startEventReminderJob } from "./eventReminderJob";
@@ -1115,19 +1116,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   // Auth middleware
   await setupAuth(app);
+  if (isVerifiedProductionRuntime()) {
   await ensureBadgeTables();
   await ensureTriviaTables();
+  }
   registerTriviaRoutes(app);
-  await ensureBirthdayTable();
-  console.log("[Init] badge catalog tables ensured");
+  if (isVerifiedProductionRuntime()) await ensureBirthdayTable();
+  console.log(isVerifiedProductionRuntime()
+    ? "[Init] badge catalog tables ensured"
+    : "[Init] Isolated dev uses explicit schema setup; production lifecycle work is disabled.");
   // Demo tables are startup-safe for deployments that use runtime migrations.
-  await ensureDemoTables();
+  if (isVerifiedProductionRuntime()) await ensureDemoTables();
   registerDemoRoutes(app, isAuthenticated);
 
   // Generic payment requests always write these optional fields, even when
   // they are null. Keep older deployed databases compatible with the current
   // insert shape before registering the routes that depend on these columns.
-  try {
+  if (isVerifiedProductionRuntime()) try {
     await db.execute(sql`
       ALTER TABLE payment_requests
         ADD COLUMN IF NOT EXISTS venmo_link_override text,
@@ -1417,6 +1422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Scorekeeper-confirmed attendance is separate from player RSVP. The
   // startup-safe DDL keeps existing deployments compatible until the next
   // schema push while the Drizzle table remains the source of truth.
+  if (isVerifiedProductionRuntime()) {
   try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS game_attendance (
@@ -1479,6 +1485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Team line management supports both the legacy primary captain field and
   // the multi-captain membership flag.
+  }
   const canManageTeamLines = async (team: any, userId: string) =>
     !!team &&
     (team.creatorId === userId || (await storage.isTeamCaptain(team.id, userId)));
@@ -1489,6 +1496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setDraftBroadcaster(broadcastToUser);
 
   // Ensure launch_at column exists (idempotent — safe on every startup)
+  if (isVerifiedProductionRuntime()) {
   try {
     await db.execute(sql`
       ALTER TABLE drafts
@@ -1802,6 +1810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   await ensureBeerBadgeEvaluationQueue();
   await reconcileCalendarYearBeerMe();
+  }
 
   // Lightweight endpoint for client runtime handlers and the ErrorBoundary to
   // report crashes so we can debug what's failing in production / on user devices.
@@ -3381,12 +3390,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stripe webhook routes only - subscription management handled via Stripe billing portal
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (isVerifiedProductionRuntime() && !process.env.STRIPE_SECRET_KEY) {
     throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
   }
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  const stripe = isVerifiedProductionRuntime() ? new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: "2024-06-20",
-  });
+  }) : disabledProvider<Stripe>();
 
   // Create checkout session for new subscriptions
   app.post('/api/stripe/create-checkout-session', isAuthenticated, async (req: any, res) => {
@@ -23638,7 +23647,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== GIPHY API ROUTES =====
   
   // Import Giphy service
-  const { giphyService } = await import('./giphyService');
+  const giphyService = isVerifiedProductionRuntime()
+    ? (await import("./giphyService")).giphyService
+    : disabledProvider<typeof import("./giphyService").giphyService>();
 
   // Search GIFs
   app.get('/api/giphy/search', isAuthenticated, async (req: any, res) => {
@@ -30888,6 +30899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Start the unified event reminder job (games and scrimmages)
+  if (isVerifiedProductionRuntime()) {
   startEventReminderJob();
   startBirthdayPushJob();
   
@@ -30896,6 +30908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Start the tournament access window job (emails on open, push 24h before close)
   startTournamentAccessJob();
+  }
 
   // ─── Admin Metrics Dashboard (founder-only) ──────────────────────────────
   const ADMIN_EMAIL = 'tobin@rosterhockey.com';

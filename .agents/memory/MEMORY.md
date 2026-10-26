@@ -1,5 +1,6 @@
 - [MP4 faststart for video scrub](mp4-faststart-scrub.md) — any seekable/scrub MP4 must have moov atom at front; use ffmpeg -movflags +faststart or currentTime seeks silently fail.
 - [Performance preservation](performance-preservation-contract.md) — egress work requires read-only approval first, unchanged data/freshness, and small reversible batches; auth and user sync deploy separately.
+- [Isolated dev preview](isolated-dev-preview.md) — dev-only hot reload stays off after rejected upgrades; preserve application WebSockets and never serve a production client as a workaround.
 - [Founder label scope](founder-label-scope.md) — exclusive Wall display title for the designated founder, never a new permission role or a title for other commissioners.
 - [Raw fetch auth pattern](raw-fetch-auth.md) — raw fetch() to backend must use getAuthHeaders() from queryClient; credentials:'include' does nothing (JWT not cookie).
 - [Database provider](db-provider.md) — PostgreSQL is hosted on Supabase, not Neon. DATABASE_URL points to Supabase's connection string.

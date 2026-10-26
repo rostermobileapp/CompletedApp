@@ -1,3 +1,6 @@
+import "./runtimeBootstrap";
+import { isVerifiedProductionRuntime } from "./runtimePolicy";
+import { nonproductionHttpGuard } from "./nonproductionHttp";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -22,6 +25,7 @@ import { createLineComboLearningWorker } from "./lineComboLearning";
 import { pool } from "./db";
 
 const app = express();
+app.use(nonproductionHttpGuard);
 const lineComboLearner = createLineComboLearningWorker(pool);
 let lineComboLearningReady = false;
 // Successful line saves refresh prospective forecasts promptly, not just on the
@@ -34,7 +38,7 @@ app.use((req, res, next) => {
   }
   next();
 });
-startTeamAwardPushJob();
+if (isVerifiedProductionRuntime()) startTeamAwardPushJob();
 
 // CORS configuration for Vercel frontend
 const allowedOriginsEnv = process.env.FRONTEND_URL 
@@ -117,6 +121,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  if (isVerifiedProductionRuntime()) {
   // Report only sanitized status from this actual runtime, never key material or JWTs.
   const appleSigningReadiness = await checkAppleSigningReadiness();
   console.info('[Apple IAP readiness]', JSON.stringify({
@@ -145,7 +150,9 @@ app.use((req, res, next) => {
   } catch (error: any) {
     console.error("[LineComboLearning] Automatic setup failed; learning is unavailable.", { code: error?.code ?? "unknown" });
   }
+  }
   const server = await registerRoutes(app);
+  if (isVerifiedProductionRuntime()) {
   await reconcileApplePurchaseLinks();
   startApplePurchaseLinkJob();
   startBeerBadgeEvaluationWorker();
@@ -166,6 +173,7 @@ app.use((req, res, next) => {
 
   // Start background jobs (scrimmage reminders + backup queue timeout cascade)
   startScrimmageReminderJob();
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -194,12 +202,14 @@ app.use((req, res, next) => {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    if (lineComboLearningReady) lineComboLearner.start();
+    if (isVerifiedProductionRuntime() && lineComboLearningReady) lineComboLearner.start();
     log(`serving on port ${port}`);
+    if (isVerifiedProductionRuntime()) {
     startDailyTriviaPushJob();
     // Backfill historical badges after readiness. Errors are logged per badge
     // family, so corrupt history cannot take down the API for every user.
     void runHistoricalBadgeBackfills().catch((error) =>
       console.error("[Badges] Unexpected backfill runner failure:", error));
+    }
   });
 })();

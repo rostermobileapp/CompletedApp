@@ -21,8 +21,14 @@ For the Supabase egress effort, authentication stays unchanged and optimization 
 
 **How to apply:** Attribute queries independently to normalized routes and named worker cycles, measure calls/rows/approximate result bytes for a bounded 24–48-hour production window, remove instrumentation afterward, and propose byte-ranked batches for new approval. Do not treat application-query measurements as coverage of Supabase Auth internal SQL or as exact billed egress.
 
-Environment separation is its own first release. Development must use a new nonproduction Supabase project with synthetic data; tests use a distinct Replit-managed PostgreSQL database. Neither may run production workers or send live pushes, emails or billing activity.
+Environment separation is its own first release. Development must use a new nonproduction Supabase project with synthetic data; tests use a distinct Replit-managed PostgreSQL database. The owner explicitly excludes Supabase for the test target. Neither may run production workers or send live pushes, emails or billing activity.
 
 **Why:** The owner explicitly requires isolation before measurement; scheduled-job guards alone do not protect direct/manual provider calls or startup billing/backfill activity.
 
 **How to apply:** Verify Railway's actual production environment before changing worker guards, preserve production behavior, and keep development stopped rather than reconnecting it to production during rollback. Measurement is a later release: exact calls/rows, about 1-in-20 sampled bytes, one aggregate log line per ten minutes to existing Railway logs, fixed expiry, then a separate removal release. No new sink.
+
+Lifecycle-guard releases must show exact verified Railway NODE_ENV, service/environment identity and replica-count evidence, or precise dashboard checks. Never ship a guard that can silently suppress production workers.
+
+**Why:** The owner repeated this as a release prerequisite and will verify live reminders, badge queue, birthday and trivia after release. Metadata identity is not proof that a job ran or delivered.
+
+**How to apply:** Distinguish deployment-scoped startup evidence from service-wide historical logs and platform metadata from container variable values. Reject production misconfiguration visibly before readiness; provide a four-job live verification checklist without triggering production deliveries as tests.

@@ -12,10 +12,13 @@
  */
 
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { assertLiveDeliveryAllowed } from "../server/runtimePolicy";
 import postgres from 'postgres';
 import * as schema from '../shared/schema';
 import { isNull, isNotNull, and, eq, sql, ne } from 'drizzle-orm';
 
+// This operational backfill must never execute from a development workspace.
+assertLiveDeliveryAllowed();
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error('DATABASE_URL environment variable is not set.');

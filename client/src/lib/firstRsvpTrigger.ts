@@ -8,6 +8,7 @@ import { getAuthHeaders } from '@/lib/queryClient';
  *   In-App Trigger  key: first_rsvp_completed  is  true
  */
 export async function fireFirstRsvpTrigger(): Promise<void> {
+  if (import.meta.env?.DEV || import.meta.env?.VITE_ISOLATED_DEVELOPMENT === "true") return;
   if (typeof window === 'undefined') return;
 
   try {
@@ -29,6 +30,7 @@ export async function fireFirstRsvpTrigger(): Promise<void> {
 }
 
 function setOneSignalTrigger(key: string, value: string): void {
+  if (import.meta.env?.DEV || import.meta.env?.VITE_ISOLATED_DEVELOPMENT === "true") return;
   // Try Natively SDK first (native app context)
   const hasNativelySDK = typeof (window as any).NativelyNotifications === 'function';
   if (hasNativelySDK) {

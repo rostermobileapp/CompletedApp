@@ -1,3 +1,5 @@
+import { isVerifiedProductionRuntime } from "./runtimePolicy";
+
 const testFilePattern = /(?:^|[/\\])[^/\\]+\.(?:test|spec)\.[cm]?[jt]sx?$/;
 
 export function isTestProcess(env: NodeJS.ProcessEnv, argv: readonly string[]): boolean {
@@ -6,7 +8,7 @@ export function isTestProcess(env: NodeJS.ProcessEnv, argv: readonly string[]): 
     argv.some((arg) => testFilePattern.test(arg));
 }
 
-function databaseEndpoint(connectionString: string): string {
+export function databaseEndpoint(connectionString: string): string {
   let url: URL;
   try {
     url = new URL(connectionString);
@@ -59,6 +61,15 @@ export function getDatabaseConnectionString(
       );
     }
     const testEndpoint = databaseEndpoint(env.TEST_DATABASE_URL);
+    if (env.NONPRODUCTION_FORBIDDEN_DATABASES) {
+      const forbidden: unknown = JSON.parse(env.NONPRODUCTION_FORBIDDEN_DATABASES);
+      if (!Array.isArray(forbidden) || forbidden.some(item => typeof item !== "string")) {
+        throw new Error("Invalid forbidden database identity configuration");
+      }
+      if (forbidden.includes(testEndpoint)) {
+        throw new Error("TEST_DATABASE_URL points to a forbidden production database");
+      }
+    }
     // DATABASE_URL remains the existing app/production reference; the new
     // development target is configured separately, never in place of it.
     for (const key of ["DATABASE_URL", "DEV_DATABASE_URL"] as const) {
@@ -69,6 +80,27 @@ export function getDatabaseConnectionString(
       }
     }
     return env.TEST_DATABASE_URL;
+  }
+  if (env.NODE_ENV !== "production") {
+    if (!env.DEV_DATABASE_URL) {
+      throw new Error("Development requires DEV_DATABASE_URL; refusing the application database");
+    }
+    const target = databaseEndpoint(env.DEV_DATABASE_URL);
+    if (env.DATABASE_URL && env.NONPRODUCTION_ISOLATED !== "1" &&
+        target === databaseEndpoint(env.DATABASE_URL)) {
+      throw new Error("Development database matches the application database");
+    }
+    if (env.NONPRODUCTION_FORBIDDEN_DATABASES) {
+      const forbidden: unknown = JSON.parse(env.NONPRODUCTION_FORBIDDEN_DATABASES);
+      if (!Array.isArray(forbidden) || forbidden.some(item => typeof item !== "string") ||
+          forbidden.includes(target)) {
+        throw new Error("Development database isolation could not be established");
+      }
+    }
+    return env.DEV_DATABASE_URL;
+  }
+  if (!isVerifiedProductionRuntime(env)) {
+    throw new Error("Production database access requires the verified Railway environment and service");
   }
   if (!env.DATABASE_URL) {
     throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");

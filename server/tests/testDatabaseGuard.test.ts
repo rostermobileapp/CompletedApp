@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getDatabaseConnectionString, isTestProcess } from "../testDatabaseGuard";
+import { PRODUCTION_RAILWAY_ENVIRONMENT, PRODUCTION_RAILWAY_SERVICE } from "../runtimePolicy";
 
 const appUrl = "postgresql://app:secret@db.example.com:5432/live";
 const testUrl = "postgresql://tester:secret@db.example.com:5432/isolated_test";
@@ -32,9 +33,16 @@ test("tests fail closed rather than use the app's database", () => {
 
 test("normal app processes retain their configured database", () => {
   assert.equal(
-    getDatabaseConnectionString({ DATABASE_URL: appUrl }, ["/app/server/index.ts"]),
+    getDatabaseConnectionString({
+      NODE_ENV: "production", DATABASE_URL: appUrl,
+      RAILWAY_ENVIRONMENT_ID: PRODUCTION_RAILWAY_ENVIRONMENT,
+      RAILWAY_SERVICE_ID: PRODUCTION_RAILWAY_SERVICE,
+    }, ["/app/server/index.ts"]),
     appUrl,
   );
+  assert.throws(() => getDatabaseConnectionString({
+    NODE_ENV: "production", DATABASE_URL: appUrl,
+  }, ["/app/server/index.ts"]), /verified Railway/);
 });
 
 test("tests reject the development database independently of the production reference", () => {

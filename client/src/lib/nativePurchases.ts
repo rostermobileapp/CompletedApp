@@ -1,4 +1,11 @@
-import { NativelyPurchases } from 'natively';
+import { NativelyPurchases as ProductionNativelyPurchases } from 'natively';
+import { assertClientDeliveryAllowed, isNonProductionClient } from "./nonproductionSafety";
+class NativelyPurchases extends ProductionNativelyPurchases {
+  constructor() {
+    assertClientDeliveryAllowed();
+    super();
+  }
+}
 import { v5 as uuidv5 } from 'uuid';
 import { extractProductId, extractPurchaseToken, isAlreadyOwnedPurchaseError, parseAndroidPurchaseStatus } from './androidPurchaseStatus';
 import type { AndroidPurchaseResult, AndroidPurchaseStatus } from './androidPurchaseStatus';
@@ -54,6 +61,7 @@ function toPromise<T>(fn: (cb: (data: T) => void) => void, timeoutMs = 15000): P
  * window.$agent is injected exclusively by the Natively bridge.
  */
 export async function isBillingSupported(): Promise<boolean> {
+  if (isNonProductionClient) return false;
   const ua = navigator.userAgent;
   return (
     typeof (window as any).$agent !== 'undefined' ||
@@ -72,6 +80,7 @@ export async function isBillingSupported(): Promise<boolean> {
  * slash, or no Natively token at all but $agent still injected on Android).
  */
 export async function isAndroidBillingSupported(waitMs = 5000): Promise<boolean> {
+  if (isNonProductionClient) return false;
   if (!navigator.userAgent.toLowerCase().includes('android')) return false;
   if (typeof (window as any).$agent !== 'undefined') return true;
 
@@ -238,6 +247,7 @@ export interface NativelyTransaction {
  * but consistent with the naming convention used by other purchases_* events).
  */
 export function setSubscriberAttributes(attributes: Record<string, string>): void {
+  assertClientDeliveryAllowed();
   try {
     const ctx = (window as any).natively;
     if (ctx && typeof ctx.trigger === 'function') {

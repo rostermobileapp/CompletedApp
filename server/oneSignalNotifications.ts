@@ -1,3 +1,4 @@
+import { assertLiveDeliveryAllowed } from "./runtimePolicy";
 import { storage } from './storage';
 import { lookupCityStateFromZip } from './zipLookup';
 import { formatDateInTimezone } from './dateUtils';
@@ -56,6 +57,7 @@ interface SendPushNotificationOptions {
 }
 
 export async function sendPushNotificationToUser(options: SendPushNotificationOptions): Promise<boolean> {
+  assertLiveDeliveryAllowed();
   const { userId, title, message, data, iconUrl, idempotencyKey, timeoutMs } = options;
   const largeIcon = iconUrl ?? NOTIFICATION_ICON_URL;
   const clickUrl = getNotificationClickUrl(data, APP_BASE_URL);
