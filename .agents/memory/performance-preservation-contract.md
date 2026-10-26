@@ -14,3 +14,9 @@ Authentication changes, RLS changes, Supabase project-setting changes, and destr
 **Why:** The owner requires isolated, reviewable risk boundaries, especially around account access and identity preservation.
 
 **How to apply:** Work in separately revertible batches of one or two related items. After each batch provide before/after call counts and approximate bytes, exact manual flows to check, and reversal instructions. Remove temporary logging. Never infer permission for a security tradeoff from general performance approval.
+
+For the Supabase egress effort, authentication stays unchanged and optimization order must follow measured returned bytes, not cumulative query-call counts.
+
+**Why:** The owner approved isolated development/production environments and temporary production measurement before any optimization batch, explicitly retaining the auth boundary.
+
+**How to apply:** Attribute queries independently to normalized routes and named worker cycles, measure calls/rows/approximate result bytes for a bounded 24–48-hour production window, remove instrumentation afterward, and propose byte-ranked batches for new approval. Do not treat application-query measurements as coverage of Supabase Auth internal SQL or as exact billed egress.
