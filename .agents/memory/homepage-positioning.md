@@ -33,7 +33,7 @@ Keep the homepage hero photo fade and the story section immediately below it pur
 
 **How to apply:** Keep the hero overlay’s final stop and the following story section backgrounds synchronized at `#000` when adjusting this transition.
 
-Hero word changes must use actual split flaps: the top half folds downward around a center hinge, not a vertically scrolling reel or a rotating whole glyph. Use black letter tiles with very thin white borders.
+Hero word changes must use actual split flaps: the top half folds downward around a center hinge, not a vertically scrolling reel or a rotating whole glyph. Use black letter tiles with very thin white outer borders, without a white center divider.
 
 **Why:** The user rejected both the earlier single-glyph animation and alphabetical scrolling approximation. Changed letters should start together and advance forward alphabetically (A→D is 3 flips; A→R is 17).
 
