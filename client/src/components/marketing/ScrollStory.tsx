@@ -66,7 +66,7 @@ function ScrollStory() {
     if (!heroRotationEnabled) return;
     const interval = window.setInterval(() => {
       setHeroWordIndex(index => (index + 1) % heroWords.length);
-    }, 2800);
+    }, 3800);
     return () => window.clearInterval(interval);
   }, [heroRotationEnabled]);
 
