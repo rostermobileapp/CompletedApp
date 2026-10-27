@@ -74,47 +74,7 @@
 .rs-hero h1 span { color:var(--blue); }
 .rs-hero-final-line { display:inline-grid;grid-template-areas:"line";white-space:nowrap; }
 .rs-hero-final-line:after { content:"MORE FELLOWSHIP";grid-area:line;visibility:hidden; }
-.rs-hero-word-line { grid-area:line;justify-self:center;white-space:nowrap; }
-.rs-hero-word-visible { display:inline-block;white-space:pre; }
-.rs-hero-roll-slot { display:inline-block;line-height:.83;vertical-align:baseline; }
-.rs-hero-roll-slot.is-rolling { position:relative; }
-.rs-hero-roll-anchor { visibility:hidden; }
-.rs-hero-roll-viewport {
-  position:absolute;
-  left:50%;top:0;
-  width:max-content;height:.83em;
-  overflow:hidden;
-  transform:translateX(-50%);
-}
-.rs-hero-roll-slot.is-rolling::after {
-  content:"";
-  position:absolute;
-  left:0;right:0;top:50%;
-  height:1px;
-  background:rgba(9,30,48,.32);
-  pointer-events:none;
-  animation:rs-hero-roll-seam var(--roll-duration) ease-out both;
-}
-.rs-hero-roll-track {
-  display:flex;
-  flex-direction:column;
-  animation-name:rs-hero-letter-roll;
-  animation-fill-mode:both;
-}
-.rs-hero-roll-glyph {
-  display:block;
-  flex:0 0 .83em;
-  height:.83em;
-  line-height:.83em;
-}
-@keyframes rs-hero-letter-roll {
-  from { transform:translateY(0); }
-  to { transform:translateY(var(--roll-distance)); }
-}
-@keyframes rs-hero-roll-seam {
-  0% { opacity:.45; }
-  100% { opacity:0; }
-}
+.rs-hero-word-line { grid-area:line;justify-self:center;white-space:nowrap;font-size:clamp(36px,10.5vw,120px); }
 .rs-hero-copy { max-width:700px; margin-top:100px; font-size:clamp(16px,1.6vw,20px); line-height:1.6; color:#ffffff;font-weight:600;text-shadow:0 2px 18px rgba(1,9,18,.62); }
 .rs-hero-features { display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;margin:12px auto 0;padding:0 18px;max-width:850px;list-style:disc;list-style-position:inside;color:#fff;font-size:14px;line-height:1.5;text-shadow:0 2px 18px rgba(1,9,18,.62); }
 .rs-hero-features li { padding:0; }

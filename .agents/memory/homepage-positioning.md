@@ -32,3 +32,9 @@ Keep the homepage hero photo fade and the story section immediately below it pur
 **Why:** The user chose to make the next section black rather than preserve its former dark-navy background, so the photo could fade to true black without a visible seam.
 
 **How to apply:** Keep the hero overlay’s final stop and the following story section backgrounds synchronized at `#000` when adjusting this transition.
+
+Hero word changes must use actual split flaps: the top half folds downward around a center hinge, not a vertically scrolling reel or a rotating whole glyph. Use black letter tiles with very thin white borders.
+
+**Why:** The user rejected both the earlier single-glyph animation and alphabetical scrolling approximation. Changed letters should start together and advance forward alphabetically (A→D is 3 flips; A→R is 17).
+
+**How to apply:** Preserve the physical half-panel folding and alphabetic step counts when refining motion. Keep reduced-motion and screen-reader behavior intact.

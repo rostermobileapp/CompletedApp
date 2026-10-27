@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowRight, Menu, X } from "lucide-react";
 import { SiAppstore, SiGoogleplay } from "react-icons/si";
 import { useLocation } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
 import { useMarketingVisit } from "./useMarketingVisit";
 import { useIsIosDevice } from "@/hooks/useIosPlatform";
+import HeroSplitFlapWord from "./HeroSplitFlapWord";
 import "./ScrollStory.css";
 
 const image = (name: string) => `/marketing/roster-home/${name}`;
@@ -12,20 +13,6 @@ const signupDestination = "/get-started";
 const appStore = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
 const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
 const heroWords = ["HOCKEY", "MEMORIES", "LAUGHS", "JOKES", "CHEERS", "GOOD TIMES", "FRIENDS", "CHIRPS", "FELLOWSHIP"];
-const heroAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-function getHeroLetterRoll(from: string | undefined, to: string) {
-  const fromIndex = from ? heroAlphabet.indexOf(from) : -1;
-  const toIndex = heroAlphabet.indexOf(to);
-  if (fromIndex < 0 || toIndex < 0) return [to];
-
-  const stepCount = (toIndex - fromIndex + heroAlphabet.length) % heroAlphabet.length;
-  return Array.from(
-    { length: stepCount + 1 },
-    (_, index) => heroAlphabet[(fromIndex + index) % heroAlphabet.length],
-  );
-}
-
 const patchItems = [
   ["hat-trick", "Hat Trick"], ["beer-me", "Beer Me"], ["iron-man", "Iron Man"],
   ["on-fire", "On Fire"], ["century-club", "Century Club"], ["locked-in", "Locked In"],
@@ -47,7 +34,6 @@ function ScrollStory() {
   const [answerState, setAnswerState] = useState("");
   const [heroWordIndex, setHeroWordIndex] = useState(0);
   const [heroRotationEnabled, setHeroRotationEnabled] = useState(false);
-  const previousHeroWordIndex = useRef(0);
   const reduced = useRef(false);
 
   useEffect(() => {
@@ -83,10 +69,6 @@ function ScrollStory() {
     }, 2800);
     return () => window.clearInterval(interval);
   }, [heroRotationEnabled]);
-
-  useEffect(() => {
-    previousHeroWordIndex.current = heroWordIndex;
-  }, [heroWordIndex]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -173,50 +155,7 @@ function ScrollStory() {
           LESS ADMIN<br />
           <span className="rs-hero-final-line" aria-hidden="true">
             <span className="rs-hero-word-line">MORE&nbsp;
-              <span className="rs-hero-word-visible">
-                {heroWords[heroWordIndex].split("").map((letter, letterIndex) => {
-                  const previousWord = heroWords[previousHeroWordIndex.current];
-                  const changingWord = heroRotationEnabled
-                    && previousHeroWordIndex.current !== heroWordIndex
-                  const roll = changingWord
-                    ? getHeroLetterRoll(previousWord[letterIndex], letter)
-                    : [letter];
-                  const flipCount = roll.length - 1;
-                  const rollStyle = {
-                    "--roll-distance": `-${flipCount * 0.83}em`,
-                    "--roll-duration": `${flipCount * 80}ms`,
-                  } as CSSProperties;
-
-                  return (
-                    <span
-                      key={`${letterIndex}-${letter}`}
-                      className={`rs-hero-roll-slot${flipCount > 0 ? " is-rolling" : ""}`}
-                      style={rollStyle}
-                    >
-                      {flipCount > 0 ? (
-                        <>
-                          <span className="rs-hero-roll-anchor">{letter}</span>
-                          <span className="rs-hero-roll-viewport">
-                            <span
-                              className="rs-hero-roll-track"
-                              style={{
-                                animationDuration: `${flipCount * 80}ms`,
-                                animationTimingFunction: `steps(${flipCount}, end)`,
-                              }}
-                            >
-                              {roll.map((rollLetter, rollIndex) => (
-                                <span className="rs-hero-roll-glyph" key={`${rollIndex}-${rollLetter}`}>
-                                  {rollLetter}
-                                </span>
-                              ))}
-                            </span>
-                          </span>
-                        </>
-                      ) : letter === " " ? "\u00a0" : letter}
-                    </span>
-                  );
-                })}
-              </span>
+                <HeroSplitFlapWord word={heroWords[heroWordIndex]} />
             </span>
           </span>
           <span className="rs-sr-only">MORE HOCKEY</span>
