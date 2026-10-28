@@ -130,7 +130,7 @@ async function main() {
       alias: [
         { find: /^@\/lib\/supabase$/, replacement: path.resolve('client/src/seo/ssrSupabaseStub.ts') },
         { find: '@shared', replacement: path.resolve('shared') },
-        { find: '@assets', replacement: path.resolve('attached_assets') },
+        { find: '@assets', replacement: path.resolve('client/src/assets') },
         { find: '@', replacement: path.resolve('client/src') },
       ],
     },

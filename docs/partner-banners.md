@@ -4,7 +4,7 @@ Partner banners are configured in `client/src/config/partnerBanners.ts`.
 
 To add a banner:
 
-1. Upload the image file into `attached_assets`.
+1. Add the image file to `client/src/assets` so it is included in clean Git checkouts.
 2. Add an import using the `@assets/<filename>` alias.
 3. Add a catalog entry with a unique `id`, partner `name`, imported `image`,
    destination `href`, accessible `alt` text, `active: true`, and the next
