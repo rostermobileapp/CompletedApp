@@ -13,7 +13,11 @@ type Transition = {
 };
 
 function normalizeWord(word: string) {
-  return word.toUpperCase().slice(0, tileCount).padEnd(tileCount, " ");
+  const centeredWord = word.toUpperCase().slice(0, tileCount);
+  const leftPadding = Math.floor((tileCount - centeredWord.length) / 2);
+  return centeredWord
+    .padStart(centeredWord.length + leftPadding, " ")
+    .padEnd(tileCount, " ");
 }
 
 function getLetterPath(from: string, to: string) {
