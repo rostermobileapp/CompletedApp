@@ -225,6 +225,7 @@ import {
 } from "@shared/schema";
 import { canAcceptFreshScrimmageRequest } from "./scrimmageLifecycle";
 import { normalizeEmail } from "./emailNormalization";
+import { getReusableUserDisplayId, shouldLookupUserByEmail } from "./userSyncPlan";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists, type SQL } from "drizzle-orm";
@@ -1295,7 +1296,9 @@ export class DatabaseStorage implements IStorage {
     try {
       // Check if this is a genuinely new user (not seen before by ID or email)
       const existingById = userData.id ? await this.getUser(userData.id) : undefined;
-      const existingByEmailCheck = userData.email ? await this.getUserByEmail(userData.email) : undefined;
+      const existingByEmailCheck = userData.email && shouldLookupUserByEmail(existingById, userData.email)
+        ? await this.getUserByEmail(userData.email)
+        : undefined;
 
       // First, check if a user with this email already exists (handles re-signup with new Supabase ID)
       if (userData.email) {
@@ -1340,8 +1343,14 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // Generate display ID upfront for both insert and update scenarios
-      const displayId = await this.generateUniqueDisplayId();
+      // Existing authenticated users already have their stable display ID.
+      // Only allocate one for a new row or a legacy row that is missing it.
+      const existingDisplayId = getReusableUserDisplayId(
+        userData.id,
+        existingById,
+        existingByEmailCheck,
+      );
+      const displayId = existingDisplayId ?? await this.generateUniqueDisplayId();
       
       // Build safe update set - filter out undefined values
       const updateSet: any = {

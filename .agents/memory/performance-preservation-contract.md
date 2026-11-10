@@ -39,6 +39,12 @@ The owner says development stopped using the production Supabase project around 
 
 **How to apply:** Prioritize measured database-result bytes and confirm the actual production clients before attributing pooler egress. Do not treat API Gateway request counts as an egress-byte breakdown.
 
+For authenticated profile sync, preserve per-request token validation and the locked placeholder-claim reconciliation. Start reductions only on stable existing accounts: skip email conflict lookup when the existing ID already has the same normalized, uniquely constrained email, and reuse an existing display ID instead of allocating another candidate.
+
+**Why:** Email-based account migration and placeholders imported after signup are correctness paths; the placeholder claim transaction prevents duplicate memberships and invoice-transfer races. The display-ID scan is unnecessary when the stored ID is already present.
+
+**How to apply:** Keep the email lookup for missing IDs or changed emails, and generate a display ID for new users or legacy rows that lack one. Measure returned bytes before broader sync or caching changes.
+
 Lifecycle-guard releases must show exact verified Railway NODE_ENV, service/environment identity and replica-count evidence, or precise dashboard checks. Never ship a guard that can silently suppress production workers.
 
 **Why:** The owner repeated this as a release prerequisite and will verify live reminders, badge queue, birthday and trivia after release. Metadata identity is not proof that a job ran or delivered.
