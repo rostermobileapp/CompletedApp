@@ -1493,12 +1493,19 @@ export async function evaluateSeasonOnFireBadgeForUser(userId: string, definitio
   return emitted.map(({ event }) => event);
 }
 
-export async function evaluateBadgesForUser(
+type BadgeEvaluationContext = {
+  leagueId?: string | null;
+  seasonId?: string | null;
+  teamId?: string | null;
+  year?: number;
+};
+
+async function evaluateBadgesForUserWithDefinitions(
   userId: string,
-  context?: { leagueId?: string | null; seasonId?: string | null; teamId?: string | null; year?: number },
-  onlyTriggerKey?: string,
+  context: BadgeEvaluationContext | undefined,
+  onlyTriggerKey: string | undefined,
+  definitions: DefinitionWithTiers[],
 ) {
-  const definitions = await definitionsWithTiers();
   const earned: Array<Record<string, unknown>> = [];
   for (const definition of definitions.filter((item) => item.category === "achievement" && item.achievementType
     && !isTriviaDefinition(item)
@@ -1591,6 +1598,15 @@ export async function evaluateBadgesForUser(
     }
   }
   return earned;
+}
+
+export async function evaluateBadgesForUser(
+  userId: string,
+  context?: BadgeEvaluationContext,
+  onlyTriggerKey?: string,
+) {
+  const definitions = await definitionsWithTiers();
+  return evaluateBadgesForUserWithDefinitions(userId, context, onlyTriggerKey, definitions);
 }
 
 // Historical participants receive their one-time award without an old game
@@ -1947,13 +1963,17 @@ export async function getTrophyCasePreview() {
 }
 
 export async function getPendingBadgeEvents(userId: string) {
+  // Reuse one fresh definition snapshot for this poll's several evaluations.
+  // Definitions are editable, so this is deliberately not cached across requests.
+  const definitions = await definitionsWithTiers();
+
   // A scrimmage becomes an appearance when it takes place, not when a request
   // is approved. Evaluate on the normal announcement poll so it can award the
   // newly reached tier even without a subsequent game-finalization event.
-  await evaluateBadgesForUser(userId, undefined, "calendar_year_appearances");
+  await evaluateBadgesForUserWithDefinitions(userId, undefined, "calendar_year_appearances", definitions);
   // Recover an approved substitution if its post-approval badge evaluation
   // could not complete; backfilled awards never create announcements.
-  await evaluateBadgesForUser(userId, undefined, "first_sub_appearance");
+  await evaluateBadgesForUserWithDefinitions(userId, undefined, "first_sub_appearance", definitions);
   // An inactive or ended season may not have any further game finalizations.
   // Evaluate when the player next polls, without needing a manual admin action.
   const endedEarlyBirdSeasons = await db.execute(sql`
@@ -1964,7 +1984,12 @@ export async function getPendingBadgeEvents(userId: string) {
       AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
   `);
   for (const row of endedEarlyBirdSeasons.rows) {
-    await evaluateBadgesForUser(userId, { seasonId: String(row.season_id) }, "season_48hr_rsvp_perfect");
+    await evaluateBadgesForUserWithDefinitions(
+      userId,
+      { seasonId: String(row.season_id) },
+      "season_48hr_rsvp_perfect",
+      definitions,
+    );
   }
   const endedRsvpKingSeasons = await db.execute(sql`
     SELECT DISTINCT s.id AS season_id FROM game_rsvps r
@@ -1975,7 +2000,12 @@ export async function getPendingBadgeEvents(userId: string) {
       AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
   `);
   for (const row of endedRsvpKingSeasons.rows) {
-    await evaluateBadgesForUser(userId, { seasonId: String(row.season_id) }, "season_rsvp_perfect");
+    await evaluateBadgesForUserWithDefinitions(
+      userId,
+      { seasonId: String(row.season_id) },
+      "season_rsvp_perfect",
+      definitions,
+    );
   }
   const events = await db.select({
     id: badgeEarnedEvents.id,

@@ -45,6 +45,12 @@ For authenticated profile sync, preserve per-request token validation and the lo
 
 **How to apply:** Keep the email lookup for missing IDs or changed emails, and generate a display ID for new users or legacy rows that lack one. Measure returned bytes before broader sync or caching changes.
 
+Badge definitions are mutable through admin and startup code, so do not add a process-wide cache without reliable invalidation across every serving instance. Reuse a fresh definitions-and-tiers snapshot only within one badge-event poll when several evaluations need it.
+
+**Why:** Admin edits, publish/archive actions, and startup reconciliation can change the catalog; no cross-instance invalidation mechanism is established. Viewer-specific awards, progress, and access must remain fresh.
+
+**How to apply:** Keep catalog data request-scoped, leave per-user state live, and prove update visibility across instances before considering a longer-lived cache.
+
 Lifecycle-guard releases must show exact verified Railway NODE_ENV, service/environment identity and replica-count evidence, or precise dashboard checks. Never ship a guard that can silently suppress production workers.
 
 **Why:** The owner repeated this as a release prerequisite and will verify live reminders, badge queue, birthday and trivia after release. Metadata identity is not proof that a job ran or delivered.
