@@ -13936,8 +13936,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUnpaidPaymentRequestCount(userId: string): Promise<number> {
-    const unpaidRecipients = await db
-      .select()
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
       .from(paymentRequestRecipients)
       .where(
         and(
@@ -13945,8 +13945,8 @@ export class DatabaseStorage implements IStorage {
           eq(paymentRequestRecipients.isPaid, false)
         )
       );
-    
-    return unpaidRecipients.length;
+
+    return result.count;
   }
 
   // Returns every player a commissioner / Player Pro can invoice in a league:
