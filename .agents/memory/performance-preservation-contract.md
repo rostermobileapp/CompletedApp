@@ -33,6 +33,12 @@ Interpret Supabase usage against the exact project filter, billing cycle, and pl
 
 **How to apply:** Verify project-only selection and date range first. Use the Usage page for billed totals; use Reports only for attribution that the displayed metrics actually support. Keep query-size estimates distinct from provider-billed egress.
 
+For the 2026-10-09 through 2026-11-09 production billing cycle, the owner reports that most project egress was Shared Pooler traffic. This identifies the connection path, not which runtime or client generated it.
+
+**Why:** The cycle overlaps the transition to isolated development, so project-only usage can still include traffic from more than the production Railway service.
+
+**How to apply:** Prioritize measured database-result bytes over pooler connections, then attribute them to production routes/workers versus any pre-isolation development traffic. Do not treat API Gateway request counts as an egress-byte breakdown.
+
 Lifecycle-guard releases must show exact verified Railway NODE_ENV, service/environment identity and replica-count evidence, or precise dashboard checks. Never ship a guard that can silently suppress production workers.
 
 **Why:** The owner repeated this as a release prerequisite and will verify live reminders, badge queue, birthday and trivia after release. Metadata identity is not proof that a job ran or delivered.
