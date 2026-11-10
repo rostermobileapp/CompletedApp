@@ -8405,18 +8405,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // League membership alone is not enough to appear in stats management.
-      const members = await storage.getLeagueMembers(leagueId);
-      const eligibleRows = await db.select({ id: users.id }).from(users)
-        .where(leagueStatsPlayerEligible(users.id, leagueId));
-      const eligibleIds = new Set(eligibleRows.map(row => row.id));
-      const players = members.filter(member => eligibleIds.has(member.user.id)).map(member => ({
-        id: member.user.id,
-        // Use displayFirstName/displayLastName from membership if set, otherwise fall back to user's names
-        firstName: member.displayFirstName || member.user.firstName || '',
-        lastName: member.displayLastName || member.user.lastName || '',
-        email: member.user.email,
+      // Apply eligibility in this query and return only the fields the screen uses.
+      const playerRows = await db
+        .select({
+          id: users.id,
+          displayFirstName: leagueMemberships.displayFirstName,
+          displayLastName: leagueMemberships.displayLastName,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+          email: users.email,
+          isGoalie: leagueMemberships.isGoalie,
+        })
+        .from(leagueMemberships)
+        .innerJoin(users, eq(leagueMemberships.userId, users.id))
+        .where(and(
+          eq(leagueMemberships.leagueId, leagueId),
+          eq(leagueMemberships.status, 'approved'),
+          isNull(users.deletedAt),
+          leagueStatsPlayerEligible(users.id, leagueId),
+        ));
+      const players = playerRows.map((member) => ({
+        id: member.id,
+        firstName: member.displayFirstName || member.userFirstName || '',
+        lastName: member.displayLastName || member.userLastName || '',
+        email: member.email,
         isGoalie: member.isGoalie || false,
-        teamName: member.assignedTeamId ? null : null // Will be populated if we have team info
+        teamName: null,
       }));
       
       res.json(players);
