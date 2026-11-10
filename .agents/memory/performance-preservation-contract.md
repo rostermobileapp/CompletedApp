@@ -27,6 +27,12 @@ Environment separation is its own first release. Development must use a new nonp
 
 **How to apply:** Verify Railway's actual production environment before changing worker guards, preserve production behavior, and keep development stopped rather than reconnecting it to production during rollback. Measurement is a later release: exact calls/rows, about 1-in-20 sampled bytes, one aggregate log line per ten minutes to existing Railway logs, fixed expiry, then a separate removal release. No new sink.
 
+Interpret Supabase usage against the exact project filter, billing cycle, and plan active during that cycle. Cached and uncached egress are separate; API request counts or ingress are not substitutes for billed egress.
+
+**Why:** A project can be upgraded while viewing a prior billing cycle, and API Gateway reports may show request counts or ingress without response-byte totals, while billed egress spans multiple Supabase services.
+
+**How to apply:** Verify project-only selection and date range first. Use the Usage page for billed totals; use Reports only for attribution that the displayed metrics actually support. Keep query-size estimates distinct from provider-billed egress.
+
 Lifecycle-guard releases must show exact verified Railway NODE_ENV, service/environment identity and replica-count evidence, or precise dashboard checks. Never ship a guard that can silently suppress production workers.
 
 **Why:** The owner repeated this as a release prerequisite and will verify live reminders, badge queue, birthday and trivia after release. Metadata identity is not proof that a job ran or delivered.
