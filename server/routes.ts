@@ -154,6 +154,8 @@ import {
   awardManualBadge,
   ensureDefaultBadges,
   evaluateBadgesForUser,
+  evaluateBadgesForUsers,
+  type BadgeEvaluationInput,
   getBadgeCatalog,
   getPendingBadgeEvents,
   reconcileCalendarYearBeerMe,
@@ -189,6 +191,24 @@ import {
 // Module-level map to store active WebSocket connections by user ID
 // This allows broadcasting from anywhere in routes.ts
 const activeConnections = new Map<string, Set<WebSocket>>();
+
+function launchBadgeEvaluationBatch(
+  evaluations: BadgeEvaluationInput[],
+  errorLabel: (evaluation: BadgeEvaluationInput) => string,
+) {
+  if (evaluations.length === 0) return;
+  void evaluateBadgesForUsers(evaluations)
+    .then((results) => {
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.error(errorLabel(evaluations[index]), result.reason);
+        }
+      });
+    })
+    .catch((error) => {
+      console.error("[Badges] Could not load shared definitions for evaluation batch:", error);
+    });
+}
 
 // Helper function to broadcast a message to a specific user via WebSocket
 export function broadcastToUser(userId: string, message: any) {
@@ -11026,12 +11046,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         thirdStarUserId,
         awardedBy: userId,
       });
-      for (const starUserId of [firstStarUserId, secondStarUserId, thirdStarUserId]) {
-        void evaluateBadgesForUser(starUserId, {
-          leagueId: game.leagueId,
-          seasonId: game.seasonId,
-        }).catch((error) => console.error('[Badges] Star evaluation failed:', error));
-      }
+      launchBadgeEvaluationBatch(
+        [firstStarUserId, secondStarUserId, thirdStarUserId].map((userId) => ({
+          userId,
+          context: { leagueId: game.leagueId, seasonId: game.seasonId },
+        })),
+        () => '[Badges] Star evaluation failed:',
+      );
 
       res.json({ 
         stars,
@@ -12958,12 +12979,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Scorekeeper Dashboard Routes - Game Goals
   const reevaluateSeasonScoringBadges = (game: { isCompleted: boolean; seasonId: string | null; leagueId: string | null }, scorerIds: Array<string | null | undefined>) => {
     if (!game.isCompleted || !game.seasonId) return;
-    for (const scorerId of Array.from(new Set(scorerIds.filter((id): id is string => !!id)))) {
-      for (const trigger of ["season_hat_tricks", "season_scoring_streak"]) {
-        void evaluateBadgesForUser(scorerId, { seasonId: game.seasonId, leagueId: game.leagueId }, trigger)
-          .catch((error) => console.error(`[Badges] ${trigger} goal correction evaluation failed:`, error));
-      }
-    }
+    const evaluations = Array.from(new Set(scorerIds.filter((id): id is string => !!id)))
+      .flatMap((userId) => ["season_hat_tricks", "season_scoring_streak"].map((onlyTriggerKey) => ({
+        userId,
+        context: { seasonId: game.seasonId, leagueId: game.leagueId },
+        onlyTriggerKey,
+      })));
+    launchBadgeEvaluationBatch(
+      evaluations,
+      (evaluation) => `[Badges] ${evaluation.onlyTriggerKey} goal correction evaluation failed:`,
+    );
   };
   app.get('/api/games/:gameId/goals', isAuthenticated, async (req: any, res) => {
     try {
@@ -13610,13 +13635,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...rosterUserIds,
         ...participants.rows.map((row) => String(row.user_id)),
       ]));
-      for (const evaluatedUserId of evaluatedUserIds) {
-        void evaluateBadgesForUser(evaluatedUserId, {
-          leagueId: result.game.leagueId,
-          seasonId: result.game.seasonId,
-          year: Number(result.game.scheduledAt.slice(0, 4)),
-        }).catch((error) => console.error('[Badges] Finalization evaluation failed:', error));
-      }
+      launchBadgeEvaluationBatch(
+        evaluatedUserIds.map((userId) => ({
+          userId,
+          context: { leagueId: result.game.leagueId, seasonId: result.game.seasonId, year: Number(result.game.scheduledAt.slice(0, 4)) },
+        })),
+        () => '[Badges] Finalization evaluation failed:',
+      );
       res.json({ 
         message: 'Game finalized successfully', 
         game: result.game,

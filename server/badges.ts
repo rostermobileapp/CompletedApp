@@ -1493,11 +1493,17 @@ export async function evaluateSeasonOnFireBadgeForUser(userId: string, definitio
   return emitted.map(({ event }) => event);
 }
 
-type BadgeEvaluationContext = {
+export type BadgeEvaluationContext = {
   leagueId?: string | null;
   seasonId?: string | null;
   teamId?: string | null;
   year?: number;
+};
+
+export type BadgeEvaluationInput = {
+  userId: string;
+  context?: BadgeEvaluationContext;
+  onlyTriggerKey?: string;
 };
 
 async function evaluateBadgesForUserWithDefinitions(
@@ -1607,6 +1613,20 @@ export async function evaluateBadgesForUser(
 ) {
   const definitions = await definitionsWithTiers();
   return evaluateBadgesForUserWithDefinitions(userId, context, onlyTriggerKey, definitions);
+}
+
+/**
+ * Evaluate several users from one fresh catalog snapshot. Per-user progress,
+ * metrics, and awards remain live queries; the snapshot is never retained.
+ */
+export async function evaluateBadgesForUsers(evaluations: BadgeEvaluationInput[]) {
+  if (evaluations.length === 0) return [];
+  const definitions = await definitionsWithTiers();
+  return Promise.allSettled(
+    evaluations.map(({ userId, context, onlyTriggerKey }) =>
+      evaluateBadgesForUserWithDefinitions(userId, context, onlyTriggerKey, definitions),
+    ),
+  );
 }
 
 // Historical participants receive their one-time award without an old game

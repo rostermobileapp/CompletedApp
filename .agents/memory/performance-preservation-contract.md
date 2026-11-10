@@ -45,11 +45,11 @@ For authenticated profile sync, preserve per-request token validation and the lo
 
 **How to apply:** Keep the email lookup for missing IDs or changed emails, and generate a display ID for new users or legacy rows that lack one. Measure returned bytes before broader sync or caching changes.
 
-Badge definitions are mutable through admin and startup code, so do not add a process-wide cache without reliable invalidation across every serving instance. Reuse a fresh definitions-and-tiers snapshot only within one badge-event poll when several evaluations need it.
+Badge definitions are mutable through admin and startup code, so do not add a process-wide cache without reliable invalidation across every serving instance. A fresh definitions-and-tiers snapshot may be reused only within one bounded operation that evaluates several users; keep each user's progress, metrics, and awards live.
 
-**Why:** Admin edits, publish/archive actions, and startup reconciliation can change the catalog; no cross-instance invalidation mechanism is established. Viewer-specific awards, progress, and access must remain fresh.
+**Why:** Admin edits, publish/archive actions, and startup reconciliation can change the catalog; no cross-instance invalidation mechanism is established. A short-lived operation-level snapshot reduces repeated catalog reads without hiding later edits or making viewer-specific state stale.
 
-**How to apply:** Keep catalog data request-scoped, leave per-user state live, and prove update visibility across instances before considering a longer-lived cache.
+**How to apply:** Load definitions once at the start of a bounded poll or batch, pass that snapshot only through its evaluations, and discard it afterward. Leave per-user state live; prove update visibility across instances before considering longer-lived caching.
 
 Lifecycle-guard releases must show exact verified Railway NODE_ENV, service/environment identity and replica-count evidence, or precise dashboard checks. Never ship a guard that can silently suppress production workers.
 
