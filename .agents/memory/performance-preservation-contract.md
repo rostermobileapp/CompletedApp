@@ -33,11 +33,11 @@ Interpret Supabase usage against the exact project filter, billing cycle, and pl
 
 **How to apply:** Verify project-only selection and date range first. Use the Usage page for billed totals; use Reports only for attribution that the displayed metrics actually support. Keep query-size estimates distinct from provider-billed egress.
 
-For the 2026-10-09 through 2026-11-09 production billing cycle, the owner reports that most project egress was Shared Pooler traffic. This identifies the connection path, not which runtime or client generated it.
+The owner says development stopped using the production Supabase project around November 2025. The 2026-10-09 through 2026-11-09 production billing cycle is therefore post-isolation; the owner reports most egress was Shared Pooler traffic, which identifies the connection path but not the client.
 
-**Why:** The cycle overlaps the transition to isolated development, so project-only usage can still include traffic from more than the production Railway service.
+**Why:** The production project can receive pooled database traffic from any client, but Replit development should not be attributed to this later cycle based on the older mistaken assumption that it still shared production.
 
-**How to apply:** Prioritize measured database-result bytes over pooler connections, then attribute them to production routes/workers versus any pre-isolation development traffic. Do not treat API Gateway request counts as an egress-byte breakdown.
+**How to apply:** Prioritize measured database-result bytes and confirm the actual production clients before attributing pooler egress. Do not treat API Gateway request counts as an egress-byte breakdown.
 
 Lifecycle-guard releases must show exact verified Railway NODE_ENV, service/environment identity and replica-count evidence, or precise dashboard checks. Never ship a guard that can silently suppress production workers.
 
