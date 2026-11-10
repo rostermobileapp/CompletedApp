@@ -4894,10 +4894,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           // Handle subscription checkout
-          else if (session.subscription && session.customer) {
+          else if (session.subscription && typeof session.customer === 'string' && session.customer) {
             const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-            const users = await storage.getAllUsers();
-            let user = users.find(u => u.stripeCustomerId === session.customer);
+            const user = await storage.getUserByStripeCustomerId(session.customer);
             
             if (user) {
               // Update customer ID and subscription ID
@@ -4923,12 +4922,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const subscription = event.data.object as Stripe.Subscription;
           
           // Find user by Stripe customer ID or subscription ID
-          const users = await storage.getAllUsers();
-          let user = users.find(u => u.stripeSubscriptionId === subscription.id);
+          let user = await storage.getUserByStripeSubscriptionId(subscription.id);
           
-          // If not found by subscription ID, try to find by customer ID
-          if (!user) {
-            user = users.find(u => u.stripeCustomerId === subscription.customer);
+          // If not found by subscription ID, try by customer ID
+          if (!user && typeof subscription.customer === 'string') {
+            user = await storage.getUserByStripeCustomerId(subscription.customer);
           }
           
           if (user) {
@@ -4966,8 +4964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const subscriptionId = (invoice as any).subscription;
           if (subscriptionId) {
             const subscription = await stripe.subscriptions.retrieve(subscriptionId as string);
-            const users = await storage.getAllUsers();
-            const user = users.find(u => u.stripeSubscriptionId === subscription.id);
+            const user = await storage.getUserByStripeSubscriptionId(subscription.id);
             
             if (user && subscription.status === 'active') {
               // Get the price ID to determine tier
@@ -4990,8 +4987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Find user by subscription ID
           const subscriptionId = invoice.subscription as string;
           if (subscriptionId) {
-            const users = await storage.getAllUsers();
-            const user = users.find(u => u.stripeSubscriptionId === subscriptionId);
+            const user = await storage.getUserByStripeSubscriptionId(subscriptionId);
             
             if (user) {
               

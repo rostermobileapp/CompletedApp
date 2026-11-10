@@ -345,6 +345,12 @@ export interface IStorage {
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User[]>;
+  getUserByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<Pick<User, "id" | "stripeCustomerId" | "stripeSubscriptionId"> | undefined>;
+  getUserByStripeSubscriptionId(
+    stripeSubscriptionId: string,
+  ): Promise<Pick<User, "id" | "stripeCustomerId" | "stripeSubscriptionId"> | undefined>;
   updateUserPermissions(userId: string, updates: { role?: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'; specialPermissions?: ('admin' | 'stat_manager')[]; isPrimaryCommissioner?: boolean; }): Promise<User>;
   addSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User>;
   removeSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User>;
@@ -2018,6 +2024,38 @@ export class DatabaseStorage implements IStorage {
   // Permission management operations
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.lastName, users.firstName);
+  }
+
+  async getUserByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<Pick<User, "id" | "stripeCustomerId" | "stripeSubscriptionId"> | undefined> {
+    const [user] = await db
+      .select({
+        id: users.id,
+        stripeCustomerId: users.stripeCustomerId,
+        stripeSubscriptionId: users.stripeSubscriptionId,
+      })
+      .from(users)
+      .where(eq(users.stripeCustomerId, stripeCustomerId))
+      .orderBy(users.lastName, users.firstName)
+      .limit(1);
+    return user;
+  }
+
+  async getUserByStripeSubscriptionId(
+    stripeSubscriptionId: string,
+  ): Promise<Pick<User, "id" | "stripeCustomerId" | "stripeSubscriptionId"> | undefined> {
+    const [user] = await db
+      .select({
+        id: users.id,
+        stripeCustomerId: users.stripeCustomerId,
+        stripeSubscriptionId: users.stripeSubscriptionId,
+      })
+      .from(users)
+      .where(eq(users.stripeSubscriptionId, stripeSubscriptionId))
+      .orderBy(users.lastName, users.firstName)
+      .limit(1);
+    return user;
   }
 
   async getUsersByRole(role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User[]> {
