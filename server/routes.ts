@@ -19514,8 +19514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Get current accepted players count
-        const acceptedRequests = await storage.getScrimmageRequests(scrimmageId);
-        const acceptedCount = acceptedRequests.filter(req => req.status === 'approved').length;
+        const acceptedCount = await storage.countScrimmageRequests(scrimmageId, 'approved');
         
         if (updateData.maxPlayers < acceptedCount) {
           return res.status(409).json({ 
@@ -19530,8 +19529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'First to Pay, First to Play requires a cost per player' });
       }
       if (existingScrimmage.joinMode !== 'first_pay' && effectiveJoinMode === 'first_pay') {
-        const existingRequests = await storage.getScrimmageRequests(existingScrimmage.id);
-        if (existingRequests.some(request => request.status === 'pending')) {
+        if (await storage.hasPendingScrimmageRequests(existingScrimmage.id)) {
           return res.status(409).json({
             message: 'Resolve existing pending requests before switching to First to Pay, First to Play',
           });
@@ -20000,16 +19998,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scrimmage.status === 'cancelled') {
         return res.status(409).json({ message: 'Cannot join cancelled scrimmage' });
       }
-      let requestsAtJoinCheck: Awaited<ReturnType<typeof storage.getScrimmageRequests>> | null = null;
+      let acceptedCountAtJoinCheck: number | null = null;
       if (scrimmage.status !== 'open') {
-        requestsAtJoinCheck = await storage.getScrimmageRequests(scrimmageId);
-        const approvedCount = requestsAtJoinCheck.filter(
-          (request) => request.status === 'approved',
-        ).length;
+        acceptedCountAtJoinCheck = await storage.countScrimmageRequests(scrimmageId, 'approved');
         if (!canAcceptFreshScrimmageRequest(
           scrimmage.status,
           scrimmage.joinMode,
-          approvedCount,
+          acceptedCountAtJoinCheck,
           scrimmage.maxPlayers,
         )) {
           return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
@@ -20172,8 +20167,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Non-co-host, approval-mode: insert a pending request (no capacity concern yet).
-      const currentRequests = requestsAtJoinCheck ?? await storage.getScrimmageRequests(scrimmageId);
-      const acceptedCount = currentRequests.filter(req => req.status === 'approved').length;
+      const acceptedCount = acceptedCountAtJoinCheck
+        ?? await storage.countScrimmageRequests(scrimmageId, 'approved');
 
       if (!isFirstPay && acceptedCount >= scrimmage.maxPlayers) {
         let backupRequestData;
@@ -20666,10 +20661,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get the scrimmage creator for the organizer name
           const creator = await storage.getUser(scrimmage.creatorId);
           
-          // Get current player count
-          const allRequests = await storage.getScrimmageRequests(scrimmage.id);
-          const approvedCount = allRequests.filter(r => r.status === 'approved').length;
-          
           if (player) {
             const timezone = getScrimmageTimezone(scrimmage);
             const { date: approvalDate, time: approvalTime } = formatDayAndTime(scrimmage.dateTime, timezone);
@@ -21092,9 +21083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const priorStatus = request.status;
       const wasFullBeforeRemoval = priorStatus === 'approved'
-        && (await storage.getScrimmageRequests(scrimmage.id))
-          .filter((scrimmageRequest) => scrimmageRequest.status === 'approved')
-          .length >= scrimmage.maxPlayers;
+        && (await storage.countScrimmageRequests(scrimmage.id, 'approved')) >= scrimmage.maxPlayers;
       await storage.deleteScrimmageRequest(requestId);
 
       // Notify creator (and co-hosts) when a player withdraws themselves

@@ -670,6 +670,8 @@ export interface IStorage {
    *  when the request is no longer in 'pending' state (concurrent actor already processed it). */
   atomicApproveRequest(requestId: string, scrimmageId: string, teamAssignment?: string | null): Promise<ScrimmageRequest | 'at_capacity' | 'not_pending' | 'not_open'>;
   getScrimmageRequests(scrimmageId: string): Promise<(ScrimmageRequest & { player: User })[]>;
+  countScrimmageRequests(scrimmageId: string, status: ScrimmageRequest["status"]): Promise<number>;
+  hasPendingScrimmageRequests(scrimmageId: string): Promise<boolean>;
   getScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | undefined>;
   updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date, teamAssignment?: string | null): Promise<ScrimmageRequest>;
   setTeamAssignment(requestId: string, teamAssignment: string | null): Promise<ScrimmageRequest>;
@@ -10419,6 +10421,34 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(scrimmageRequests.requestedAt));
 
     return results.map(r => ({ ...r.scrimmage_requests, player: r.users }));
+  }
+
+  async countScrimmageRequests(
+    scrimmageId: string,
+    status: ScrimmageRequest["status"],
+  ): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(scrimmageRequests)
+      .innerJoin(users, eq(scrimmageRequests.playerId, users.id))
+      .where(and(
+        eq(scrimmageRequests.scrimmageId, scrimmageId),
+        eq(scrimmageRequests.status, status),
+      ));
+    return Number(result?.count ?? 0);
+  }
+
+  async hasPendingScrimmageRequests(scrimmageId: string): Promise<boolean> {
+    const [request] = await db
+      .select({ id: scrimmageRequests.id })
+      .from(scrimmageRequests)
+      .innerJoin(users, eq(scrimmageRequests.playerId, users.id))
+      .where(and(
+        eq(scrimmageRequests.scrimmageId, scrimmageId),
+        eq(scrimmageRequests.status, "pending"),
+      ))
+      .limit(1);
+    return Boolean(request);
   }
 
   async getScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | undefined> {
