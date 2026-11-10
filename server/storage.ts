@@ -8642,11 +8642,18 @@ export class DatabaseStorage implements IStorage {
     // Fetch skill levels for all users in this league
     const skillLevels = await this.fetchUserSkills(userIds, leagueId);
 
-    // Fetch each team's full row once for this operation instead of once per request.
+    // Fetch only the team fields used by the approval summary and captain check.
     const teamIds = collectUniqueTeamIdsFromGames(pendingRequests.map(({ game }) => game));
-    const teamsById = new Map<string, Team>();
+    const teamsById = new Map<string, Pick<Team, "id" | "name" | "captainId">>();
     if (teamIds.length > 0) {
-      const teamRows = await db.select().from(teams).where(inArray(teams.id, teamIds));
+      const teamRows = await db
+        .select({
+          id: teams.id,
+          name: teams.name,
+          captainId: teams.captainId,
+        })
+        .from(teams)
+        .where(inArray(teams.id, teamIds));
       for (const team of teamRows) {
         teamsById.set(team.id, team);
       }
