@@ -226,6 +226,7 @@ import {
 import { canAcceptFreshScrimmageRequest } from "./scrimmageLifecycle";
 import { normalizeEmail } from "./emailNormalization";
 import { getReusableUserDisplayId, shouldLookupUserByEmail } from "./userSyncPlan";
+import { collectUniqueTeamIdsFromGames } from "./teamQueryBatch";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists, type SQL } from "drizzle-orm";
@@ -8641,14 +8642,24 @@ export class DatabaseStorage implements IStorage {
     // Fetch skill levels for all users in this league
     const skillLevels = await this.fetchUserSkills(userIds, leagueId);
 
+    // Fetch each team's full row once for this operation instead of once per request.
+    const teamIds = collectUniqueTeamIdsFromGames(pendingRequests.map(({ game }) => game));
+    const teamsById = new Map<string, Team>();
+    if (teamIds.length > 0) {
+      const teamRows = await db.select().from(teams).where(inArray(teams.id, teamIds));
+      for (const team of teamRows) {
+        teamsById.set(team.id, team);
+      }
+    }
+
     // Process each request
     for (const row of pendingRequests) {
       const request = row.request;
       const game = row.game;
 
       // Get team information
-      const homeTeam = await this.getTeam(game.homeTeamId);
-      const awayTeam = await this.getTeam(game.awayTeamId);
+      const homeTeam = teamsById.get(game.homeTeamId);
+      const awayTeam = game.awayTeamId ? teamsById.get(game.awayTeamId) : undefined;
       
       // Get player information
       const originalPlayer = request.originalPlayerId ? await this.getUser(request.originalPlayerId) : null;
