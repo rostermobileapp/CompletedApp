@@ -456,7 +456,7 @@ export interface IStorage {
     userId: string,
     monthYM: string,
   ): Promise<{ leagueId: string; leagueName: string; seatsTotal: number }[]>;
-  getLeagueProSeatsByGrant(grantId: string): Promise<LeagueProSeat[]>;
+  getLeagueProSeatCountsByGrant(grantIds: string[]): Promise<{ grantId: string; count: number }[]>;
   assignLeagueProSeat(grantId: string, userId: string): Promise<LeagueProSeat | null>;
   assignLeagueProSeatForLeague(
     leagueId: string,
@@ -4288,12 +4288,19 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(leagueProGrants.createdAt));
   }
 
-  async getLeagueProSeatsByGrant(grantId: string): Promise<LeagueProSeat[]> {
-    return db
-      .select()
+  async getLeagueProSeatCountsByGrant(
+    grantIds: string[],
+  ): Promise<{ grantId: string; count: number }[]> {
+    if (grantIds.length === 0) return [];
+    const rows = await db
+      .select({
+        grantId: leagueProSeats.grantId,
+        count: sql<number>`COUNT(*)::int`,
+      })
       .from(leagueProSeats)
-      .where(eq(leagueProSeats.grantId, grantId))
-      .orderBy(asc(leagueProSeats.assignedAt));
+      .where(inArray(leagueProSeats.grantId, grantIds))
+      .groupBy(leagueProSeats.grantId);
+    return rows.map((row) => ({ grantId: row.grantId, count: Number(row.count) }));
   }
 
   async assignLeagueProSeat(grantId: string, userId: string): Promise<LeagueProSeat | null> {

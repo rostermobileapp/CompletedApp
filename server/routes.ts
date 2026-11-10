@@ -1029,8 +1029,8 @@ async function applyLeagueProBulkPaymentFromSession(
     session.id,
   );
   if (!applied) {
-    const seats = await storage.getLeagueProSeatsByGrant(grantId);
-    return { applied: false, seatsFilled: seats.length };
+    const [seatCount] = await storage.getLeagueProSeatCountsByGrant([grantId]);
+    return { applied: false, seatsFilled: seatCount?.count ?? 0 };
   }
   const seatsFilled = await storage.backfillLeagueProSeats(grantId);
   return { applied: true, seatsFilled };
@@ -4712,17 +4712,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         return false;
       });
-      const enriched = await Promise.all(
-        visible.map(async (g) => {
-          const seats = await storage.getLeagueProSeatsByGrant(g.id);
-          return {
-            ...g,
-            seatsAssigned: seats.length,
-            seatsRemaining: Math.max(0, g.seatCount - seats.length),
-            isActive: g.status === 'paid' && g.startMonth <= monthYM && g.endMonth >= monthYM,
-          };
-        })
+      const seatCounts = await storage.getLeagueProSeatCountsByGrant(visible.map((g) => g.id));
+      const seatsAssignedByGrantId = new Map(
+        seatCounts.map(({ grantId, count }) => [grantId, count]),
       );
+      const enriched = visible.map((g) => {
+        const seatsAssigned = seatsAssignedByGrantId.get(g.id) ?? 0;
+        return {
+          ...g,
+          seatsAssigned,
+          seatsRemaining: Math.max(0, g.seatCount - seatsAssigned),
+          isActive: g.status === 'paid' && g.startMonth <= monthYM && g.endMonth >= monthYM,
+        };
+      });
       res.json(enriched);
     } catch (error: any) {
       console.error('[League Pro] List grants error:', error);
