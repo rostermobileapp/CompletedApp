@@ -5,12 +5,14 @@ import { useLocation } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
 import { useMarketingVisit } from "./useMarketingVisit";
 import { useIsIosDevice } from "@/hooks/useIosPlatform";
+import HeroSplitFlapWord from "./HeroSplitFlapWord";
 import "./ScrollStory.css";
 
 const image = (name: string) => `/marketing/roster-home/${name}`;
 const signupDestination = "/get-started";
 const appStore = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
 const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
+const heroWords = ["HOCKEY", "MEMORIES", "LAUGHS", "JOKES", "CHEERS", "GOOD TIMES", "FRIENDS", "CHIRPS", "FELLOWSHIP"];
 const patchItems = [
   ["hat-trick", "Hat Trick"], ["beer-me", "Beer Me"], ["iron-man", "Iron Man"],
   ["on-fire", "On Fire"], ["century-club", "Century Club"], ["locked-in", "Locked In"],
@@ -35,6 +37,8 @@ function ScrollStory() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answerState, setAnswerState] = useState("");
+  const [heroWordIndex, setHeroWordIndex] = useState(0);
+  const [heroRotationEnabled, setHeroRotationEnabled] = useState(false);
   const reduced = useRef(false);
 
   useEffect(() => {
@@ -50,6 +54,26 @@ function ScrollStory() {
       media.removeEventListener("change", updatePreference);
     };
   }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateHeroMotionPreference = () => {
+      const shouldRotate = !media.matches;
+      setHeroRotationEnabled(shouldRotate);
+      if (!shouldRotate) setHeroWordIndex(0);
+    };
+    updateHeroMotionPreference();
+    media.addEventListener("change", updateHeroMotionPreference);
+    return () => media.removeEventListener("change", updateHeroMotionPreference);
+  }, []);
+
+  useEffect(() => {
+    if (!heroRotationEnabled) return;
+    const interval = window.setInterval(() => {
+      setHeroWordIndex(index => (index + 1) % heroWords.length);
+    }, 3800);
+    return () => window.clearInterval(interval);
+  }, [heroRotationEnabled]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -133,7 +157,13 @@ function ScrollStory() {
           loading="eager"
         />
         <h1 className="rs-hero-title mt-[1px] text-[#ffffff]">
-          RosterHockey: less admin, more hockey.
+          LESS ADMIN<br />
+          <span className="rs-hero-final-line" aria-hidden="true">
+            <span className="rs-hero-word-line">MORE&nbsp;
+                <HeroSplitFlapWord word={heroWords[heroWordIndex]} />
+            </span>
+          </span>
+          <span className="rs-sr-only">MORE HOCKEY</span>
         </h1>
         <p className="rs-hero-copy text-[#ffffff] font-semibold">RosterHockey is a hockey-specific team and league management app for iOS and Android.</p>
         <ul className="rs-hero-features" aria-label="RosterHockey features">
