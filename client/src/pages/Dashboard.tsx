@@ -3885,16 +3885,18 @@ function DashboardMobile() {
                           </div>
                         );
                       })()}
-                      <span
-                        className="ml-auto shrink-0 whitespace-nowrap text-sm font-medium text-primary"
-                        data-testid={`text-view-details-${game.id}`}
-                      >
-                        View
-                      </span>
-                      <ChevronRight 
-                        className="w-8 h-8 shrink-0 text-primary -ml-1"
-                        data-testid={`icon-view-details-${game.id}`}
-                      />
+                      <div className="flex items-center gap-2 -translate-y-1/2">
+                        <span
+                          className="shrink-0 whitespace-nowrap text-sm font-medium text-primary"
+                          data-testid={`text-view-details-${game.id}`}
+                        >
+                          View
+                        </span>
+                        <ChevronRight
+                          className="w-8 h-8 shrink-0 text-primary -ml-1"
+                          data-testid={`icon-view-details-${game.id}`}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
