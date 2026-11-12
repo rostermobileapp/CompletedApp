@@ -3727,7 +3727,7 @@ function DashboardMobile() {
                 .slice(0, 5).map((game: any) => (
                 <div 
                   key={game.id} 
-                   className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121]"
+                   className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] mb-[24px] pl-[20px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121]"
                   style={{ order: getListOrder(`game-${game.id}`) }}
                   onClick={() => navigate(`/game/${game.id}`)}
                   data-testid={`card-game-${game.id}`}
