@@ -52,7 +52,7 @@ export function GameWinProbabilityBar({
 
   return (
     <div
-      className={cn("relative mt-2 h-6 w-full", className)}
+      className="relative h-6 w-full mt-[-10px]"
       role="meter"
       aria-label={`${viewerTeamName} estimated chance to win`}
       aria-valuemin={0}
