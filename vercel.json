@@ -18,6 +18,12 @@
       "statusCode": 302
     },
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "rosterhockey.com" }],
+      "destination": "https://www.rosterhockey.com/",
+      "statusCode": 302
+    },
+    {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "rosterhockey.com" }],
       "destination": "https://www.rosterhockey.com/:path*",
