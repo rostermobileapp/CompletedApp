@@ -80,6 +80,7 @@
 - [Homepage positioning](homepage-positioning.md) — lead with time together; fade the hero photo to pure black into the story section.
 - [Beverage-duty tally](beverage-duty-tally.md) — roster counts use recorded per-game assignments, not a permanent log of every claim event.
 - [Win-chance tie policy](win-chance-tie-policy.md) — prediction tie probabilities follow each league's configured tie setting, not a global rule.
+- [Internal win-chance tuning](win-chance-internal-tooling.md) — keep prediction accuracy and formula-tuning tools development-only, outside commissioner screens.
 - [Line-combo predictions and tests](line-combo-test-data.md) — predict unseen groups before Save; distinguish estimates from recorded averages and synthetic test lineups.
 - [Automatic line prediction tuning](line-combo-learning.md) — future verified results must change the formula, not merely update averages or report accuracy.
 - [PostgreSQL timestamp precision](postgres-timestamp-precision.md) — JavaScript Date drops microseconds; preserve canonical text for strict database timestamp equality.

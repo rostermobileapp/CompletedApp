@@ -36,3 +36,21 @@ goals/goalie/player stats, team records, a league tie-setting change, and an RSV
 becoming “No.” Reads and page opens never invoke the worker. If a later schedule
 needs an initial prediction before any eligible data event occurs, run the
 one-team SQL dispatch above as an explicit administrative seed.
+
+## Internal formula-accuracy report
+
+The report is a development-only, read-only command; it does not add a
+commissioner-facing accuracy page or modify stored predictions. After the
+isolated development Supabase project is reachable and migration 0047 has been
+applied, run:
+
+```sh
+npm run win-chance:accuracy
+```
+
+It evaluates only completed non-scrimmage games with a stored prediction whose
+team IDs still match the game. It reports sample counts, top-choice accuracy,
+mean multiclass Brier score, and per-outcome probability calibration buckets
+overall and by league. Samples under 30 games are explicitly flagged. Tied final
+scores are counted as ties only when that league allows ties; inconsistent tied
+results for no-tie leagues are excluded.
