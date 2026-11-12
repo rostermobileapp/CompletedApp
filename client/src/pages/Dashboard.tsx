@@ -1223,6 +1223,11 @@ function ScrimmageRequestsBadge({ scrimmageId }: { scrimmageId: string }) {
 export default function Dashboard() {
   const isDesktopWeb = useIsDesktopWeb();
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
+  React.useEffect(() => {
+    if (import.meta.env.DEV && import.meta.env.VITE_LIVE_PROJECT_PREVIEW === 'true') {
+      console.log('[Home prediction render check]', JSON.stringify({ view: isDesktopWeb ? 'desktop' : 'mobile' }));
+    }
+  }, [isDesktopWeb]);
 
   if (isDesktopWeb) {
     return (
@@ -1835,6 +1840,26 @@ function DashboardMobile() {
 
     return games;
   }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll]);
+
+  React.useEffect(() => {
+    if (!import.meta.env.DEV || import.meta.env.VITE_LIVE_PROJECT_PREVIEW !== 'true') return;
+    if (!Array.isArray(upcomingGames)) return;
+    const viewerTeamIds = Array.isArray(userTeamsAll) ? userTeamsAll.map((team: any) => String(team.id)) : [];
+    console.log('[Home prediction eligibility check]', JSON.stringify({
+      scheduleView,
+      teamsLoaded: Array.isArray(userTeamsAll),
+      teamCount: viewerTeamIds.length,
+      games: upcomingGames.slice(0, 5).map((game: any) => ({
+        scrimmage: !!game.isScrimmage,
+        tournament: !!game.isTournamentMatch,
+        completed: !!game.isCompleted,
+        unscored: game.homeScore == null && game.awayScore == null,
+        homeTeamPresent: !!game.homeTeamId,
+        awayTeamPresent: !!game.awayTeamId,
+        viewerMatches: viewerTeamIds.includes(game.homeTeamId) || viewerTeamIds.includes(game.awayTeamId),
+      })),
+    }));
+  }, [upcomingGames, userTeamsAll, scheduleView]);
 
   // Fetch duty assignments for upcoming games
   const { data: dutyAssignments = [] } = useQuery({
