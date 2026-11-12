@@ -51,7 +51,7 @@ import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
 import { TeamAwardHolderStrip } from '@/components/team-awards/TeamAwardHolders';
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
-import { GamePredictionButton } from '@/components/GamePredictionButton';
+import { GameWinProbabilityBar } from '@/components/GameWinProbabilityBar';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -3796,6 +3796,24 @@ function DashboardMobile() {
                           {game.venue}
                         </p>
                       )}
+                      {!game.isScrimmage
+                        && !game.isTournamentMatch
+                        && !game.isCompleted
+                        && game.homeScore == null
+                        && game.awayScore == null
+                        && game.homeTeamId
+                        && game.awayTeamId && (
+                          <GameWinProbabilityBar
+                            gameId={game.id}
+                            homeTeamId={game.homeTeamId}
+                            awayTeamId={game.awayTeamId}
+                            homeTeamName={game.homeTeam?.name || "Home team"}
+                            awayTeamName={game.awayTeam?.name || "Away team"}
+                            viewerTeamIds={Array.isArray(userTeamsAll)
+                              ? userTeamsAll.map((team: any) => String(team.id))
+                              : []}
+                          />
+                        )}
                       {/* Score display for completed games */}
                       {(game.isCompleted || (game.homeScore !== null && game.awayScore !== null)) && !game.isScrimmage && (
                         <div className="text-sm font-medium" data-testid={`text-game-score-${game.id}`}>
@@ -3878,26 +3896,6 @@ function DashboardMobile() {
                         data-testid={`icon-view-details-${game.id}`}
                       />
                     </div>
-                    {!game.isScrimmage
-                      && !game.isTournamentMatch
-                      && !game.isCompleted
-                      && game.homeScore == null
-                      && game.awayScore == null
-                      && game.homeTeamId
-                      && game.awayTeamId && (
-                        <GamePredictionButton
-                          gameId={game.id}
-                          homeTeamId={game.homeTeamId}
-                          awayTeamId={game.awayTeamId}
-                          homeTeamName={game.homeTeam?.name || "Home team"}
-                          awayTeamName={game.awayTeam?.name || "Away team"}
-                          viewerTeamIds={Array.isArray(userTeamsAll)
-                            ? userTeamsAll.map((team: any) => String(team.id))
-                            : []}
-                          className="mx-4 mt-2 mb-3 w-[calc(100%-2rem)]"
-                          dataTestId={`button-home-game-prediction-${game.id}`}
-                        />
-                      )}
                   </div>
                 </div>
               ))}
