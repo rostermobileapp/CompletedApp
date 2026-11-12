@@ -24,7 +24,6 @@ export function AboutPage() {
           </button>
           <div className="ap-intro">
             <span className="rp-kicker">The story behind RosterHockey</span>
-            <p>RosterHockey (formerly written Roster Hockey).</p>
             <h1 className="rp-title">Built by a player.<br /><em>For the people.</em></h1>
             <h2>Tobin K. <span>· Hockey player, lifetime beer league member</span></h2>
             <p>I didn’t set out to build a software company. I set out to build an app for the hockey community with the added benefit of never wondering if we had enough players.</p>
