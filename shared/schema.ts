@@ -426,6 +426,7 @@ export const leagues = pgTable("leagues", {
   maxTeams: integer("max_teams").default(16),
   isActive: boolean("is_active").default(true).notNull(),
   playoffStarted: boolean("playoff_started").default(false).notNull(),
+  allowTies: boolean("allow_ties").default(false).notNull(),
   playoffBracket: jsonb("playoff_bracket"), // Store playoff bracket data
   subApprovalWorkflow: subApprovalWorkflowEnum("sub_approval_workflow").default("captain_and_commissioner").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -706,6 +707,52 @@ export const games = pgTable("games", {
   color: text("color"), // Optional color for calendar display (e.g. "#ef4444")
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Predictions are written only by the Supabase Edge Function. Client access is
+// read-only and additionally constrained by the database RLS policy.
+export const gamePredictions = pgTable("game_predictions", {
+  gameId: varchar("game_id").primaryKey().references(() => games.id, { onDelete: "cascade" }),
+  homeTeamId: varchar("home_team_id").references(() => teams.id, { onDelete: "cascade" }).notNull(),
+  awayTeamId: varchar("away_team_id").references(() => teams.id, { onDelete: "cascade" }).notNull(),
+  homeWinProbability: decimal("home_win_probability", { precision: 6, scale: 5 }).notNull(),
+  awayWinProbability: decimal("away_win_probability", { precision: 6, scale: 5 }).notNull(),
+  tieProbability: decimal("tie_probability", { precision: 6, scale: 5 }).notNull().default("0"),
+  expectedGoalsHome: decimal("expected_goals_home", { precision: 7, scale: 3 }).notNull(),
+  expectedGoalsAway: decimal("expected_goals_away", { precision: 7, scale: 3 }).notNull(),
+  moneylineHome: varchar("moneyline_home", { length: 16 }).notNull(),
+  moneylineAway: varchar("moneyline_away", { length: 16 }).notNull(),
+  projectedScoreHome: integer("projected_score_home").notNull(),
+  projectedScoreAway: integer("projected_score_away").notNull(),
+  winByTwoHome: decimal("win_by_two_home", { precision: 6, scale: 5 }).notNull(),
+  winByTwoAway: decimal("win_by_two_away", { precision: 6, scale: 5 }).notNull(),
+  overUnderLine: decimal("over_under_line", { precision: 6, scale: 2 }).notNull(),
+  overProbability: decimal("over_probability", { precision: 6, scale: 5 }).notNull(),
+  underProbability: decimal("under_probability", { precision: 6, scale: 5 }).notNull(),
+  topScorersHome: jsonb("top_scorers_home").$type<Array<{
+    id: string;
+    name: string;
+    projectedPoints: number;
+    chanceOfPoint: number;
+    form: "hot" | "cold" | null;
+  }>>().notNull().default([]),
+  topScorersAway: jsonb("top_scorers_away").$type<Array<{
+    id: string;
+    name: string;
+    projectedPoints: number;
+    chanceOfPoint: number;
+    form: "hot" | "cold" | null;
+  }>>().notNull().default([]),
+  homeRecordSnapshot: jsonb("home_record_snapshot").$type<{ wins: number; losses: number; ties: number }>().notNull(),
+  awayRecordSnapshot: jsonb("away_record_snapshot").$type<{ wins: number; losses: number; ties: number }>().notNull(),
+  homeStreak: integer("home_streak").notNull().default(0),
+  awayStreak: integer("away_streak").notNull().default(0),
+  goalieHome: varchar("goalie_home"),
+  goalieAway: varchar("goalie_away"),
+  calculatedAt: timestamp("calculated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("game_predictions_home_team_idx").on(table.homeTeamId),
+  index("game_predictions_away_team_idx").on(table.awayTeamId),
+]);
 
 // Duty templates table - defines the types of duties (beverage, custom, etc.)
 export const dutyTemplates = pgTable("duty_templates", {
@@ -3764,6 +3811,7 @@ export type TeamLeagueRequest = typeof teamLeagueRequests.$inferSelect;
 export type InsertTeamLeagueRequest = z.infer<typeof insertTeamLeagueRequestSchema>;
 export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
+export type GamePrediction = typeof gamePredictions.$inferSelect;
 export type DutyTemplate = typeof dutyTemplates.$inferSelect;
 export type InsertDutyTemplate = z.infer<typeof insertDutyTemplateSchema>;
 export type DutyAssignment = typeof dutyAssignments.$inferSelect;

@@ -399,6 +399,7 @@ const editLeagueSchema = z.object({
   rinkAddress: z.string().nullable().optional(),
   timezone: z.string().optional(),
   isActive: z.boolean(),
+  allowTies: z.boolean().default(false),
   subApprovalWorkflow: z.enum(['substitute_only', 'captain_only', 'commissioner_only', 'captain_and_commissioner']).optional(),
 });
 
@@ -1197,6 +1198,7 @@ export default function LeagueManagement() {
       facilityId: league?.facilityId || '',
       timezone: (league as any)?.timezone || 'America/New_York',
       isActive: league?.isActive ?? true,
+      allowTies: (league as any)?.allowTies ?? false,
       subApprovalWorkflow: (league as any)?.subApprovalWorkflow || 'captain_and_commissioner',
     },
   });
@@ -1264,6 +1266,7 @@ export default function LeagueManagement() {
         rinkName: league.rinkName || null,
         rinkAddress: league.rinkAddress || null,
         timezone: (league as any)?.timezone || 'America/New_York',
+        allowTies: (league as any)?.allowTies ?? false,
         subApprovalWorkflow: (league as any)?.subApprovalWorkflow || 'captain_and_commissioner',
       });
     }
@@ -5741,6 +5744,29 @@ export default function LeagueManagement() {
                     This timezone will be used for all game schedules and notifications
                   </p>
                 </div>
+
+                {/* Sub Approval Workflow */}
+                <Controller
+                  name="allowTies"
+                  control={editLeagueForm.control}
+                  render={({ field }) => (
+                    <label className="flex items-start gap-3 rounded-lg border border-border p-4 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={(event) => field.onChange(event.target.checked)}
+                        className="mt-1 accent-primary"
+                        data-testid="checkbox-allow-ties"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium">Allow ties in predictions</span>
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          Show a tie probability instead of splitting ties between the teams.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                />
 
                 {/* Sub Approval Workflow */}
                 <div>

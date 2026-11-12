@@ -41,6 +41,13 @@ interface UpcomingItem {
   isTournamentMatch?: boolean;
 }
 
+interface WinChanceSummary {
+  homeTeamId: string;
+  awayTeamId: string;
+  homeWinProbability: number;
+  awayWinProbability: number;
+}
+
 export function UpNextCard({
   effectiveLeagueId,
   selectedTeamId,
@@ -172,6 +179,28 @@ export function UpNextCard({
     staleTime: 30_000,
   });
 
+  const showWinPrediction = !!nextGame
+    && !!ourTeamId
+    && !!nextGame.homeTeamId
+    && !!nextGame.awayTeamId
+    && !nextGame.isCompleted
+    && !nextGame.isTournamentMatch;
+  const { data: winPrediction } = useQuery<WinChanceSummary | null>({
+    queryKey: [`/api/games/${nextGame?.id}/prediction`],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/games/${nextGame!.id}/prediction`);
+      return response.json();
+    },
+    enabled: showWinPrediction,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const ourWinChance = winPrediction
+    ? ourTeamId === winPrediction.homeTeamId
+      ? winPrediction.homeWinProbability
+      : winPrediction.awayWinProbability
+    : null;
+
   const handleClick = () => {
     if (!nextGame) return;
     setPageTransitionDirection('up');
@@ -293,6 +322,20 @@ export function UpNextCard({
               testid="rsvp-noresponse"
               compact={compact}
             />
+          </div>
+        )}
+
+        {showWinPrediction && ourWinChance != null && (
+          <div
+            className={`${compact ? 'mt-2 px-2 py-1.5' : 'mt-3 px-3 py-2'} flex items-center justify-between gap-2 rounded-lg bg-blue-50 text-blue-950 dark:bg-blue-950/40 dark:text-blue-100`}
+            data-testid="up-next-win-chance"
+          >
+            <span className={`${compact ? 'text-[11px]' : 'text-xs'} font-medium`}>
+              Win chance <span className="font-normal opacity-75">· for fun</span>
+            </span>
+            <span className={`${compact ? 'text-sm' : 'text-base'} font-bold tabular-nums`}>
+              {Math.round(ourWinChance * 100)}%
+            </span>
           </div>
         )}
       </>

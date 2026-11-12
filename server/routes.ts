@@ -62,7 +62,7 @@ import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
 import { assertNativeBillingRequestAccount } from "./nativeBillingAccount";
 import { nativePurchaseLoginId, confirmReportedNativeIdentity } from "./nativePurchaseAccount";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, gamePredictions, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { incrementBeerCountIfWindowOpen } from "./beerLogging";
@@ -7518,6 +7518,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!league || league.commissionerId !== userId) {
         return res.status(403).json({ message: "You can only edit your own leagues" });
       }
+
+      if (req.body?.allowTies !== undefined && typeof req.body.allowTies !== 'boolean') {
+        return res.status(400).json({ message: "allowTies must be a boolean" });
+      }
       
       const result = await storage.updateLeague(league.id, req.body);
       res.json(result);
@@ -12046,6 +12050,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching full game details:', error);
       res.status(500).json({ message: 'Failed to fetch game details' });
+    }
+  });
+
+  // Read-only prediction lookup. Recalculation is handled only by database
+  // triggers dispatching the Supabase Edge Function.
+  app.get('/api/games/:gameId/prediction', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const gameId = req.params.gameId;
+      const [game] = await db
+        .select({ homeTeamId: games.homeTeamId, awayTeamId: games.awayTeamId })
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game || !game.awayTeamId) {
+        return res.status(404).json({ message: 'Prediction not available' });
+      }
+
+      const teamIds = [game.homeTeamId, game.awayTeamId];
+      const [teamMembershipRows, leagueAssignments, captainRows] = await Promise.all([
+        db.select({ teamId: teamMemberships.teamId })
+          .from(teamMemberships)
+          .where(and(
+            eq(teamMemberships.userId, userId),
+            eq(teamMemberships.status, 'approved'),
+            inArray(teamMemberships.teamId, teamIds),
+          )),
+        db.select({ teamId: leagueMemberships.assignedTeamId })
+          .from(leagueMemberships)
+          .where(and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved'),
+            inArray(leagueMemberships.assignedTeamId, teamIds),
+          )),
+        db.select({ id: teams.id })
+          .from(teams)
+          .where(and(eq(teams.captainId, userId), inArray(teams.id, teamIds)))
+          .limit(1),
+      ]);
+      if (!teamMembershipRows.length && !leagueAssignments.length && !captainRows.length) {
+        return res.status(403).json({ message: 'You must be on one of these teams to view this prediction' });
+      }
+
+      const [prediction] = await db
+        .select()
+        .from(gamePredictions)
+        .where(eq(gamePredictions.gameId, gameId))
+        .limit(1);
+      if (!prediction || prediction.homeTeamId !== game.homeTeamId || prediction.awayTeamId !== game.awayTeamId) {
+        return res.json(null);
+      }
+
+      const asNumber = (value: unknown) => value == null ? null : Number(value);
+      res.json({
+        ...prediction,
+        homeWinProbability: asNumber(prediction.homeWinProbability),
+        awayWinProbability: asNumber(prediction.awayWinProbability),
+        tieProbability: asNumber(prediction.tieProbability),
+        expectedGoalsHome: asNumber(prediction.expectedGoalsHome),
+        expectedGoalsAway: asNumber(prediction.expectedGoalsAway),
+        winByTwoHome: asNumber(prediction.winByTwoHome),
+        winByTwoAway: asNumber(prediction.winByTwoAway),
+        overUnderLine: asNumber(prediction.overUnderLine),
+        overProbability: asNumber(prediction.overProbability),
+        underProbability: asNumber(prediction.underProbability),
+      });
+    } catch (error) {
+      console.error('Error fetching game prediction:', error);
+      res.status(500).json({ message: 'Failed to fetch game prediction' });
     }
   });
 
