@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isUnindexedPublicPage } from '../shared/publicPagePolicy';
 
-const SITE_ORIGIN = 'https://www.roster-app.com';
+const SITE_ORIGIN = 'https://www.rosterhockey.com';
+const APP_ORIGIN = 'https://www.roster-app.com';
 const API_ORIGIN = (process.env.PRERENDER_API_ORIGIN || process.env.VITE_API_BASE_URL ||
   'https://completedapp-production.up.railway.app').replace(/\/+$/, '').replace(/\/api$/, '');
 const outputDir = path.resolve('dist/public');
@@ -47,7 +48,7 @@ function structuredData(
 ) {
   const storeLinks = [
     'https://apps.apple.com/us/app/roster-hockey/id6756852981',
-    'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med',
+    'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively',
   ];
   const offers = [{
     '@type': 'Offer',
@@ -81,6 +82,7 @@ function structuredData(
     {
       '@context': 'https://schema.org',
       '@type': 'Organization',
+      '@id': `${SITE_ORIGIN}/#organization`,
       name: 'RosterHockey',
       alternateName: ['Roster Hockey', 'Roster'],
       url: SITE_ORIGIN,
@@ -90,6 +92,7 @@ function structuredData(
     {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
+      '@id': `${SITE_ORIGIN}/#app`,
       name: 'RosterHockey',
       alternateName: ['Roster Hockey', 'Roster'],
       applicationCategory: 'SportsApplication',
@@ -178,11 +181,15 @@ async function main() {
       html = putMeta(html, /<meta\s+property="og:description"[^>]*>/i,
         `<meta property="og:description" content="${escapeHtml(metadata.ogDescription || description)}" />`);
       html = putMeta(html, /<meta\s+property="og:url"[^>]*>/i, `<meta property="og:url" content="${canonical}" />`);
+      html = putMeta(html, /<meta\s+property="og:image"[^>]*>/i,
+        `<meta property="og:image" content="${SITE_ORIGIN}/roster-logo.png" />`);
       html = putMeta(html, /<link\s+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${canonical}" />`);
       html = putMeta(html, /<meta\s+name="twitter:title"[^>]*>/i,
         `<meta name="twitter:title" content="${escapeHtml(metadata.ogTitle || title)}" />`);
       html = putMeta(html, /<meta\s+name="twitter:description"[^>]*>/i,
         `<meta name="twitter:description" content="${escapeHtml(metadata.ogDescription || description)}" />`);
+      html = putMeta(html, /<meta\s+name="twitter:image"[^>]*>/i,
+        `<meta name="twitter:image" content="${SITE_ORIGIN}/roster-logo.png" />`);
       if (isUnindexedPublicPage(pathname)) {
         html = putMeta(html, /<meta\s+name="robots"[^>]*>/i, '<meta name="robots" content="noindex" />');
       } else if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
@@ -203,7 +210,7 @@ async function main() {
       console.log(`Prerendered ${pathname}`);
     }
     await fs.writeFile(path.join(outputDir, '404.html'),
-      '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Page not found | RosterHockey</title><meta property="og:site_name" content="RosterHockey" /><link rel="canonical" href="https://www.roster-app.com/"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to RosterHockey</a></main></body></html>');
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Page not found | RosterHockey</title><meta property="og:site_name" content="RosterHockey" /><link rel="canonical" href="${APP_ORIGIN}/"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="${APP_ORIGIN}/">Return to RosterHockey</a></main></body></html>`);
     await writeSitemap(renderer.publicPagePaths.filter(path => !isUnindexedPublicPage(path)), new Date().toISOString().slice(0, 10));
     if (seoErrors.length) throw new Error(`SEO validation failed:\n${seoErrors.map(error => `- ${error}`).join('\n')}`);
     if (!rootHtml) throw new Error('The homepage was not prerendered.');

@@ -3,6 +3,7 @@ import { MarketingLayout } from '@/components/MarketingLayout';
 import { Check, Calendar, MessageCircle, Trophy, Users, CreditCard, Bell } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { FunFeaturesNudge } from '@/components/FunFeaturesShowcase';
+import { APP_SITE_ORIGIN } from '@/lib/seoMetadata';
 
 interface SportConfig {
   slug: string;
@@ -66,7 +67,7 @@ const sportConfigs: Record<string, SportConfig> = {
         description: 'Keep all team communication in one place. No more buried group texts or missed emails.',
       },
     ],
-    metaTitle: 'Hockey | RosterHockey',
+    metaTitle: 'Hockey Team Management | RosterHockey',
     metaDescription: 'Manage hockey schedules, RSVPs, rosters, stats, and payments with RosterHockey. One ad-free app for your team.',
   },
   soccer: {
@@ -209,12 +210,12 @@ export default function SportLanding({ sport }: SportLandingProps) {
             </div>
           )}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => setLocation('/get-started')}
-              className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
+            <a
+              href={`${APP_SITE_ORIGIN}/get-started`}
+              className="inline-flex items-center justify-center px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
               Get Started
-            </button>
+            </a>
             <button
               onClick={() => setLocation('/pricing')}
               className="px-8 py-4 rounded-full border border-gray-300 hover:border-[#3c82f4] text-gray-700 hover:text-[#3c82f4] transition-colors font-semibold text-lg"
@@ -305,12 +306,12 @@ export default function SportLanding({ sport }: SportLandingProps) {
             RosterHockey for hockey is live on the App Store and Google Play. Free tier available now.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => setLocation('/get-started')}
-              className="px-10 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
+            <a
+              href={`${APP_SITE_ORIGIN}/get-started`}
+              className="inline-flex items-center justify-center px-10 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
               Get Started
-            </button>
+            </a>
             <button
               onClick={() => setLocation('/about')}
               className="px-10 py-4 rounded-full border border-gray-200 text-gray-700 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold text-lg"

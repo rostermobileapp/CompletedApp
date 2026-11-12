@@ -19,7 +19,7 @@ const seasonTools = [
 ];
 
 export function FeaturesPage() {
-  useSeo({ title: "Features | RosterHockey", description: "Schedules, RSVPs, live scorekeeping, automated brackets, league drafts, payments, and team messaging in one ad-free hockey app." });
+  useSeo({ title: "Features: Hockey League Management | RosterHockey", description: "Schedules, RSVPs, live scorekeeping, automated brackets, league drafts, payments, and team messaging in one ad-free hockey app." });
   return (
     <main className="rp-page rp-features">
       <RosterPageNav active="features" />

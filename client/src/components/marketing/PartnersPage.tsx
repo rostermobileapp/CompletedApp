@@ -2,12 +2,13 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import { ArrowRight, Check, CheckCircle2, FileText, Minus, Plus, Upload, X } from "lucide-react";
 import { RosterPageFooter, RosterPageNav } from "./RosterPageNav";
 import { useSeo } from "@/hooks/useSeo";
+import { APP_SITE_ORIGIN } from "@/lib/seoMetadata";
 import "./PartnersPage.css";
 
 const orgTypes = ["Hockey Association / Club", "Arena / Ice Facility", "Recreation League", "Youth Sports Organization", "Sports Media / Podcast", "Other"];
 
 export function PartnersPage() {
-  useSeo({ title: "Referral Program | RosterHockey", description: "Partner with RosterHockey to support your hockey community through our referral program. Apply online and help teams stay connected." });
+  useSeo({ title: "Community Partner Program | RosterHockey", description: "Partner with RosterHockey to support your hockey community through our referral program. Apply online and help teams stay connected." });
   const [referrals, setReferrals] = useState(300);
   const [fileName, setFileName] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -50,7 +51,7 @@ export function PartnersPage() {
     if (form.hockeyAffiliation.trim()) data.append("hockeyAffiliation", form.hockeyAffiliation.trim());
     if (file) data.append("proofDocument", file);
     try {
-      const response = await fetch("/api/referral/apply", { method: "POST", body: data });
+      const response = await fetch(`${APP_SITE_ORIGIN}/api/referral/apply`, { method: "POST", body: data });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Unable to submit your application. Please try again.");
       setSubmitted(true);
@@ -70,7 +71,7 @@ export function PartnersPage() {
           <h1 className="rp-title">We give back<br /><em>to the hockey community.</em></h1>
           <p>Refer players to our platform and RosterHockey will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization.</p>
           <strong>Choose a good cause and track your referrals.</strong>
-          <div className="partner-hero-actions"><a className="partner-button" href="#apply">Apply to become a partner <ArrowRight size={16} /></a><a className="partner-login-link" href="/referral-program/portal/login">Partner login</a></div>
+          <div className="partner-hero-actions"><a className="partner-button" href="#apply">Apply to become a partner <ArrowRight size={16} /></a><a className="partner-login-link" href={`${APP_SITE_ORIGIN}/referral-program/portal/login`}>Partner login</a></div>
           <div className="partner-trustline"><Check size={15} /> Paid quarterly&nbsp; · &nbsp;10% of net subscription revenue&nbsp; · &nbsp;Built for the hockey community</div>
         </div>
       </section>

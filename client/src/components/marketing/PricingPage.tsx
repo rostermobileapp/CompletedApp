@@ -38,7 +38,7 @@ function PlanCard({ name, audience, price, note, features, featured, annual = fa
       <p className="pp-plan-audience">{audience}</p>
       <div className="pp-price">{price}<small>{name === "Free" ? "forever" : annual ? "per month · billed annually" : "per month"}</small></div>
       <p className="pp-price-note">{note}</p>
-      <a className="pp-plan-action" href="/get-started">Get started <ArrowRight size={15} /></a>
+      <a className="pp-plan-action" href="https://www.roster-app.com/get-started">Get started <ArrowRight size={15} /></a>
       <div className="pp-includes-label">INCLUDES</div>
       <ul>{features.map(feature => <li key={feature}><Check size={15} />{feature}</li>)}</ul>
     </article>
@@ -47,7 +47,7 @@ function PlanCard({ name, audience, price, note, features, featured, annual = fa
 
 export function PricingPage() {
   const [annual, setAnnual] = useState(false);
-  useSeo({ title: "Pricing | RosterHockey", description: "Start free. Compare Player Pro and Commissioner plans for hockey teams and leagues. No ads on any plan." });
+  useSeo({ title: "Pricing: Free, Player Pro & Commissioner | RosterHockey", description: "Start free. Compare Player Pro and Commissioner plans for hockey teams and leagues. No ads on any plan." });
   const formatPrice = (amount: number, monthlyEquivalent = false) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount / (monthlyEquivalent ? 12 : 1));
   };

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, Menu, X } from "lucide-react";
 import "./RosterPageNav.css";
+import { APP_SITE_ORIGIN } from "@/lib/seoMetadata";
 
 const pages = [
   { key: "features", label: "Features", href: "/features" },
@@ -18,7 +19,7 @@ export function RosterPageNav({ active }: { active: string }) {
       </a>
       <nav className="rp-nav-links" aria-label="Main navigation">
         {pages.map(page => <a key={page.key} href={page.href} aria-current={active === page.key ? "page" : undefined} className={active === page.key ? "is-active" : ""}>{page.label}</a>)}
-        <a href="/login">Log in</a>
+        <a href={`${APP_SITE_ORIGIN}/login`}>Log in</a>
       </nav>
       <a className="rp-nav-cta" href="/">Home <ArrowRight size={15} /></a>
       <button className="rp-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}>
@@ -27,8 +28,8 @@ export function RosterPageNav({ active }: { active: string }) {
       {menuOpen && <nav className="rp-mobile-menu" aria-label="Mobile navigation">
         <a href="/" onClick={() => setMenuOpen(false)}>Home</a>
         {pages.map(page => <a key={page.key} href={page.href} aria-current={active === page.key ? "page" : undefined} onClick={() => setMenuOpen(false)}>{page.label}</a>)}
-        <a href="/login">Log in</a>
-        <a href="/get-started">Get started</a>
+        <a href={`${APP_SITE_ORIGIN}/login`}>Log in</a>
+        <a href={`${APP_SITE_ORIGIN}/get-started`}>Get started</a>
       </nav>}
     </header>
   );

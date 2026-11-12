@@ -1,6 +1,6 @@
 import { useContext, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { applyCanonicalUrl, CANONICAL_SITE_ORIGIN, canonicalUrl, SeoMetadataContext } from '@/lib/seoMetadata';
+import { applyCanonicalUrl, canonicalOriginForPath, canonicalUrl, SeoMetadataContext } from '@/lib/seoMetadata';
 import { isUnindexedPublicPage } from '@shared/publicPagePolicy';
 
 interface SeoOptions {
@@ -12,12 +12,11 @@ interface SeoOptions {
 }
 
 const DEFAULT_TITLE = 'RosterHockey | Beer League Hockey Team & League Management App';
-const OG_IMAGE = `${CANONICAL_SITE_ORIGIN}/roster-logo.png`;
-
 export function useSeo({ title, description, ogTitle, ogDescription, canonical }: SeoOptions) {
   const [location] = useLocation();
   const collector = useContext(SeoMetadataContext);
   const resolvedCanonical = canonicalUrl(canonical ?? location);
+  const ogImage = `${canonicalOriginForPath(canonical ?? location)}/roster-logo.png`;
   if (collector) collector.current = { title, description, ogTitle, ogDescription, canonical: resolvedCanonical };
 
   useEffect(() => {
@@ -60,17 +59,17 @@ export function useSeo({ title, description, ogTitle, ogDescription, canonical }
     setMeta('og:title', resolvedOgTitle, true);
     setMeta('og:description', resolvedOgDesc, true);
     setMeta('og:type', 'website', true);
-    setMeta('og:image', OG_IMAGE, true);
+    setMeta('og:image', ogImage, true);
     setMeta('og:url', resolvedCanonical, true);
     setMeta('twitter:card', 'summary_large_image');
     setMeta('twitter:title', resolvedOgTitle);
     setMeta('twitter:description', resolvedOgDesc);
-    setMeta('twitter:image', OG_IMAGE);
+    setMeta('twitter:image', ogImage);
     setCanonical(resolvedCanonical);
     applyCanonicalUrl(canonical ?? location);
 
     return () => {
       document.title = DEFAULT_TITLE;
     };
-  }, [title, description, ogTitle, ogDescription, canonical, location, resolvedCanonical]);
+  }, [title, description, ogTitle, ogDescription, canonical, location, resolvedCanonical, ogImage]);
 }

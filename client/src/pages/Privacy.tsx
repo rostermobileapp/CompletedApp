@@ -1,25 +1,37 @@
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft } from 'lucide-react';
+import { useSeo } from '@/hooks/useSeo';
+import { MARKETING_SITE_ORIGIN } from '@/lib/seoMetadata';
 
-export default function Privacy() {
+export default function Privacy({ publicPage = false }: { publicPage?: boolean }) {
   const [, navigate] = useLocation();
+  useSeo({
+    title: 'Privacy | RosterHockey',
+    description: 'A short statement about how RosterHockey handles and protects user data.',
+  });
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="privacy-page">
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
-          <button 
-            onClick={() => {
-              setPageTransitionDirection('down');
-              navigate('/profile');
-            }}
-            className="text-muted-foreground"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
+          {publicPage ? (
+            <a href={`${MARKETING_SITE_ORIGIN}/`} className="text-muted-foreground" aria-label="Back to RosterHockey home" data-testid="button-back">
+              <ArrowLeft className="w-6 h-6" />
+            </a>
+          ) : (
+            <button
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate('/profile');
+              }}
+              className="text-muted-foreground"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          )}
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Privacy</h1>
         </div>
       </div>

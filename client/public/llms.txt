@@ -3,9 +3,11 @@
 RosterHockey (previously written Roster Hockey or Roster) is a hockey-specific team and league management app for iOS and Android. It helps teams and leagues organize schedules, attendance, team chat, dues and payments, substitute and goalie coverage, and league operations.
 
 Key pages:
-- https://www.roster-app.com/
-- https://www.roster-app.com/features
-- https://www.roster-app.com/pricing
-- https://www.roster-app.com/about
-- https://www.roster-app.com/faq
-- https://www.roster-app.com/support
+- https://www.rosterhockey.com/
+- https://www.rosterhockey.com/features
+- https://www.rosterhockey.com/pricing
+- https://www.rosterhockey.com/about
+- https://www.rosterhockey.com/faq
+- https://www.rosterhockey.com/support
+
+Web app and login: https://www.roster-app.com

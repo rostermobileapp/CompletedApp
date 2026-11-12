@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowRight, Menu, X } from "lucide-react";
 import { SiAppstore, SiGoogleplay } from "react-icons/si";
-import { useLocation } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
 import { useMarketingVisit } from "./useMarketingVisit";
 import { useIsIosDevice } from "@/hooks/useIosPlatform";
+import { APP_SITE_ORIGIN } from "@/lib/seoMetadata";
 import HeroSplitFlapWord from "./HeroSplitFlapWord";
 import "./ScrollStory.css";
 
 const image = (name: string) => `/marketing/roster-home/${name}`;
-const signupDestination = "/get-started";
+const signupDestination = `${APP_SITE_ORIGIN}/get-started`;
 const appStore = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
 const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
 const heroWords = ["HOCKEY", "MEMORIES", "LAUGHS", "JOKES", "CHEERS", "GOOD TIMES", "FRIENDS", "CHIRPS", "FELLOWSHIP"];
@@ -24,7 +24,6 @@ const questions = [
   { q: "What is the name of the trophy awarded to the NHL’s top goaltender?", answers: ["Vezina Trophy", "Norris Trophy", "Selke Trophy"], right: "Vezina Trophy" },
 ];
 function ScrollStory() {
-  const [, navigate] = useLocation();
   const isIos = useIsIosDevice();
   useMarketingVisit();
   useSeo({
@@ -135,7 +134,7 @@ function ScrollStory() {
               <SiGoogleplay size={15} aria-hidden="true" />
             </a>
           </div>
-          <button className="rs-nav-cta" onClick={() => navigate(signupDestination)}>Get started <ArrowRight size={15} /></button>
+          <a className="rs-nav-cta" href={signupDestination}>Get started <ArrowRight size={15} /></a>
         </div>
         <button className="rs-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
         {menuOpen && <nav className="rs-mobile-menu" aria-label="Mobile navigation">
@@ -146,7 +145,7 @@ function ScrollStory() {
             ["about", "/about"],
             ["partners", "/referral-program"],
           ].map(([label, href]) => <a key={label} href={href} onClick={() => setMenuOpen(false)}>{label[0].toUpperCase() + label.slice(1)}</a>)}
-          <a href="#start" onClick={(e) => { e.preventDefault(); setMenuOpen(false); jumpTo("start"); }}>Get started</a>
+          <a href={signupDestination} onClick={() => setMenuOpen(false)}>Get started</a>
         </nav>}
       </header>
       <section className="rs-hero" id="top">
@@ -175,8 +174,8 @@ function ScrollStory() {
           <li>League management</li>
         </ul>
         <div className="rs-hero-actions">
-          <button className="rs-button" onClick={() => navigate(signupDestination)}>Bring your team together <ArrowRight size={16} /></button>
-          <button className="rs-button secondary" onClick={() => navigate("/login")}>Log in</button>
+          <a className="rs-button" href={signupDestination}>Bring your team together <ArrowRight size={16} /></a>
+          <a className="rs-button secondary" href={`${APP_SITE_ORIGIN}/login`}>Log in</a>
         </div>
         <p className="rs-micro">No ads. Free forever tier available. No credit card required.</p>
         <a className="rs-sr-only" href="#team">Scroll to the story</a>
@@ -278,7 +277,7 @@ function ScrollStory() {
           <h2 className="rs-display">Let’s get<br />back to hockey.</h2>
           <p className="rs-copy">Bring your team together, keep the season in step, and save the admin for the app.</p>
           <div className="rs-hero-actions">
-            <button className="rs-button" onClick={() => navigate(signupDestination)}>Get started <ArrowRight size={16} /></button>
+            <a className="rs-button" href={signupDestination}>Get started <ArrowRight size={16} /></a>
             <a className="rs-button secondary" href={appStore} target="_blank" rel="noreferrer"><SiAppstore size={19} /> App Store</a>
             {!isIos && <a className="rs-button secondary" href={playStore} target="_blank" rel="noreferrer"><SiGoogleplay size={18} /> Google Play</a>}
           </div>

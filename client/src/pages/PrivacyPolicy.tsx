@@ -1,6 +1,6 @@
-import { Link } from 'wouter';
 import { ArrowLeft } from 'lucide-react';
 import { useSeo } from '@/hooks/useSeo';
+import { MARKETING_SITE_ORIGIN } from '@/lib/seoMetadata';
 
 export default function PrivacyPolicy() {
   useSeo({
@@ -11,10 +11,10 @@ export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-black text-white" data-testid="privacy-policy-page">
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8" data-testid="link-back">
+        <a href={`${MARKETING_SITE_ORIGIN}/`} className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8" data-testid="link-back">
           <ArrowLeft className="w-5 h-5" />
           Back to Home
-        </Link>
+        </a>
 
         <h1 className="text-4xl font-bold mb-4" data-testid="text-title">Privacy Policy</h1>
         <p className="text-gray-400 mb-8" data-testid="text-last-updated">Last Updated: 4/20/2026</p>
@@ -205,9 +205,9 @@ export default function PrivacyPolicy() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-gray-800">
-          <Link href="/" className="text-[#3c82f4] hover:underline" data-testid="link-home">
+          <a href={`${MARKETING_SITE_ORIGIN}/`} className="text-[#3c82f4] hover:underline" data-testid="link-home">
             Return to Home
-          </Link>
+          </a>
           <p className="mt-8 text-sm text-gray-400">© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</p>
         </div>
       </div>

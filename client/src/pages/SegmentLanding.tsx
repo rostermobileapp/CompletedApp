@@ -3,6 +3,7 @@ import { MarketingLayout } from '@/components/MarketingLayout';
 import { Check, Calendar, MessageCircle, Trophy, Users, CreditCard, Bell, Shield } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { FunFeaturesNudge } from '@/components/FunFeaturesShowcase';
+import { APP_SITE_ORIGIN } from '@/lib/seoMetadata';
 
 interface SegmentConfig {
   slug: string;
@@ -56,7 +57,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: MessageCircle, label: 'Parent & Team Messaging' },
       { icon: Shield, label: 'No Ads. Kid-Friendly.' },
     ],
-    metaTitle: 'For Youth Teams | RosterHockey',
+    metaTitle: 'Youth Team Management | RosterHockey',
     metaDescription: 'Keep youth teams organized with scheduling, parent communication, RSVPs, and payments in one app for coaches and families.',
   },
   'for-adult-leagues': {
@@ -95,7 +96,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: Trophy, label: 'League Standings & Stats' },
       { icon: MessageCircle, label: 'Team Messaging' },
     ],
-    metaTitle: 'For Adult Leagues | RosterHockey',
+    metaTitle: 'Adult League Management | RosterHockey',
     metaDescription: 'Simplify adult league schedules, RSVP tracking, substitute coverage, and dues with one app built for recreational teams.',
   },
   'for-varsity': {
@@ -134,7 +135,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: MessageCircle, label: 'Coaching Staff Messaging' },
       { icon: Shield, label: 'League-Wide Posts & Awards' },
     ],
-    metaTitle: 'For Varsity | RosterHockey',
+    metaTitle: 'Varsity Team Management | RosterHockey',
     metaDescription: 'Manage varsity rosters, schedules, stats, tournaments, and standings with one app for competitive teams.',
   },
 };
@@ -172,12 +173,12 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
             {config.subheadline}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => setLocation('/get-started')}
-              className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
+            <a
+              href={`${APP_SITE_ORIGIN}/get-started`}
+              className="inline-flex items-center justify-center px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
               Get Started
-            </button>
+            </a>
             <button
               onClick={() => setLocation('/pricing')}
               className="px-8 py-4 rounded-full border border-gray-300 hover:border-[#3c82f4] text-gray-700 hover:text-[#3c82f4] transition-colors font-semibold text-lg"
@@ -261,12 +262,12 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
           <p className="text-gray-500 text-lg mb-8">
             Live on the App Store and Google Play. Free tier available now.
           </p>
-          <button
-            onClick={() => setLocation('/get-started')}
-            className="px-10 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
+          <a
+            href={`${APP_SITE_ORIGIN}/get-started`}
+            className="inline-flex items-center justify-center px-10 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
           >
             Get Started
-          </button>
+          </a>
         </div>
       </section>
     </MarketingLayout>

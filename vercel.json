@@ -5,25 +5,42 @@
   "framework": null,
   "redirects": [
     {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "roster-app.com" }],
-      "destination": "https://www.roster-app.com/:path*",
-      "statusCode": 301
+      "source": "/:path(features|pricing|about|hockey|baseball|soccer|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|sitemap\\.xml|llms\\.txt)",
+      "has": [
+        {
+          "type": "host",
+          "value": {
+            "re": "^(?:www\\.)?roster-app\\.com$"
+          }
+        }
+      ],
+      "destination": "https://www.rosterhockey.com/:path",
+      "statusCode": 302,
+      "preserveQueryParams": true,
+      "caseSensitive": true
     },
     {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "rosterhockey.com" }],
-      "destination": "https://www.roster-app.com/:path*",
-      "statusCode": 301
+      "destination": "https://www.rosterhockey.com/:path*",
+      "statusCode": 302,
+      "preserveQueryParams": true
     },
     {
-      "source": "/:path*",
+      "source": "/:path((?!$|(?:features|pricing|about|hockey|baseball|soccer|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|privacy-policy|privacy|terms-of-service|sitemap\\.xml|robots\\.txt|llms\\.txt|manifest\\.json)(?:/?$)|(?:assets|marketing|badges)(?:/|$)|(?:favicon\\.png|icon-192\\.png|icon-512\\.png|roster-logo(?:-transparent)?\\.png)$).*)",
       "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
       "destination": "https://www.roster-app.com/:path*",
-      "statusCode": 301
+      "statusCode": 302,
+      "preserveQueryParams": true,
+      "caseSensitive": true
     }
   ],
   "rewrites": [
+    {
+      "source": "/robots.txt",
+      "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
+      "destination": "/marketing/robots.txt"
+    },
     {
       "source": "/api/:path*",
       "destination": "https://completedapp-production.up.railway.app/api/:path*"
@@ -100,7 +117,6 @@
     { "source": "/admin/referrals/login", "destination": "/index.html" },
     { "source": "/admin/referrals/partner/:id", "destination": "/index.html" },
     { "source": "/admin/referrals", "destination": "/index.html" },
-    { "source": "/privacy", "destination": "/index.html" },
     { "source": "/facilities", "destination": "/index.html" },
     { "source": "/facilities/:id", "destination": "/index.html" },
     { "source": "/admin/stripe", "destination": "/index.html" },

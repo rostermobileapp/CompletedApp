@@ -79,11 +79,11 @@ export default function Support() {
   const isFaqPage = location === '/faq';
   return (
     <MarketingLayout
-      title={isFaqPage ? 'RosterHockey FAQ' : 'Support | RosterHockey'}
+      title={isFaqPage ? 'RosterHockey FAQ | Hockey Team and League Management' : 'Support | RosterHockey Hockey Team Management'}
       description={isFaqPage
         ? 'Answers about RosterHockey teams, leagues, RSVPs, payments, substitutions, and subscriptions.'
         : 'Get help with RosterHockey. Browse our FAQ, contact support by email, or report a bug. We’re here to help you manage your team or league.'}
-      ogTitle={isFaqPage ? 'RosterHockey FAQ' : 'Support | RosterHockey'}
+      ogTitle={isFaqPage ? 'RosterHockey FAQ | Hockey Team and League Management' : 'Support | RosterHockey Hockey Team Management'}
       ogDescription={isFaqPage
         ? 'Answers to common questions about managing teams, leagues, games, and RosterHockey accounts.'
         : 'Need help with RosterHockey? Find answers to common questions or reach out to our support team directly.'}

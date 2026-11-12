@@ -1,11 +1,11 @@
 import { ReactNode, useState } from 'react';
 import { useIsIosDevice } from '@/hooks/useIosPlatform';
-import { Link, useLocation } from 'wouter';
+import { Link } from 'wouter';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSeo } from '@/hooks/useSeo';
-import { canonicalUrl } from '@/lib/seoMetadata';
+import { APP_SITE_ORIGIN, canonicalUrl } from '@/lib/seoMetadata';
 // Public URLs work in both build-time HTML and the browser bundle.
 const rosterLightLogo = "/marketing/roster-home/logo-light.png";
 
@@ -19,7 +19,6 @@ interface MarketingLayoutProps {
 }
 
 export function MarketingLayout({ title, description, ogTitle, ogDescription, canonical, children }: MarketingLayoutProps) {
-  const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isIos = useIsIosDevice();
   const { isAuthenticated } = useAuth();
@@ -49,18 +48,18 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
             <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain cursor-pointer" />
           </Link>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setLocation('/login')}
+            <a
+              href={`${APP_SITE_ORIGIN}/login`}
               className="hidden md:block text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
               Log In
-            </button>
-            <button
-              onClick={() => setLocation('/get-started')}
+            </a>
+            <a
+              href={`${APP_SITE_ORIGIN}/get-started`}
               className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-xs sm:text-sm"
             >
               Get Started
-            </button>
+            </a>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 text-gray-600 hover:text-gray-900"

@@ -11,6 +11,7 @@ import SportLanding from '@/pages/SportLanding';
 import SegmentLanding from '@/pages/SegmentLanding';
 import Support, { supportFaqs } from '@/pages/Support';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import Privacy from '@/pages/Privacy';
 import TermsOfService from '@/pages/TermsOfService';
 import { SeoMetadataCollector, type SeoMetadata } from '@/lib/seoMetadata';
 
@@ -31,6 +32,7 @@ const publicPages: Record<string, () => ReactElement> = {
   '/faq': () => createElement(Support),
   '/support': () => createElement(Support),
   '/privacy-policy': () => createElement(PrivacyPolicy),
+  '/privacy': () => createElement(Privacy, { publicPage: true }),
   '/terms-of-service': () => createElement(TermsOfService),
 };
 export const publicPagePaths = Object.keys(publicPages);

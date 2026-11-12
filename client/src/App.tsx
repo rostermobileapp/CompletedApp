@@ -143,7 +143,7 @@ export function Router() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isActive: isDemoActive } = useDemo();
   const [location, setLocation] = useLocation();
-  useEffect(() => applyCanonicalUrl(location), [location]);
+  useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
 
   const isDesktopWeb = useIsDesktopWeb();
   useAppDataPrefetch(isAuthenticated && !authLoading);
@@ -285,6 +285,7 @@ export function Router() {
           <Route path="/login" component={Login} />
           <Route path="/get-started" component={OnboardingQuestionnaire} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/privacy">{() => <Privacy publicPage />}</Route>
           <Route path="/terms-of-service" component={TermsOfService} />
           <Route path="/support" component={Support} />
           <Route path="/facilities" component={FacilityBrowse} />
@@ -407,7 +408,7 @@ export function Router() {
               <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
               <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
               <Route path="/admin/referrals" component={ReferralAdmin} />
-              <Route path="/privacy" component={Privacy} />
+              <Route path="/privacy">{() => <Privacy />}</Route>
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />
               <Route path="/support" component={Support} />

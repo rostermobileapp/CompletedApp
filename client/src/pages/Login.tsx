@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import rosterModalLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
 import { EmailVerificationModal } from '@/components/EmailVerificationModal';
 import { loginDestination } from '@/lib/appRouteEntry';
+import { MARKETING_SITE_ORIGIN } from '@/lib/seoMetadata';
 
 const rosterLogo = '/roster-logo-transparent.png';
 
@@ -329,6 +330,13 @@ export default function Login() {
         email={pendingEmail}
         onVerificationSuccess={handleVerificationSuccess}
       />
+      <a
+        href={`${MARKETING_SITE_ORIGIN}/`}
+        className="fixed inset-x-0 bottom-4 z-[60] text-center text-sm text-gray-500 underline underline-offset-4 hover:text-gray-900"
+        data-testid="link-back-to-rosterhockey"
+      >
+        Back to RosterHockey.com
+      </a>
     </div>
   );
 }

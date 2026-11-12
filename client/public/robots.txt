@@ -62,4 +62,4 @@ Disallow: /referral-program/portal$
 Disallow: /referral-program/portal/
 Disallow: /referral-program/verify$
 
-Sitemap: https://www.roster-app.com/sitemap.xml
+Sitemap: https://www.rosterhockey.com/sitemap.xml

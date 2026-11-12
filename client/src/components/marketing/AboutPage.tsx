@@ -11,7 +11,7 @@ const processNotes = [
 ];
 
 export function AboutPage() {
-  useSeo({ title: "About | RosterHockey", description: "Meet the people and the hockey community behind RosterHockey, the ad-free hockey team and league management app." });
+  useSeo({ title: "About: Built for Hockey | RosterHockey", description: "Meet the people and the hockey community behind RosterHockey, the ad-free hockey team and league management app." });
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   return (
     <main className="rp-page ap-page">

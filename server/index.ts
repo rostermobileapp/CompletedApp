@@ -44,6 +44,10 @@ if (isVerifiedProductionRuntime()) startTeamAwardPushJob();
 const allowedOriginsEnv = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : ['https://www.roster-app.com']; // fallback default
+const allowedFrontendOrigins = new Set([
+  ...allowedOriginsEnv,
+  'https://www.rosterhockey.com',
+]);
 
 const corsOptions = {
   origin: (origin: string | undefined, callback: Function) => {
@@ -57,7 +61,7 @@ const corsOptions = {
       }
     }
     
-    if (allowedOriginsEnv.includes(origin)) {
+    if (allowedFrontendOrigins.has(origin)) {
       return callback(null, true);
     }
     console.warn(`❌ CORS blocked for origin: ${origin}`);
