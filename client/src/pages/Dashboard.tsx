@@ -2561,7 +2561,7 @@ function DashboardMobile() {
               <div className="flex items-center gap-2">
                 <img 
                   src={theme === 'dark' ? darkModeLogo : lightModeLogo}
-                  alt="Roster"
+                  alt="RosterHockey logo"
                   className="h-[50px] pl-[12px] pr-[12px]"
                   data-testid="img-roster-logo"
                 />

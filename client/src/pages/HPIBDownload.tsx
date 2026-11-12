@@ -92,7 +92,7 @@ function IPhoneMockup({ scale }: { scale: number }) {
         >
           <img
             src="/roster-app-screenshot.png"
-            alt="Roster app"
+            alt="RosterHockey app"
             style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }}
           />
           {/* Dynamic Island */}
@@ -187,7 +187,7 @@ export default function HPIBDownload() {
     >
       {/* Logo */}
       <div style={{ width: "100%", maxWidth: 280, marginBottom: 10, flexShrink: 0 }}>
-        <img src={rosterLogo} alt="Roster — less admin, more hockey" style={{ width: "100%", height: "auto" }} />
+        <img src={rosterLogo} alt="RosterHockey logo — less admin, more hockey" style={{ width: "100%", height: "auto" }} />
       </div>
       {/* RosterHockey.com button */}
       <a
@@ -215,7 +215,7 @@ export default function HPIBDownload() {
       </a>
       {/* CTA */}
       <div style={{ textAlign: "center", maxWidth: 300, marginBottom: 14, flexShrink: 0 }}>
-        <p style={{ color: "#fff", fontWeight: 700, fontSize: "clamp(1.1rem, 4.5vw, 1.5rem)", lineHeight: 1.25, margin: "0 0 6px" }}>Run your team or league through Roster FREE for 30 days with code "HPIB30"</p>
+        <p style={{ color: "#fff", fontWeight: 700, fontSize: "clamp(1.1rem, 4.5vw, 1.5rem)", lineHeight: 1.25, margin: "0 0 6px" }}>Run your team or league through RosterHockey FREE for 30 days with code "HPIB30"</p>
         <p style={{ color: "#3b82f6", fontWeight: 600, fontSize: "clamp(0.9rem, 3.5vw, 1.1rem)", lineHeight: 1.3, margin: 0 }}>
           We'll send&nbsp;10% back to Hockey Players in Business to help grow the game we love.
         </p>

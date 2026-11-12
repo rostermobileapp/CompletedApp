@@ -164,7 +164,7 @@ export default function Login() {
         >
           <img
             src={rosterLogo}
-            alt="Roster"
+            alt="RosterHockey logo"
             className="w-96 md:w-[512px] h-auto"
             data-testid="logo-image"
           />
@@ -216,7 +216,7 @@ export default function Login() {
                 <div className="text-center mb-2">
                   <img
                     src={rosterLogo}
-                    alt="Roster"
+                    alt="RosterHockey logo"
                     className="w-3/4 h-auto mx-auto"
                     data-testid="modal-logo"
                   />

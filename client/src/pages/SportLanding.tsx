@@ -27,7 +27,7 @@ const sportConfigs: Record<string, SportConfig> = {
     tagline: 'Built for Hockey',
     headline: 'Built specifically for hockey teams and leagues.',
     subheadline: 'Scheduling, lineups, RSVPs, stats, and payments — built specifically for hockey teams and leagues.',
-    description: 'Running a hockey team is harder than it looks. Between scheduling ice time, tracking who\'s showing up, managing subs, and handling dues — it\'s a full-time job. Roster handles all of it so you can focus on the game.',
+    description: 'Running a hockey team is harder than it looks. Between scheduling ice time, tracking who\'s showing up, managing subs, and handling dues — it\'s a full-time job. RosterHockey handles all of it so you can focus on the game.',
     pains: [
       'Never know how many skaters are showing up',
       'Ice time wasted because of no-shows',
@@ -48,7 +48,7 @@ const sportConfigs: Record<string, SportConfig> = {
       {
         icon: Calendar,
         title: 'Player Substitution System',
-        description: 'Short a skater? Roster\'s sub system finds and notifies available fill-ins automatically — so you never show up one man short.',
+        description: 'Short a skater? RosterHockey\'s sub system finds and notifies available fill-ins automatically — so you never show up one man short.',
       },
       {
         icon: CreditCard,
@@ -66,8 +66,8 @@ const sportConfigs: Record<string, SportConfig> = {
         description: 'Keep all team communication in one place. No more buried group texts or missed emails.',
       },
     ],
-    metaTitle: 'Hockey Team Management | Roster',
-    metaDescription: 'Manage hockey schedules, RSVPs, rosters, stats, and payments with Roster. One ad-free app for your team.',
+    metaTitle: 'Hockey | RosterHockey',
+    metaDescription: 'Manage hockey schedules, RSVPs, rosters, stats, and payments with RosterHockey. One ad-free app for your team.',
   },
   soccer: {
     slug: 'soccer',
@@ -76,7 +76,7 @@ const sportConfigs: Record<string, SportConfig> = {
     tagline: 'Coming to Soccer',
     headline: 'The team management app your soccer team deserves.',
     subheadline: 'Scheduling, RSVPs, lineups, stats, and payments — all in one place. Coming to soccer teams soon.',
-    description: "Managing a soccer team shouldn't require three apps and a group text that spirals out of control. Roster is bringing its powerful, ad-free team management tools to soccer leagues of all sizes.",
+      description: "Managing a soccer team shouldn't require three apps and a group text that spirals out of control. RosterHockey is bringing its powerful, ad-free team management tools to soccer leagues of all sizes.",
     pains: [
       'Players confirming availability through 5 different channels',
       'Scrambling for subs when half the team is injured',
@@ -115,8 +115,8 @@ const sportConfigs: Record<string, SportConfig> = {
         description: 'One place for all team communication. No more fragmented group chats.',
       },
     ],
-    metaTitle: 'Soccer Team Management | Roster',
-    metaDescription: 'Roster brings team management to soccer: schedules, RSVPs, lineups, stats, and payments in one ad-free app.',
+    metaTitle: 'Soccer | RosterHockey',
+    metaDescription: 'RosterHockey brings team management to soccer: schedules, RSVPs, lineups, stats, and payments in one ad-free app.',
     comingSoon: true,
   },
   baseball: {
@@ -126,7 +126,7 @@ const sportConfigs: Record<string, SportConfig> = {
     tagline: 'Coming to Baseball',
     headline: 'Keep your baseball team organized all season.',
     subheadline: 'Batting orders, schedules, RSVPs, and payments — one app for the whole season. Coming soon.',
-    description: "Baseball seasons are long. The scheduling is complicated. And keeping 15+ players organized from spring training through playoffs is a full-time job. Roster is built to handle all of it.",
+    description: "Baseball seasons are long. The scheduling is complicated. And keeping 15+ players organized from spring training through playoffs is a full-time job. RosterHockey is built to handle all of it.",
     pains: [
       'Last-minute roster changes with no system to manage them',
       'Weather cancellations communicated through a dozen text chains',
@@ -165,8 +165,8 @@ const sportConfigs: Record<string, SportConfig> = {
         description: 'One channel for all team news. No more missed messages about field changes or canceled games.',
       },
     ],
-    metaTitle: 'Baseball Team Management | Roster',
-    metaDescription: 'Manage baseball schedules, batting orders, RSVPs, stats, and payments with Roster in one ad-free app.',
+    metaTitle: 'Baseball | RosterHockey',
+    metaDescription: 'Manage baseball schedules, batting orders, RSVPs, stats, and payments with RosterHockey in one ad-free app.',
     comingSoon: true,
   },
 };
@@ -205,7 +205,7 @@ export default function SportLanding({ sport }: SportLandingProps) {
           </p>
           {config.comingSoon && (
             <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-4 py-2 mb-6 text-sm font-semibold">
-              {config.name} is not yet available. Roster is available now for hockey.
+              {config.name} is not yet available. RosterHockey is available now for hockey.
             </div>
           )}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -302,7 +302,7 @@ export default function SportLanding({ sport }: SportLandingProps) {
             Ready to get organized?
           </h2>
           <p className="text-gray-500 text-lg mb-8">
-            Roster for hockey is live on the App Store and Google Play. Free tier available now.
+            RosterHockey for hockey is live on the App Store and Google Play. Free tier available now.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button

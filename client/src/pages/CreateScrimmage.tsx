@@ -1926,7 +1926,7 @@ export default function CreateScrimmage() {
                           <Mail className="w-5 h-5 text-muted-foreground shrink-0" />
                           <div>
                             <span className="font-medium">Invite</span> <span className="text-muted-foreground">{coHostSearchTerm.trim()}</span>
-                            <span className="block text-xs text-muted-foreground">They'll get a welcome email to join Rosters</span>
+                            <span className="block text-xs text-muted-foreground">They'll get a welcome email to join RosterHockey</span>
                           </div>
                         </button>
                       )}

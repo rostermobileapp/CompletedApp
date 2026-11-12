@@ -4,8 +4,8 @@ import { useSeo } from '@/hooks/useSeo';
 
 export default function PrivacyPolicy() {
   useSeo({
-    title: 'Privacy Policy | Roster',
-    description: 'Read the Roster Privacy Policy. Learn how we collect, use, and protect your data when you use the Roster sports team management app.',
+    title: 'Privacy Policy | RosterHockey',
+    description: 'Read the RosterHockey Privacy Policy. Learn how we collect, use, and protect your data when you use the RosterHockey sports team management app.',
   });
 
   return (
@@ -23,7 +23,7 @@ export default function PrivacyPolicy() {
           <section data-testid="section-introduction">
             <h2 className="text-2xl font-semibold mb-4">Introduction</h2>
             <p className="text-gray-300 leading-relaxed">
-              Roster, LLC ("we," "our," or "us") operates Roster (the "Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the Service.
+              Roster, LLC ("we," "our," or "us") operates RosterHockey (the "Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the Service.
             </p>
           </section>
 
@@ -62,7 +62,7 @@ export default function PrivacyPolicy() {
           <section data-testid="section-visitor-location">
             <h2 className="text-2xl font-semibold mb-4">Visitor Location Tracking</h2>
             <p className="text-gray-300 leading-relaxed mb-4">
-              When you visit our landing page, we collect your approximate location (city and country) to power the "Roster is growing across North America" heatmap. This applies to visitors located in the United States and Canada.
+              When you visit our landing page, we collect your approximate location (city and country) to power the "RosterHockey is growing across North America" heatmap. This applies to visitors located in the United States and Canada.
             </p>
             <ul className="list-disc list-inside text-gray-300 space-y-2 mb-4">
               <li><strong>What we collect:</strong> Approximate city and country derived from your IP address at the time of your visit.</li>
@@ -208,6 +208,7 @@ export default function PrivacyPolicy() {
           <Link href="/" className="text-[#3c82f4] hover:underline" data-testid="link-home">
             Return to Home
           </Link>
+          <p className="mt-8 text-sm text-gray-400">© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</p>
         </div>
       </div>
     </div>

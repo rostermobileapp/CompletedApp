@@ -168,7 +168,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/onboarding'] });
       toast({
-        title: isReplay ? 'Profile updated!' : 'Welcome to Roster!',
+        title: isReplay ? 'Profile updated!' : 'Welcome to RosterHockey!',
         description: isReplay ? 'Your information has been updated.' : 'You\'re all set to start using the app.',
       });
       onComplete();
@@ -243,7 +243,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       
       // Show success toast
       toast({
-        title: isReplay ? 'Profile updated!' : 'Welcome to Roster!',
+        title: isReplay ? 'Profile updated!' : 'Welcome to RosterHockey!',
         description: isReplay ? 'Your information has been updated.' : 'You\'re all set to start using the app.',
       });
       
@@ -283,7 +283,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
           <div className="flex flex-col items-center justify-center min-h-[500px] text-center px-4" data-testid="screen-welcome">
             <div className="mb-8">
               <h1 className="text-4xl font-bold mb-4 text-white dark:text-white">
-                Welcome to Roster
+                Welcome to RosterHockey
               </h1>
               <p className="text-xl text-gray-300 dark:text-gray-300 max-w-md">
                 Your all-in-one hockey league management platform

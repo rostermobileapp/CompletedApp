@@ -98,7 +98,7 @@ function ReplySection({ requestId, isFounder }: { requestId: string; isFounder: 
             className="flex items-center gap-1 text-xs font-bold text-[#0079d3] hover:underline transition-colors"
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            {expanded ? 'Hide' : `${replies.length} reply from Rosters`}
+            {expanded ? 'Hide' : `${replies.length} reply from RosterHockey`}
           </button>
         )}
       </div>
@@ -107,7 +107,7 @@ function ReplySection({ requestId, isFounder }: { requestId: string; isFounder: 
       {isFounder && showComposer && (
         <div className="ml-4 border-l-2 border-[#0079d3] pl-3 flex flex-col gap-2">
           <Textarea
-            placeholder="Reply as Rosters…"
+            placeholder="Reply as RosterHockey…"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             className="min-h-[72px] resize-none text-sm bg-[#f6f7f8] border-[#edeff1] focus:bg-white"
@@ -143,7 +143,7 @@ function ReplySection({ requestId, isFounder }: { requestId: string; isFounder: 
           {replies.map((r) => (
             <div key={r.id} className="flex flex-col gap-0.5">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-[#0079d3]">Rosters</span>
+                <span className="text-xs font-bold text-[#0079d3]">RosterHockey</span>
                 <span className="text-[11px] text-[#878a8c]">· {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}</span>
               </div>
               <p className="text-sm text-[#1c1c1c] leading-relaxed">{r.body}</p>

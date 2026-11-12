@@ -43,9 +43,9 @@ export default function Landing() {
 
 
   useSeo({
-    title: 'Roster — Hockey Team Management App',
-    description: 'Roster is the all-in-one hockey team management app. Scheduling, RSVP reminders, player substitutions, stats, standings, and in-app payments — no ads, ever. Free to start.',
-    ogTitle: 'Roster — Hockey Team Management App',
+    title: 'RosterHockey | Beer League Hockey Team & League Management App',
+    description: 'RosterHockey is the ad-free app for beer league hockey teams and leagues: RSVPs, sub requests, dues tracking, live scoring, stats and brackets. Free to start.',
+    ogTitle: 'RosterHockey | Beer League Hockey Team & League Management App',
     ogDescription: 'Scheduling, RSVP, rosters, stats, and payments in one ad-free app. Built for hockey players, by hockey players.',
   });
 
@@ -109,7 +109,7 @@ export default function Landing() {
           <div className="flex-none md:flex md:justify-center">
             <img
               src={rosterLightLogo}
-              alt="Roster"
+              alt="RosterHockey logo"
               className="h-10 object-contain"
               data-testid="logo-image"
             />
@@ -172,9 +172,7 @@ export default function Landing() {
               className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-gray-900"
               data-testid="text-hero-title"
             >
-              less admin
-              <br />
-              <span className="text-[#3c82f4]">more hockey</span>
+              RosterHockey: less admin, more hockey.
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-8">Built purely for hockey. Scheduling, RSVPs, rosters, stats, payments, messaging, smart brackets— all in one place. No ads. Ever.</p>
             <a href="#fun-features" className="inline-block mb-7 rounded-full border border-blue-200 bg-white px-5 py-3 text-sm font-semibold text-[#2563eb] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
@@ -246,7 +244,7 @@ export default function Landing() {
             >
               <img
                 src="/hero-demo.png"
-                alt="Roster app demo"
+                alt="RosterHockey app demo"
                 className="w-full md:w-[75%] h-auto"
               />
             </div>
@@ -267,7 +265,7 @@ export default function Landing() {
                     </div>
                   ))}
                 </div>
-                <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
+                <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain" /> fixes all of it.</p>
                 <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
               </div>
             </div>
@@ -276,7 +274,7 @@ export default function Landing() {
             <div className="md:hidden mt-8" data-testid="image-hero-mobile">
               <img
                 src="/hero-demo.png"
-                alt="Roster app demo"
+                alt="RosterHockey app demo"
                 className="w-full h-auto"
               />
             </div>
@@ -289,14 +287,14 @@ export default function Landing() {
       <section className="py-20 px-6 bg-gray-50 pt-[4px] pb-[20px]" id="demo">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900 flex items-center justify-center gap-2">
-            See <img src={rosterLightLogo} alt="Roster" className="h-8 md:h-16 object-contain" /> in action.
+            See <img src={rosterLightLogo} alt="RosterHockey logo" className="h-8 md:h-16 object-contain" /> in action.
           </h2>
           <p className="text-gray-500 text-lg mb-10">Watch how teams go from chaos to organized in under 1 minute.</p>
 
           <div className="relative w-full rounded-2xl overflow-hidden border border-gray-200 shadow-xl" style={{ aspectRatio: '16/9' }}>
             <iframe
               src="https://www.youtube.com/embed/h4M22L9E6pg"
-              title="Roster Demo"
+              title="RosterHockey Demo"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               className="absolute inset-0 w-full h-full"
@@ -339,7 +337,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto">
           <img
             src="/features-phones.png"
-            alt="Roster app features"
+            alt="RosterHockey app features"
             className="w-full h-auto"
           />
         </div>
@@ -377,7 +375,7 @@ export default function Landing() {
               <br />
               <span className="text-[#3c82f4]">All in one place.</span>
             </h2>
-            <p className="text-gray-500 text-lg max-w-2xl mx-auto">See how Roster stacks up against the competition — for a fraction of the price.</p>
+            <p className="text-gray-500 text-lg max-w-2xl mx-auto">See how RosterHockey stacks up against the competition — for a fraction of the price.</p>
           </div>
 
           {(() => {
@@ -416,7 +414,7 @@ export default function Landing() {
 
             return (
               <>
-                {/* ── MOBILE (< md): 3-column — Feature | Roster | Competition logos ── */}
+                {/* ── MOBILE (< md): 3-column — Feature | RosterHockey | Competition logos ── */}
                 <div className="md:hidden">
                   <table className="w-full border-collapse bg-white rounded-xl border border-gray-200 shadow-sm" data-testid="comparison-table-mobile">
                     <thead>
@@ -424,7 +422,7 @@ export default function Landing() {
                         <th className="text-left px-3 py-3 font-bold text-gray-900 text-sm">Feature</th>
                         <th className="text-center px-2 py-3 font-bold bg-[#3c82f4]/8 border-x border-[#3c82f4]/20 w-20">
                           <div className="flex flex-col items-center gap-0.5">
-                            <img src={rosterLightLogo} alt="Roster" className="h-5 object-contain" />
+                            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-5 object-contain" />
                             <span className="text-[9px] font-semibold text-[#3c82f4] leading-none">$6.50 / mo</span>
                           </div>
                         </th>
@@ -505,7 +503,7 @@ export default function Landing() {
                         <th className="text-left p-4 font-bold text-gray-900">Feature</th>
                         <th className="text-center p-4 font-bold bg-[#3c82f4]/8 text-gray-900 border border-[#3c82f4]/20">
                           <div className="flex flex-col items-center gap-1">
-                            <img src={rosterLightLogo} alt="Roster" className="h-6 object-contain" />
+                            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-6 object-contain" />
                             <span className="text-xs font-normal text-[#3c82f4] bg-[#3c82f4]/10 rounded-full px-2 py-0.5">Best Value</span>
                           </div>
                         </th>
@@ -739,7 +737,7 @@ export default function Landing() {
           </div>
           <div className="border-t border-gray-100 pt-6">
             <p className="text-sm text-gray-400 text-center flex items-center justify-center gap-2" data-testid="text-footer">
-              © 2026 <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />. Built for teams, by team players. No ads. Ever.
+              © 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.
             </p>
           </div>
         </div>

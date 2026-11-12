@@ -13,8 +13,8 @@ export function RosterPageNav({ active }: { active: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header className="rp-nav">
-      <a className="rp-nav-logo" href="/" aria-label="Roster homepage">
-        <img src="/marketing/roster-home/logo-dark.png" alt="Roster" />
+      <a className="rp-nav-logo" href="/" aria-label="RosterHockey homepage">
+        <img src="/marketing/roster-home/logo-dark.png" alt="RosterHockey logo" />
       </a>
       <nav className="rp-nav-links" aria-label="Main navigation">
         {pages.map(page => <a key={page.key} href={page.href} aria-current={active === page.key ? "page" : undefined} className={active === page.key ? "is-active" : ""}>{page.label}</a>)}
@@ -37,7 +37,8 @@ export function RosterPageNav({ active }: { active: string }) {
 export function RosterPageFooter() {
   return (
     <footer className="rp-footer">
-      <a href="/" aria-label="Back to Roster homepage"><img src="/marketing/roster-home/logo-dark.png" alt="Roster" /></a>
+      <a href="/" aria-label="Back to RosterHockey homepage"><img src="/marketing/roster-home/logo-dark.png" alt="RosterHockey logo" /></a>
+      <span>© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</span>
       <span>Built for hockey. Made for the people around it.</span>
       <nav aria-label="Footer navigation">
         {pages.map(page => <a key={page.key} href={page.href}>{page.label}</a>)}

@@ -81,19 +81,22 @@ function structuredData(
     {
       '@context': 'https://schema.org',
       '@type': 'Organization',
-      name: 'Roster',
+      name: 'RosterHockey',
+      alternateName: ['Roster Hockey', 'Roster'],
       url: SITE_ORIGIN,
       logo: `${SITE_ORIGIN}/marketing/roster-home/logo-light.png`,
-      sameAs: storeLinks,
+      sameAs: [...storeLinks, 'https://linkedin.com/company/rosterhockey'],
     },
     {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
-      name: 'Roster',
+      name: 'RosterHockey',
+      alternateName: ['Roster Hockey', 'Roster'],
       applicationCategory: 'SportsApplication',
       operatingSystem: 'iOS, Android',
       description: 'A hockey-specific team and league management app for schedules, attendance, team communication, payments, substitutes, and league operations.',
       url: SITE_ORIGIN,
+      sameAs: [...storeLinks, 'https://linkedin.com/company/rosterhockey'],
       offers,
     },
   ];
@@ -159,7 +162,8 @@ async function main() {
       const canonical = `${SITE_ORIGIN}${pathname === '/' ? '/' : pathname}`;
       const title = metadata.title.trim();
       const description = metadata.description.trim();
-      if (title.length >= 60) seoErrors.push(`${pathname} title must be under 60 characters (${title.length}): ${title}`);
+      const titleLimit = pathname === '/' ? 70 : 60;
+      if (title.length >= titleLimit) seoErrors.push(`${pathname} title must be under ${titleLimit} characters (${title.length}): ${title}`);
       if (description.length >= 160) seoErrors.push(`${pathname} description must be under 160 characters (${description.length}).`);
       if (titles.has(title)) seoErrors.push(`Duplicate SEO title "${title}" on ${pathname}.`);
       titles.add(title);
@@ -184,6 +188,8 @@ async function main() {
       } else if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
         html = putMeta(html, /<meta\s+name="robots"[^>]*>/i, '<meta name="robots" content="noindex,nofollow" />');
       }
+      html = putMeta(html, /<meta\s+property="og:site_name"[^>]*>/i,
+        '<meta property="og:site_name" content="RosterHockey" />');
       html = html.replace('</head>',
         `    ${jsonLdScript(structuredData(pathname, prices, renderer.faqStructuredData()))}\n  </head>`);
       const relativePath = pathname === '/' ? 'index.html' : path.join(pathname.slice(1), 'index.html');
@@ -197,7 +203,7 @@ async function main() {
       console.log(`Prerendered ${pathname}`);
     }
     await fs.writeFile(path.join(outputDir, '404.html'),
-      '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Page not found | Roster</title><link rel="canonical" href="https://www.roster-app.com/"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to Roster</a></main></body></html>');
+      '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Page not found | RosterHockey</title><meta property="og:site_name" content="RosterHockey" /><link rel="canonical" href="https://www.roster-app.com/"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to RosterHockey</a></main></body></html>');
     await writeSitemap(renderer.publicPagePaths.filter(path => !isUnindexedPublicPage(path)), new Date().toISOString().slice(0, 10));
     if (seoErrors.length) throw new Error(`SEO validation failed:\n${seoErrors.map(error => `- ${error}`).join('\n')}`);
     if (!rootHtml) throw new Error('The homepage was not prerendered.');

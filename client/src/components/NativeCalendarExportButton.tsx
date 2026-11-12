@@ -73,13 +73,13 @@ export default function NativeCalendarExportButton({
     if (result.updatedEvents.includes(event.sourceKey)) {
       toast({
         title: "Device calendar updated",
-        description: `${event.title} now matches the Roster schedule.`,
+        description: `${event.title} now matches the RosterHockey schedule.`,
       });
     } else if (result.staleEvents.includes(event.sourceKey)) {
       toast({
-        title: "Roster schedule changed",
+        title: "RosterHockey schedule changed",
         description:
-          "This device calendar version cannot edit the existing event, so no duplicate was created. Use the Roster schedule as the source of truth.",
+          "This device calendar version cannot edit the existing event, so no duplicate was created. Use the RosterHockey schedule as the source of truth.",
       });
     }
   };

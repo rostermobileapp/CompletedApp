@@ -55,7 +55,7 @@ export async function handleNativeRevenueCatWebhook(
         [...event.transferred_from, ...event.transferred_to].some(id => typeof id !== 'string')) {
       return { status: 400, body: { processed: false, reason: 'invalid_transfer' } };
     }
-    // Refresh sources before destinations; never move canonical Roster claims.
+    // Refresh sources before destinations; never move canonical RosterHockey claims.
     customerIds = Array.from(new Set([...event.transferred_from, ...event.transferred_to]))
       .filter(id => APPLE_CUSTOMER_ID.test(id));
   } else {
@@ -64,7 +64,7 @@ export async function handleNativeRevenueCatWebhook(
       ? [customerId] : [];
   }
   if (!customerIds.length) {
-    // Anonymous customers and aliases are not Roster ownership proof.
+    // Anonymous customers and aliases are not RosterHockey ownership proof.
     return { status: 200, body: { processed: false, reason: 'unrecognized_purchase_context' } };
   }
   const originalTransactionId = transactionId('original_transaction_id' in event ? event.original_transaction_id : undefined);

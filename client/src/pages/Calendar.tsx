@@ -239,7 +239,7 @@ export default function Calendar() {
         if (result.staleEvents.length > 0) {
           const count = result.staleEvents.length;
           setNativeCalendarSyncMessage(
-            `${count === 1 ? "A device calendar event has" : `${count} device calendar events have`} changed or been cancelled in Roster. This app version cannot safely edit or remove ${count === 1 ? "it" : "them"}, so no duplicate was created. Use this schedule as the source of truth.`,
+            `${count === 1 ? "A device calendar event has" : `${count} device calendar events have`} changed or been cancelled in RosterHockey. This app version cannot safely edit or remove ${count === 1 ? "it" : "them"}, so no duplicate was created. Use this schedule as the source of truth.`,
           );
         } else {
           setNativeCalendarSyncMessage(null);
@@ -248,7 +248,7 @@ export default function Calendar() {
       .catch(() => {
         if (!cancelled) {
           setNativeCalendarSyncMessage(
-            "The device calendar could not be checked. The Roster schedule remains the source of truth.",
+            "The device calendar could not be checked. The RosterHockey schedule remains the source of truth.",
           );
         }
       });

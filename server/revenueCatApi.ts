@@ -118,9 +118,9 @@ export async function getRevenueCatActiveAppleSubscriptions(
 }
 
 /**
- * Does not modify Roster access. RevenueCat v1 calls this a "get or create"
+ * Does not modify RosterHockey access. RevenueCat v1 calls this a "get or create"
  * endpoint: looking up an unknown ID may create an empty RevenueCat customer.
- * The caller must independently establish Roster account ownership.
+ * The caller must independently establish RosterHockey account ownership.
  */
 export async function getRevenueCatAppleSubscriptions(
   customerId: string,

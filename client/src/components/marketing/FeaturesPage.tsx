@@ -5,21 +5,21 @@ import { useSeo } from "@/hooks/useSeo";
 import "./FeaturesPage.css";
 
 const tournamentFeatures = [
-  { icon: Trophy, title: "Smart Bracket Creator", text: "Drop in your teams, pick your format, and Roster builds the bracket in seconds. Single elim, double elim, round robin into playoffs — it knows what you’re trying to do." },
+  { icon: Trophy, title: "Smart Bracket Creator", text: "Drop in your teams, pick your format, and RosterHockey builds the bracket in seconds. Single elim, double elim, round robin into playoffs — it knows what you’re trying to do." },
   { icon: Zap, title: "Brackets that advance themselves", text: "Score a game, the winner moves on. No commissioner sitting in the rink office updating a bracket on a clipboard. The next matchup is already on the schedule." },
-  { icon: CreditCard, title: "Running a solo tournament?", text: "Use Roster for just that weekend at $10/team. Every player gets full paid access for the whole tournament." },
+  { icon: CreditCard, title: "Running a solo tournament?", text: "Use RosterHockey for just that weekend at $10/team. Every player gets full paid access for the whole tournament." },
 ];
 const seasonTools = [
   { icon: CalendarDays, name: "Team schedule", text: "Keep game times, attendance, and player subs together." },
   { icon: ClipboardList, name: "Live scorekeeping", text: "Goals, assists, penalties, and saves—tracked as the game happens." },
   { icon: BarChart3, name: "Standings that stay current", text: "Score the game in the app and standings update instantly." },
-  { icon: MessageCircle, name: "Communication, one place", text: "Schedules, lineups, payments, announcements, and captain chats live inside Roster." },
+  { icon: MessageCircle, name: "Communication, one place", text: "Schedules, lineups, payments, announcements, and captain chats live inside RosterHockey." },
   { icon: Users, name: "Roster management", text: "Player and attendance tracking helps the group know who’s in." },
   { icon: BellRing, name: "Registration and payments", text: "Players register, pay league dues, and sign waivers in one flow." },
 ];
 
 export function FeaturesPage() {
-  useSeo({ title: "Features | Roster — Hockey League Management", description: "Schedules, RSVPs, live scorekeeping, automated brackets, league drafts, payments, and team messaging in one ad-free hockey app." });
+  useSeo({ title: "Features | RosterHockey", description: "Schedules, RSVPs, live scorekeeping, automated brackets, league drafts, payments, and team messaging in one ad-free hockey app." });
   return (
     <main className="rp-page rp-features">
       <RosterPageNav active="features" />
@@ -30,7 +30,7 @@ export function FeaturesPage() {
           <p>From the first registration to the last whistle, replace the scattered tools with one place to run your league and stay connected.</p>
           <a className="rp-primary-link" href="#season-tools">Explore the toolkit <ArrowDown size={16} /></a>
           <div className="rp-feature-art">
-            <img src="/marketing/roster-home/features-phones.png" alt="Roster app screens for payments, team chat, private skate scheduling, and in-game scorekeeping" />
+            <img src="/marketing/roster-home/features-phones.png" alt="RosterHockey app screens for payments, team chat, private skate scheduling, and in-game scorekeeping" />
             <span>Made for the people who keep hockey moving.</span>
           </div>
         </div>
@@ -78,7 +78,7 @@ export function FeaturesPage() {
       <section className="rp-draft-section">
         <div className="rp-container rp-draft-layout">
           <div className="rp-draft-orbit"><div className="rp-phone-shell"><div className="rp-phone-top" /><div className="rp-phone-screen"><span>DRAFT NIGHT · LIVE</span><strong>Choose your next teammate.</strong><div><b>ROUND 04</b><span>01:18</span></div><label>AVAILABLE PLAYERS</label><p>#18&nbsp; Jordan M. <i>LEFT WING</i></p><p>#07&nbsp; Casey R. <i>DEFENCE</i></p><p>#31&nbsp; Morgan T. <i>GOALIE</i></p><div className="rp-demo-pick">MAKE A PICK <ArrowRight size={14} /></div></div></div></div>
-          <div><span className="rp-kicker">Exclusive to Roster</span><h2 className="rp-title rp-title-sm">Draft night<br />feels like an event.</h2><p>Give your players a real moment to look forward to, with the commissioner in control and every pick moving the room forward.</p><div className="rp-draft-points"><span><Check size={16} /> Captain READY lobby</span><span><Check size={16} /> Live pick clock with 30-second extension</span><span><Check size={16} /> Buddy groups to keep linemates together</span><span><Check size={16} /> Separate goalie round</span></div></div>
+          <div><span className="rp-kicker">Exclusive to RosterHockey</span><h2 className="rp-title rp-title-sm">Draft night<br />feels like an event.</h2><p>Give your players a real moment to look forward to, with the commissioner in control and every pick moving the room forward.</p><div className="rp-draft-points"><span><Check size={16} /> Captain READY lobby</span><span><Check size={16} /> Live pick clock with 30-second extension</span><span><Check size={16} /> Buddy groups to keep linemates together</span><span><Check size={16} /> Separate goalie round</span></div></div>
         </div>
       </section>
 

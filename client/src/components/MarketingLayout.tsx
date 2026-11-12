@@ -46,7 +46,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
             <Link href="/referral-program" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Partners</Link>
           </nav>
           <Link href="/">
-            <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain cursor-pointer" />
+            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain cursor-pointer" />
           </Link>
           <div className="flex items-center gap-3">
             <button
@@ -96,7 +96,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row gap-8 justify-between mb-8">
             <div>
-              <img src={rosterLightLogo} alt="Roster" className="h-8 object-contain mb-3" />
+              <img src={rosterLightLogo} alt="RosterHockey logo" className="h-8 object-contain mb-3" />
               <p className="text-sm text-gray-400 max-w-xs">Built for hockey players, by hockey players. No ads. Ever.</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-8 text-sm">
@@ -135,7 +135,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
             </div>
           </div>
           <div className="border-t border-gray-100 pt-6 text-center">
-            <p className="text-sm text-gray-400 flex items-center justify-center gap-2">© 2026 <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />. Built for teams, by team players. No ads. Ever.</p>
+            <p className="text-sm text-gray-400">© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</p>
           </div>
         </div>
       </footer>

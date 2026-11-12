@@ -93,7 +93,7 @@ export default function VisitorMap() {
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-6">
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 flex items-center justify-center gap-2 flex-wrap">
-            <img src={rosterLogo} alt="Roster" className="h-7 md:h-9 inline-block" />
+            <img src={rosterLogo} alt="RosterHockey logo" className="h-7 md:h-9 inline-block" />
             <span>is growing across</span>{" "}
             <span className="text-[#3c82f4]">North America</span>
           </h2>

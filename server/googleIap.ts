@@ -121,7 +121,7 @@ export async function getGooglePlayOrderToken(
   );
   if (!response.ok) {
     throw Object.assign(new Error(
-      response.status === 404 ? 'Google Play could not find this Roster order' : 'Google Play order lookup failed',
+      response.status === 404 ? 'Google Play could not find this RosterHockey order' : 'Google Play order lookup failed',
     ), { status: response.status === 404 ? 404 : 502 });
   }
   const order: any = await response.json();

@@ -30,7 +30,7 @@ export async function verifyGoogleAccountOrder(input: {
       !order.productIds.includes(purchase.productId) ||
       !isSubscriptionEntitled(purchase.subscriptionState, purchase.expiryTimeMs) ||
       !Number.isFinite(purchase.expiryTimeMs)) {
-    throw Object.assign(new Error('Google Play did not confirm an active Roster subscription.'), { status: 402 });
+    throw Object.assign(new Error('Google Play did not confirm an active RosterHockey subscription.'), { status: 402 });
   }
   return { role, purchase };
 }

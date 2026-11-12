@@ -11,7 +11,7 @@ interface SeoOptions {
   canonical?: string;
 }
 
-const DEFAULT_TITLE = 'Roster — Hockey Team Management App';
+const DEFAULT_TITLE = 'RosterHockey | Beer League Hockey Team & League Management App';
 const OG_IMAGE = `${CANONICAL_SITE_ORIGIN}/roster-logo.png`;
 
 export function useSeo({ title, description, ogTitle, ogDescription, canonical }: SeoOptions) {
@@ -48,6 +48,7 @@ export function useSeo({ title, description, ogTitle, ogDescription, canonical }
     const resolvedOgDesc = ogDescription ?? description;
 
     setMeta('description', description);
+    setMeta('og:site_name', 'RosterHockey', true);
     const robots = document.querySelector('meta[name="robots"]');
     if (isUnindexedPublicPage(location)) {
       setMeta('robots', robots?.getAttribute('content')?.includes('nofollow') ? 'noindex,nofollow' : 'noindex');

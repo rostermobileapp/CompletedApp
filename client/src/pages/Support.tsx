@@ -22,7 +22,7 @@ export const supportFaqs = [
   {
     question: 'What happens if I miss a payment request?',
     answer:
-      'Payment requests sent through Roster are tracked in the "Payments" tab. You can view outstanding and completed requests there. The app links to Venmo or CashApp — Roster does not process payments directly.',
+      'Payment requests sent through RosterHockey are tracked in the "Payments" tab. You can view outstanding and completed requests there. The app links to Venmo or CashApp — RosterHockey does not process payments directly.',
   },
   {
     question: 'How does the substitute system work?',
@@ -30,9 +30,9 @@ export const supportFaqs = [
       'If a player can\'t make a game, they can mark themselves as unavailable and optionally request a substitute. Captains are notified and can approve or deny sub requests. Substitutes are sourced from a pool of available players in your league.',
   },
   {
-    question: 'Can I use Roster for sports other than hockey?',
+    question: 'Can I use RosterHockey for sports other than hockey?',
     answer:
-      'Yes. Roster supports hockey, soccer, baseball, and more. When creating a team or league, select your sport and the app will tailor the stats tracking, positions, and scheduling to that sport.',
+      'Yes. RosterHockey supports hockey, soccer, baseball, and more. When creating a team or league, select your sport and the app will tailor the stats tracking, positions, and scheduling to that sport.',
   },
   {
     question: 'How do I cancel or change my subscription?',
@@ -79,14 +79,14 @@ export default function Support() {
   const isFaqPage = location === '/faq';
   return (
     <MarketingLayout
-      title={isFaqPage ? 'Roster FAQ | Hockey Team and League Management' : 'Support | Roster — Hockey & Sports Team Management'}
+      title={isFaqPage ? 'RosterHockey FAQ' : 'Support | RosterHockey'}
       description={isFaqPage
-        ? 'Answers about Roster teams, leagues, RSVPs, payments, substitutions, and subscriptions.'
-        : 'Get help with Roster. Browse our FAQ, contact support by email, or report a bug. We’re here to help you manage your team or league.'}
-      ogTitle={isFaqPage ? 'Roster FAQ' : 'Roster Support'}
+        ? 'Answers about RosterHockey teams, leagues, RSVPs, payments, substitutions, and subscriptions.'
+        : 'Get help with RosterHockey. Browse our FAQ, contact support by email, or report a bug. We’re here to help you manage your team or league.'}
+      ogTitle={isFaqPage ? 'RosterHockey FAQ' : 'Support | RosterHockey'}
       ogDescription={isFaqPage
-        ? 'Answers to common questions about managing teams, leagues, games, and Roster accounts.'
-        : 'Need help with Roster? Find answers to common questions or reach out to our support team directly.'}
+        ? 'Answers to common questions about managing teams, leagues, games, and RosterHockey accounts.'
+        : 'Need help with RosterHockey? Find answers to common questions or reach out to our support team directly.'}
     >
       {/* Hero */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white text-center">
@@ -95,7 +95,7 @@ export default function Support() {
             <span className="text-sm font-medium text-[#3c82f4]">We're here to help</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
-            {isFaqPage ? 'Roster FAQ' : 'Roster Support'}
+            {isFaqPage ? 'RosterHockey FAQ' : 'RosterHockey Support'}
           </h1>
           <p className="text-lg text-gray-500 max-w-xl mx-auto">
             Browse the FAQ below or reach out directly — we typically respond within one business day.

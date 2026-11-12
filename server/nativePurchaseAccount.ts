@@ -20,7 +20,7 @@ export function confirmReportedNativeIdentity(
     typeof id !== 'string' || !id || id.length > 1500 ||
     (id !== loginId && !(id === originalId && /^\$RCAnonymousID:[A-Za-z0-9_-]{20,128}$/.test(id))),
   )) {
-    throw Object.assign(new Error('Checkout was not opened: the native purchase account could not be confirmed. Update and reopen Roster or contact support.'), { status: 409 });
+    throw Object.assign(new Error('Checkout was not opened: the native purchase account could not be confirmed. Update and reopen RosterHockey or contact support.'), { status: 409 });
   }
   return observations.every(id => id === loginId) ? 'current' : 'provider-confirmed-original';
 }

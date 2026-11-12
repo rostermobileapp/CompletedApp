@@ -86,7 +86,7 @@ export default function ReferralProgram() {
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
           <Link href="/">
-            <img src={rosterLightLogo} alt="Roster" className="h-8 object-contain cursor-pointer" />
+            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-8 object-contain cursor-pointer" />
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm">
             <a href="#how-it-works" className="text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
@@ -133,7 +133,7 @@ export default function ReferralProgram() {
             <span className="text-[#3c82f4]">to the hockey community</span>
           </h1>
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-            Refer players to our platform and Roster will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization.
+            Refer players to our platform and RosterHockey will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization.
             <br /><br />
             <span className="text-[#3c82f4] font-extrabold text-[26px]">Choose a good cause and track your referrals!</span>
           </p>
@@ -219,7 +219,7 @@ export default function ReferralProgram() {
                   We look within when we need help. We look within when we hire. We leave our fights on the ice so we can be family in the locker room. When someone falls, we pick them up. When someone steps up, we follow.
                 </p>
                 <p>
-                  Roster was built by a player, for players — and now we want to give back to the organizations holding this community together.
+                  RosterHockey was built by a player, for players — and now we want to give back to the organizations holding this community together.
                 </p>
                 <p className="text-gray-900 font-semibold">
                   Every paying subscriber you refer puts 10% of net revenue back into your cause. That's our way of saying thanks to the people who spread the passion for our beautiful game.
@@ -424,14 +424,14 @@ export default function ReferralProgram() {
       {/* Footer */}
       <footer className="border-t border-gray-200 py-8 px-6 bg-white">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-          <img src={rosterLightLogo} alt="Roster" className="h-6 object-contain" />
+          <img src={rosterLightLogo} alt="RosterHockey logo" className="h-6 object-contain" />
           <div className="flex gap-4">
             <Link href="/" className="hover:text-gray-900 transition-colors">Home</Link>
             <Link href="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link>
             <Link href="/privacy-policy" className="hover:text-gray-900 transition-colors">Privacy</Link>
             <Link href="/terms-of-service" className="hover:text-gray-900 transition-colors">Terms</Link>
           </div>
-          <p>© 2026 Roster. No ads. Ever.</p>
+          <p>© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</p>
         </div>
       </footer>
     </div>

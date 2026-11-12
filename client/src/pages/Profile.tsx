@@ -178,10 +178,10 @@ export default function Profile() {
         description: staleCount > 0
           ? `${addedCount > 0 ? `${addedCount} allowed ${addedCount === 1 ? 'event was' : 'events were'} added. ` : ''}${staleCount} previously exported ${staleCount === 1 ? 'event is' : 'events are'} no longer eligible. This SDK cannot remove existing device events, so delete those manually or choose a fresh calendar.`
           : addedCount > 0
-            ? `${addedCount} upcoming Roster ${addedCount === 1 ? 'event was' : 'events were'} added to your selected calendar.`
+            ? `${addedCount} upcoming RosterHockey ${addedCount === 1 ? 'event was' : 'events were'} added to your selected calendar.`
             : currentEvents.length === 0
-              ? 'No upcoming eligible Roster events were found.'
-              : 'Your selected calendar is up to date with the Roster schedule.',
+              ? 'No upcoming eligible RosterHockey events were found.'
+              : 'Your selected calendar is up to date with the RosterHockey schedule.',
       });
     } catch (error: any) {
       const message = error instanceof NativeCalendarError
@@ -1302,7 +1302,7 @@ export default function Profile() {
                <DialogHeader>
                  <DialogTitle>Calendar Sync</DialogTitle>
                  <DialogDescription>
-                    Choose a device calendar, then confirm to add your upcoming Roster events. Roster remains the source of truth.
+                    Choose a device calendar, then confirm to add your upcoming RosterHockey events. RosterHockey remains the source of truth.
                  </DialogDescription>
                </DialogHeader>
 
@@ -1313,7 +1313,7 @@ export default function Profile() {
                      <div className="min-w-0">
                        <h3 className="font-semibold">Native device calendar</h3>
                        <p className="text-sm text-muted-foreground">
-                          Confirming will add your upcoming Roster events to the selected calendar on this device.
+                          Confirming will add your upcoming RosterHockey events to the selected calendar on this device.
                        </p>
                      </div>
                    </div>
@@ -1378,7 +1378,7 @@ export default function Profile() {
                      </>
                    ) : (
                      <p className="text-sm text-muted-foreground">
-                        Device calendar controls are available in the Roster mobile app.
+                        Device calendar controls are available in the RosterHockey mobile app.
                      </p>
                    )}
                  </section>

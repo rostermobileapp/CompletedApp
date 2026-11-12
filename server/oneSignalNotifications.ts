@@ -18,7 +18,7 @@ const NEW_SIGNUP_ALERT_RECIPIENT_DISPLAY_ID = 'U00001';
 // renders in the top bar. Android requires this to be a fully monochrome
 // silhouette PNG (transparent background, white shapes) — anything else
 // gets silently rejected and Android falls back to its default bell icon.
-// `notification-badge.png` is a 96x96 white-on-alpha Roster R created
+// `notification-badge.png` is a 96x96 white-on-alpha RosterHockey R created
 // specifically for this purpose; do not swap it for a colored asset.
 const NOTIFICATION_ICON_URL = 'https://www.roster-app.com/icon-512.png';
 const NOTIFICATION_BADGE_URL = 'https://www.roster-app.com/notification-badge.png';
@@ -27,7 +27,7 @@ const APP_BASE_URL = 'https://www.roster-app.com';
 /**
  * Converts a stored team logo path (e.g. "/team-logos/<id>") to a fully
  * qualified public URL served by the app. Returns undefined when the path is
- * absent so callers can fall back to the default Roster icon.
+ * absent so callers can fall back to the default RosterHockey icon.
  */
 export function resolveTeamLogoUrl(logoPath: string | null | undefined): string | undefined {
   if (!logoPath) return undefined;
@@ -52,7 +52,7 @@ interface SendPushNotificationOptions {
   /** Bound scheduled delivery attempts so failures can release their lease. */
   timeoutMs?: number;
   /** Optional override for the large icon shown in the notification card.
-   *  Falls back to the default Roster logo when omitted. */
+   *  Falls back to the default RosterHockey logo when omitted. */
   iconUrl?: string;
 }
 
@@ -108,7 +108,7 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
         ios_badgeCount: 1,
         ...(process.env.ONESIGNAL_ANDROID_CHANNEL_ID ? { android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID } : {}),
         // Web push (Chrome / Firefox / Edge / Safari) — override the dashboard
-        // default with the current Roster logo so old uploads don't appear.
+        // default with the current RosterHockey logo so old uploads don't appear.
         chrome_web_icon: largeIcon,
         chrome_web_badge: NOTIFICATION_BADGE_URL,
         firefox_icon: largeIcon,
@@ -747,7 +747,7 @@ export async function sendPlayerRsvpPushNotification(
     const team = await storage.getTeam(teamId);
     teamLogoUrl = resolveTeamLogoUrl(team?.logoUrl);
   } catch {
-    // Non-fatal — fall back to default Roster icon
+    // Non-fatal — fall back to default RosterHockey icon
   }
   
   return sendPushNotificationToUser({
@@ -845,7 +845,7 @@ export async function sendRsvpReminderPushNotification(
   return sendPushNotificationToUser({
     userId: recipientId,
     title: `📅 RSVP Reminder`,
-    message: `You haven't RSVP'd for ${eventName} yet. Open Roster to RSVP`,
+    message: `You haven't RSVP'd for ${eventName} yet. Open RosterHockey to RSVP`,
     data: {
       type: 'rsvp_reminder',
       eventType,

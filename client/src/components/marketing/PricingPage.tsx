@@ -44,7 +44,7 @@ function PlanCard({ name, audience, price, note, features, featured, annual = fa
 
 export function PricingPage() {
   const [annual, setAnnual] = useState(false);
-  useSeo({ title: "Pricing | Roster — Free, Pro & Commissioner Plans", description: "Start free. Compare Player Pro and Commissioner plans for hockey teams and leagues. No ads on any plan." });
+  useSeo({ title: "Pricing | RosterHockey", description: "Start free. Compare Player Pro and Commissioner plans for hockey teams and leagues. No ads on any plan." });
   const { data: prices, isLoading, isError, refetch } = useQuery<StripePrices>({ queryKey: ["/api/stripe/prices"] });
   const formatPrice = (entry?: StripePriceEntry, monthlyEquivalent = false) => {
     if (isLoading) return "Loading…";
@@ -70,7 +70,7 @@ export function PricingPage() {
         </div>
       </section>
 
-      <section className="pp-plans-section" aria-label="Roster subscription plans">
+      <section className="pp-plans-section" aria-label="RosterHockey subscription plans">
         <div className="pp-container">
           <div className="pp-billing-control">
             <span className={!annual ? "is-current" : ""}>Monthly</span>

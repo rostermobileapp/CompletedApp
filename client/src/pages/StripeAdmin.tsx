@@ -182,7 +182,7 @@ export default function StripeAdmin() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="apple-roster-id">Roster user ID</Label>
+                <Label htmlFor="apple-roster-id">RosterHockey user ID</Label>
                 <Input id="apple-roster-id" placeholder="U00096" value={appleRosterId}
                   onChange={e => setAppleRosterId(e.target.value)} />
               </div>
@@ -205,13 +205,13 @@ export default function StripeAdmin() {
             {revenueCatCheck.data && (
               <Alert>
                 <AlertDescription className="space-y-1">
-                  <p>Roster role: {revenueCatCheck.data.currentRole}. Existing in-app purchase link: {revenueCatCheck.data.alreadyLinkedToIap ? 'Yes' : 'No'}.</p>
+                  <p>RosterHockey role: {revenueCatCheck.data.currentRole}. Existing in-app purchase link: {revenueCatCheck.data.alreadyLinkedToIap ? 'Yes' : 'No'}.</p>
                   {revenueCatCheck.data.activeAppleSubscriptions.length
                     ? revenueCatCheck.data.activeAppleSubscriptions.map(sub => (
                       <p key={sub.productId}>{sub.role} — {sub.productId} — active until {new Date(sub.expiresAt).toLocaleString()}.</p>
                     ))
                     : <p>No active purchased Apple subscription found for this RevenueCat ID.</p>}
-                  <p>This check does not prove which Roster account owns the purchase. No access was changed.</p>
+                  <p>This check does not prove which RosterHockey account owns the purchase. No access was changed.</p>
                 </AlertDescription>
               </Alert>
             )}

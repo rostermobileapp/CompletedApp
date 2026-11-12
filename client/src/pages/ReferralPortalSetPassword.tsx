@@ -70,7 +70,7 @@ export default function ReferralPortalSetPassword() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="text-center">
-          <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-8" />
+          <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain mx-auto mb-8" />
           <Loader2 className="w-10 h-10 text-[#3c82f4] animate-spin mx-auto mb-4" />
           <p className="text-sm text-gray-500">Validating your link…</p>
         </div>
@@ -82,7 +82,7 @@ export default function ReferralPortalSetPassword() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
-          <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-8" />
+          <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain mx-auto mb-8" />
           <div className="bg-red-50 border border-red-200 rounded-2xl p-8">
             <XCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
             <h2 className="text-lg font-bold text-gray-900 mb-2">Link expired or invalid</h2>
@@ -103,7 +103,7 @@ export default function ReferralPortalSetPassword() {
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-6" />
+          <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain mx-auto mb-6" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Create Your Password</h1>
           <p className="text-gray-500 text-sm">Set a password to access your partner portal anytime.</p>
         </div>

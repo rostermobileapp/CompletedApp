@@ -18,7 +18,7 @@ function emailWrapper(content: string): string {
 <tr><td align="center" style="padding:40px 20px;">
 <table role="presentation" style="width:600px;max-width:100%;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);overflow:hidden;">
 <tr><td style="background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%);padding:32px 40px;text-align:center;">
-<h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;">Roster Referral Program</h1>
+<h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;">RosterHockey Referral Program</h1>
 </td></tr>
 <tr><td style="padding:40px;">${content}</td></tr>
 <tr><td style="background:#f8f9fa;padding:24px 40px;text-align:center;font-size:12px;color:#6b7280;">
@@ -76,10 +76,10 @@ export async function sendPartnerApplicationVerificationEmail(
   const { error } = await client.emails.send({
     from: fromEmail,
     to: toEmail,
-    subject: 'Confirm your Roster Referral Program application',
+    subject: 'Confirm your RosterHockey Referral Program application',
     html: emailWrapper(`
       <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Confirm your email address</h2>
-      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${contactName}, thanks for applying to the Roster Referral Program for <strong>${orgName}</strong>.</p>
+      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${contactName}, thanks for applying to the RosterHockey Referral Program for <strong>${orgName}</strong>.</p>
       <p style="margin:0 0 24px 0;color:#374151;font-size:15px;line-height:24px;">Please confirm that this email address belongs to you. Your application will be sent to our team for review after you confirm.</p>
       <div style="text-align:center;margin:32px 0;">
         <a href="${verificationLink}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:16px;">Confirm My Email</a>
@@ -156,13 +156,13 @@ export async function sendPartnerApprovalEmail(
       html = emailWrapper(templateToHtml(interpolate(customTemplate, vars)));
     } else {
       html = emailWrapper(`
-        <h2 style="margin:0 0 8px 0;color:#111827;font-size:20px;">Welcome to the Roster Referral Program!</h2>
+        <h2 style="margin:0 0 8px 0;color:#111827;font-size:20px;">Welcome to the RosterHockey Referral Program!</h2>
         <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, congratulations! Your application for <strong>${data.orgName}</strong> has been approved.</p>
         <h3 style="margin:0 0 12px 0;color:#111827;font-size:16px;">Getting Started</h3>
         <ol style="margin:0 0 24px 0;padding-left:24px;color:#374151;font-size:14px;line-height:24px;">
           <li><strong>Create your password</strong> using the button below — this link is valid for 24 hours</li>
           <li>Share your referral code with your organization members and hockey community</li>
-          <li>When someone signs up for Roster and enters your code during onboarding, the conversion is automatically tracked</li>
+          <li>When someone signs up for RosterHockey and enters your code during onboarding, the conversion is automatically tracked</li>
           <li>Earn commissions on net revenue for every active subscriber you refer</li>
           <li>View your stats and payout history anytime in your portal</li>
         </ol>
@@ -213,7 +213,7 @@ export async function sendPartnerRejectionEmail(
     } else {
       html = emailWrapper(`
         <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Application Status Update</h2>
-        <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, thank you for your interest in the Roster Referral Program.</p>
+        <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, thank you for your interest in the RosterHockey Referral Program.</p>
         <p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:24px;">After reviewing your application for <strong>${data.orgName}</strong>, we're unable to approve it at this time.</p>
         <div style="background:#fef2f2;border-left:4px solid #f87171;padding:16px;border-radius:4px;margin-bottom:24px;">
           <p style="margin:0;font-size:14px;color:#374151;"><strong>Reason:</strong> ${data.reason}</p>
@@ -246,7 +246,7 @@ export async function sendPasswordResetEmail(
     const loginUrl = `https://www.roster-app.com/referral-program/portal/login`;
     const html = emailWrapper(`
       <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Reset Your Partner Portal Password</h2>
-      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, click the button below to set a new password for your Roster Partner Portal.</p>
+      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, click the button below to set a new password for your RosterHockey Partner Portal.</p>
       <div style="text-align:center;margin:32px 0;">
         <a href="${data.resetLink}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:16px;">Set New Password</a>
       </div>
@@ -257,7 +257,7 @@ export async function sendPasswordResetEmail(
     await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: 'Reset Your Roster Partner Portal Password',
+      subject: 'Reset Your RosterHockey Partner Portal Password',
       html,
     });
     console.log(`[ReferralEmail] Sent password reset email to ${toEmail}`);

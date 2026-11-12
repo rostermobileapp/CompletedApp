@@ -70,7 +70,7 @@
   letter-spacing:.015em; line-height:.83;
 }
 .rs-hero h1 { margin:27px 0 22px; max-width:1100px;font-size:clamp(67px,10.1vw,140px);letter-spacing:.015em;text-shadow:0 4px 36px rgba(1,9,18,.35); }
-.rs-hero h1.rs-hero-title { margin-top:1px;color:#ffffff; }
+.rs-hero h1.rs-hero-title { margin-top:1px;color:#ffffff;text-transform:none;line-height:1; }
 .rs-hero h1 span { color:var(--blue); }
 .rs-hero-final-line { display:inline-grid;grid-template-areas:"line";white-space:nowrap; }
 .rs-hero-final-line:after { content:"MORE FELLOWSHIP";grid-area:line;visibility:hidden; }

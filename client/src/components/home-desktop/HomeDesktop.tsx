@@ -28,7 +28,7 @@ interface HomeDesktopProps {
 }
 
 /**
- * Desktop-only Roster Home page (>=1024px). Renders inside the existing
+ * Desktop-only RosterHockey Home page (>=1024px). Renders inside the existing
  * DesktopAppShell. Mobile/tablet (<1024px) and Natively/Capacitor wrappers
  * keep the original mobile Dashboard layout — see Dashboard.tsx where this
  * component is gated by useIsDesktopWeb().

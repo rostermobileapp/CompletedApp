@@ -32,7 +32,7 @@ export default function ReferralPortalForgotPassword() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/referral-program">
-            <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-6 cursor-pointer" />
+            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain mx-auto mb-6 cursor-pointer" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Reset Your Password</h1>
           <p className="text-gray-500 text-sm">Enter your email and we'll send you a link to set a new password.</p>

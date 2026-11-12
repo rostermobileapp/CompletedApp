@@ -45,7 +45,7 @@ export async function claimAutomaticApplePurchaseWithClient(
       `SELECT id, role, stripe_subscription_id, iap_original_transaction_id
          FROM users WHERE id = $1 FOR UPDATE`, [input.userId],
     )).rows[0];
-    if (!user) throw conflict('Roster account was not found.');
+    if (!user) throw conflict('RosterHockey account was not found.');
     const legacyOwners = (await client.query(
       `SELECT id FROM users WHERE iap_original_transaction_id = $1 FOR UPDATE`,
       [input.originalTransactionId],
@@ -64,7 +64,7 @@ export async function claimAutomaticApplePurchaseWithClient(
         [googleTokenHash, input.userId],
       )).rows[0];
       if (!googleOwner) {
-        throw conflict('This Roster account already has a different Apple subscription claim. Contact support.');
+        throw conflict('This RosterHockey account already has a different Apple subscription claim. Contact support.');
       }
     }
     const existing = (await client.query(

@@ -14,13 +14,13 @@ export async function associateBillingAccount(
   flow: NativeAssociationFlow, loginId: string | undefined, userId: string,
   assertAccount: () => void, checkoutProductId?: string,
 ): Promise<() => Promise<void>> {
-  if (!loginId) throw new Error('Checkout was not opened: purchase-account setup is unavailable. Reopen Roster or contact support.');
+  if (!loginId) throw new Error('Checkout was not opened: purchase-account setup is unavailable. Reopen RosterHockey or contact support.');
   const association = await flow.associate(loginId);
   assertAccount();
   const result = await flow.confirmAssociation({ loginId, expectedUserId: userId, ...association });
   assertAccount();
   if (result.confirmed !== true) {
-    throw new Error('Checkout was not opened: the native purchase account could not be confirmed. Update and reopen Roster or contact support.');
+    throw new Error('Checkout was not opened: the native purchase account could not be confirmed. Update and reopen RosterHockey or contact support.');
   }
   if (checkoutProductId && result.activeProductIds?.length) {
     throw Object.assign(new Error('You already have an active store subscription. Use Restore purchases, then manage the existing plan in the App Store or Google Play; do not start another subscription.'), { code: 'PURCHASE_ALREADY_OWNED' });
@@ -33,7 +33,7 @@ export async function associateBillingAccount(
     const current = await flow.nativeIdentity();
     assertAccount();
     if (!accepted.has(current)) {
-      throw new Error('The native purchase account changed. Reopen Roster on the purchasing account and restore; do not purchase again.');
+      throw new Error('The native purchase account changed. Reopen RosterHockey on the purchasing account and restore; do not purchase again.');
     }
   };
 }

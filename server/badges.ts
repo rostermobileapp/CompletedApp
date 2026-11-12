@@ -210,7 +210,7 @@ DEFAULT_BADGES.push(
   ]),
   { ...achievement("rsvp_king", "RSVP King", "RSVP Yes or No to every eligible league game in a season. Scrimmages do not count. Earn a patch for each perfect season.", "multiplier", "metric", "season_rsvp_perfect"), imagePath: "/badges/rsvp-king/patch.webp" },
   achievement("team_player", "Team Player", "Filled a sub spot for another team.", "multiplier", "metric", "career_sub_appearances"),
-  { ...achievement("rookie_card", "Rookie Card", "Your first game ever logged on Roster.", "onetime", "event", "first_game_logged"), imagePath: "/badges/rookie-card/patch.webp" },
+  { ...achievement("rookie_card", "Rookie Card", "Your first game ever logged on RosterHockey.", "onetime", "event", "first_game_logged"), imagePath: "/badges/rookie-card/patch.webp" },
   { ...achievement("sub", "Sub", "First time approved to sub in for another player in a game.", "onetime", "metric", "first_sub_appearance"), imagePath: "/badges/sub/patch.webp" },
   { ...achievement("league_hopper", "League Hopper", "Played in 3 or more different leagues.", "onetime", "metric", "career_leagues_played", { threshold: 3 }), imagePath: "/badges/league-hopper/patch.webp" },
   { ...achievement("early_bird", "Early Bird", "RSVP Yes at least 48 hours before every eligible game in a completed season. Resets each season.", "onetime", "metric", "season_48hr_rsvp_perfect"), imagePath: "/badges/early-bird/patch.webp" },

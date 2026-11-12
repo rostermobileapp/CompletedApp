@@ -4,7 +4,7 @@ let uncertain = false;
 /** Shared by both platforms, automatic checks, checkout and recovery. */
 export async function withNativeBillingOperation<T>(operation: () => Promise<T>): Promise<T> {
   if (busy) throw new Error('Another native billing operation is in progress. Please wait.');
-  if (uncertain) throw new Error('The native bridge did not finish its last operation. Fully close and reopen Roster before continuing. Check store subscriptions and restore before purchasing again.');
+  if (uncertain) throw new Error('The native bridge did not finish its last operation. Fully close and reopen RosterHockey before continuing. Check store subscriptions and restore before purchasing again.');
   busy = true;
   try {
     return await operation();

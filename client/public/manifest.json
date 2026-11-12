@@ -1,6 +1,6 @@
 {
-  "name": "Roster",
-  "short_name": "Roster",
+  "name": "RosterHockey",
+  "short_name": "RosterHockey",
   "display": "standalone",
   "start_url": "/",
   "background_color": "#ffffff",

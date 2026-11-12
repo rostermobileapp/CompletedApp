@@ -31,7 +31,7 @@ function emailShell(title: string, bodyContent: string, accentColor = '#3b82f6')
           <!-- HEADER -->
           <tr>
             <td align="center" style="background-color:#0a0a0a;padding:28px 40px;">
-              <img src="${logoUrl}" alt="Roster Hockey" width="200" style="display:block;max-width:200px;height:auto;">
+              <img src="${logoUrl}" alt="RosterHockey logo" width="200" style="display:block;max-width:200px;height:auto;">
             </td>
           </tr>
 
@@ -49,7 +49,7 @@ function emailShell(title: string, bodyContent: string, accentColor = '#3b82f6')
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8faff;border:1px solid #dbeafe;border-radius:10px;">
                 <tr>
                   <td style="padding:20px 24px;">
-                    <p style="margin:0 0 6px 0;font-size:13px;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:0.05em;">Get Roster Hockey</p>
+                    <p style="margin:0 0 6px 0;font-size:13px;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:0.05em;">Get RosterHockey</p>
                     <p style="margin:0 0 16px 0;font-size:13px;color:#64748b;line-height:1.5;">Download the app to RSVP, view schedules, and stay connected with your team.</p>
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
@@ -71,7 +71,7 @@ function emailShell(title: string, bodyContent: string, accentColor = '#3b82f6')
           <tr>
             <td style="background-color:#0a0a0a;padding:20px 40px;text-align:center;">
               <p style="margin:0 0 6px 0;font-size:12px;color:#6b7280;line-height:1.6;">
-                Sent by <strong style="color:#9ca3af;">Roster Hockey</strong> &mdash; Your beer league hockey app.
+                Sent by <strong style="color:#9ca3af;">RosterHockey</strong> &mdash; Your beer league hockey app.
               </p>
               <a href="https://RosterHockey.com" style="font-size:12px;color:#3b82f6;text-decoration:none;">RosterHockey.com</a>
             </td>
@@ -179,7 +179,7 @@ export async function sendScrimmageInviteEmail(
                 <tr>
                   <td align="center">
                     <div style="background-color:#0a0a0a;border-radius:12px;padding:20px 32px;display:inline-block;">
-                      <p style="margin:0 0 4px 0;font-size:18px;font-weight:800;color:#ffffff;text-align:center;letter-spacing:0.01em;">Open the Roster Hockey app to RSVP</p>
+                      <p style="margin:0 0 4px 0;font-size:18px;font-weight:800;color:#ffffff;text-align:center;letter-spacing:0.01em;">Open the RosterHockey app to RSVP</p>
                       <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">Download the app using the links below</p>
                     </div>
                   </td>
@@ -206,12 +206,12 @@ ${scrimmageData.notes ? `\nNotes:\n${scrimmageData.notes}\n` : ''}
 RSVP and view details:
 ${scrimmageUrl}
 
-Download Roster Hockey to manage your RSVP:
+Download RosterHockey to manage your RSVP:
 App Store: ${APPLE_URL}
 Google Play: ${GOOGLE_URL}
 
 ---
-Sent by Roster Hockey - Your beer league hockey app
+Sent by RosterHockey - Your beer league hockey app
 Visit: https://RosterHockey.com
     `.trim();
 
@@ -308,7 +308,7 @@ export async function sendScrimmageApprovalEmail(
                       </tr>
                       <tr>
                         <td style="padding:6px 0;">
-                          <span style="font-size:13px;color:#065f46;display:block;margin-bottom:1px;">Roster</span>
+                          <span style="font-size:13px;color:#065f46;display:block;margin-bottom:1px;">RosterHockey</span>
                           <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${data.currentPlayers} / ${data.maxPlayers} players confirmed</span>
                         </td>
                       </tr>
@@ -346,12 +346,12 @@ View scrimmage details: ${scrimmageUrl}
 
 See you on the ice!
 
-Download Roster Hockey:
+Download RosterHockey:
 App Store: ${APPLE_URL}
 Google Play: ${GOOGLE_URL}
 
 ---
-Sent by Roster Hockey - Your beer league hockey app
+Sent by RosterHockey - Your beer league hockey app
 Visit: https://RosterHockey.com
     `.trim();
 
@@ -431,7 +431,7 @@ export async function sendScrimmageReminderEmail(
                       </tr>
                       <tr>
                         <td style="padding:6px 0;border-bottom:1px solid #fde68a;">
-                          <span style="font-size:13px;color:#92400e;display:block;margin-bottom:1px;">Roster</span>
+                          <span style="font-size:13px;color:#92400e;display:block;margin-bottom:1px;">RosterHockey</span>
                           <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${data.currentPlayers} / ${data.maxPlayers} confirmed</span>
                         </td>
                       </tr>
@@ -476,12 +476,12 @@ View scrimmage details: ${scrimmageUrl}
 
 Don't forget your gear. See you out there!
 
-Download Roster Hockey:
+Download RosterHockey:
 App Store: ${APPLE_URL}
 Google Play: ${GOOGLE_URL}
 
 ---
-Sent by Roster Hockey - Your beer league hockey app
+Sent by RosterHockey - Your beer league hockey app
 Visit: https://RosterHockey.com
     `.trim();
 
@@ -523,7 +523,7 @@ export async function sendWelcomeEmail(
               <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;">Welcome</p>
               <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">You're on the team!</h1>
               <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
-                Hey <strong style="color:#0a0a0a;">${data.playerName}</strong> — you've been added to <strong style="color:#0a0a0a;">${data.leagueName}</strong>${data.teamName ? ` to play for <strong style="color:#0a0a0a;">${data.teamName}</strong>` : ''} on Roster Hockey. Create your account to get started.
+                Hey <strong style="color:#0a0a0a;">${data.playerName}</strong> — you've been added to <strong style="color:#0a0a0a;">${data.leagueName}</strong>${data.teamName ? ` to play for <strong style="color:#0a0a0a;">${data.teamName}</strong>` : ''} on RosterHockey. Create your account to get started.
               </p>
 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
@@ -543,35 +543,35 @@ export async function sendWelcomeEmail(
             </td>
           </tr>`;
 
-    const htmlContent = emailShell('Welcome to Roster Hockey', body);
+    const htmlContent = emailShell('Welcome to RosterHockey', body);
 
     const textContent = `
-Welcome to Roster Hockey!
+Welcome to RosterHockey!
 
 Hey ${data.playerName},
 
-You've been added to ${data.leagueName}${data.teamName ? ` to play for ${data.teamName}` : ''} on Roster Hockey. Now it's time to create your account and join the action!
+You've been added to ${data.leagueName}${data.teamName ? ` to play for ${data.teamName}` : ''} on RosterHockey. Now it's time to create your account and join the action!
 
 CREATE YOUR ACCOUNT:
 ${signupUrl}
 
-DOWNLOAD ROSTER HOCKEY:
+DOWNLOAD RosterHockey:
 App Store: ${APPLE_URL}
 Google Play: ${GOOGLE_URL}
 
-If you already have a Roster Hockey account, you can simply log in with ${recipientEmail} and you'll automatically be added to the team.
+If you already have a RosterHockey account, you can simply log in with ${recipientEmail} and you'll automatically be added to the team.
 
 Questions? Contact your league commissioner or visit our support page.
 
 ---
-Sent by Roster Hockey - Your beer league hockey app
+Sent by RosterHockey - Your beer league hockey app
 Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `Welcome to ${data.leagueName} on Roster Hockey`,
+      subject: `Welcome to ${data.leagueName} on RosterHockey`,
       html: htmlContent,
       text: textContent,
     });
@@ -659,12 +659,12 @@ Join the tournament at: ${searchUrl}
 
 Enter the tournament ID on the Find a Tournament page to register your spot.
 
-Download Roster Hockey:
+Download RosterHockey:
 App Store: ${APPLE_URL}
 Google Play: ${GOOGLE_URL}
 
 ---
-Sent by Roster Hockey - Your beer league hockey app
+Sent by RosterHockey - Your beer league hockey app
 Visit: https://RosterHockey.com
     `.trim();
 
@@ -752,7 +752,7 @@ ${firstNewDateStr ? `Your next affected match is now on ${firstNewDateStr}${firs
 View the full schedule: ${tournamentUrl}
 
 ---
-Sent by Roster Hockey - Your beer league hockey app
+Sent by RosterHockey - Your beer league hockey app
 Visit: https://RosterHockey.com
     `.trim();
 
@@ -787,7 +787,7 @@ export async function sendTeamPlayerInviteEmail(
               <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;">Team Invitation</p>
               <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">You've been added to a team!</h1>
               <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
-                Hey <strong style="color:#0a0a0a;">${data.playerFirstName}</strong> — <strong style="color:#0a0a0a;">${data.inviterName}</strong> has added you to <strong style="color:#0a0a0a;">${data.teamName}</strong> on Roster Hockey.
+                Hey <strong style="color:#0a0a0a;">${data.playerFirstName}</strong> — <strong style="color:#0a0a0a;">${data.inviterName}</strong> has added you to <strong style="color:#0a0a0a;">${data.teamName}</strong> on RosterHockey.
               </p>
 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:28px;">
@@ -798,7 +798,7 @@ export async function sendTeamPlayerInviteEmail(
                       <tr>
                         <td style="padding:8px 0;border-bottom:1px solid #dbeafe;">
                           <span style="font-size:14px;color:#1e3a8a;font-weight:600;">Step 1</span>
-                          <span style="font-size:14px;color:#374151;margin-left:8px;">Download the Roster Hockey app below</span>
+                          <span style="font-size:14px;color:#374151;margin-left:8px;">Download the RosterHockey app below</span>
                         </td>
                       </tr>
                       <tr>
@@ -827,28 +827,28 @@ export async function sendTeamPlayerInviteEmail(
     const textContent = `
 You've been added to ${data.teamName}!
 
-Hey ${data.playerFirstName} — ${data.inviterName} has added you to ${data.teamName} on Roster Hockey.
+Hey ${data.playerFirstName} — ${data.inviterName} has added you to ${data.teamName} on RosterHockey.
 
 How to join your team:
-1. Download the Roster Hockey app (links below)
+1. Download the RosterHockey app (links below)
 2. Sign up using ${recipientEmail}
 3. You'll automatically appear on ${data.teamName} — no extra steps needed!
 
 Make sure to sign up with this email address so we can connect you to your team automatically.
 
-Download Roster Hockey:
+Download RosterHockey:
 App Store: ${APPLE_URL}
 Google Play: ${GOOGLE_URL}
 
 ---
-Sent by Roster Hockey - Your beer league hockey app
+Sent by RosterHockey - Your beer league hockey app
 Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `You've been added to ${data.teamName} on Roster Hockey`,
+      subject: `You've been added to ${data.teamName} on RosterHockey`,
       html: htmlContent,
       text: textContent,
     });

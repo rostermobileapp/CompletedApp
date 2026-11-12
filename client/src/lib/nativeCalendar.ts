@@ -134,7 +134,7 @@ function ensureNativeBridge(): void {
   if (!isNativeCalendarAvailable()) {
     throw new NativeCalendarError(
       "native_calendar_unavailable",
-      "Device calendar access is available in the Roster mobile app.",
+      "Device calendar access is available in the RosterHockey mobile app.",
     );
   }
 }
@@ -160,9 +160,9 @@ export function getCalendarErrorMessage(error?: string): string {
     case "add_calendar_event_failure":
       return "The event could not be added to your device calendar. Please try again.";
     case "update_calendar_event_failure":
-      return "The device calendar event could not be updated. The Roster schedule remains the source of truth.";
+      return "The device calendar event could not be updated. The RosterHockey schedule remains the source of truth.";
     case "delete_calendar_event_failure":
-      return "The cancelled device calendar event could not be removed. The Roster schedule remains the source of truth.";
+      return "The cancelled device calendar event could not be removed. The RosterHockey schedule remains the source of truth.";
     case "start_date_missing":
     case "end_date_missing":
     case "timezone_missing":
@@ -320,12 +320,12 @@ export function toNativeCalendarEvent(event: any): NativeCalendarEvent | null {
     end = addHours(start, 1);
   }
 
-  let title = event.title || "Roster event";
+  let title = event.title || "RosterHockey event";
   if (event.type === "game" || event.type === "substitute") {
     const homeTeam = event.homeTeam?.name;
     const awayTeam = event.awayTeam?.name || event.opponentName;
     const opponent = event.homeTeam?.id === event.activeTeamId ? awayTeam : homeTeam || awayTeam;
-    title = opponent ? `Game vs ${opponent}` : "Roster game";
+    title = opponent ? `Game vs ${opponent}` : "RosterHockey game";
     if (event.type === "substitute" || event.isSubstitute) title = `Subbing: ${title}`;
   }
 

@@ -6,7 +6,7 @@ const triviaOptions = ["Hart Trophy", "Art Ross Trophy", "Vezina Trophy", "Calde
 
 export function FunFeaturesNudge() {
   return (
-    <section className="fun-nudge" aria-label="Discover the fun side of Roster">
+    <section className="fun-nudge" aria-label="Discover the fun side of RosterHockey">
       <div className="fun-nudge-copy">
         <span className="fun-kicker">A little extra after the final buzzer</span>
         <p>Adult hockey extras: patches, post-game beer tracking, and daily trivia.</p>
@@ -30,7 +30,7 @@ export default function FunFeaturesShowcase({ underFixedHeader = false }: { unde
             <span className="fun-kicker">Built for the hockey life</span>
             <h2 id="fun-showcase-title">More than game night.</h2>
           </div>
-          <p>Roster keeps the team together between puck drops, too. A little competition, a little ritual, and a few stories worth retelling.</p>
+          <p>RosterHockey keeps the team together between puck drops, too. A little competition, a little ritual, and a few stories worth retelling.</p>
         </div>
 
         <div className="fun-feature-grid">

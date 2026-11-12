@@ -391,7 +391,7 @@ const LEAGUE_CALLOUTS = [
     id: 'messaging',
     eyebrow: '03 — Communication',
     headline: 'All communication, one place.',
-    body: 'Schedules, lineups, payments, announcements, captain chats — all inside Roster. Your players already check the app for their next game. Why would you message them somewhere else?',
+    body: 'Schedules, lineups, payments, announcements, captain chats — all inside RosterHockey. Your players already check the app for their next game. Why would you message them somewhere else?',
     icon: MessageSquare,
   },
   {
@@ -646,10 +646,10 @@ export default function FeaturesLanding() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useSeo({
-    title: 'Roster — Features Built for Hockey Leagues',
-    description: 'Built by a beer league captain. Roster is the all-in-one league management platform for adult recreational hockey — tournaments, scorekeeping, standings, and registration in one app.',
-    ogTitle: 'Roster — Features Built for Hockey Leagues',
-    ogDescription: 'Built by a beer league captain. Roster is the all-in-one league management platform for adult recreational hockey.',
+    title: 'Features | RosterHockey',
+    description: 'Built by a beer league captain. RosterHockey is the all-in-one league management platform for adult recreational hockey — tournaments, scorekeeping, standings, and registration in one app.',
+    ogTitle: 'Features | RosterHockey',
+    ogDescription: 'Built by a beer league captain. RosterHockey is the all-in-one league management platform for adult recreational hockey.',
   });
 
   return (
@@ -667,7 +667,7 @@ export default function FeaturesLanding() {
           </nav>
           {/* Logo — left on mobile, centered col on desktop */}
           <div className="flex-none md:flex md:justify-center">
-            <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" />
+            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain" />
           </div>
           {/* Mobile: Log In centered between logo and hamburger */}
           <div className="flex-1 flex justify-center md:hidden px-2">
@@ -742,7 +742,7 @@ export default function FeaturesLanding() {
                 {
                   icon: Trophy,
                   title: 'Smart Bracket Creator',
-                  body: 'Drop in your teams, pick your format, and Roster builds the bracket in seconds. Single elim, double elim, round robin into playoffs — it knows what you\'re trying to do.',
+                  body: 'Drop in your teams, pick your format, and RosterHockey builds the bracket in seconds. Single elim, double elim, round robin into playoffs — it knows what you\'re trying to do.',
                 },
                 {
                   icon: Zap,
@@ -752,7 +752,7 @@ export default function FeaturesLanding() {
                 {
                   icon: CreditCard,
                   title: 'Running a solo tournament?',
-                  body: 'Running a one-off tournament? Use Roster for just that weekend at $10/team. Every player gets full paid access for the whole tournament.',
+                  body: 'Running a one-off tournament? Use RosterHockey for just that weekend at $10/team. Every player gets full paid access for the whole tournament.',
                 },
               ].map((item, i) => {
                 const Icon = item.icon;
@@ -793,7 +793,7 @@ export default function FeaturesLanding() {
         <div className="max-w-6xl mx-auto">
           {/* Heading — centered above the 3-col layout */}
           <FadeUp>
-            <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase mb-4 text-center">Exclusive to Roster</p>
+            <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase mb-4 text-center">Exclusive to RosterHockey</p>
             <h2
               className="font-bold text-gray-900 text-center mb-4"
               style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
@@ -803,7 +803,7 @@ export default function FeaturesLanding() {
               <span className="text-gray-400">Not one.</span>
             </h2>
             <p className="text-gray-500 text-lg leading-relaxed text-center max-w-2xl mx-auto mb-16">
-              If you want draft night to feel like an event — a real moment your players actually look forward to — Roster is the only way to do it.
+              If you want draft night to feel like an event — a real moment your players actually look forward to — RosterHockey is the only way to do it.
             </p>
           </FadeUp>
 
@@ -984,10 +984,8 @@ export default function FeaturesLanding() {
             </div>
           </div>
           <div className="border-t border-gray-100 pt-6">
-            <p className="text-sm text-gray-400 text-center flex items-center justify-center gap-2">
-              &copy; 2026{' '}
-              <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />
-              . Built for leagues, by a beer league captain. No ads. Ever.
+            <p className="text-sm text-gray-400 text-center">
+              © 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.
             </p>
           </div>
         </div>

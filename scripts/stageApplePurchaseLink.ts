@@ -1,7 +1,7 @@
 /**
  * Operator-only, non-granting purchase binding. The operator must first verify
  * RevenueCat v2 transaction history (earliest Apple transaction + purchase time)
- * and independently confirm which Roster account the project owner authorizes.
+ * and independently confirm which RosterHockey account the project owner authorizes.
  *
  * npx tsx scripts/stageApplePurchaseLink.ts U00096 '<customer>' '<original transaction>' \
  *   com.rosterapp.player_pro_monthly '<first purchase ISO date>' --attested
@@ -11,7 +11,7 @@
 async function main() {
   const [displayId, customerId, originalId, productId, purchasedAt, attested] = process.argv.slice(2);
   if (attested !== '--attested' || !displayId || !customerId || !originalId || !productId || !purchasedAt) {
-    throw new Error('Usage: <Roster ID> <RevenueCat customer> <original Apple transaction> <product> <first purchase ISO date> --attested');
+    throw new Error('Usage: <RosterHockey ID> <RevenueCat customer> <original Apple transaction> <product> <first purchase ISO date> --attested');
   }
   const { initApplePurchaseLinks, stageApplePurchaseLink } = await import('../server/applePurchaseLinks');
   const { pool } = await import('../server/db');

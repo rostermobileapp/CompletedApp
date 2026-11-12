@@ -12,10 +12,10 @@ export default function About() {
 
   return (
     <MarketingLayout
-      title="About Roster | Built by a Hockey Player Who Got Tired of the Chaos"
-      description="Roster was built by a frustrated hockey captain who was sick of managing his team through group texts and spreadsheets. Here's his story."
-      ogTitle="About Roster — The Founder's Story"
-      ogDescription="A hockey team management app built by a frustrated captain, for captains. Here's the story behind Roster."
+      title="About | RosterHockey"
+      description="RosterHockey was built by a frustrated hockey captain who was sick of managing his team through group texts and spreadsheets. Here's his story."
+      ogTitle="About | RosterHockey"
+      ogDescription="A hockey team management app built by a frustrated captain, for captains. Here's the story behind RosterHockey."
     >
       {/* ── 1. FOUNDER INTRO ─────────────────────────────────────── */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white">
@@ -29,7 +29,7 @@ export default function About() {
               >
                 <img
                   src={founderPhoto}
-                  alt="Tobin K., Roster founder, on the ice"
+                  alt="Tobin K., RosterHockey founder, on the ice"
                   className="w-full h-auto"
                 />
               </div>
@@ -44,6 +44,7 @@ export default function About() {
                 <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
                   Tobin K.
                 </h1>
+                <p className="text-[#3c82f4] font-semibold text-lg mb-1">RosterHockey (formerly written Roster Hockey).</p>
                 <p className="text-[#3c82f4] font-semibold text-lg mb-1">Hockey Player - Lifetime Beer League Member</p>
                 <p className="text-gray-600 text-lg leading-relaxed max-w-xl mx-auto xl:mx-0">I didn't set out to build a software company. I set out to build an app for the hockey community with the added benefit of never wondering if we had enough players. </p>
               </div>
@@ -57,7 +58,7 @@ export default function About() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
                     <p className="text-3xl font-black text-gray-900 mb-1">10</p>
-                    <p className="text-sm text-gray-500">Years with a BenchApp account before building Roster</p>
+                    <p className="text-sm text-gray-500">Years with a BenchApp account before building RosterHockey</p>
                   </div>
                   <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
                     <p className="text-3xl font-black text-gray-900 mb-1">4</p>
@@ -73,7 +74,7 @@ export default function About() {
       <section className="py-20 px-6 bg-white pt-[2px] pb-[2px]">
         <div className="max-w-5xl mx-auto">
           <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Origin</span>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">Why I built Roster</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">Why I built RosterHockey</h2>
           <div className="space-y-4 text-gray-600 text-lg leading-relaxed max-w-3xl">
             <p>
               Since 2016 we used a different app for the teams.  It worked well for surface level items like calendar and planning.  But as I moved into a more community-oriented league with fantastic people, I realized that we could benefit from a more personal app experience.
@@ -81,7 +82,7 @@ export default function About() {
             <p>
               Our league used everything.  Excel for schedules and drafts, esportsdesk for standings and player stats, team text threads. Nothing solved the actual problem: <em>having 1 app for everything... literally everything.</em>
             </p>
-            <p>So while driving back to Ohio from our annual family vacation, I planned out Roster.  4 months later, some of the players had a working beta app to test. </p>
+            <p>So while driving back to Ohio from our annual family vacation, I planned out RosterHockey.  4 months later, some of the players had a working beta app to test. </p>
           </div>
         </div>
       </section>
@@ -90,9 +91,9 @@ export default function About() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Process</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How I made sure Roster was built right</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How I made sure RosterHockey was built right</h2>
             <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-              Roster wasn't built in isolation. I spent a full season talking to captains, coaches, and commissioners in order to release Roster
+              RosterHockey wasn't built in isolation. I spent a full season talking to captains, coaches, and commissioners in order to release RosterHockey
             </p>
           </div>
 
@@ -114,7 +115,7 @@ export default function About() {
                 icon: CheckCircle,
                 number: '3',
                 label: 'Beta leagues before launch',
-                description: 'Before the public launch, three real leagues used Roster through a full season. Every bug, every workflow gap, and every confusing screen was fixed based on real feedback.',
+                description: 'Before the public launch, three real leagues used RosterHockey through a full season. Every bug, every workflow gap, and every confusing screen was fixed based on real feedback.',
               },
             ].map((item) => (
               <div key={item.label} className="bg-white border border-gray-200 rounded-2xl p-7 shadow-sm">
@@ -130,7 +131,7 @@ export default function About() {
 
           <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
             <p className="text-gray-700 text-lg leading-relaxed">
-              The result is an app that's built around how recreational hockey actually works — not how a product manager imagined it might work. Every feature in Roster exists because a real captain asked for it, struggled without it, or wasted time working around the fact that it didn't exist.
+              The result is an app that's built around how recreational hockey actually works — not how a product manager imagined it might work. Every feature in RosterHockey exists because a real captain asked for it, struggled without it, or wasted time working around the fact that it didn't exist.
             </p>
           </div>
         </div>
@@ -140,7 +141,7 @@ export default function About() {
         <DialogContent className="w-[85vw] max-w-xs sm:max-w-sm md:max-w-md max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl shadow-black/40">
           <img
             src={easterEggPhoto}
-            alt="Tobin K., Roster founder, on the ice"
+            alt="Tobin K., RosterHockey founder, on the ice"
             className="w-full h-auto rounded-lg"
           />
         </DialogContent>

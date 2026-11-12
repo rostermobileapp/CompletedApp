@@ -41,7 +41,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       },
       {
         title: 'Volunteer coach tools',
-        description: "You\'re a coach, not an admin. Roster automates schedules, reminders, and RSVP tracking so you spend your energy coaching.",
+        description: "You\'re a coach, not an admin. RosterHockey automates schedules, reminders, and RSVP tracking so you spend your energy coaching.",
       },
       {
         title: 'Safe, simple payment collection',
@@ -56,7 +56,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: MessageCircle, label: 'Parent & Team Messaging' },
       { icon: Shield, label: 'No Ads. Kid-Friendly.' },
     ],
-    metaTitle: 'Youth Team Management | Roster',
+    metaTitle: 'For Youth Teams | RosterHockey',
     metaDescription: 'Keep youth teams organized with scheduling, parent communication, RSVPs, and payments in one app for coaches and families.',
   },
   'for-adult-leagues': {
@@ -65,7 +65,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
     emoji: '🏟️',
     tagline: 'Built for Adult Rec Leagues',
     headline: 'Finally, an app that understands adult rec sports.',
-    subheadline: 'Busy schedules. Last-minute no-shows. Dues nobody wants to collect. Roster handles all of it.',
+    subheadline: 'Busy schedules. Last-minute no-shows. Dues nobody wants to collect. RosterHockey handles all of it.',
     audience: 'adult recreational leagues',
     pains: [
       'Players confirming, then bailing at the last minute',
@@ -76,7 +76,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
     solutions: [
       {
         title: 'RSVP & sub system that actually works',
-        description: "Players confirm availability with one tap. If someone drops out, Roster\'s sub system finds a replacement automatically — before you even know there\'s a problem.",
+        description: "Players confirm availability with one tap. If someone drops out, RosterHockey\'s sub system finds a replacement automatically — before you even know there\'s a problem.",
       },
       {
         title: 'Dues collection without the awkwardness',
@@ -95,7 +95,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: Trophy, label: 'League Standings & Stats' },
       { icon: MessageCircle, label: 'Team Messaging' },
     ],
-    metaTitle: 'Adult League Management | Roster',
+    metaTitle: 'For Adult Leagues | RosterHockey',
     metaDescription: 'Simplify adult league schedules, RSVP tracking, substitute coverage, and dues with one app built for recreational teams.',
   },
   'for-varsity': {
@@ -119,7 +119,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       },
       {
         title: 'Tournament & bracket management',
-        description: "Run your whole tournament from Roster. Build brackets, schedule rounds, record scores, and publish standings — all in one place.",
+        description: "Run your whole tournament from RosterHockey. Build brackets, schedule rounds, record scores, and publish standings — all in one place.",
       },
       {
         title: 'Deep roster management',
@@ -134,7 +134,7 @@ const segmentConfigs: Record<string, SegmentConfig> = {
       { icon: MessageCircle, label: 'Coaching Staff Messaging' },
       { icon: Shield, label: 'League-Wide Posts & Awards' },
     ],
-    metaTitle: 'Varsity Team Management | Roster',
+    metaTitle: 'For Varsity | RosterHockey',
     metaDescription: 'Manage varsity rosters, schedules, stats, tournaments, and standings with one app for competitive teams.',
   },
 };
@@ -215,7 +215,7 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-3 text-gray-900">
-            Roster fixes it.
+            RosterHockey fixes it.
           </h2>
           <p className="text-gray-500 text-center mb-12">Built specifically for {config.audience}.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

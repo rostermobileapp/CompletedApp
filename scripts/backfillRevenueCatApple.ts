@@ -24,8 +24,8 @@ async function main() {
          FROM users u WHERE ($1::text IS NULL OR u.display_id = $1) ORDER BY u.id`,
       [args.user ?? null],
     )).rows;
-    if (args.user && !accounts.length) throw new Error('Roster user not found.');
-    console.log(args.apply ? 'APPLY: re-verifying and claiming eligible purchases.' : 'DRY RUN: no Roster changes. Candidates are re-verified with ownership checks when applied.');
+    if (args.user && !accounts.length) throw new Error('RosterHockey user not found.');
+    console.log(args.apply ? 'APPLY: re-verifying and claiming eligible purchases.' : 'DRY RUN: no RosterHockey changes. Candidates are re-verified with ownership checks when applied.');
     const result = await backfillAppleAccounts(accounts, args.apply, {
       loginId: id => nativePurchaseLoginId(id, 'ios'),
       customerExists: async id => {

@@ -4,8 +4,8 @@ import { useSeo } from '@/hooks/useSeo';
 
 export default function TermsOfService() {
   useSeo({
-    title: 'Terms of Service | Roster',
-    description: 'Review the Roster Terms of Service. These terms govern your use of the Roster sports team management platform.',
+    title: 'Terms of Service | RosterHockey',
+    description: 'Review the RosterHockey Terms of Service. These terms govern your use of the RosterHockey sports team management platform.',
   });
 
   return (
@@ -23,14 +23,14 @@ export default function TermsOfService() {
           <section data-testid="section-acceptance">
             <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-300 leading-relaxed">
-              By accessing or using Roster (the "Service") operated by Roster, LLC ("we," "us," or "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not access or use the Service. These Terms apply to all visitors, users, and others who access or use the Service.
+              By accessing or using RosterHockey (the "Service") operated by Roster, LLC ("we," "us," or "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not access or use the Service. These Terms apply to all visitors, users, and others who access or use the Service.
             </p>
           </section>
 
           <section data-testid="section-description">
             <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
             <p className="text-gray-300 leading-relaxed">
-              Roster is a sports team management platform that allows users to organize recreational leagues and teams, manage schedules, track attendance, communicate with team members, and access related features. The Service may include web-based applications, mobile applications, and any related services or features.
+              RosterHockey is a sports team management platform that allows users to organize recreational leagues and teams, manage schedules, track attendance, communicate with team members, and access related features. The Service may include web-based applications, mobile applications, and any related services or features.
             </p>
           </section>
 
@@ -191,6 +191,7 @@ export default function TermsOfService() {
           <Link href="/" className="text-[#3c82f4] hover:underline" data-testid="link-home">
             Return to Home
           </Link>
+          <p className="mt-8 text-sm text-gray-400">© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</p>
         </div>
       </div>
     </div>

@@ -510,7 +510,7 @@ async function notifyScrimmageCoHostAdded({
           .limit(1);
         teamLogoUrl = resolveTeamLogoUrl(teamRows[0]?.logoUrl);
       } catch {
-        // The standard Roster icon is used when no team logo is available.
+        // The standard RosterHockey icon is used when no team logo is available.
       }
 
       const { sendCoHostPushNotification } = await import('./oneSignalNotifications');
@@ -741,7 +741,7 @@ async function getCalendarFeedEvents(userId: string): Promise<CalendarFeedEvent[
     const awayName = game.awayTeam?.name || game.opponentName;
     const matchup = homeName && awayName
       ? `${homeName} vs ${awayName}`
-      : awayName || homeName || "Roster game";
+      : awayName || homeName || "RosterHockey game";
     events.push({
       uid: `game:${game.id}@rosterhockey.com`,
       title: game.isSubstitute ? `Subbing: ${matchup}` : `Game: ${matchup}`,
@@ -779,7 +779,7 @@ async function getCalendarFeedEvents(userId: string): Promise<CalendarFeedEvent[
       const date = calendarDateOnly(start);
       events.push({
         uid: `scrimmage:${scrimmage.id}@rosterhockey.com`,
-        title: scrimmage.title || "Roster scrimmage",
+        title: scrimmage.title || "RosterHockey scrimmage",
         start: date,
         end: addCalendarDays(date, 1),
         timezone,
@@ -790,7 +790,7 @@ async function getCalendarFeedEvents(userId: string): Promise<CalendarFeedEvent[
     } else {
       events.push({
         uid: `scrimmage:${scrimmage.id}@rosterhockey.com`,
-        title: scrimmage.title || "Roster scrimmage",
+        title: scrimmage.title || "RosterHockey scrimmage",
         start,
         end: addCalendarHours(start, 2),
         timezone,
@@ -810,7 +810,7 @@ async function getCalendarFeedEvents(userId: string): Promise<CalendarFeedEvent[
     if (!start) continue;
     const homeName = game.homeTeam?.name;
     const awayName = game.awayTeam?.name || game.opponentName;
-    const matchup = homeName && awayName ? `${homeName} vs ${awayName}` : awayName || homeName || "Roster game";
+    const matchup = homeName && awayName ? `${homeName} vs ${awayName}` : awayName || homeName || "RosterHockey game";
     events.push({
       uid: `substitute:${game.id}@rosterhockey.com`,
       title: `Subbing: ${matchup}`,
@@ -886,10 +886,10 @@ function buildCalendarFeed(events: CalendarFeedEvent[]): string {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Roster Hockey//Calendar Sync//EN",
+    "PRODID:-//RosterHockey//Calendar Sync//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "X-WR-CALNAME:Roster Schedule",
+    "X-WR-CALNAME:RosterHockey Schedule",
   ];
   for (const event of events) {
     lines.push("BEGIN:VEVENT");
@@ -3055,7 +3055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ios_badgeType: 'Increase',
           ios_badgeCount: 1,
           ...(process.env.ONESIGNAL_ANDROID_CHANNEL_ID ? { android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID } : {}),
-          // Force the current Roster brand icons on every push so an old
+          // Force the current RosterHockey brand icons on every push so an old
           // OneSignal-dashboard default cannot leak through (see
           // server/oneSignalNotifications.ts for the same overrides).
           // chrome_web_badge MUST be the monochrome silhouette PNG —
@@ -5138,7 +5138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { IAP_PRODUCT_ROLES, resolveNotificationAction } = await import('./appleNotificationHandler');
 
   // Non-granting RevenueCat diagnostics. In particular, an anonymous customer
-  // ID is NOT proof of ownership of a Roster account.
+  // ID is NOT proof of ownership of a RosterHockey account.
   app.get('/api/admin/iap/revenuecat/availability', isAuthenticated, loadUserPermissions, requireSpecialPermission('admin'), async (_req, res) => {
     const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
     const { isRevenueCatAppleHistoryConfigured } = await import('./revenueCatAppleHistory');
@@ -5150,13 +5150,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { customerId, rosterUserId } = req.body ?? {};
     if (typeof customerId !== 'string' || !customerId.trim() || customerId.length > 1500 ||
         typeof rosterUserId !== 'string' || !rosterUserId.trim()) {
-      return res.status(400).json({ message: 'A customer ID and Roster user ID are required' });
+      return res.status(400).json({ message: 'A customer ID and RosterHockey user ID are required' });
     }
     try {
       const user = /^U\d{5}$/i.test(rosterUserId.trim())
         ? await storage.getUserByDisplayId(rosterUserId.trim().toUpperCase())
         : await storage.getUser(rosterUserId.trim());
-      if (!user) return res.status(404).json({ message: 'Roster user not found' });
+      if (!user) return res.status(404).json({ message: 'RosterHockey user not found' });
       const { getRevenueCatAppleSubscriptions } = await import('./revenueCatApi');
       const subscriptions = await getRevenueCatAppleSubscriptions(customerId);
       return res.json({
@@ -5199,7 +5199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } else {
       // Tokenless transactions may only refresh an existing account-owned claim;
-      // a valid Apple signature alone does not identify the Roster account.
+      // a valid Apple signature alone does not identify the RosterHockey account.
     }
 
     return tx;
@@ -5250,7 +5250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: users.role, iapOriginalTransactionId: users.iapOriginalTransactionId,
         stripeSubscriptionId: users.stripeSubscriptionId,
       }).from(users).where(eq(users.id, userId)).for('update');
-      if (!user) throw new Error('Roster user not found');
+      if (!user) throw new Error('RosterHockey user not found');
       if (originalTransactionId && user.iapOriginalTransactionId &&
           user.iapOriginalTransactionId !== originalTransactionId && linkedOwner !== userId) {
         throw Object.assign(new Error('Account already has another IAP purchase'), { status: 409 });
@@ -5344,7 +5344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     linkedPurchaseToken?: string,
   ) => {
     const appliedRole = await db.transaction(async (tx) => {
-      // Claims for distinct tokens on the same Roster account must also be
+      // Claims for distinct tokens on the same RosterHockey account must also be
       // serialized so a lower-tier restore cannot race a higher-tier one.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
       const lineageTokens = Array.from(new Set([purchaseToken, linkedPurchaseToken].filter((token): token is string => Boolean(token)))).sort();
@@ -5362,7 +5362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [ancestor] = await tx.select({ userId: googleIapClaims.userId })
           .from(googleIapClaims).where(eq(googleIapClaims.tokenHash, hashGoogleIapToken(linkedPurchaseToken))).limit(1);
         if (ancestor && ancestor.userId !== userId) {
-          throw Object.assign(new Error('The original Google Play subscription is linked to another Roster account.'), { status: 409 });
+          throw Object.assign(new Error('The original Google Play subscription is linked to another RosterHockey account.'), { status: 409 });
         }
       }
       const tokenHash = hashGoogleIapToken(purchaseToken);
@@ -5391,7 +5391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: users.role, stripeSubscriptionId: users.stripeSubscriptionId,
         iapOriginalTransactionId: users.iapOriginalTransactionId,
       }).from(users).where(eq(users.id, userId)).for('update');
-      if (!user) throw new Error('Roster user not found');
+      if (!user) throw new Error('RosterHockey user not found');
       const oldTokenHash = user.iapOriginalTransactionId && user.iapOriginalTransactionId !== purchaseToken
         ? hashGoogleIapToken(user.iapOriginalTransactionId) : null;
       const [oldGoogleClaim] = oldTokenHash ? await tx.select({
@@ -5400,7 +5400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(googleIapClaims).where(eq(googleIapClaims.tokenHash, oldTokenHash)).limit(1) : [];
       if (rejectMixedStore && (appleOriginal ||
           (oldTokenHash && !isVerifiedPriorGoogleClaim(userId, oldGoogleClaim)))) {
-        throw Object.assign(new Error('This Roster account has another store purchase. Contact support to review both subscriptions before linking this order.'), { status: 409 });
+        throw Object.assign(new Error('This RosterHockey account has another store purchase. Contact support to review both subscriptions before linking this order.'), { status: 409 });
       }
       const activeClaims = await tx.execute(sql`
         SELECT
@@ -5474,7 +5474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (!tx.appAccountToken && !await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
-          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Update Roster and restore, or contact support; do not purchase again.' });
+          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Update RosterHockey and restore, or contact support; do not purchase again.' });
         }
         const appliedRole = await activateDirectApplePurchase(userId, tx.originalTransactionId, tx.productId);
         console.log(`[IAP] JWS verified: role → ${newRole} (${tx.environment})`);
@@ -5503,7 +5503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Verify appAccountToken when Apple included it. Without it, allow only
-        // a purchase lineage already owned by this Roster account.
+        // a purchase lineage already owned by this RosterHockey account.
         const { v5: uuidv5 } = await import('uuid');
         const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
         if (tx.appAccountToken) {
@@ -5511,7 +5511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(403).json({ message: 'Purchase does not belong to this account' });
           }
         } else if (!await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
-          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Update Roster and restore, or contact support; do not purchase again.' });
+          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Update RosterHockey and restore, or contact support; do not purchase again.' });
         }
 
         const newRole = IAP_PRODUCT_ROLES[tx.productId] ?? null;
@@ -5524,7 +5524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ message: 'IAP verified and role updated', role: appliedRole });
       }
 
-      return res.status(400).json({ message: 'This app build did not provide an Apple transaction for verification. Update Roster and restore, or contact support. Do not purchase again.' });
+      return res.status(400).json({ message: 'This app build did not provide an Apple transaction for verification. Update RosterHockey and restore, or contact support. Do not purchase again.' });
 
     } catch (error: any) {
       const status = [400, 402, 403, 409, 503].includes(error?.status) ? error.status : 502;
@@ -5789,7 +5789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       assertNativeBillingRequestAccount(userId, req.body ?? {});
 
       if (!purchaseToken || typeof purchaseToken !== 'string' || !purchaseToken.trim()) {
-        return res.status(400).json({ message: 'This app build did not provide the Google Play purchase token needed for verification. Update Roster and restore, or contact support. Do not purchase again.' });
+        return res.status(400).json({ message: 'This app build did not provide the Google Play purchase token needed for verification. Update RosterHockey and restore, or contact support. Do not purchase again.' });
       }
 
       const {
@@ -5911,7 +5911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'The native purchase platform is not recognized.' });
       }
       const expected = nativePurchaseLoginId(userId, platform);
-      if (loginId !== expected) return res.status(409).json({ message: 'Your signed-in purchase account changed. Reopen Roster.' });
+      if (loginId !== expected) return res.status(409).json({ message: 'Your signed-in purchase account changed. Reopen RosterHockey.' });
       const { getRevenueCatSubscriber, getActiveAppleSubscriptions, getActiveGoogleOrderIds } = await import('./revenueCatApi');
       // Only our authenticated, server-derived ID is looked up. Never query
       // a supplied anonymous ID, alias, subscriber attribute, or receipt hint.
@@ -5924,14 +5924,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'SELECT 1 FROM apple_purchase_links WHERE user_id <> $1 AND customer_id IN ($2, $3) LIMIT 1',
           [userId, expected, subscriber.original_app_user_id],
         );
-        if (foreign.rowCount) throw Object.assign(new Error('This store purchase account is already linked to another Roster account. Contact support; do not buy again.'), { status: 409 });
+        if (foreign.rowCount) throw Object.assign(new Error('This store purchase account is already linked to another RosterHockey account. Contact support; do not buy again.'), { status: 409 });
         // Canonical historical lineage remains owned even after SDK aliasing.
         for (const sub of subscriptions) {
           const conflicting = await pool.query(
             'SELECT 1 FROM apple_purchase_links WHERE user_id <> $1 AND product_id = $2 AND original_purchased_at = $3::timestamptz LIMIT 1',
             [userId, sub.productId, sub.originalPurchasedAt],
           );
-          if (conflicting.rowCount) throw Object.assign(new Error('This Apple subscription is linked to another Roster account.'), { status: 409 });
+          if (conflicting.rowCount) throw Object.assign(new Error('This Apple subscription is linked to another RosterHockey account.'), { status: 409 });
         }
         activeProductIds = subscriptions.map(sub => sub.productId);
         const own = await pool.query('SELECT product_id FROM apple_purchase_links WHERE user_id = $1 AND expires_at > NOW() AND revoked_by_apple = FALSE', [userId]);
@@ -5948,7 +5948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ) AND id <> ${userId}
             LIMIT 1
           `);
-          if (conflict.rows.length) throw Object.assign(new Error('This Google Play subscription is linked to another Roster account.'), { status: 409 });
+          if (conflict.rows.length) throw Object.assign(new Error('This Google Play subscription is linked to another RosterHockey account.'), { status: 409 });
           activeProductIds.push(purchase.productId);
         }
       }
@@ -6055,7 +6055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, {
         findAppleUser: async customerId => {
           // The HMAC identity is intentionally not reversible. Match only IDs
-          // derived from existing Roster users; ignore client aliases/attributes.
+          // derived from existing RosterHockey users; ignore client aliases/attributes.
           let cursor = '';
           for (;;) {
             const page = await pool.query<{ id: string }>(
@@ -9654,7 +9654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public-by-token calendar feed. Calendar apps cannot send a Roster session
+  // Public-by-token calendar feed. Calendar apps cannot send a RosterHockey session
   // cookie or Supabase bearer token, so the URL itself is the revocable
   // credential. Only the token hash is stored.
   app.get("/api/calendar-feed/:token", async (req, res) => {
@@ -15045,7 +15045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 let existingLocalUser = await storage.getUserByEmail(player.email);
                 
                 if (existingLocalUser) {
-                  // User already exists in Roster, just use their ID
+                  // User already exists in RosterHockey, just use their ID
                   newUserId = existingLocalUser.id;
                 } else {
                   // User doesn't exist locally, check Supabase Auth or create
@@ -15056,7 +15056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     const existingAuthUser = existingUsers?.users.find(u => u.email?.toLowerCase() === player.email.toLowerCase());
                     
                     if (existingAuthUser) {
-                      // User exists in Supabase Auth but not in Roster - add them to Roster
+                      // User exists in Supabase Auth but not in RosterHockey - add them to RosterHockey
                       authUser = existingAuthUser;
                       authUserExists = true;
                     } else {
@@ -15083,7 +15083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     throw error;
                   }
 
-                  // Add user to local Roster database using upsert
+                  // Add user to local RosterHockey database using upsert
                   newUserId = authUser.id;
                   await storage.upsertUser({
                     id: authUser.id,
@@ -15315,7 +15315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // If the email matches an existing Roster user, fall back to the
+      // If the email matches an existing RosterHockey user, fall back to the
       // legacy "real-membership" path. Otherwise create a placeholder_players
       // row — they'll be auto-claimed when the real person signs up.
       const existingLocalUser = email ? await storage.getUserByEmail(email) : null;
@@ -24538,7 +24538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const emailResult = await client.emails.send({
           from: fromEmail,
           to: recipientEmail,
-          subject: `Rosters Feedback: ${categoryLabel}`,
+          subject: `RosterHockey Feedback: ${categoryLabel}`,
           html: `
             <h2>New Feedback Submission</h2>
             <p><strong>Category:</strong> ${categoryLabel}</p>
@@ -24670,7 +24670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       if (user?.email !== 'tobin@rosterhockey.com') {
-        return res.status(403).json({ message: 'Only the Rosters team can reply to feature requests' });
+        return res.status(403).json({ message: 'Only the RosterHockey team can reply to feature requests' });
       }
       const requestId = req.params.id;
       const schema = z.object({ body: z.string().min(1).max(2000) });

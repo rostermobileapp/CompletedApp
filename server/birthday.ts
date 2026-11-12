@@ -130,7 +130,7 @@ export async function checkBirthdayPushes(now = new Date()) {
         && current.birthday_enabled !== "false"
         && eligibleBirthdayDate(current.date_of_birth as string | null, current.timezone as string | null) === birthdayDate;
       const sent = stillEligible && await sendPushNotificationToUser({
-        userId, title: "Roster Hockey", message: "Happy Birthday",
+        userId, title: "RosterHockey", message: "Happy Birthday",
         data: { type: "birthday" },
         idempotencyKey: birthdayPushKey(userId, birthdayDate),
       });

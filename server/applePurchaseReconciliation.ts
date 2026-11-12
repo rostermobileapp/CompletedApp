@@ -104,7 +104,7 @@ export async function reconcileOne(
       `SELECT role, stripe_subscription_id, iap_original_transaction_id
          FROM users WHERE id = $1 FOR UPDATE`, [link.user_id],
     )).rows[0];
-    if (!user) throw new Error('Roster account no longer exists');
+    if (!user) throw new Error('RosterHockey account no longer exists');
     const google = (await client.query(
       `SELECT product_id FROM google_iap_claims
         WHERE user_id = $1 AND expires_at > NOW()

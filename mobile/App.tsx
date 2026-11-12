@@ -137,7 +137,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Roster App</Text>
+        <Text style={styles.title}>RosterHockey</Text>
       
       <View style={styles.statusCard}>
         <Text style={styles.sectionTitle}>User Status</Text>

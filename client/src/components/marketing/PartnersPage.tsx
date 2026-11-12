@@ -7,7 +7,7 @@ import "./PartnersPage.css";
 const orgTypes = ["Hockey Association / Club", "Arena / Ice Facility", "Recreation League", "Youth Sports Organization", "Sports Media / Podcast", "Other"];
 
 export function PartnersPage() {
-  useSeo({ title: "Partners | Roster — Community Partner Program", description: "Partner with Roster to support your hockey community through our referral program. Apply online and help teams stay connected." });
+  useSeo({ title: "Referral Program | RosterHockey", description: "Partner with RosterHockey to support your hockey community through our referral program. Apply online and help teams stay connected." });
   const [referrals, setReferrals] = useState(300);
   const [fileName, setFileName] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -66,9 +66,9 @@ export function PartnersPage() {
       <RosterPageNav active="partners" />
       <section className="partner-hero">
         <div className="partner-container">
-          <span className="rp-kicker">The Roster community partner program</span>
+          <span className="rp-kicker">The RosterHockey community partner program</span>
           <h1 className="rp-title">We give back<br /><em>to the hockey community.</em></h1>
-          <p>Refer players to our platform and Roster will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization.</p>
+          <p>Refer players to our platform and RosterHockey will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization.</p>
           <strong>Choose a good cause and track your referrals.</strong>
           <div className="partner-hero-actions"><a className="partner-button" href="#apply">Apply to become a partner <ArrowRight size={16} /></a><a className="partner-login-link" href="/referral-program/portal/login">Partner login</a></div>
           <div className="partner-trustline"><Check size={15} /> Paid quarterly&nbsp; · &nbsp;10% of net subscription revenue&nbsp; · &nbsp;Built for the hockey community</div>
@@ -89,13 +89,13 @@ export function PartnersPage() {
       <section className="partner-community">
         <div className="partner-container partner-community-layout">
           <div className="partner-community-image"><img src="/marketing/roster-partners-community.png" alt="Hockey community members supporting one another" /></div>
-          <div><span className="rp-kicker">Why we do this</span><h2 className="rp-title rp-title-sm">Hockey takes<br />care of its own.</h2><p>We look within when we need help. We look within when we hire. We leave our fights on the ice so we can be family in the locker room. When someone falls, we pick them up. When someone steps up, we follow.</p><p>Roster was built by a player, for players — and now we want to give back to the organizations holding this community together.</p><strong>Every paying subscriber you refer puts 10% of net revenue back into your cause. That’s our way of saying thanks to the people who spread the passion for our beautiful game.</strong></div>
+          <div><span className="rp-kicker">Why we do this</span><h2 className="rp-title rp-title-sm">Hockey takes<br />care of its own.</h2><p>We look within when we need help. We look within when we hire. We leave our fights on the ice so we can be family in the locker room. When someone falls, we pick them up. When someone steps up, we follow.</p><p>RosterHockey was built by a player, for players — and now we want to give back to the organizations holding this community together.</p><strong>Every paying subscriber you refer puts 10% of net revenue back into your cause. That’s our way of saying thanks to the people who spread the passion for our beautiful game.</strong></div>
         </div>
       </section>
 
       <section className="partner-current">
         <div className="partner-container">
-          <span className="rp-kicker">Already in the Roster community</span>
+          <span className="rp-kicker">Already in the RosterHockey community</span>
           <h2 className="rp-title rp-title-sm">Current partners.</h2>
           <div className="partner-mark"><img src="/marketing/roster-partners-hpib.png" alt="Hockey Players in Business" /><span>Hockey Players in Business</span></div>
         </div>

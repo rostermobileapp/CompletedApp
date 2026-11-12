@@ -82,9 +82,9 @@ export default function Pricing() {
   const isIos = useIsIosDevice();
 
   useSeo({
-    title: 'Pricing | Roster — Free, Pro & Commissioner Plans',
-    description: 'Roster is free to start. Upgrade to Player Pro for sub requests and payment tracking, or Commissioner for full league management. No ads on any plan.',
-    ogTitle: 'Roster Pricing — Free, Pro & Commissioner Plans',
+    title: 'Pricing | RosterHockey',
+    description: 'RosterHockey is free to start. Upgrade to Player Pro for sub requests and payment tracking, or Commissioner for full league management. No ads on any plan.',
+    ogTitle: 'Pricing | RosterHockey',
     ogDescription: 'Start free. Upgrade when you need more. No ads on any plan.',
   });
 
@@ -141,7 +141,7 @@ export default function Pricing() {
             <Link href="/referral-program" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Partners</Link>
           </nav>
           <Link href="/">
-            <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain cursor-pointer" />
+            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain cursor-pointer" />
           </Link>
           <div className="flex items-center gap-3">
             <button
@@ -405,7 +405,7 @@ export default function Pricing() {
       {/* Footer */}
       <footer className="border-t border-gray-200 py-10 px-6 bg-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <p className="text-sm text-gray-400">© 2026 Roster. Built for teams, by team players. No ads. Ever.</p>
+          <p className="text-sm text-gray-400">© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</p>
           <div className="flex items-center gap-6">
             <Link href="/pricing" className="text-sm text-[#3c82f4] font-medium">Pricing</Link>
             <Link href="/privacy-policy" className="text-sm text-gray-400 hover:text-gray-900 transition-colors">Privacy Policy</Link>

@@ -5,14 +5,12 @@ import { useLocation } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
 import { useMarketingVisit } from "./useMarketingVisit";
 import { useIsIosDevice } from "@/hooks/useIosPlatform";
-import HeroSplitFlapWord from "./HeroSplitFlapWord";
 import "./ScrollStory.css";
 
 const image = (name: string) => `/marketing/roster-home/${name}`;
 const signupDestination = "/get-started";
 const appStore = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
 const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
-const heroWords = ["HOCKEY", "MEMORIES", "LAUGHS", "JOKES", "CHEERS", "GOOD TIMES", "FRIENDS", "CHIRPS", "FELLOWSHIP"];
 const patchItems = [
   ["hat-trick", "Hat Trick"], ["beer-me", "Beer Me"], ["iron-man", "Iron Man"],
   ["on-fire", "On Fire"], ["century-club", "Century Club"], ["locked-in", "Locked In"],
@@ -27,13 +25,16 @@ function ScrollStory() {
   const [, navigate] = useLocation();
   const isIos = useIsIosDevice();
   useMarketingVisit();
-  useSeo({ title: "Roster — Hockey Team and League Management App", description: "More time together. Less time on admin. Roster handles hockey schedules, RSVPs, rosters, stats, and payments in one ad-free app. Free to start." });
+  useSeo({
+    title: "RosterHockey | Beer League Hockey Team & League Management App",
+    description: "RosterHockey is the ad-free app for beer league hockey teams and leagues: RSVPs, sub requests, dues tracking, live scoring, stats and brackets. Free to start.",
+    ogTitle: "RosterHockey | Beer League Hockey Team & League Management App",
+    ogDescription: "RosterHockey is the ad-free app for beer league hockey teams and leagues: RSVPs, sub requests, dues tracking, live scoring, stats and brackets. Free to start.",
+  });
   const rootRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answerState, setAnswerState] = useState("");
-  const [heroWordIndex, setHeroWordIndex] = useState(0);
-  const [heroRotationEnabled, setHeroRotationEnabled] = useState(false);
   const reduced = useRef(false);
 
   useEffect(() => {
@@ -49,26 +50,6 @@ function ScrollStory() {
       media.removeEventListener("change", updatePreference);
     };
   }, []);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updateHeroMotionPreference = () => {
-      const shouldRotate = !media.matches;
-      setHeroRotationEnabled(shouldRotate);
-      if (!shouldRotate) setHeroWordIndex(0);
-    };
-    updateHeroMotionPreference();
-    media.addEventListener("change", updateHeroMotionPreference);
-    return () => media.removeEventListener("change", updateHeroMotionPreference);
-  }, []);
-
-  useEffect(() => {
-    if (!heroRotationEnabled) return;
-    const interval = window.setInterval(() => {
-      setHeroWordIndex(index => (index + 1) % heroWords.length);
-    }, 3800);
-    return () => window.clearInterval(interval);
-  }, [heroRotationEnabled]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -111,8 +92,8 @@ function ScrollStory() {
   return (
     <main className="roster-scroll" ref={rootRef}>
       <header className="rs-nav">
-        <a href="#top" className="rs-logo" aria-label="Roster home" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>
-          <img src={image("logo-dark.png")} alt="Roster" />
+        <a href="#top" className="rs-logo" aria-label="RosterHockey home" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>
+          <img src={image("logo-dark.png")} alt="RosterHockey logo" />
         </a>
         <nav className="rs-nav-links" aria-label="Main navigation">
           <a href="#top" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>Home</a>
@@ -122,11 +103,11 @@ function ScrollStory() {
           <a href="/referral-program">Partners</a>
         </nav>
         <div className="rs-nav-actions">
-          <div className="rs-nav-stores" role="group" aria-label="Download Roster">
-            <a className="rs-nav-store" href={appStore} target="_blank" rel="noreferrer" aria-label="Get Roster on the App Store">
+          <div className="rs-nav-stores" role="group" aria-label="Download RosterHockey">
+            <a className="rs-nav-store" href={appStore} target="_blank" rel="noreferrer" aria-label="Get RosterHockey on the App Store">
               <SiAppstore size={15} aria-hidden="true" />
             </a>
-            <a className="rs-nav-store" href={playStore} target="_blank" rel="noreferrer" aria-label="Get Roster on Google Play">
+            <a className="rs-nav-store" href={playStore} target="_blank" rel="noreferrer" aria-label="Get RosterHockey on Google Play">
               <SiGoogleplay size={15} aria-hidden="true" />
             </a>
           </div>
@@ -152,16 +133,10 @@ function ScrollStory() {
           loading="eager"
         />
         <h1 className="rs-hero-title mt-[1px] text-[#ffffff]">
-          LESS ADMIN<br />
-          <span className="rs-hero-final-line" aria-hidden="true">
-            <span className="rs-hero-word-line">MORE&nbsp;
-                <HeroSplitFlapWord word={heroWords[heroWordIndex]} />
-            </span>
-          </span>
-          <span className="rs-sr-only">MORE HOCKEY</span>
+          RosterHockey: less admin, more hockey.
         </h1>
-        <p className="rs-hero-copy text-[#ffffff] font-semibold">Roster is a hockey-specific team and league management app for iOS and Android.</p>
-        <ul className="rs-hero-features" aria-label="Roster features">
+        <p className="rs-hero-copy text-[#ffffff] font-semibold">RosterHockey is a hockey-specific team and league management app for iOS and Android.</p>
+        <ul className="rs-hero-features" aria-label="RosterHockey features">
           <li>Scheduling</li>
           <li>Attendance/RSVPs</li>
           <li>Team chat</li>
@@ -190,7 +165,7 @@ function ScrollStory() {
           </ul>
         </div>
         <div className="rs-split-art">
-          <img src={image("features-phones.png")} alt="Roster app screens for organizing a team" />
+          <img src={image("features-phones.png")} alt="RosterHockey app screens for organizing a team" />
         </div>
         </div>
       </section>
@@ -199,7 +174,7 @@ function ScrollStory() {
           <div className="rs-pricing-intro">
             <div className="rs-section-kicker">Clear access. No surprises.</div>
             <h2 className="rs-display">Start free.<br />Find your<br />next level.</h2>
-            <p className="rs-copy">Roster has a free-forever tier, with no ads. Compare Player Pro and Commissioner plans to find the right fit for your team.</p>
+            <p className="rs-copy">RosterHockey has a free-forever tier, with no ads. Compare Player Pro and Commissioner plans to find the right fit for your team.</p>
             <div className="rs-store-links">
               <a className="rs-button" href={appStore} target="_blank" rel="noreferrer"><SiAppstore size={18} /> App Store</a>
               {!isIos && <a className="rs-button secondary" href={playStore} target="_blank" rel="noreferrer"><SiGoogleplay size={18} /> Google Play</a>}
@@ -227,7 +202,7 @@ function ScrollStory() {
            <p className="rs-copy">Collectible patches make the season more fun. Build patch progress on every plan. Hat Trick follows the season; Beer Me resets January 1. Unlock the full Trophy Case and patch artwork with Player Pro or Commissioner access and verified age 21+.</p>
         </div>
         {[0, 1].map((row) => <div className="rs-marquee-wrap" key={row}>
-          <div className="rs-marquee" aria-label="Illustrative Roster patch collection" style={{ marginLeft: row ? "-8vw" : "-3vw" }}>
+          <div className="rs-marquee" aria-label="Illustrative RosterHockey patch collection" style={{ marginLeft: row ? "-8vw" : "-3vw" }}>
             {[...patchItems, ...patchItems, ...patchItems].map(([slug, title], i) =>
               <img key={`${row}-${slug}-${i}`} src={`/marketing/roster-home/badges/${slug}/tier-1.webp`} alt={i < patchItems.length ? `${title} patch` : ""} aria-hidden={i >= patchItems.length} />,
             )}
@@ -277,12 +252,12 @@ function ScrollStory() {
             <a className="rs-button secondary" href={appStore} target="_blank" rel="noreferrer"><SiAppstore size={19} /> App Store</a>
             {!isIos && <a className="rs-button secondary" href={playStore} target="_blank" rel="noreferrer"><SiGoogleplay size={18} /> Google Play</a>}
           </div>
-          <p className="rs-micro">Download Roster and bring your team together.</p>
+          <p className="rs-micro">Download RosterHockey and bring your team together.</p>
         </div>
       </section>
       <footer className="rs-footer">
         <div className="rs-footer-inner">
-          <a href="#top" onClick={(e) => { e.preventDefault(); jumpTo("top"); }}><img src={image("logo-dark.png")} alt="Roster" style={{ width: 96, height: 34, objectFit: "contain" }} /></a>
+          <a href="#top" onClick={(e) => { e.preventDefault(); jumpTo("top"); }}><img src={image("logo-dark.png")} alt="RosterHockey logo" style={{ width: 96, height: 34, objectFit: "contain" }} /></a>
           <div className="rs-footer-links">
           <a href="/features">Features</a>
           <a href="/pricing">Pricing</a>
@@ -296,7 +271,7 @@ function ScrollStory() {
             <a href="/privacy-policy">Privacy</a>
             <a href="/support">Support</a>
           </div>
-          <span>Ad-free hockey team management.</span>
+          <span>© 2026 RosterHockey. Built for hockey players, by hockey players. No ads. Ever.</span>
         </div>
       </footer>
     </main>

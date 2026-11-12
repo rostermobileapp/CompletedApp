@@ -120,7 +120,7 @@ export function serveStatic(app: Express, distPath = path.resolve(import.meta.di
     }
     const canonical = `https://www.roster-app.com${req.path.replaceAll('"', '%22').replaceAll('<', '%3C')}`;
     res.status(404).set("X-Robots-Tag", "noindex, nofollow").type("html").send(
-      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Page not found | Roster</title><link rel="canonical" href="${canonical}"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to Roster</a></main></body></html>`,
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Page not found | RosterHockey</title><meta property="og:site_name" content="RosterHockey"><link rel="canonical" href="${canonical}"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to RosterHockey</a></main></body></html>`,
     );
   });
 }

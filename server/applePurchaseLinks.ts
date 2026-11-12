@@ -130,7 +130,7 @@ export async function stageApplePurchaseLink(
       [displayId],
     )).rows[0];
     if (!user || user.role !== 'free_tier' || user.stripe_subscription_id || user.iap_original_transaction_id) {
-      throw new Error('Roster account is missing or already has a linked subscription');
+      throw new Error('RosterHockey account is missing or already has a linked subscription');
     }
     const owner = (await client.query(
       'SELECT id FROM users WHERE iap_original_transaction_id = $1 LIMIT 1',
@@ -220,7 +220,7 @@ async function reconcileOneLegacy(link: Link): Promise<void> {
       `SELECT role, stripe_subscription_id, iap_original_transaction_id
          FROM users WHERE id = $1 FOR UPDATE`, [link.user_id],
     )).rows[0];
-    if (!user) throw new Error('Roster account no longer exists');
+    if (!user) throw new Error('RosterHockey account no longer exists');
     const google = (await client.query(
       `SELECT product_id FROM google_iap_claims
         WHERE user_id = $1 AND expires_at > NOW()

@@ -43,7 +43,7 @@ function toPromise<T>(fn: (cb: (data: T) => void) => void, timeoutMs = 15000): P
           if (error.code === 2 || error.code === 'PURCHASE_CANCELLED') {
             reject(Object.assign(new Error('Purchase cancelled'), { code: 'PURCHASE_CANCELLED' }));
           } else {
-            reject(new Error('The native billing operation reported an error. Reopen Roster and check store subscriptions before retrying.'));
+            reject(new Error('The native billing operation reported an error. Reopen RosterHockey and check store subscriptions before retrying.'));
           }
           return;
         }
@@ -285,7 +285,7 @@ export async function readNativePurchaseIdentity(): Promise<string> {
   const data = await toPromise<any>(cb => bridge.customerId(cb));
   if (data?.status !== 'SUCCESS' || typeof data.customerId !== 'string' ||
       !data.customerId.trim() || data.customerId.length > 1500) {
-    throw new Error('Roster could not read the native purchase account. Update and reopen the app before purchasing.');
+    throw new Error('RosterHockey could not read the native purchase account. Update and reopen the app before purchasing.');
   }
   return data.customerId.trim();
 }
@@ -294,13 +294,13 @@ export async function associateNativePurchaseAccount(
   loginId: string,
 ): Promise<{ loginReportedId: string; readBackId: string }> {
   if (!/^roster_(?:ios_)?[a-f0-9]{64}$/.test(loginId)) {
-    throw new Error('Purchase-account setup is unavailable. Reopen Roster before purchasing.');
+    throw new Error('Purchase-account setup is unavailable. Reopen RosterHockey before purchasing.');
   }
   const bridge = new NativelyPurchases();
   const data = await toPromise<any>(cb => bridge.login(loginId, undefined, cb));
   if (data?.status !== 'SUCCESS' || typeof data.customerId !== 'string' ||
       !data.customerId.trim() || data.customerId.length > 1500) {
-    throw new Error('Roster could not link the native purchase account. Update and reopen the app before purchasing.');
+    throw new Error('RosterHockey could not link the native purchase account. Update and reopen the app before purchasing.');
   }
   // Do not assume CustomerInfo's original ID is the SDK's current appUserID.
   // The backend checks both observations against its derived subscriber record.
@@ -416,7 +416,7 @@ export async function inspectAndroidPurchases(): Promise<AndroidPurchaseStatus> 
     throw new Error('Google Play restore returned no data. Please try again.');
   }
   if (data.status === 'FAILED') {
-    throw new Error('Google Play could not restore purchases. Check the signed-in Play account, then reopen Roster and try Restore purchases.');
+    throw new Error('Google Play could not restore purchases. Check the signed-in Play account, then reopen RosterHockey and try Restore purchases.');
   }
   if (!Array.isArray(data) && data.status !== 'SUCCESS') {
     throw new Error('Google Play did not confirm restore completion. Reopen the app and try Restore purchases again.');
@@ -439,7 +439,7 @@ export async function restorePurchases(): Promise<NativelyTransaction[]> {
   }
 
   if (data.status === 'FAILED') {
-    throw new Error('The App Store could not restore purchases. Check the signed-in Apple account, then reopen Roster and try Restore purchases.');
+    throw new Error('The App Store could not restore purchases. Check the signed-in Apple account, then reopen RosterHockey and try Restore purchases.');
   }
 
   // The restore payload may be an array or have a purchases/transactions array

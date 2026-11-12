@@ -43,7 +43,7 @@ const TOTAL_STEPS = 3;
 const PROFILE_PREVIEW_STEPS = [
   { value: 1, label: 'Basic information' },
   { value: 2, label: 'Additional information' },
-  { value: 3, label: 'About Roster' },
+  { value: 3, label: 'About RosterHockey' },
 ];
 
 interface OnboardingData {
@@ -163,7 +163,7 @@ export default function Onboarding() {
         onboardingProgress: { step: 3, completed: true },
       });
       queryClient.setQueryData(['/api/user'], (old: any) => ({ ...(old || {}), onboardingCompleted: true }));
-      toast({ title: 'Welcome to Roster!', description: 'Your profile has been set up successfully.' });
+      toast({ title: 'Welcome to RosterHockey!', description: 'Your profile has been set up successfully.' });
       navigate('/get-started');
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to complete onboarding. Please try again.', variant: 'destructive' });
@@ -467,13 +467,13 @@ function StepAbout() {
   return (
     <div className="space-y-8 pt-4">
       <div className="text-center pt-8">
-        <img src={rosterLogo} alt="Roster Logo" className="w-24 h-24 rounded-2xl mx-auto mb-6" />
-        <h1 className="text-2xl font-bold">Welcome to Roster</h1>
+        <img src={rosterLogo} alt="RosterHockey logo" className="w-24 h-24 rounded-2xl mx-auto mb-6" />
+        <h1 className="text-2xl font-bold">Welcome to RosterHockey</h1>
       </div>
 
       <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800">
         <p className="text-zinc-300 leading-relaxed text-center">
-          Roster was built to make organizing and joining recreational sports teams simple, fair, and fun for everyone. 
+          RosterHockey was built to make organizing and joining recreational sports teams simple, fair, and fun for everyone.
           Whether you're looking for a pickup game or managing an entire league, we've got you covered.
         </p>
       </div>

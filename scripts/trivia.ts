@@ -52,7 +52,7 @@ async function ensureTriviaDatabase(): Promise<void> {
       AND to_regclass('public.badge_tiers') IS NOT NULL AS badge_tables_ready
   `);
   if (!result.rows[0]?.badge_tables_ready) {
-    // Existing databases are initialized by the Roster server. Only a truly
+    // Existing databases are initialized by the RosterHockey server. Only a truly
     // new database needs the broader badge bootstrap before trivia tables.
     const { ensureBadgeTables } = await import("../server/badgeDbInit");
     await ensureBadgeTables();

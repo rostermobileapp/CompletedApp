@@ -117,7 +117,7 @@ function LoadingScreen() {
       <div className="relative w-32 h-32 flex items-center justify-center">
         <img 
           src={rosterLogo} 
-          alt="Roster Logo" 
+          alt="RosterHockey logo"
           className="w-20 h-20 object-contain z-10"
         />
         <div className="absolute inset-0 animate-spin" style={{ animationDuration: '2s' }}>

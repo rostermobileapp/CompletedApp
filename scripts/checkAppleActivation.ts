@@ -1,6 +1,6 @@
 /**
  * Read-only diagnostic for a customer independently confirmed to exist in
- * RevenueCat. Never creates a Roster claim or changes account access.
+ * RevenueCat. Never creates a RosterHockey claim or changes account access.
  */
 import { getRevenueCatActiveAppleSubscriptions } from '../server/revenueCatApi';
 import { lookupTransactionById } from '../server/appleIap';

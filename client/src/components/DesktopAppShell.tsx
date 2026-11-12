@@ -392,7 +392,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           ) : (
             <img
               src={desktopHeaderLogo}
-              alt="Roster"
+              alt="RosterHockey logo"
               className="w-10 h-10 xl:w-14 xl:h-14 [@media(max-height:760px)]:w-8 [@media(max-height:760px)]:h-8 object-contain"
             />
           )}

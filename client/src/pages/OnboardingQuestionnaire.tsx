@@ -250,7 +250,7 @@ export default function OnboardingQuestionnaire() {
         {/* ── WELCOME ─────────────────────────────────── */}
         {screen === 'welcome' && (
           <div className="flex flex-col items-center text-center pt-12 pb-4">
-            <img src={rosterLightLogo} alt="Roster" className="h-[72px] object-contain mb-8" />
+            <img src={rosterLightLogo} alt="RosterHockey logo" className="h-[72px] object-contain mb-8" />
             <div className="inline-flex items-center gap-2 bg-blue-50 text-[#3c82f4] font-semibold px-4 py-1.5 rounded-full mb-6 text-[16px]">Built JUST for Hockey</div>
             <h1 className="text-4xl font-black text-gray-900 leading-tight mb-4">
               Your team<br />
@@ -265,7 +265,7 @@ export default function OnboardingQuestionnaire() {
               <div className="space-y-3">
                 {[
                   { icon: Calendar, label: "Thursday 8PM — Pickwick Ice", detail: "12 confirmed · 2 declined", color: "text-[#3c82f4]" },
-                  { icon: Users, label: "Roster: 18 players", detail: "All fees collected ✓", color: "text-green-600" },
+                  { icon: Users, label: "roster: 18 players", detail: "All fees collected ✓", color: "text-green-600" },
                   { icon: MessageSquare, label: "Team Chat", detail: "Sub found for Friday! 🎉", color: "text-purple-600" },
                 ].map(({ icon: Icon, label, detail, color }) => (
                   <div key={label} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm">
@@ -312,7 +312,7 @@ export default function OnboardingQuestionnaire() {
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
                 </div>
                 <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "I've had different leagues use different apps and Roster is the best BY FAR"
+                  "I've had different leagues use different apps and RosterHockey is the best BY FAR"
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">S</div>
@@ -328,7 +328,7 @@ export default function OnboardingQuestionnaire() {
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
                 </div>
                 <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "The substitute player request system is the crown jewel of this app. This feature alone makes Roster worth it if you are a Captain."
+                  "The substitute player request system is the crown jewel of this app. This feature alone makes RosterHockey worth it if you are a Captain."
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">J</div>
@@ -344,7 +344,7 @@ export default function OnboardingQuestionnaire() {
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
                 </div>
                 <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... Roster had us covered."
+                  "As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... RosterHockey had us covered."
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">B</div>
@@ -460,7 +460,7 @@ export default function OnboardingQuestionnaire() {
                   { icon: Calendar, label: "Game schedule & RSVPs", detail: "See every game, RSVP in one tap" },
                   { icon: MessageSquare, label: "Team chat", detail: "All team comms in one place" },
                   { icon: BarChart2, label: "Stats & standings", detail: "Track your season performance" },
-                  { icon: Users, label: "Roster", detail: "Know your teammates" },
+                  { icon: Users, label: "roster", detail: "Know your teammates" },
                 ].map(({ icon: Icon, label, detail }) => (
                   <div key={label} className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center gap-3">
                     <div className="bg-green-50 p-2.5 rounded-xl flex-shrink-0">
@@ -517,7 +517,7 @@ export default function OnboardingQuestionnaire() {
               Here's your fix
             </h2>
             <p className="text-gray-500 mb-6">
-              Roster solves every one of those frustrations.
+              RosterHockey solves every one of those frustrations.
             </p>
 
             <div className="space-y-4 mb-8">
@@ -540,7 +540,7 @@ export default function OnboardingQuestionnaire() {
                   })
                 : (
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-center text-sm text-gray-500">
-                    Select at least one challenge to see how Roster helps.
+                    Select at least one challenge to see how RosterHockey helps.
                   </div>
                 )
               }
@@ -563,7 +563,7 @@ export default function OnboardingQuestionnaire() {
 
             {/* Who referred you dropdown */}
             <div className="mb-6">
-              <p className="text-sm font-semibold text-gray-700 mb-1">Who referred you to Roster? <span className="font-normal text-gray-400">(optional)</span></p>
+              <p className="text-sm font-semibold text-gray-700 mb-1">Who referred you to RosterHockey? <span className="font-normal text-gray-400">(optional)</span></p>
               <p className="text-xs text-gray-400 mb-2">Select your hockey association or partner organization.</p>
               <select
                 value={state.referralPartnerId}
@@ -649,7 +649,7 @@ export default function OnboardingQuestionnaire() {
               }}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
-              Build my Roster →
+              Build my roster →
             </button>
           </div>
         )}
@@ -660,10 +660,10 @@ export default function OnboardingQuestionnaire() {
             <div className="relative mb-8">
               <div className="w-20 h-20 rounded-full border-4 border-blue-100 border-t-[#3c82f4] animate-spin" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <img src={rosterLightLogo} alt="Roster" className="h-8 object-contain" />
+                <img src={rosterLightLogo} alt="RosterHockey logo" className="h-8 object-contain" />
               </div>
             </div>
-            <h2 className="text-2xl font-black text-gray-900 mb-3">Building your Roster...</h2>
+            <h2 className="text-2xl font-black text-gray-900 mb-3">Building your team...</h2>
             <p className="text-gray-500">Personalising your experience based on your answers</p>
             <div className="mt-6 space-y-2">
               {[
@@ -708,7 +708,7 @@ function PaywallScreen({ isAuthenticated, onSignUp }: { isAuthenticated: boolean
 
   return (
     <div className="pt-8 pb-4">
-      <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-6" />
+      <img src={rosterLightLogo} alt="RosterHockey logo" className="h-10 object-contain mx-auto mb-6" />
       {/* Plans */}
       <div className="space-y-3 mb-6">
 

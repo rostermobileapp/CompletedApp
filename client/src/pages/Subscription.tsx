@@ -641,7 +641,7 @@ export default function Subscription() {
       toast({
         title: 'Change your existing plan first',
         description: hasStripePlan
-          ? 'Your Commissioner plan is billed by Roster. Restore your existing Google Play purchase, then manage the Roster subscription before switching plans.'
+          ? 'Your Commissioner plan is billed by RosterHockey. Restore your existing Google Play purchase, then manage the RosterHockey subscription before switching plans.'
           : 'Manage your Commissioner subscription in Google Play before switching to Player Pro. Do not start a second subscription.',
       });
       return;
@@ -714,7 +714,7 @@ export default function Subscription() {
         setAndroidOwnedProducts((previous) => Array.from(new Set([...previous, productId])));
         toast({
           title: 'Already subscribed in Google Play',
-          description: 'Google Play says this plan is already owned. Do not buy it again. Tap Restore Purchases to link it to your Roster account.',
+          description: 'Google Play says this plan is already owned. Do not buy it again. Tap Restore Purchases to link it to your RosterHockey account.',
         });
         setIsLoading(false);
         return;
@@ -733,7 +733,7 @@ export default function Subscription() {
       toast({
         title: msg.startsWith('Purchase needs verification') ? 'Purchase needs verification' : 'Checkout not completed',
         description: isBridgeTimeout
-          ? 'The native bridge did not finish. Fully close and reopen Roster. Check Google Play subscriptions and use Restore purchases before trying another payment.'
+          ? 'The native bridge did not finish. Fully close and reopen RosterHockey. Check Google Play subscriptions and use Restore purchases before trying another payment.'
           : msg,
         variant: 'destructive',
       });
@@ -822,17 +822,17 @@ export default function Subscription() {
           <DialogHeader>
             <DialogTitle>How to switch to Free</DialogTitle>
             <DialogDescription>
-              Free starts after your paid subscriptions end. Cancel each subscription where it is billed; changing your Roster plan does not cancel a store charge.
+              Free starts after your paid subscriptions end. Cancel each subscription where it is billed; changing your RosterHockey plan does not cancel a store charge.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
             {hasStripePlan && (
               <div className="rounded-lg border p-3">
-                <p className="font-medium">Roster billing (Stripe)</p>
-                <p className="text-muted-foreground mt-1">Your current plan is linked to Roster billing. Open billing management and cancel it there.</p>
+                <p className="font-medium">RosterHockey billing (Stripe)</p>
+                <p className="text-muted-foreground mt-1">Your current plan is linked to RosterHockey billing. Open billing management and cancel it there.</p>
                 <button type="button" onClick={() => { setShowFreeHelp(false); void handleManageSubscription(); }}
                   className="text-primary underline mt-2" data-testid="button-free-manage-roster">
-                  Manage Roster billing
+                  Manage RosterHockey billing
                 </button>
               </div>
             )}
@@ -850,7 +850,7 @@ export default function Subscription() {
             {isIos && (
               <p>For an App Store subscription, open Settings → your name → Subscriptions → Roster → Cancel Subscription. Access usually continues until its expiry.</p>
             )}
-            <p className="text-muted-foreground">If you have more than one paid subscription, cancel each one separately. If your Roster tier still appears paid after all billing ends, contact support—some access may be assigned separately from billing.</p>
+            <p className="text-muted-foreground">If you have more than one paid subscription, cancel each one separately. If your RosterHockey tier still appears paid after all billing ends, contact support—some access may be assigned separately from billing.</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -919,7 +919,7 @@ export default function Subscription() {
         <img
           className="subscription-banner"
           src={subscriptionBanner}
-          alt="Roster hockey app, achievement patches, and a player"
+          alt="RosterHockey app, achievement patches, and a player"
         />
         <button
           onClick={() => { setPageTransitionDirection('down'); navigate('/profile'); }}
@@ -991,15 +991,15 @@ export default function Subscription() {
                 <div className="mt-4 text-sm text-muted-foreground text-center space-y-2">
                   {hasStripePlan && (
                     <>
-                      <p>Your current plan is billed through Roster (Stripe), not Google Play. Cancel it separately if you want to change plans.</p>
+                      <p>Your current plan is billed through RosterHockey (Stripe), not Google Play. Cancel it separately if you want to change plans.</p>
                       <button onClick={handleManageSubscription} disabled={isLoading}
                         className="w-full rounded-lg bg-primary text-primary-foreground py-3 font-semibold disabled:opacity-50"
                         data-testid="button-manage-roster-android">
-                        {isLoading ? 'Opening billing…' : 'Manage Roster billing'}
+                        {isLoading ? 'Opening billing…' : 'Manage RosterHockey billing'}
                       </button>
                     </>
                   )}
-                  <p>For a Google Play subscription, open Play Store → Profile → Payments &amp; subscriptions → Subscriptions. A Play purchase is billed separately from Roster billing.</p>
+                  <p>For a Google Play subscription, open Play Store → Profile → Payments &amp; subscriptions → Subscriptions. A Play purchase is billed separately from RosterHockey billing.</p>
                 </div>
               ) : (
                 <button
@@ -1226,8 +1226,8 @@ export default function Subscription() {
                 <div className="space-y-2 text-sm">
                   <p className="text-muted-foreground">
                     {hasStripePlan
-                      ? 'Your Commissioner plan is billed through Roster. If Google Play already has Player Pro, restore it below; then manage your Roster-billed plan to switch. Do not buy Player Pro again.'
-                      : 'Your Roster account currently has Commissioner access, but its billing source is not confirmed here. If Google Play shows Player Pro, do not buy it again. Restore it below; if Play returns no purchase proof, contact support. Do not cancel a subscription just to change the displayed tier.'}
+                      ? 'Your Commissioner plan is billed through RosterHockey. If Google Play already has Player Pro, restore it below; then manage your RosterHockey-billed plan to switch. Do not buy Player Pro again.'
+                      : 'Your RosterHockey account currently has Commissioner access, but its billing source is not confirmed here. If Google Play shows Player Pro, do not buy it again. Restore it below; if Play returns no purchase proof, contact support. Do not cancel a subscription just to change the displayed tier.'}
                   </p>
                   <button type="button" onClick={handleAndroidRestore} disabled={isLoading}
                     className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground disabled:opacity-50"
@@ -1237,7 +1237,7 @@ export default function Subscription() {
                   {hasStripePlan ? (
                     <button type="button" onClick={handleManageSubscription} disabled={isLoading}
                       className="text-primary underline" data-testid="button-change-roster-plan">
-                      Manage Roster-billed Commissioner plan
+                      Manage RosterHockey-billed Commissioner plan
                     </button>
                   ) : (
                     <button type="button"
@@ -1306,7 +1306,7 @@ export default function Subscription() {
                       </div>
                       {alreadyOwned && (
                         <p role="status" className="text-xs text-muted-foreground">
-                          Google Play reports this plan already active. Do not purchase it again; restore it to verify your Roster access.
+                          Google Play reports this plan already active. Do not purchase it again; restore it to verify your RosterHockey access.
                         </p>
                       )}
                       {statusMessage && (
@@ -1341,7 +1341,7 @@ export default function Subscription() {
                   );
                 })())
               ) : isIos ? (
-                /* iOS: Roster (Stripe) on top dominant, App Store below outlined.
+                /* iOS: RosterHockey (Stripe) on top dominant, App Store below outlined.
                    Each button shows its own price label so users can see the
                    difference without any "save" / promotional language in the
                    CTA itself (App Store anti-steering compliance). */
@@ -1443,7 +1443,7 @@ export default function Subscription() {
             ? 'App Store subscriptions are managed through Apple. Cancel anytime via Settings → Apple ID → Subscriptions.'
             : isAndroid
             ? hasStripePlan
-              ? 'Your Roster-billed plan is managed through Roster billing. Google Play subscriptions, if any, must be cancelled separately in Play Store.'
+              ? 'Your RosterHockey-billed plan is managed through RosterHockey billing. Google Play subscriptions, if any, must be cancelled separately in Play Store.'
               : 'Google Play subscriptions auto-renew until cancelled. Cancel via Play Store → Profile → Payments & subscriptions → Subscriptions.'
             : billingPeriod === 'yearly'
             ? 'Subscriptions are billed annually. Cancel anytime through your account settings.'
