@@ -19,4 +19,6 @@ explicitly accepted.
 **How to apply:** Keep the opt-in limited to the Replit preview workflow. Keep
 Vite HMR disabled because proxy upgrades fail, preserve application `/ws`
 behavior, and serve the Vite development client rather than a production-built
-client.
+client. Vite development mode also activates the browser request guard, so
+explicitly allow the preview's exact same-origin API host plus its configured
+Supabase origin; do not weaken the guard for arbitrary hosts.
