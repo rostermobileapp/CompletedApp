@@ -46,39 +46,41 @@ export function GameWinProbabilityBar({
     : prediction.awayWinProbability;
   const chance = Math.min(1, Math.max(0, rawChance ?? 0));
   const chancePercent = Math.round(chance * 100);
-  const labelPosition = Math.min(94, Math.max(6, chance * 100));
   const viewerTeamName = viewerIsHome ? homeTeamName : awayTeamName;
   const opponentTeamName = viewerIsHome ? awayTeamName : homeTeamName;
 
   return (
     <div
-      className="relative h-6 w-full mt-[-10px]"
-      role="meter"
-      aria-label={`${viewerTeamName} estimated chance to win`}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={chancePercent}
-      aria-valuetext={`${chancePercent}% for ${viewerTeamName}, ${100 - chancePercent}% for ${opponentTeamName}`}
+      className={cn("mt-[-10px] flex h-7 w-full items-center gap-2", className)}
       data-testid={`game-win-probability-${gameId}`}
     >
-      <div className="absolute inset-x-0 bottom-1 flex h-1.5 overflow-hidden rounded-full bg-[#ef4444]">
+      <div
+        className="relative h-5 min-w-0 flex-1"
+        role="meter"
+        aria-label={`${viewerTeamName} estimated chance to win`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={chancePercent}
+        aria-valuetext={`${chancePercent}% for ${viewerTeamName}, ${100 - chancePercent}% for ${opponentTeamName}`}
+      >
+        <div className="absolute inset-x-0 top-1/2 flex h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-[#ef4444]">
+          <div
+            className="h-full bg-[#22c55e]"
+            style={{ width: `${chance * 100}%` }}
+          />
+        </div>
         <div
-          className="h-full bg-[#22c55e]"
-          style={{ width: `${chance * 100}%` }}
+          className="absolute left-0 top-1/2 z-10 h-3.5 w-[2px] -translate-x-1/2 -translate-y-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+          style={{ left: `${chance * 100}%` }}
+          aria-hidden="true"
         />
       </div>
-      <div
-        className="absolute bottom-0 z-10 h-3 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
-        style={{ left: `${chance * 100}%` }}
-        aria-hidden="true"
-      />
-      <span
-        className="absolute bottom-2 z-10 -translate-x-1/2 rounded px-1 text-[10px] font-bold leading-4 text-foreground bg-[#e2e2e2] dark:bg-[#212121]"
-        style={{ left: `${labelPosition}%` }}
-        aria-hidden="true"
-      >
-        {chancePercent}%
-      </span>
+      <div className="w-[82px] shrink-0 text-right leading-none" aria-hidden="true">
+        <span className="block text-sm font-bold tabular-nums">{chancePercent}%</span>
+        <span className="mt-0.5 block whitespace-nowrap text-[10px] text-muted-foreground">
+          Chance to Win
+        </span>
+      </div>
     </div>
   );
 }
