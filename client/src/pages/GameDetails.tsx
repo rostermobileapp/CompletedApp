@@ -31,7 +31,7 @@ import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
 import { PaymentMethodPicker, type PaymentMethod } from "@/components/PaymentMethodPicker";
 import { GameTeamAwardPrompt } from "@/components/team-awards/GameTeamAwardPrompt";
-import { WinChanceSheet, type WinChanceData } from "@/components/WinChanceSheet";
+import { GamePredictionButton } from "@/components/GamePredictionButton";
 
 interface ApprovedScrimmagePlayer extends ScrimmageRequest {
   player?: Pick<User, 'id' | 'firstName' | 'lastName'> | null;
@@ -53,7 +53,6 @@ export default function GameDetails() {
   const [editHomeScore, setEditHomeScore] = useState("");
   const [editAwayScore, setEditAwayScore] = useState("");
   const [showRSVPModal, setShowRSVPModal] = useState(false);
-  const [showWinChanceSheet, setShowWinChanceSheet] = useState(false);
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
   const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string; teamId?: string } | null>(null);
   const [firstStarUserId, setFirstStarUserId] = useState("");
@@ -398,22 +397,6 @@ export default function GameDetails() {
   const { data: predictionRsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[] } | null>({
     queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${predictionViewerTeamId}`],
     enabled: !!gameId && !!predictionViewerTeamId && !isScrimmage,
-  });
-  const { data: winPrediction } = useQuery<WinChanceData | null>({
-    queryKey: [`/api/games/${gameId}/prediction`],
-    queryFn: async () => {
-      const response = await apiRequest("GET", `/api/games/${gameId}/prediction`);
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: !!gameId
-      && !!predictionViewerTeamId
-      && !!game?.homeTeam?.id
-      && !!game?.awayTeam?.id
-      && !game?.isCompleted
-      && !isScrimmage,
-    staleTime: 30_000,
-    retry: false,
   });
 
   const notAttendingCount = captainRsvpSummary?.notAttending?.length || 0;
@@ -1515,6 +1498,20 @@ export default function GameDetails() {
           </div>
         </div>
 
+        {!isGameCompleted && !isScrimmage && predictionViewerTeamId && game.homeTeam && game.awayTeam && (
+          <GamePredictionButton
+            gameId={game.id}
+            homeTeamId={game.homeTeam.id}
+            awayTeamId={game.awayTeam.id}
+            homeTeamName={game.homeTeam.name}
+            awayTeamName={game.awayTeam.name}
+            viewerTeamIds={[predictionViewerTeamId]}
+            notAttending={predictionRsvpSummary?.notAttending || []}
+            className="mt-4 border border-primary/25 bg-[#e2e2e2] dark:bg-[#212121]"
+            dataTestId="button-view-win-chance"
+          />
+        )}
+
         {/* RSVP Section */}
         {!isGameCompleted && (
           <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
@@ -1598,21 +1595,6 @@ export default function GameDetails() {
                 </Button>
               )}
 
-              {winPrediction && predictionViewerTeamId && game?.homeTeam && game?.awayTeam && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full mt-2"
-                  onClick={() => setShowWinChanceSheet(true)}
-                  data-testid="button-view-win-chance"
-                >
-                  Win chance · {Math.round(
-                    ((predictionViewerTeamId === winPrediction.homeTeamId
-                      ? winPrediction.homeWinProbability
-                      : winPrediction.awayWinProbability) || 0) * 100
-                  )}%
-                </Button>
-              )}
             </div>
           </div>
         )}
@@ -2074,16 +2056,6 @@ export default function GameDetails() {
           notAttendingPlayers={captainRsvpSummary?.notAttending || []}
         />
       )}
-
-      <WinChanceSheet
-        open={showWinChanceSheet}
-        onOpenChange={setShowWinChanceSheet}
-        prediction={winPrediction ?? null}
-        homeTeamName={game?.homeTeam?.name || "Home team"}
-        awayTeamName={game?.awayTeam?.name || "Away team"}
-        viewerTeamId={predictionViewerTeamId || ""}
-        notAttending={predictionRsvpSummary?.notAttending || []}
-      />
 
       {/* Line Combos read-only Sheet */}
       <Sheet open={showLineCombosModal} onOpenChange={setShowLineCombosModal}>

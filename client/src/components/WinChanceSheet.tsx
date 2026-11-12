@@ -1,5 +1,11 @@
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type ScorerProjection = {
   id: string;
@@ -84,18 +90,18 @@ export function WinChanceSheet({
   const awayChance = prediction.awayWinProbability ?? 0;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[90dvh] overflow-y-auto rounded-t-2xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:mx-auto sm:max-w-xl"
-        data-testid="sheet-win-chance"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        disableAnimation
+        className="max-h-[88dvh] w-[calc(100vw-2rem)] max-w-xl overflow-y-auto rounded-2xl border border-border bg-background px-4 py-5 shadow-2xl sm:px-6 sm:py-6"
+        data-testid="dialog-win-chance"
       >
-        <SheetHeader className="mb-5 pr-8 text-left">
-          <SheetTitle className="text-xl">Game win chance</SheetTitle>
-          <p className="text-sm text-muted-foreground">
-            A stats-based estimate for fun, not wagering advice.
-          </p>
-        </SheetHeader>
+        <DialogHeader className="mb-1 pr-8 text-left">
+          <DialogTitle className="text-xl">Game prediction</DialogTitle>
+          <DialogDescription>
+            A stats-based estimate for fun. Predictions are not guarantees.
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="space-y-4">
           <section className="rounded-xl border border-border p-4" aria-label="Win probabilities">
@@ -132,22 +138,11 @@ export function WinChanceSheet({
           <section className="grid grid-cols-2 gap-3">
             <Metric label="Projected score" value={`${prediction.projectedScoreHome} – ${prediction.projectedScoreAway}`} />
             <Metric label="Expected goals" value={`${(prediction.expectedGoalsHome ?? 0).toFixed(1)} – ${(prediction.expectedGoalsAway ?? 0).toFixed(1)}`} />
-            <Metric label="Win by 2+" value={`${percent(prediction.winByTwoHome)} / ${percent(prediction.winByTwoAway)}`} detail="Home / Away" />
-            <Metric label="Over / under" value={`${prediction.overUnderLine ?? "—"} goals`} detail={`${percent(prediction.overProbability)} over · ${percent(prediction.underProbability)} under`} />
-          </section>
-
-          <section className="rounded-xl border border-border p-4">
-            <h3 className="text-sm font-semibold">For-fun moneyline</h3>
-            <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-              <div className="flex justify-between gap-2">
-                <span className="truncate text-muted-foreground">{homeTeamName}</span>
-                <span className="font-semibold tabular-nums">{prediction.moneylineHome}</span>
-              </div>
-              <div className="flex justify-between gap-2">
-                <span className="truncate text-muted-foreground">{awayTeamName}</span>
-                <span className="font-semibold tabular-nums">{prediction.moneylineAway}</span>
-              </div>
-            </div>
+            <Metric label="Win by 2+ goals" value={`${percent(prediction.winByTwoHome)} / ${percent(prediction.winByTwoAway)}`} detail="Home / away" />
+            <Metric
+              label="Estimated total goals"
+              value={`${((prediction.expectedGoalsHome ?? 0) + (prediction.expectedGoalsAway ?? 0)).toFixed(1)}`}
+            />
           </section>
 
           <section className="rounded-xl border border-border p-4">
@@ -187,8 +182,8 @@ export function WinChanceSheet({
             Saved {new Date(prediction.calculatedAt).toLocaleString()}
           </p>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

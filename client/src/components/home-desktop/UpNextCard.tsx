@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Trophy, MapPin, Clock } from 'lucide-react';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
+import { GamePredictionButton } from '@/components/GamePredictionButton';
 import { cardClass, cardStyle, sectionTitleClass } from './cardStyles';
 
 interface UpNextCardProps {
@@ -39,13 +40,6 @@ interface UpcomingItem {
   awayScore?: number | null;
   tournamentId?: string | null;
   isTournamentMatch?: boolean;
-}
-
-interface WinChanceSummary {
-  homeTeamId: string;
-  awayTeamId: string;
-  homeWinProbability: number;
-  awayWinProbability: number;
 }
 
 export function UpNextCard({
@@ -184,22 +178,8 @@ export function UpNextCard({
     && !!nextGame.homeTeamId
     && !!nextGame.awayTeamId
     && !nextGame.isCompleted
+    && !nextGame.isScrimmage
     && !nextGame.isTournamentMatch;
-  const { data: winPrediction } = useQuery<WinChanceSummary | null>({
-    queryKey: [`/api/games/${nextGame?.id}/prediction`],
-    queryFn: async () => {
-      const response = await apiRequest("GET", `/api/games/${nextGame!.id}/prediction`);
-      return response.json();
-    },
-    enabled: showWinPrediction,
-    staleTime: 30_000,
-    retry: false,
-  });
-  const ourWinChance = winPrediction
-    ? ourTeamId === winPrediction.homeTeamId
-      ? winPrediction.homeWinProbability
-      : winPrediction.awayWinProbability
-    : null;
 
   const handleClick = () => {
     if (!nextGame) return;
@@ -325,18 +305,18 @@ export function UpNextCard({
           </div>
         )}
 
-        {showWinPrediction && ourWinChance != null && (
-          <div
-            className={`${compact ? 'mt-2 px-2 py-1.5' : 'mt-3 px-3 py-2'} flex items-center justify-between gap-2 rounded-lg bg-blue-50 text-blue-950 dark:bg-blue-950/40 dark:text-blue-100`}
-            data-testid="up-next-win-chance"
-          >
-            <span className={`${compact ? 'text-[11px]' : 'text-xs'} font-medium`}>
-              Win chance <span className="font-normal opacity-75">· for fun</span>
-            </span>
-            <span className={`${compact ? 'text-sm' : 'text-base'} font-bold tabular-nums`}>
-              {Math.round(ourWinChance * 100)}%
-            </span>
-          </div>
+        {showWinPrediction && nextGame && ourTeamId && (
+          <GamePredictionButton
+            gameId={nextGame.id}
+            homeTeamId={nextGame.homeTeamId!}
+            awayTeamId={nextGame.awayTeamId!}
+            homeTeamName={nextGame.homeTeam?.name || "Home team"}
+            awayTeamName={nextGame.awayTeam?.name || "Away team"}
+            viewerTeamIds={[ourTeamId]}
+            notAttending={rsvpSummary?.notAttending || []}
+            className={`${compact ? 'mt-2 px-2 py-1.5' : 'mt-3 px-3 py-2'}`}
+            dataTestId="up-next-win-chance"
+          />
         )}
       </>
     );
