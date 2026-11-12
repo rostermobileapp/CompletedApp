@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useSeo } from "@/hooks/useSeo";
 import { ArrowRight, Check, Shield, Sparkles, X } from "lucide-react";
 import { RosterPageFooter, RosterPageNav } from "./RosterPageNav";
@@ -24,8 +23,12 @@ const comparison = [
   ...commissionerFeatures.map(label => [label, "no", "no", "yes"]),
 ];
 
-type StripePriceEntry = { id: string; amount: number | null; currency: string | null };
-type StripePrices = Partial<Record<"player_pro_monthly" | "player_pro_yearly" | "commissioner_monthly" | "commissioner_yearly", StripePriceEntry>>;
+const prices = {
+  player_pro_monthly: 6.49,
+  player_pro_yearly: 64.99,
+  commissioner_monthly: 12,
+  commissioner_yearly: 119.99,
+} as const;
 
 function PlanCard({ name, audience, price, note, features, featured, annual = false }: { name: string; audience: string; price: string; note: string; features: string[]; featured?: boolean; annual?: boolean }) {
   return (
@@ -45,18 +48,13 @@ function PlanCard({ name, audience, price, note, features, featured, annual = fa
 export function PricingPage() {
   const [annual, setAnnual] = useState(false);
   useSeo({ title: "Pricing | RosterHockey", description: "Start free. Compare Player Pro and Commissioner plans for hockey teams and leagues. No ads on any plan." });
-  const { data: prices, isLoading, isError, refetch } = useQuery<StripePrices>({ queryKey: ["/api/stripe/prices"] });
-  const formatPrice = (entry?: StripePriceEntry, monthlyEquivalent = false) => {
-    if (isLoading) return "Loading…";
-    if (!entry || entry.amount === null || !entry.currency) return "Unavailable";
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: entry.currency.toUpperCase(), minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(entry.amount / (monthlyEquivalent ? 12 : 1));
+  const formatPrice = (amount: number, monthlyEquivalent = false) => {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount / (monthlyEquivalent ? 12 : 1));
   };
-  const planPrice = (plan: "player_pro" | "commissioner") => formatPrice(prices?.[`${plan}_${annual ? "yearly" : "monthly"}`], annual);
+  const planPrice = (plan: "player_pro" | "commissioner") => formatPrice(prices[`${plan}_${annual ? "yearly" : "monthly"}`], annual);
   const planNote = (plan: "player_pro" | "commissioner") => {
-    const entry = prices?.[`${plan}_${annual ? "yearly" : "monthly"}`];
-    if (isLoading) return "Loading current pricing.";
-    if (isError || entry?.amount == null) return "Pricing is temporarily unavailable. Please try again.";
-    return annual ? `${formatPrice(entry)} billed annually.` : "Billed monthly. No ads, ever.";
+    const amount = prices[`${plan}_${annual ? "yearly" : "monthly"}`];
+    return annual ? `${formatPrice(amount)} billed annually.` : "Billed monthly. No ads, ever.";
   };
   return (
     <main className="rp-page pp-page">
@@ -78,13 +76,12 @@ export function PricingPage() {
             <span className={annual ? "is-current" : ""}>Annual</span>
           </div>
           {annual && <p className="pp-billing-note">Monthly equivalent shown · billed annually.</p>}
-          {(isError || (!isLoading && (!prices?.player_pro_monthly?.amount || !prices?.commissioner_monthly?.amount))) && <p className="pp-billing-note" role="alert">Some prices are temporarily unavailable. <button onClick={() => refetch()}>Retry pricing</button></p>}
           <div className="pp-plan-grid">
             <PlanCard name="Free" audience="Perfect for players joining their first team." price="$0" note="Free to start. No ads, ever." features={freeFeatures} />
             <PlanCard name="Player Pro" audience="For serious players who want the full experience." price={planPrice("player_pro")} note={planNote("player_pro")} annual={annual} features={["Everything in Free", ...proFeatures]} featured />
             <PlanCard name="Commissioner" audience="Run a full league with schedules, scores, standings, and tournaments." price={planPrice("commissioner")} note={planNote("commissioner")} annual={annual} features={["Everything in Player Pro", ...commissionerFeatures]} />
           </div>
-          <p className="pp-rate-footnote">Current pricing is loaded from our pricing service. Final availability and pricing are confirmed before purchase and may vary by platform.</p>
+          <p className="pp-rate-footnote">Prices shown are in USD. Final availability and pricing are confirmed before purchase and may vary by platform.</p>
         </div>
       </section>
 
