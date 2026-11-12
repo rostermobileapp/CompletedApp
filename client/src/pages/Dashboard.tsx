@@ -824,7 +824,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
               {Array.isArray(notifications) && notifications.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-[24px]">
                       <Bell className="w-5 h-5 text-primary" />
                       <h3 className="text-lg font-semibold text-[#212121] dark:text-[#ffffff]">
                         Notifications ({notifications.length})
