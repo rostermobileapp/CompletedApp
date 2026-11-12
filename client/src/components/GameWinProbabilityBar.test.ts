@@ -1,0 +1,115 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { runInNewContext } from "node:vm";
+import { buildSync } from "esbuild";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient } from "@tanstack/react-query";
+
+const nativeRequire = createRequire(import.meta.url);
+const prediction = {
+  homeTeamId: "home", awayTeamId: "away",
+  homeWinProbability: 0.62, awayWinProbability: 0.38,
+};
+const props = {
+  gameId: "game", homeTeamId: "home", awayTeamId: "away",
+  homeTeamName: "Home team", awayTeamName: "Away team", viewerTeamIds: ["home"],
+};
+
+function load(path: string, mocks: Record<string, unknown>) {
+  const code = buildSync({
+    entryPoints: [path], bundle: true, write: false, format: "cjs",
+    platform: "node", jsx: "automatic", packages: "external",
+    external: ["@/hooks/useGamePrediction", "@/lib/queryClient", "@/lib/utils", "@/components/WinChanceSheet"],
+  }).outputFiles[0].text;
+  const module = { exports: {} as any };
+  runInNewContext(code, {
+    module, exports: module.exports, setTimeout, clearTimeout,
+    require: (name: string) => mocks[name] ?? nativeRequire(name),
+  });
+  return module.exports;
+}
+
+function render(state: Record<string, unknown>, viewerTeamIds = ["home"]) {
+  const { GameWinProbabilityBar } = load("client/src/components/GameWinProbabilityBar.tsx", {
+    "@/hooks/useGamePrediction": { useGamePrediction: () => ({ refetch: async () => {}, ...state }) },
+    "@/lib/utils": { cn: (...values: unknown[]) => values.filter(Boolean).join(" ") },
+  });
+  return renderToStaticMarkup(createElement(GameWinProbabilityBar, { ...props, viewerTeamIds }));
+}
+
+test("Home shows the signed-in team's green/red probability bar", () => {
+  const home = render({ data: prediction });
+  assert.match(home, /aria-valuenow="62"/);
+  assert.match(home, /Chance to win/);
+  assert.match(home, /#22c55e/);
+  assert.match(home, /#ef4444/);
+  assert.match(render({ data: prediction }, ["away"]), /aria-valuenow="38"/);
+});
+
+test("loading, failed and absent predictions never silently disappear for a rostered player", () => {
+  assert.match(render({ isPending: true }), /Loading win chance/);
+  assert.match(render({ isError: true }), /Retry win chance/);
+  assert.match(render({ data: null, isPending: false }), /Win chance unavailable/);
+  assert.doesNotMatch(render({ isPending: true }), /role="meter"/);
+  assert.equal(render({ data: prediction }, []), "");
+});
+
+test("Game Details keeps View Odds and exposes recoverable loading/error states", () => {
+  const renderButton = (state: Record<string, unknown>) => {
+    const { GamePredictionButton } = load("client/src/components/GamePredictionButton.tsx", {
+      "@/hooks/useGamePrediction": { useGamePrediction: () => ({ refetch: async () => {}, ...state }) },
+      "@/lib/utils": { cn: (...values: unknown[]) => values.filter(Boolean).join(" ") },
+      "@/components/WinChanceSheet": { WinChanceSheet: () => null },
+    });
+    return renderToStaticMarkup(createElement(GamePredictionButton, props));
+  };
+  assert.match(renderButton({ data: prediction }), /View Odds/);
+  assert.match(renderButton({ isLoading: true }), /Loading game prediction/);
+  assert.match(renderButton({ isError: true }), /Retry game prediction/);
+});
+
+function optionsFor(request: () => Promise<unknown>) {
+  const hook = load("client/src/hooks/useGamePrediction.ts", {
+    "@tanstack/react-query": { useQuery: (options: unknown) => options },
+    "@/lib/queryClient": { apiRequest: request },
+  });
+  return { options: hook.useGamePrediction("game", "home"), retry: hook.shouldRetryGamePrediction };
+}
+
+test("a transient prediction fetch recovers without a page reload", async () => {
+  let calls = 0;
+  const { options } = optionsFor(async () => {
+    if (++calls === 1) throw new TypeError("Failed to fetch");
+    return { json: async () => prediction };
+  });
+  const client = new QueryClient();
+  try {
+    const data = await client.fetchQuery({ ...options, retryDelay: 0 });
+    assert.equal(data, prediction);
+    assert.equal(calls, 2);
+  } finally { client.clear(); }
+});
+
+test("retries remain bounded and never replay unauthorized requests", () => {
+  const { retry } = optionsFor(async () => null);
+  assert.equal(retry(0, new TypeError("Failed to fetch")), true);
+  assert.equal(retry(1, { status: 503 }), true);
+  assert.equal(retry(2, { status: 503 }), false);
+  for (const status of [400, 401, 403, 404]) assert.equal(retry(0, { status }), false);
+});
+
+test("Home and Game Details share one request/cache key", async () => {
+  let calls = 0;
+  const { options } = optionsFor(async () => {
+    calls++;
+    await new Promise(resolve => setTimeout(resolve, 5));
+    return { json: async () => prediction };
+  });
+  const client = new QueryClient();
+  try {
+    await Promise.all([client.fetchQuery(options), client.fetchQuery(options)]);
+    assert.equal(calls, 1);
+  } finally { client.clear(); }
+});

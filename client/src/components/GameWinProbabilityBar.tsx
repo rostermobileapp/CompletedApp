@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useGamePrediction } from "@/hooks/useGamePrediction";
 import { cn } from "@/lib/utils";
-import type { WinChanceData } from "@/components/WinChanceSheet";
 
 interface GameWinProbabilityBarProps {
   gameId: string;
@@ -26,19 +24,24 @@ export function GameWinProbabilityBar({
     (teamId) => teamId === homeTeamId || teamId === awayTeamId,
   );
 
-  const { data: prediction } = useQuery<WinChanceData | null>({
-    queryKey: [`/api/games/${gameId}/prediction`],
-    queryFn: async () => {
-      const response = await apiRequest("GET", `/api/games/${gameId}/prediction`);
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: !!gameId && !!viewerTeamId,
-    staleTime: 30_000,
-    retry: false,
-  });
+  const { data: prediction, isPending, isError, refetch } = useGamePrediction(gameId, viewerTeamId);
 
-  if (!viewerTeamId || !prediction) return null;
+  if (!viewerTeamId) return null;
+  if (!prediction) {
+    return (
+      <div className={cn("flex min-h-7 items-center text-[10px] text-muted-foreground", className)}
+        data-testid={`game-win-probability-status-${gameId}`}>
+        {isError ? (
+          <button type="button" className="text-primary underline"
+            onClick={event => { event.stopPropagation(); void refetch(); }}>
+            Retry win chance
+          </button>
+        ) : (
+          <span role="status">{isPending ? "Loading win chance…" : "Win chance unavailable"}</span>
+        )}
+      </div>
+    );
+  }
 
   const viewerIsHome = viewerTeamId === prediction.homeTeamId;
   const rawChance = viewerIsHome

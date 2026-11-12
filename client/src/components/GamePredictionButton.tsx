@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useGamePrediction } from "@/hooks/useGamePrediction";
 import { cn } from "@/lib/utils";
-import { WinChanceSheet, type WinChanceData } from "@/components/WinChanceSheet";
+import { WinChanceSheet } from "@/components/WinChanceSheet";
 
 interface GamePredictionButtonProps {
   gameId: string;
@@ -34,17 +33,7 @@ export function GamePredictionButton({
     (teamId) => teamId === homeTeamId || teamId === awayTeamId,
   );
 
-  const { data: prediction, isLoading } = useQuery<WinChanceData | null>({
-    queryKey: [`/api/games/${gameId}/prediction`],
-    queryFn: async () => {
-      const response = await apiRequest("GET", `/api/games/${gameId}/prediction`);
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: !!gameId && !!viewerTeamId,
-    staleTime: 30_000,
-    retry: false,
-  });
+  const { data: prediction, isLoading, isError, refetch } = useGamePrediction(gameId, viewerTeamId);
 
   if (!viewerTeamId) return null;
 
@@ -65,7 +54,18 @@ export function GamePredictionButton({
     );
   }
 
-  if (!prediction) return null;
+  if (!prediction) {
+    return (
+      <div className={cn("text-xs text-muted-foreground", className)} data-testid={`${dataTestId}-unavailable`}>
+        {isError ? (
+          <button type="button" className="text-primary underline"
+            onClick={event => { event.stopPropagation(); void refetch(); }}>
+            Retry game prediction
+          </button>
+        ) : <span role="status">Game prediction unavailable</span>}
+      </div>
+    );
+  }
 
   const chance = viewerTeamId === prediction.homeTeamId
     ? prediction.homeWinProbability
