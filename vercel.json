@@ -15,24 +15,19 @@
         }
       ],
       "destination": "https://www.rosterhockey.com/:path",
-      "statusCode": 302,
-      "preserveQueryParams": true,
-      "caseSensitive": true
+      "statusCode": 302
     },
     {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "rosterhockey.com" }],
       "destination": "https://www.rosterhockey.com/:path*",
-      "statusCode": 302,
-      "preserveQueryParams": true
+      "statusCode": 302
     },
     {
       "source": "/:path((?!$|(?:features|pricing|about|hockey|baseball|soccer|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|privacy-policy|privacy|terms-of-service|sitemap\\.xml|robots\\.txt|llms\\.txt|manifest\\.json)(?:/?$)|(?:assets|marketing|badges)(?:/|$)|(?:favicon\\.png|icon-192\\.png|icon-512\\.png|roster-logo(?:-transparent)?\\.png)$).*)",
       "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
       "destination": "https://www.roster-app.com/:path*",
-      "statusCode": 302,
-      "preserveQueryParams": true,
-      "caseSensitive": true
+      "statusCode": 302
     }
   ],
   "rewrites": [
