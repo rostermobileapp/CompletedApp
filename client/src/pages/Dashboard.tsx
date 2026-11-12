@@ -3885,7 +3885,8 @@ function DashboardMobile() {
                           </div>
                         );
                       })()}
-                      <div className="flex items-center gap-2 -translate-y-1/2">
+                      <div className="w-[68px] shrink-0" aria-hidden="true" />
+                      <div className="absolute right-1 top-[66.6667%] flex -translate-y-1/2 items-center gap-2">
                         <span
                           className="shrink-0 whitespace-nowrap text-sm font-medium text-primary"
                           data-testid={`text-view-details-${game.id}`}
