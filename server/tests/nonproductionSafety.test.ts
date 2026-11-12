@@ -288,6 +288,49 @@ test("browser and native policy blocks delivery and off-target fetch/XHR/WebSock
   assert.equal(calls, 1);
 });
 
+test("live-project preview client allows its own account API and Supabase auth", () => {
+  const previewOrigin = "https://preview.replit.dev";
+  const output = buildSync({
+    entryPoints: ["client/src/lib/nonproductionSafety.ts"],
+    bundle: true,
+    write: false,
+    format: "cjs",
+    define: {
+      "import.meta.env": JSON.stringify({
+        DEV: true,
+        VITE_LIVE_PROJECT_PREVIEW: "true",
+        VITE_LIVE_PROJECT_PREVIEW_ORIGIN: previewOrigin,
+        VITE_SUPABASE_URL: "https://live-project.supabase.co",
+      }),
+    },
+  }).outputFiles[0].text;
+  let calls = 0;
+  const module = { exports: {} as any };
+  runInNewContext(output, {
+    module,
+    exports: module.exports,
+    window: {
+      location: { href: `${previewOrigin}/` },
+      fetch: async () => { calls += 1; return {}; },
+      WebSocket: class {},
+    },
+    XMLHttpRequest: class { open() {} },
+    navigator: {},
+    URL,
+  });
+
+  assert.doesNotThrow(() => module.exports.assertDevelopmentClientRequest("/api/user", "GET"));
+  assert.doesNotThrow(() => module.exports.assertDevelopmentClientRequest(
+    "https://live-project.supabase.co/auth/v1/token",
+    "POST",
+  ));
+  assert.throws(() => module.exports.assertDevelopmentClientRequest(
+    "https://unrelated.example/api/user",
+    "GET",
+  ), /disabled/);
+  assert.equal(calls, 0);
+});
+
 test("isolated native purchase, restore, identity and raw attribute paths never reach the bridge", async () => {
   const output = buildSync({
     entryPoints: ["client/src/lib/nativePurchases.ts"], bundle: true, write: false,

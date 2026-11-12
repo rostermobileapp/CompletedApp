@@ -48,5 +48,7 @@ export function configureLiveProjectPreview(source: NodeJS.ProcessEnv): NodeJS.P
   delete result.NONPRODUCTION_FORBIDDEN_DATABASES;
   delete result.VITE_ISOLATED_DEVELOPMENT;
   delete result.VITE_ISOLATED_APP_ORIGIN;
+  result.VITE_LIVE_PROJECT_PREVIEW = "true";
+  result.VITE_LIVE_PROJECT_PREVIEW_ORIGIN = `https://${source.REPLIT_DEV_DOMAIN}`;
   return result;
 }

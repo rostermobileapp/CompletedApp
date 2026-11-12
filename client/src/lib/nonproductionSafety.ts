@@ -12,7 +12,10 @@ export function assertClientDeliveryAllowed(): void {
 export function assertDevelopmentClientRequest(value: string | URL, method = "GET"): void {
   if (!isNonProductionClient) return;
   const url = new URL(value, window.location.href);
-  const devApp = import.meta.env?.VITE_ISOLATED_APP_ORIGIN;
+  const livePreviewApp = import.meta.env?.VITE_LIVE_PROJECT_PREVIEW === "true"
+    ? import.meta.env?.VITE_LIVE_PROJECT_PREVIEW_ORIGIN
+    : undefined;
+  const devApp = livePreviewApp ?? import.meta.env?.VITE_ISOLATED_APP_ORIGIN;
   const devAuth = import.meta.env?.VITE_SUPABASE_URL;
   const origin = url.origin.replace(/^ws/, "http");
   const localPreview = ["http://127.0.0.1:5000", "http://localhost:5000"].includes(origin);
