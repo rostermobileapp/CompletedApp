@@ -137,7 +137,7 @@ BEGIN
       'apikey', v_secret_key
     ),
     body := jsonb_build_object('team_id', p_team_id),
-     timeout_milliseconds := 15000
+     timeout_milliseconds := 60000
   );
 EXCEPTION WHEN OTHERS THEN
   UPDATE public.win_chance_dispatch_locks
