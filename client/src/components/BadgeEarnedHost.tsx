@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, X } from "lucide-react";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useWebSocket } from "@/context/WebSocketContext";
+import { useAuth } from "@/hooks/useAuth";
 import confettiVideo from "@/assets/badge-confetti.webm";
 import { TeamAwardEarnedAnnouncement } from "./team-awards/TeamAwardEarnedAnnouncement";
 import { teamAwardCelebrationKey, useTeamAwardCelebrations } from "./team-awards/useTeamAwardCelebrations";
@@ -148,12 +149,17 @@ export function BadgeEarnedAnnouncement({
 }
 
 export function BadgeEarnedHost() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { subscribe, onConnected } = useWebSocket();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [queue, setQueue] = useState<EarnedEvent[]>([]);
   const [triviaOpen, setTriviaOpen] = useState(false);
-  const { data: user } = useQuery<{ id: string }>({ queryKey: ["/api/user"] });
+  const { data: profile } = useQuery<{ id: string }>({
+    queryKey: ["/api/user"],
+    enabled: isAuthenticated && !authLoading,
+  });
+  const user = isAuthenticated ? profile : undefined;
   const { data: awardPending } = useTeamAwardCelebrations(user?.id);
   const [awardBusy, setAwardBusy] = useState(false);
   const awardBusyRef = useRef(false);
@@ -162,14 +168,16 @@ export function BadgeEarnedHost() {
   const current = queue[0];
   const { data: pending } = useQuery<EarnedEvent[]>({
     queryKey: ["/api/badges/events/pending"],
+    enabled: isAuthenticated && !authLoading && !!user,
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchInterval: queue.length ? 5_000 : false,
   });
 
   useEffect(() => {
-    if (pending) setQueue(pending);
-  }, [pending]);
+    if (!isAuthenticated) setQueue([]);
+    else if (pending) setQueue(pending);
+  }, [pending, isAuthenticated]);
 
   useEffect(() => { setAwardError(""); }, [currentAward?.id, user?.id]);
 
@@ -217,7 +225,7 @@ export function BadgeEarnedHost() {
     return () => window.removeEventListener("roster:trivia-modal", onTriviaModal);
   }, [queryClient]);
 
-  if (triviaOpen) return null;
+  if (!isAuthenticated || triviaOpen) return null;
   if (!current && currentAward && user) {
     const dismissAward = async (viewTeam = false) => {
       if (awardBusyRef.current) return;

@@ -1,206 +1,63 @@
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
-export function useAppDataPrefetch(enabled: boolean = true) {
-  // Essential data for Dashboard & Profile
-  const userQuery = useQuery({
-    queryKey: ['/api/user'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
+function usePrefetch(queryKey: unknown[], enabled: boolean, staleTime = 30000) {
+  return useQuery({ queryKey, enabled, retry: 2, staleTime });
+}
 
-  // Essential data for Teams screen
-  const userTeamsQuery = useQuery({
-    queryKey: ['/api/user/teams'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
+export function useAppDataPrefetch(enabled = true) {
+  // Account is already available before App enables this hook. Home data goes
+  // first; all other screens still query immediately when actually opened.
+  const userQuery = usePrefetch(['/api/user'], enabled);
+  const userTeamsQuery = usePrefetch(['/api/user/teams'], enabled);
+  const upcomingGamesQuery = usePrefetch(['/api/user/games/upcoming'], enabled);
+  const leagueMembershipsQuery = usePrefetch(['/api/user/league-memberships'], enabled);
+  const userLeaguesQuery = usePrefetch(['/api/user/leagues'], enabled);
+  const scrimmageInvitesQuery = usePrefetch(['/api/users/scrimmage-invites'], enabled);
+  const notificationsQuery = usePrefetch(['/api/notifications'], enabled, 10000);
+  const personalRemindersQuery = usePrefetch(['/api/user/personal-reminders'], enabled);
+  const teamEventsQuery = usePrefetch(['/api/user/team-events'], enabled);
 
-  // Get team IDs and league IDs from user teams for dependent queries
+  const homeQueries = [
+    userQuery, userTeamsQuery, upcomingGamesQuery, leagueMembershipsQuery, userLeaguesQuery,
+  ];
+  // Errors count as settled so one failed Home endpoint cannot permanently
+  // suppress unrelated background data. No added cache or freshness changes.
+  const backgroundEnabled = enabled && homeQueries.every(query => !query.isPending);
   const userTeams = (userTeamsQuery.data as any[]) || [];
-  const teamIds = userTeams.map((t: any) => t.id).filter(Boolean);
-  const leagueIdSet = new Set(userTeams.map((t: any) => t.leagueId).filter(Boolean));
-  const leagueIds = Array.from(leagueIdSet);
-  const primaryTeamId = teamIds[0];
-  const primaryLeagueId = leagueIds[0];
+  const primaryTeamId = userTeams.find((team: any) => team.id)?.id;
+  const primaryLeagueId = userTeams.find((team: any) => team.leagueId)?.leagueId;
 
-  // Prefetch team members for the primary team (Teams screen)
-  const teamMembersQuery = useQuery({
-    queryKey: ['/api/teams', primaryTeamId, 'members'],
-    enabled: enabled && !!primaryTeamId,
-    retry: 2,
-    staleTime: 30000,
-  });
+  const teamMembersQuery = usePrefetch(
+    ['/api/teams', primaryTeamId, 'members'], backgroundEnabled && !!primaryTeamId,
+  );
+  const leagueStandingsQuery = usePrefetch(
+    ['/api/leagues', primaryLeagueId, 'standings'], backgroundEnabled && !!primaryLeagueId, 60000,
+  );
+  const leagueGamesQuery = usePrefetch(
+    ['/api/leagues', primaryLeagueId, 'games'], backgroundEnabled && !!primaryLeagueId,
+  );
+  const conversationsQuery = usePrefetch(['/api/conversations'], backgroundEnabled);
+  const unreadMessageCountQuery = usePrefetch(['/api/messages/unread-count'], backgroundEnabled, 5000);
+  const unreadCountPerConversationQuery = usePrefetch(
+    ['/api/messages/unread-count-per-conversation'], backgroundEnabled, 5000,
+  );
+  const unpaidCountQuery = usePrefetch(['/api/payment-requests/unpaid-count'], backgroundEnabled, 10000);
+  const createdPaymentsQuery = usePrefetch(['/api/payment-requests/created/by-me'], backgroundEnabled);
+  const receivedPaymentsQuery = usePrefetch(['/api/payment-requests/received/by-me'], backgroundEnabled);
+  const userStatsQuery = usePrefetch(['/api/user/stats/aggregate'], backgroundEnabled, 60000);
 
-  // Prefetch league standings for the primary league (Teams & Dashboard screens)
-  const leagueStandingsQuery = useQuery({
-    queryKey: ['/api/leagues', primaryLeagueId, 'standings'],
-    enabled: enabled && !!primaryLeagueId,
-    retry: 2,
-    staleTime: 60000,
-  });
-
-  // Prefetch league games for schedule display (Dashboard screen)
-  const leagueGamesQuery = useQuery({
-    queryKey: ['/api/leagues', primaryLeagueId, 'games'],
-    enabled: enabled && !!primaryLeagueId,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  const upcomingGamesQuery = useQuery({
-    queryKey: ['/api/user/games/upcoming'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  const leagueMembershipsQuery = useQuery({
-    queryKey: ['/api/user/league-memberships'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  // Essential data for Messages screen
-  const conversationsQuery = useQuery({
-    queryKey: ['/api/conversations'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  const userLeaguesQuery = useQuery({
-    queryKey: ['/api/user/leagues'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  const unreadMessageCountQuery = useQuery({
-    queryKey: ['/api/messages/unread-count'],
-    enabled,
-    retry: 2,
-    staleTime: 5000,
-  });
-
-  const unreadCountPerConversationQuery = useQuery({
-    queryKey: ['/api/messages/unread-count-per-conversation'],
-    enabled,
-    retry: 2,
-    staleTime: 5000,
-  });
-
-  // Essential data for Payments screen
-  const unpaidCountQuery = useQuery({
-    queryKey: ['/api/payment-requests/unpaid-count'],
-    enabled,
-    retry: 2,
-    staleTime: 10000,
-  });
-
-  const createdPaymentsQuery = useQuery({
-    queryKey: ['/api/payment-requests/created/by-me'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  const receivedPaymentsQuery = useQuery({
-    queryKey: ['/api/payment-requests/received/by-me'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  // Essential data for Profile screen
-  const userStatsQuery = useQuery({
-    queryKey: ['/api/user/stats/aggregate'],
-    enabled,
-    retry: 2,
-    staleTime: 60000,
-  });
-
-  // Essential data for Dashboard alerts
-  const scrimmageInvitesQuery = useQuery({
-    queryKey: ['/api/users/scrimmage-invites'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  const notificationsQuery = useQuery({
-    queryKey: ['/api/notifications'],
-    enabled,
-    retry: 2,
-    staleTime: 10000,
-  });
-
-  // Prefetch personal reminders so the Dashboard schedule section has them
-  // ready on first paint. Otherwise the query only fires when Dashboard
-  // mounts, and a recently created reminder can stay invisible if the
-  // initial fetch races other prefetches or fails silently.
-  const personalRemindersQuery = useQuery({
-    queryKey: ['/api/user/personal-reminders'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  // Prefetch user team events so reminders/team events show up on first
-  // mount alongside the rest of the schedule.
-  const teamEventsQuery = useQuery({
-    queryKey: ['/api/user/team-events'],
-    enabled,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  // If not enabled, we're not loading
-  if (!enabled) {
-    return { isLoading: false, hasError: false, data: {} };
-  }
-
-  // Check if all critical queries are loaded (isLoading means initial load, not refetch)
-  const baseQueries = [
-    userQuery,
-    userTeamsQuery,
-    upcomingGamesQuery,
-    leagueMembershipsQuery,
-    conversationsQuery,
-    userLeaguesQuery,
-    unreadMessageCountQuery,
-    unreadCountPerConversationQuery,
-    unpaidCountQuery,
-    createdPaymentsQuery,
-    receivedPaymentsQuery,
-    userStatsQuery,
-    scrimmageInvitesQuery,
-    notificationsQuery,
+  const allQueries = [
+    ...homeQueries, conversationsQuery, unreadMessageCountQuery, unreadCountPerConversationQuery,
+    unpaidCountQuery, createdPaymentsQuery, receivedPaymentsQuery, userStatsQuery,
+    scrimmageInvitesQuery, notificationsQuery, personalRemindersQuery, teamEventsQuery,
+    ...(primaryTeamId ? [teamMembersQuery] : []),
+    ...(primaryLeagueId ? [leagueStandingsQuery, leagueGamesQuery] : []),
   ];
 
-  // Dependent queries (only check if their preconditions are met)
-  const dependentQueries = [];
-  if (primaryTeamId) {
-    dependentQueries.push(teamMembersQuery);
-  }
-  if (primaryLeagueId) {
-    dependentQueries.push(leagueStandingsQuery);
-    dependentQueries.push(leagueGamesQuery);
-  }
-
-  const allQueries = [...baseQueries, ...dependentQueries];
-
-  // Consider loading complete if queries are still loading OR if they errored out
-  // Don't block the app forever if an API call fails for new users
-  const isLoading = allQueries.some(q => q.isLoading && !q.isError);
-  const hasError = allQueries.some(q => q.isError);
-
   return {
-    isLoading,
-    hasError,
-    data: {
+    isLoading: enabled && allQueries.some(query => query.isLoading && !query.isError),
+    hasError: enabled && allQueries.some(query => query.isError),
+    data: enabled ? {
       user: userQuery.data,
       userTeams: userTeamsQuery.data,
       upcomingGames: upcomingGamesQuery.data,
@@ -215,6 +72,6 @@ export function useAppDataPrefetch(enabled: boolean = true) {
       userStats: userStatsQuery.data,
       scrimmageInvites: scrimmageInvitesQuery.data,
       notifications: notificationsQuery.data,
-    },
+    } : {},
   };
 }

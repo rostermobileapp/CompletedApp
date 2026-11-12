@@ -3,6 +3,7 @@
 - [Live-project preview](isolated-dev-preview.md) — owner-approved unprefixed live data in preview; keep the opt-in preview-only, disable Vite HMR, and never serve a production-built client.
 - [Founder label scope](founder-label-scope.md) — exclusive Wall display title for the designated founder, never a new permission role or a title for other commissioners.
 - [Raw fetch auth pattern](raw-fetch-auth.md) — raw fetch() to backend must use getAuthHeaders() from queryClient; credentials:'include' does nothing (JWT not cookie).
+- [Auth transport boundary](auth-transport-boundary.md) — transient fetch failures are not invalid sessions; preserve server verification and let newer auth events win.
 - [Database provider](db-provider.md) — PostgreSQL is hosted on Supabase, not Neon. DATABASE_URL points to Supabase's connection string.
 - [Placeholder player orphaned teamId](placeholder-orphaned-teamid.md) — placeholder_players can have stale team_id pointing to deleted teams; fix is in getLeaguePlaceholderPlayers to null-out via LEFT JOIN detection.
 - [Draft keeper ID format](draft-keeper-id-format.md) — draft_keepers.placeholder_player_id stores "placeholder:{uuid}" WITH the prefix; draft_picks.placeholder_player_id stores bare UUID (applyPick strips prefix). Never add the prefix again when reading from draft_keepers.

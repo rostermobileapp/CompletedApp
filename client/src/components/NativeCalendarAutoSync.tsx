@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNativelyNotifications } from "@/hooks/useNativelyNotifications";
+import { useAuth } from "@/hooks/useAuth";
 import {
   isNativeCalendarAvailable,
   loadSavedCalendarId,
@@ -14,9 +15,11 @@ import {
  * after that, schedule query changes automatically reconcile new events.
  */
 export function NativeCalendarAutoSync() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { displayId: nativeDisplayId } = useNativelyNotifications();
   const { data: user } = useQuery<any>({
     queryKey: ["/api/user"],
+    enabled: isAuthenticated && !authLoading,
   });
 
   const canUseCalendarSync =
@@ -25,11 +28,11 @@ export function NativeCalendarAutoSync() {
 
   const { data: calendarData } = useQuery<any>({
     queryKey: ["/api/user/calendar"],
-    enabled: canUseCalendarSync && nativeCalendarAvailable && !!user?.id,
+    enabled: isAuthenticated && canUseCalendarSync && nativeCalendarAvailable && !!user?.id,
   });
 
   useEffect(() => {
-    if (!canUseCalendarSync || !nativeCalendarAvailable || !user?.id || !calendarData) {
+    if (!isAuthenticated || !canUseCalendarSync || !nativeCalendarAvailable || !user?.id || !calendarData) {
       return;
     }
 
@@ -54,6 +57,7 @@ export function NativeCalendarAutoSync() {
       cancelled = true;
     };
   }, [
+    isAuthenticated,
     calendarData,
     canUseCalendarSync,
     nativeCalendarAvailable,

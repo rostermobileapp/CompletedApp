@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import rosterModalLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
 import { EmailVerificationModal } from '@/components/EmailVerificationModal';
 import { loginDestination } from '@/lib/appRouteEntry';
+import { isTransientAuthError, retryTransientSignIn } from '@/lib/authSessionController';
 
 const rosterLogo = '/roster-logo-transparent.png';
 
@@ -84,10 +85,10 @@ export default function Login() {
           setIsSignUp(false);
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error } = await retryTransientSignIn(() => supabase.auth.signInWithPassword({
           email,
           password,
-        });
+        }));
         
         if (error) throw error;
         
@@ -101,7 +102,9 @@ export default function Login() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        description: isTransientAuthError(error)
+          ? 'The sign-in service could not be reached. Please try again; your account has not been changed.'
+          : error instanceof Error ? error.message : 'An error occurred',
       });
     } finally {
       setLoading(false);

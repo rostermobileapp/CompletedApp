@@ -146,13 +146,14 @@ export function Router() {
   useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
 
   const isDesktopWeb = useIsDesktopWeb();
-  useAppDataPrefetch(isAuthenticated && !authLoading);
   const { data: userData, isError: userDataError } = useQuery<any>({
     queryKey: ['/api/user'],
     enabled: isAuthenticated && !authLoading,
     staleTime: Infinity,
     retry: 3,
   });
+  // Load the account first; background requests must not compete with it.
+  useAppDataPrefetch(isAuthenticated && !authLoading && !!userData);
   
   // This is only a safety timeout for slow data, not a mandatory splash delay.
   const [maxTimeoutReached, setMaxTimeoutReached] = useState(false);
@@ -164,6 +165,7 @@ export function Router() {
   const restoringPath = useRef<string | null>(null);
 
   useEffect(() => {
+    setMaxTimeoutReached(false);
     if (authLoading || !isAuthenticated || userData) return;
     const timer = window.setTimeout(() => setMaxTimeoutReached(true), 10000);
     return () => window.clearTimeout(timer);
@@ -306,8 +308,14 @@ export function Router() {
     );
   }
 
-  if (!userData && !userDataError && !maxTimeoutReached) {
-    return <LoadingScreen />;
+  if (!userData && !userDataError) {
+    if (!maxTimeoutReached) return <LoadingScreen />;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background p-6 text-center" role="status">
+        <p>Your account is taking longer than usual to load. We’re still trying.</p>
+        <button className="rounded bg-primary px-4 py-2 text-primary-foreground" onClick={() => window.location.reload()}>Retry loading</button>
+      </div>
+    );
   }
 
   // Never send a returning user to onboarding when the account API fails.

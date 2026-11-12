@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useCallback, type ReactNo
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 type WebSocketEventHandler = (data: any) => void;
 
@@ -44,6 +45,7 @@ function invalidateRealtimeQueries() {
 }
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -54,9 +56,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   const { data: userData } = useQuery<{ id: string }>({
     queryKey: ['/api/user'],
+    enabled: isAuthenticated && !authLoading,
   });
 
-  const userId = userData?.id;
+  const userId = isAuthenticated ? userData?.id : undefined;
 
   const send = useCallback((data: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
