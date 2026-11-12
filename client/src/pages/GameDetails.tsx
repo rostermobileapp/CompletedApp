@@ -1479,38 +1479,39 @@ export default function GameDetails() {
                 </div>
               )}
               {!isGameCompleted && opponentTeam && (
-                <div className="flex items-center gap-3 mt-2">
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4 text-green-600" />
-                    <span className="font-medium text-green-600 text-[16px]" data-testid="text-opponent-in-count">
-                      {opponentInCount} In
-                    </span>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Users className="w-4 h-4 text-green-600" />
+                      <span className="font-medium text-green-600 text-[16px]" data-testid="text-opponent-in-count">
+                        {opponentInCount} In
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <X className="w-4 h-4 text-red-500" />
+                      <span className="font-medium text-red-500 text-[16px]" data-testid="text-opponent-out-count">
+                        {opponentRsvpSummary?.notAttending?.length || 0} Out
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <X className="w-4 h-4 text-red-500" />
-                    <span className="font-medium text-red-500 text-[16px]" data-testid="text-opponent-out-count">
-                      {opponentRsvpSummary?.notAttending?.length || 0} Out
-                    </span>
-                  </div>
+                  {!isScrimmage && predictionViewerTeamId && game.homeTeam && game.awayTeam && (
+                    <GamePredictionButton
+                      gameId={game.id}
+                      homeTeamId={game.homeTeam.id}
+                      awayTeamId={game.awayTeam.id}
+                      homeTeamName={game.homeTeam.name}
+                      awayTeamName={game.awayTeam.name}
+                      viewerTeamIds={[predictionViewerTeamId]}
+                      notAttending={predictionRsvpSummary?.notAttending || []}
+                      compact
+                      dataTestId="button-view-odds"
+                    />
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {!isGameCompleted && !isScrimmage && predictionViewerTeamId && game.homeTeam && game.awayTeam && (
-          <GamePredictionButton
-            gameId={game.id}
-            homeTeamId={game.homeTeam.id}
-            awayTeamId={game.awayTeam.id}
-            homeTeamName={game.homeTeam.name}
-            awayTeamName={game.awayTeam.name}
-            viewerTeamIds={[predictionViewerTeamId]}
-            notAttending={predictionRsvpSummary?.notAttending || []}
-            className="mt-4 border border-primary/25 bg-[#e2e2e2] dark:bg-[#212121]"
-            dataTestId="button-view-win-chance"
-          />
-        )}
 
         {/* RSVP Section */}
         {!isGameCompleted && (

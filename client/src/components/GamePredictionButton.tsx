@@ -14,6 +14,7 @@ interface GamePredictionButtonProps {
   notAttending?: any[];
   className?: string;
   dataTestId?: string;
+  compact?: boolean;
 }
 
 export function GamePredictionButton({
@@ -26,6 +27,7 @@ export function GamePredictionButton({
   notAttending,
   className,
   dataTestId = "button-game-prediction",
+  compact = false,
 }: GamePredictionButtonProps) {
   const [open, setOpen] = useState(false);
   const viewerTeamId = viewerTeamIds.find(
@@ -50,13 +52,15 @@ export function GamePredictionButton({
     return (
       <div
         className={cn(
-          "flex min-h-14 w-full items-center rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground",
+          compact
+            ? "flex h-10 w-[148px] shrink-0 items-center justify-center rounded-lg border border-border text-xs text-muted-foreground"
+            : "flex min-h-14 w-full items-center rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground",
           className,
         )}
         role="status"
         data-testid={`${dataTestId}-loading`}
       >
-        Loading game prediction…
+        {compact ? "Loading…" : "Loading game prediction…"}
       </div>
     );
   }
@@ -77,21 +81,29 @@ export function GamePredictionButton({
           setOpen(true);
         }}
         className={cn(
-          "flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+          compact
+            ? "flex h-10 w-[148px] shrink-0 items-center justify-center rounded-lg border-0 bg-[#0079f2] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0067d1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            : "flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
           className,
         )}
-        aria-label={`Open game prediction, your team's estimated win chance is ${chancePercent}%`}
+        aria-label={`View odds, your team's estimated win chance is ${chancePercent}%`}
         data-testid={dataTestId}
       >
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold">Game prediction</span>
-          <span className="block text-xs text-muted-foreground">
-            Your team’s estimated win chance · for fun
-          </span>
-        </span>
-        <span className="shrink-0 text-xl font-bold tabular-nums text-primary">
-          {chancePercent}%
-        </span>
+        {compact ? (
+          "View Odds"
+        ) : (
+          <>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">View Odds</span>
+              <span className="block text-xs text-muted-foreground">
+                Your team’s estimated win chance · for fun
+              </span>
+            </span>
+            <span className="shrink-0 text-xl font-bold tabular-nums text-primary">
+              {chancePercent}%
+            </span>
+          </>
+        )}
       </button>
       <WinChanceSheet
         open={open}
