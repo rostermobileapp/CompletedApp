@@ -173,24 +173,6 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.win_chance_game_insert_trigger()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  -- Seed a newly scheduled game once; this is the only schedule-write trigger.
-  IF NOT NEW.is_completed
-     AND NEW.scheduled_at >= now()
-     AND NEW.away_team_id IS NOT NULL THEN
-    PERFORM public.win_chance_dispatch_team(NEW.home_team_id);
-    PERFORM public.win_chance_dispatch_team(NEW.away_team_id);
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
 CREATE OR REPLACE FUNCTION public.win_chance_game_score_trigger()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -339,9 +321,7 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS win_chance_game_insert ON public.games;
-CREATE TRIGGER win_chance_game_insert
-  AFTER INSERT ON public.games
-  FOR EACH ROW EXECUTE FUNCTION public.win_chance_game_insert_trigger();
+DROP FUNCTION IF EXISTS public.win_chance_game_insert_trigger();
 
 DROP TRIGGER IF EXISTS win_chance_game_final_score ON public.games;
 CREATE TRIGGER win_chance_game_final_score
@@ -437,7 +417,6 @@ CREATE TRIGGER win_chance_rsvp_no_updated
 
 REVOKE ALL ON FUNCTION public.win_chance_dispatch_team(varchar) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_dispatch_game_if_completed(varchar) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.win_chance_game_insert_trigger() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_game_score_trigger() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_game_stats_trigger() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_team_record_trigger() FROM PUBLIC, anon, authenticated;

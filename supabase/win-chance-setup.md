@@ -30,7 +30,9 @@ WHERE league_id IS NOT NULL;
 For a one-team smoke test, run `SELECT public.win_chance_dispatch_team('<team-id>');`
 in the SQL editor and then read that team's upcoming `game_predictions` rows.
 
-New scheduled games are seeded by the `games` insert trigger. Later updates are
-limited to completed-game scores, scorekeeper attendance/goals/goalie/player
-stats, team records, a league tie-setting change, and an RSVP becoming “No.”
-Reads and page opens never invoke the worker.
+Schedule changes do not invoke the worker. After the initial seed, automatic
+updates are limited to completed-game scores, scorekeeper attendance,
+goals/goalie/player stats, team records, a league tie-setting change, and an RSVP
+becoming “No.” Reads and page opens never invoke the worker. If a later schedule
+needs an initial prediction before any eligible data event occurs, run the
+one-team SQL dispatch above as an explicit administrative seed.
