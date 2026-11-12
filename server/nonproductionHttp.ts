@@ -1,7 +1,10 @@
 import type { RequestHandler } from "express";
+import { isLiveProjectPreview } from "./runtimePolicy";
 
 export const nonproductionHttpGuard: RequestHandler = (req, res, next) => {
-  if (process.env.NONPRODUCTION_ISOLATED !== "1") return next();
+  const previewSafetyEnabled = process.env.NONPRODUCTION_ISOLATED === "1"
+    || isLiveProjectPreview(process.env);
+  if (!previewSafetyEnabled) return next();
   const origin = process.env.SUPABASE_URL!;
   // A dev page must not register push workers or contact production providers,
   // including libraries that bypass the application's fetch helper.
@@ -19,7 +22,7 @@ export const nonproductionHttpGuard: RequestHandler = (req, res, next) => {
   if (req.path.startsWith("/api/giphy")) {
     res.status(503).json({
       code: "NONPRODUCTION_DELIVERY_DISABLED",
-      message: "The live Giphy provider is disabled in isolated development.",
+      message: "The live Giphy provider is disabled in development previews.",
     });
     return;
   }
@@ -28,7 +31,7 @@ export const nonproductionHttpGuard: RequestHandler = (req, res, next) => {
       /stripe|subscription|checkout|webhook|purchase|billing|\/iap|send|invite|remind|push|payment-request|password|recover|reset|otp|sign.?up|magic/i.test(req.path)) {
     res.status(503).json({
       code: "NONPRODUCTION_DELIVERY_DISABLED",
-      message: "Delivery, live provider actions and billing are disabled in isolated development.",
+      message: "Delivery, live provider actions and billing are disabled in development previews.",
     });
     return;
   }

@@ -1,6 +1,7 @@
 import { Pool } from "@neondatabase/serverless";
 import { Pool as NativePool } from "pg";
 import { readFileSync } from "node:fs";
+import { isLiveProjectPreview } from "./runtimePolicy";
 
 type PoolErrorLogger = (message: string, details: { code: string }) => void;
 
@@ -18,7 +19,7 @@ export function createDatabasePool(
   };
   let pool: Pool;
   if (process.env.NODE_ENV === "development") {
-    if (process.env.NONPRODUCTION_ISOLATED !== "1") {
+    if (process.env.NONPRODUCTION_ISOLATED !== "1" && !isLiveProjectPreview(process.env)) {
       throw new Error("Development database transport requires validated isolation");
     }
     const url = new URL(connectionString);

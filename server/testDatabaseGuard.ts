@@ -1,4 +1,4 @@
-import { isVerifiedProductionRuntime } from "./runtimePolicy";
+import { isLiveProjectPreview, isVerifiedProductionRuntime } from "./runtimePolicy";
 
 const testFilePattern = /(?:^|[/\\])[^/\\]+\.(?:test|spec)\.[cm]?[jt]sx?$/;
 
@@ -82,6 +82,12 @@ export function getDatabaseConnectionString(
     return env.TEST_DATABASE_URL;
   }
   if (env.NODE_ENV !== "production") {
+    if (isLiveProjectPreview(env)) {
+      if (!env.DATABASE_URL) {
+        throw new Error("Live-project preview requires DATABASE_URL.");
+      }
+      return env.DATABASE_URL;
+    }
     if (!env.DEV_DATABASE_URL) {
       throw new Error("Development requires DEV_DATABASE_URL; refusing the application database");
     }

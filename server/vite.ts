@@ -6,6 +6,7 @@ import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
 import { serveCrawlabilityFiles } from "./crawlabilityFiles";
+import { isLiveProjectPreview } from "./runtimePolicy";
 
 const viteLogger = createLogger();
 
@@ -21,11 +22,13 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  const previewSafetyEnabled = process.env.NONPRODUCTION_ISOLATED === "1"
+    || isLiveProjectPreview(process.env);
   const serverOptions = {
     middlewareMode: true,
     // Vite HMR upgrades failed through the preview proxy. Disable only dev-tool
     // hot reload instead of changing the application's existing /ws handling.
-    hmr: process.env.NONPRODUCTION_ISOLATED === "1" ? false as const : { server },
+    hmr: previewSafetyEnabled ? false as const : { server },
     allowedHosts: true as const,
   };
 
@@ -45,7 +48,7 @@ export async function setupVite(app: Express, server: Server) {
 
   // Never serve a previously built production client (and its native bridge
   // configuration) from the isolated development server.
-  if (process.env.NONPRODUCTION_ISOLATED !== "1") {
+  if (!previewSafetyEnabled) {
     serveCrawlabilityFiles(app, path.resolve(import.meta.dirname, "..", "dist", "public"));
   }
   app.use(vite.middlewares);
@@ -62,7 +65,7 @@ export async function setupVite(app: Express, server: Server) {
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      if (process.env.NONPRODUCTION_ISOLATED === "1") {
+      if (previewSafetyEnabled) {
         template = template
           .replace(/<script\b[^>]*\bsrc=["'][^"']*(?:cdn\.onesignal\.com|cdn\.jsdelivr\.net\/npm\/natively|replit\.com\/public\/js\/replit-dev-banner\.js)[^"']*["'][^>]*>\s*<\/script>/gi, "")
           .replace(/<script\b[^>]*>(?:(?!<\/script>)[\s\S])*?window\.OneSignalDeferred(?:(?!<\/script>)[\s\S])*?<\/script>/gi, "");

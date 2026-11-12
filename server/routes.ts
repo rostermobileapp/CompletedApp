@@ -138,7 +138,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createHash, randomBytes } from 'crypto';
 import Stripe from "stripe";
-import { isVerifiedProductionRuntime, disabledProvider } from "./runtimePolicy";
+import {
+  isLiveProjectPreview, isVerifiedProductionRuntime, disabledProvider,
+} from "./runtimePolicy";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail } from "./emails";
 import { startEventReminderJob } from "./eventReminderJob";
@@ -1148,7 +1150,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (isVerifiedProductionRuntime()) await ensureBirthdayTable();
   console.log(isVerifiedProductionRuntime()
     ? "[Init] badge catalog tables ensured"
-    : "[Init] Isolated dev uses explicit schema setup; production lifecycle work is disabled.");
+    : isLiveProjectPreview()
+      ? "[Init] Live-project preview; production lifecycle work is disabled."
+      : "[Init] Isolated dev uses explicit schema setup; production lifecycle work is disabled.");
   // Demo tables are startup-safe for deployments that use runtime migrations.
   if (isVerifiedProductionRuntime()) await ensureDemoTables();
   registerDemoRoutes(app, isAuthenticated);

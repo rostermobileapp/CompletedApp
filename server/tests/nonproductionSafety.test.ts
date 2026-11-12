@@ -7,6 +7,7 @@ import {
   assertProductionRuntimeConfiguration, isVerifiedProductionRuntime,
   PRODUCTION_RAILWAY_ENVIRONMENT, PRODUCTION_RAILWAY_SERVICE,
 } from "../runtimePolicy";
+import { configureLiveProjectPreview } from "../liveProjectPreview";
 import { isolateDevelopmentEnvironment } from "../nonproductionEnvironment";
 import { assertDevelopmentRequest } from "../nonproductionNetwork";
 import { nonproductionHttpGuard } from "../nonproductionHttp";
@@ -64,6 +65,7 @@ test("production misconfiguration refuses startup instead of silently suppressin
     { ...production, RAILWAY_SERVICE_ID: "another-service" },
     { ...production, NONPRODUCTION_ISOLATED: "1" },
     { ...production, VITE_ISOLATED_DEVELOPMENT: "true" },
+    { ...production, PREVIEW_USE_LIVE_SECRETS: "1" },
     { NODE_ENV: "production" },
     { NODE_ENV: "development", RAILWAY_ENVIRONMENT_ID: "unexpected-environment" },
     { NODE_ENV: "test", RAILWAY_SERVICE_ID: "unexpected-service" },
@@ -109,6 +111,36 @@ test("development maps database/browser/auth together and removes all live provi
   assert.deepEqual(isolateDevelopmentEnvironment(isolated), isolated);
   assert.throws(() => isolateDevelopmentEnvironment({ ...environment, DEV_DATABASE_URL: environment.DATABASE_URL }));
   assert.throws(() => isolateDevelopmentEnvironment({ ...environment, DEV_SUPABASE_URL: environment.SUPABASE_URL }));
+});
+
+test("live-project preview requires explicit Replit opt-in and matching unprefixed settings", () => {
+  const livePreview = configureLiveProjectPreview({
+    ...environment,
+    PREVIEW_USE_LIVE_SECRETS: "1",
+    SUPABASE_URL: "https://live-project.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "synthetic-live-service",
+    VITE_SUPABASE_URL: "https://live-project.supabase.co",
+    VITE_SUPABASE_ANON_KEY: "synthetic-live-anon",
+    DATABASE_URL: "postgres://postgres:synthetic@db.live-project.supabase.co/postgres",
+  });
+  assert.equal(livePreview.SUPABASE_URL, "https://live-project.supabase.co");
+  assert.equal(livePreview.VITE_SUPABASE_URL, "https://live-project.supabase.co");
+  assert.equal(getDatabaseConnectionString(livePreview, []), livePreview.DATABASE_URL);
+  for (const key of [
+    "DEV_DATABASE_URL", "DEV_SUPABASE_URL", "DEV_SUPABASE_SERVICE_ROLE_KEY",
+    "DEV_SUPABASE_ANON_KEY", "NONPRODUCTION_ISOLATED", "VITE_ISOLATED_DEVELOPMENT",
+  ]) assert.equal(livePreview[key], undefined, key);
+
+  assert.throws(() => configureLiveProjectPreview({
+    ...livePreview, REPLIT_DEV_DOMAIN: undefined,
+  }));
+  assert.throws(() => configureLiveProjectPreview({
+    ...livePreview, VITE_SUPABASE_URL: "https://other-project.supabase.co",
+  }));
+  assert.throws(() => configureLiveProjectPreview({
+    ...livePreview,
+    DATABASE_URL: "postgres://postgres:synthetic@db.other-project.supabase.co/postgres",
+  }));
 });
 
 test("standalone dev database clients fail closed rather than falling back to production", () => {
@@ -180,6 +212,53 @@ test("development delivery HTTP endpoints reject requests explicitly, while prod
     else process.env.NONPRODUCTION_ISOLATED = previous;
     if (previousUrl === undefined) delete process.env.SUPABASE_URL;
     else process.env.SUPABASE_URL = previousUrl;
+  }
+});
+
+test("live-project preview still allows auth connections but blocks delivery and billing routes", () => {
+  const previous = {
+    NODE_ENV: process.env.NODE_ENV,
+    PREVIEW_USE_LIVE_SECRETS: process.env.PREVIEW_USE_LIVE_SECRETS,
+    REPLIT_DEV_DOMAIN: process.env.REPLIT_DEV_DOMAIN,
+    NONPRODUCTION_ISOLATED: process.env.NONPRODUCTION_ISOLATED,
+    SUPABASE_URL: process.env.SUPABASE_URL,
+  };
+  try {
+    process.env.NODE_ENV = "development";
+    process.env.PREVIEW_USE_LIVE_SECRETS = "1";
+    process.env.REPLIT_DEV_DOMAIN = "preview.replit.dev";
+    delete process.env.NONPRODUCTION_ISOLATED;
+    process.env.SUPABASE_URL = "https://live-project.supabase.co";
+
+    let status: number | undefined;
+    let csp = "";
+    let next = false;
+    const res = {
+      setHeader(_name: string, value: string) { csp = value; },
+      status(value: number) { status = value; return this; },
+      json() {},
+    };
+    nonproductionHttpGuard(
+      { method: "POST", path: "/api/stripe/create-checkout-session" } as any,
+      res as any,
+      () => { next = true; },
+    );
+    assert.equal(status, 503);
+    assert.equal(next, false);
+    assert.match(csp, /https:\/\/live-project\.supabase\.co/);
+
+    next = false;
+    nonproductionHttpGuard(
+      { method: "GET", path: "/api/user" } as any,
+      res as any,
+      () => { next = true; },
+    );
+    assert.equal(next, true);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 });
 

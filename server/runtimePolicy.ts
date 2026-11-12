@@ -1,6 +1,12 @@
 export const PRODUCTION_RAILWAY_ENVIRONMENT = "aa52bb2b-6ecf-4b99-8df2-d5eb710a7249";
 export const PRODUCTION_RAILWAY_SERVICE = "56ba1c43-f2dd-477e-b1fc-310dbd841a45";
 
+export function isLiveProjectPreview(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV === "development" &&
+    env.PREVIEW_USE_LIVE_SECRETS === "1" &&
+    Boolean(env.REPLIT_DEV_DOMAIN);
+}
+
 export function isVerifiedProductionRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.NODE_ENV === "production" &&
     env.RAILWAY_ENVIRONMENT_ID === PRODUCTION_RAILWAY_ENVIRONMENT &&
@@ -16,7 +22,8 @@ export function assertProductionRuntimeConfiguration(env: NodeJS.ProcessEnv = pr
   if (!productionContext) return;
   if (!isVerifiedProductionRuntime(env) ||
       env.NONPRODUCTION_ISOLATED === "1" ||
-      env.VITE_ISOLATED_DEVELOPMENT === "true") {
+      env.VITE_ISOLATED_DEVELOPMENT === "true" ||
+      env.PREVIEW_USE_LIVE_SECRETS === "1") {
     throw Object.assign(new Error(
       "Production runtime verification failed; application startup refused so production workers cannot be silently disabled. " +
       "Check NODE_ENV=production, RAILWAY_ENVIRONMENT_ID, RAILWAY_SERVICE_ID, and remove development-isolation flags.",
