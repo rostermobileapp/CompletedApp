@@ -75,10 +75,10 @@ export function GameWinProbabilityBar({
           aria-hidden="true"
         />
       </div>
-      <div className="w-[82px] shrink-0 text-right leading-none" aria-hidden="true">
-        <span className="block text-sm font-bold tabular-nums">{chancePercent}%</span>
-        <span className="mt-0.5 block whitespace-nowrap text-[10px] text-muted-foreground">
-          Chance to Win
+      <div className="flex shrink-0 items-baseline gap-1.5 whitespace-nowrap text-right leading-none" aria-hidden="true">
+        <span className="text-sm font-bold tabular-nums">{chancePercent}%</span>
+        <span className="text-[10px] text-muted-foreground">
+          Chance to win
         </span>
       </div>
     </div>
