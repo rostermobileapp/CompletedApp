@@ -3733,7 +3733,8 @@ function DashboardMobile() {
                   data-testid={`card-game-${game.id}`}
                 >
                   <div className="flex items-center gap-4 bg-[212121]">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center relative ${(() => {
+                    <div className="w-12 h-12 shrink-0" aria-hidden="true" />
+                    <div className={`absolute left-[20px] top-1/2 -translate-y-1/2 w-12 h-12 rounded-lg flex items-center justify-center ${(() => {
                         const isHomeTeamUser = game.isTournamentMatch 
                           ? game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase()
                           : game.homeTeam?.id === primaryTeam?.id;

@@ -11,3 +11,9 @@ two-thirds-down interpretation was wrong.
 
 **How to apply:** Position the action group as a unit without changing the
 card's surrounding spacing.
+
+The trophy/team-logo box stays vertically centered in the full card, including
+the probability row, independently of the View/chevron placement.
+
+**Why:** The owner explicitly requested full-card centering after widening the
+probability row.
