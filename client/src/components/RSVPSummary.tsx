@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Users, UserCheck, UserX } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getAuthHeaders } from "@/lib/queryClient";
@@ -113,23 +113,5 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, className }: R
     );
   }
 
-  // Handle single team or legacy data
-  const attendingCount = rsvpSummary.attending?.length || 0;
-  const notAttendingCount = rsvpSummary.notAttending?.length || 0;
-  const noResponseCount = rsvpSummary.noResponse?.length || 0;
-  const totalPlayers = attendingCount + notAttendingCount + noResponseCount;
-
-  return (
-    <Card className="rounded-lg border shadow-sm cursor-pointer transition-all hover:shadow-md bg-[212121] text-[#ffffff]" data-testid="rsvp-summary">
-      <CardHeader className="pt-[4px] pb-[4px]">
-        <CardTitle className="text-sm flex items-center gap-2 text-[#212121]">
-          <Users className="h-4 w-4" />
-          {teamId ? "Team RSVP Status" : "RSVP Status"}
-        </CardTitle>
-        <CardDescription className="text-xs">
-          {totalPlayers} total player{totalPlayers !== 1 ? 's' : ''}
-        </CardDescription>
-      </CardHeader>
-    </Card>
-  );
+  return null;
 }
