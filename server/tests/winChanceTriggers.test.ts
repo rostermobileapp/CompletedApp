@@ -12,6 +12,9 @@ const dispatchScopeMigration = readFileSync(
   "utf8",
 );
 const routes = readFileSync(resolve(process.cwd(), "server/routes.ts"), "utf8");
+const lineManager = readFileSync(resolve(process.cwd(), "client/src/components/LineManager.tsx"), "utf8");
+const scorekeeperDashboard = readFileSync(resolve(process.cwd(), "client/src/pages/ScorekeeperDashboard.tsx"), "utf8");
+const lineComboLearning = readFileSync(resolve(process.cwd(), "server/lineComboLearning.ts"), "utf8");
 const createTriggerStatements = [...migration.matchAll(/CREATE TRIGGER[\s\S]*?;/g)]
   .map(([statement]) => statement);
 
@@ -77,4 +80,33 @@ test("the authenticated prediction endpoint reads stored rows only", () => {
   assert.match(route, /\.select\(/);
   assert.doesNotMatch(route, /\.(?:insert|update|delete)\(/i);
   assert.doesNotMatch(route, /dispatch_team|recalculate-win-chance/i);
+});
+
+test("adaptive line-combo stats stay read-only and do not poll every minute", () => {
+  const route = routes.match(
+    /app\.get\('\/api\/teams\/:teamId\/line-combos\/stats'[\s\S]*?^  \}\);/m,
+  )?.[0];
+  assert.ok(route, "adaptive line-combo stats route exists");
+  assert.match(route, /loadLineComboCalibration\(pool,\s*teamId,\s*false\)/);
+  assert.doesNotMatch(route, /lineComboLearner|\.request\(/);
+  assert.doesNotMatch(lineManager, /refetchInterval\s*:/);
+  assert.doesNotMatch(lineComboLearning, /setInterval\s*\(/);
+});
+
+test("scorekeeper finalization returns minimal success and updates targeted client state", () => {
+  const route = routes.match(
+    /app\.post\('\/api\/games\/:gameId\/finalize'[\s\S]*?^  \}\);/m,
+  )?.[0];
+  assert.ok(route, "scorekeeper finalize route exists");
+  assert.match(route, /res\.json\(\{\s*ok:\s*true\s*\}\)/);
+  assert.doesNotMatch(route, /res\.json\(\{\s*ok:\s*true\s*,/);
+
+  const mutation = scorekeeperDashboard.match(
+    /const finalizeGameMutation = useMutation\(\{[\s\S]*?(?=\n\s*const updateScoresMutation)/m,
+  )?.[0];
+  assert.ok(mutation, "scorekeeper finalize mutation exists");
+  assert.match(mutation, /queryClient\.setQueryData<Game\[\]>/);
+  assert.match(mutation, /games-needing-verification/);
+  assert.match(mutation, /notification-counts/);
+  assert.doesNotMatch(mutation, /queryKey:\s*\[\s*gamesQueryKey\s*\]/);
 });

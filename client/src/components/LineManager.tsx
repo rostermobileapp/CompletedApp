@@ -377,7 +377,6 @@ export function LineManager({
     enabled: !!teamId && view === 'lines',
     staleTime: 60 * 1000,
     refetchOnWindowFocus: 'always',
-    refetchInterval: 60 * 1000,
   });
 
   // ── Sync DB template → editor state ──────────────────────────

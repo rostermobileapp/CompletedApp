@@ -13817,7 +13817,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
           });
         });
       }
-      res.json({ ok: true, message: 'Game finalized successfully' });
+      res.json({ ok: true });
     } catch (error) {
       console.error('Error finalizing game:', error);
       if ((error as { status?: number }).status === 400) {
