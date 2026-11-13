@@ -94,3 +94,4 @@
 - [RosterHockey brand naming](rosterhockey-brand-naming.md) — use RosterHockey in public copy; retain legal entity, store labels, and stable technical identifiers.
 - [Prediction visibility verification](prediction-visibility-verification.md) — test parent-card eligibility and roster identity; stored rows and child tests do not establish signed-in visibility.
 - [Schedule card action alignment](schedule-card-action-alignment.md) — center View and chevron one-third down from the top, never one-third up from the bottom.
+- [Prediction standings authority](prediction-standings-authority.md) — team-summary counters can stay zero; prediction inputs must match result-derived season standings, including OT losses.
