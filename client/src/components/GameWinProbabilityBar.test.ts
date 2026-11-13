@@ -74,6 +74,9 @@ test("the prediction popup matches Home's thin green/red track and white marker"
   assert.match(home, /bg-\[#22c55e\]" style="width:62%"/);
   assert.match(home, /left:62%/);
   assert.match(home, /Record 8-0-0-1/);
+  assert.match(home, /rounded-xl border border-border bg-card p-4/);
+  assert.match(home, /rounded-xl border border-border bg-muted p-3/);
+  assert.doesNotMatch(home, /dark:bg-\[/);
   const away = renderSheet("away");
   assert.match(away, /bg-\[#ef4444\]" style="width:62%"/);
   assert.match(away, /bg-\[#22c55e\]" style="width:38%"/);

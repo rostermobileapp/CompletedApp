@@ -101,7 +101,7 @@ export function WinChanceSheet({
         </DialogHeader>
 
         <div className="space-y-4">
-          <section className="rounded-xl border border-border p-4" aria-label="Win probabilities">
+          <section className="rounded-xl border border-border bg-card p-4" aria-label="Win probabilities">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
               <TeamChance
                 name={homeTeamName}
@@ -138,7 +138,7 @@ export function WinChanceSheet({
             </div>
           </section>
 
-          <section className="grid grid-cols-2 gap-3">
+          <section className="grid grid-cols-2 gap-3" aria-label="Prediction metrics">
             <Metric label="Projected score" value={`${prediction.projectedScoreHome} – ${prediction.projectedScoreAway}`} />
             <Metric label="Expected goals" value={`${(prediction.expectedGoalsHome ?? 0).toFixed(1)} – ${(prediction.expectedGoalsAway ?? 0).toFixed(1)}`} />
             <Metric label="Win by 2+ goals" value={`${percent(prediction.winByTwoHome)} / ${percent(prediction.winByTwoAway)}`} detail="Home / away" />
@@ -148,7 +148,7 @@ export function WinChanceSheet({
             />
           </section>
 
-          <section className="rounded-xl border border-border p-4">
+          <section className="rounded-xl border border-border bg-card p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">Top scorers for your team</h3>
               <Badge variant="secondary">{viewerIsHome ? homeTeamName : awayTeamName}</Badge>
@@ -217,7 +217,7 @@ function TeamChance({
 
 function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-border p-3">
+    <div className="min-w-0 rounded-xl border border-border bg-muted p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 truncate text-base font-semibold tabular-nums">{value}</div>
       {detail && <div className="mt-0.5 text-xs text-muted-foreground">{detail}</div>}
