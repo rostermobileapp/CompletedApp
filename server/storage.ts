@@ -229,6 +229,8 @@ import { getReusableUserDisplayId, shouldLookupUserByEmail } from "./userSyncPla
 import { collectUniqueTeamIdsFromGames } from "./teamQueryBatch";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
+import { readVerifiedGameSummary } from "./verifiedGameSummaries";
+import { databaseGameSummaryStore } from "./verifiedGameSummaryStore";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists, type SQL } from "drizzle-orm";
 
 // Recipient row hydrated with either the real user or the placeholder player.
@@ -6073,6 +6075,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeagueStandings(leagueId: string, seasonId?: string): Promise<Array<{
+    teamId: string;
+    teamName: string;
+    gamesPlayed: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    shootoutLosses: number;
+    points: number;
+    goalsFor: number;
+    goalsAgainst: number;
+  }>> {
+    return readVerifiedGameSummary(databaseGameSummaryStore, {
+      kind: "league_standings",
+      entityId: leagueId,
+      scopeKey: seasonId ?? "all",
+      computeRaw: () => this.getLeagueStandingsRaw(leagueId, seasonId),
+    });
+  }
+
+  private async getLeagueStandingsRaw(leagueId: string, seasonId?: string): Promise<Array<{
     teamId: string;
     teamName: string;
     gamesPlayed: number;

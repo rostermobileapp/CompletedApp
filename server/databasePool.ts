@@ -18,7 +18,16 @@ export function createDatabasePool(
     keepAliveInitialDelayMillis: 10_000,
   };
   let pool: Pool;
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === "test" && process.env.TEST_NATIVE_POSTGRES === "1") {
+    const host = new URL(connectionString).hostname;
+    if (!["127.0.0.1", "::1", "localhost"].includes(host)) {
+      throw new Error("Native PostgreSQL test transport is restricted to loopback hosts");
+    }
+    pool = new NativePool({
+      ...options,
+      ssl: false,
+    }) as unknown as Pool;
+  } else if (process.env.NODE_ENV === "development") {
     if (process.env.NONPRODUCTION_ISOLATED !== "1" && !isLiveProjectPreview(process.env)) {
       throw new Error("Development database transport requires validated isolation");
     }

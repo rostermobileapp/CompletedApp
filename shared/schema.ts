@@ -16,6 +16,7 @@ import {
   check,
   primaryKey,
   uuid,
+  bigint,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -4787,3 +4788,50 @@ export type BadgeTier = typeof badgeTiers.$inferSelect;
 export type BadgeAward = typeof badgeAwards.$inferSelect;
 export type BadgeProgress = typeof badgeProgress.$inferSelect;
 export type BadgeEarnedEvent = typeof badgeEarnedEvents.$inferSelect;
+
+// Revision-bound, raw-parity-verified summaries for high-cost game-history reads.
+export const gameSummarySourceRevisions = pgTable("game_summary_source_revisions", {
+  summaryType: text("summary_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  revision: bigint("revision", { mode: "bigint" }).notNull().default(sql`1`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.summaryType, table.entityId] }),
+  check("game_summary_source_type_check", sql`${table.summaryType} IN ('league_standings', 'team_streaks', 'trophy_case')`),
+]);
+
+export const verifiedGameSummaryCache = pgTable("verified_game_summary_cache", {
+  summaryType: text("summary_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  scopeKey: text("scope_key").notNull(),
+  cacheVersion: integer("cache_version").notNull().default(1),
+  sourceRevision: text("source_revision").notNull(),
+  payload: jsonb("payload").notNull(),
+  matchingReads: integer("matching_reads").notNull().default(0),
+  isVerified: boolean("is_verified").notNull().default(false),
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+}, table => [
+  primaryKey({ columns: [table.summaryType, table.entityId, table.scopeKey] }),
+  index("verified_game_summary_cache_freshness").on(table.summaryType, table.entityId, table.sourceRevision),
+  check("verified_game_summary_type_check", sql`${table.summaryType} IN ('league_standings', 'team_streaks', 'trophy_case')`),
+  check("verified_game_summary_version_check", sql`${table.cacheVersion} > 0`),
+  check("verified_game_summary_matching_reads_check", sql`${table.matchingReads} >= 0`),
+]);
+
+export const gameSummaryParityReports = pgTable("game_summary_parity_reports", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  summaryType: text("summary_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  scopeKey: text("scope_key").notNull(),
+  sourceRevision: text("source_revision").notNull(),
+  matched: boolean("matched").notNull(),
+  cachedHash: varchar("cached_hash", { length: 64 }).notNull(),
+  rawHash: varchar("raw_hash", { length: 64 }).notNull(),
+  rowCount: integer("row_count").notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index("game_summary_parity_reports_recent").on(table.checkedAt, table.summaryType, table.matched),
+  check("game_summary_parity_type_check", sql`${table.summaryType} IN ('league_standings', 'team_streaks', 'trophy_case')`),
+  check("game_summary_parity_row_count_check", sql`${table.rowCount} >= 0`),
+]);

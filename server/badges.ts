@@ -27,6 +27,8 @@ import {
   type BadgeEarnedEvent,
 } from "@shared/schema";
 import { db } from "./db";
+import { readVerifiedGameSummary } from "./verifiedGameSummaries";
+import { databaseGameSummaryStore } from "./verifiedGameSummaryStore";
 import { collectEarnedPatches } from "./earnedPatches";
 import { newlyReachedTiers, reachedTiers } from "./badgeTierEligibility";
 import { THREE_STARS_TIERS } from "@shared/threeStarsTiers";
@@ -2199,6 +2201,15 @@ export async function getEarnedPatches(userId: string) {
 }
 
 export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: string) {
+  return readVerifiedGameSummary(databaseGameSummaryStore, {
+    kind: "trophy_case",
+    entityId: userId,
+    scopeKey: `year:${currentCenturyClubYear()}:season:${requestedHatTrickSeasonId ?? "default"}`,
+    computeRaw: () => getTrophyCaseRaw(userId, requestedHatTrickSeasonId),
+  });
+}
+
+async function getTrophyCaseRaw(userId: string, requestedHatTrickSeasonId?: string) {
   // Trivia is lifetime-only and has its own section; never duplicate it into
   // season-selected achievement groups or expose it through another user's case.
   const definitions = (await definitionsWithTiers()).filter((definition) => !isTriviaDefinition(definition));

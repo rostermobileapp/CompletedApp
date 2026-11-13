@@ -50,6 +50,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db, pool } from "./db";
+import { getTeamStreaks } from "./teamStreaks";
 import {
   finalizeScorekeeperGame,
   normalizeScorekeeperAttendees,
@@ -31445,16 +31446,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   // STREAKS — Hot/Cold Player Trends
   // ============================================================
 
-  // Constant for the Bayesian prior used in streak baseline computation.
-  // Stored as a named constant so it can be tuned in one place.
-  const ASSUMED_BASELINE_PPG = 0.50;
-
   /**
    * GET /api/teams/:id/streaks?seasonId=
    * Returns { streaks: { [userId]: "HOT" | "COLD" | "NEUTRAL" } }
    *
-   * Game participation is established only from submitted goals, assists, or
-   * penalties so RSVP status cannot create a streak game.
+   * Game participation is established from submitted goals, assists,
+   * penalties, and scorekeeper-confirmed attendance; an RSVP alone is excluded.
    * Only players with >= 2 recorded-stat games receive a streak entry.
    * Requires the requester to be a member of the team's league.
    */
@@ -31480,120 +31477,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const leagueId = team.leagueId;
-      const RECENT_GAME_COUNT = 2;
-      const priorBoost = RECENT_GAME_COUNT * ASSUMED_BASELINE_PPG; // = 1.0
-      const seasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
-
-       // Only submitted player-stat records create streak games. Penalties count
-       // as participation with zero points; goals and assists contribute points.
-      const result = await db.execute(sql`
-         WITH recorded_stats AS (
-           -- Expand each submitted goal into one row per credited player.
-           SELECT gg.scorer_id AS user_id, gg.game_id, 1 AS pts
-          FROM game_goals gg
-          JOIN games g ON g.id = gg.game_id
-           WHERE g.league_id = ${leagueId}
-             AND g.is_completed = true
-             AND gg.is_submitted = true
-             AND gg.scorer_id IS NOT NULL
-             ${seasonFilter}
-          UNION ALL
-          SELECT gg.primary_assist_id, gg.game_id, 1
-          FROM game_goals gg
-          JOIN games g ON g.id = gg.game_id
-           WHERE g.league_id = ${leagueId}
-             AND g.is_completed = true
-             AND gg.is_submitted = true
-             AND gg.primary_assist_id IS NOT NULL
-             ${seasonFilter}
-          UNION ALL
-          SELECT gg.secondary_assist_id, gg.game_id, 1
-          FROM game_goals gg
-          JOIN games g ON g.id = gg.game_id
-           WHERE g.league_id = ${leagueId}
-             AND g.is_completed = true
-             AND gg.is_submitted = true
-             AND gg.secondary_assist_id IS NOT NULL
-             ${seasonFilter}
-           UNION ALL
-           -- A submitted penalty establishes participation but is worth zero points.
-           SELECT gp.player_id, gp.game_id, 0
-           FROM game_penalties gp
-           JOIN games g ON g.id = gp.game_id
-           WHERE g.league_id = ${leagueId}
-             AND g.is_completed = true
-             AND gp.is_submitted = true
-             ${seasonFilter}
-           UNION ALL
-           -- Scorekeeper-confirmed attendance counts as a zero-point game.
-           SELECT ga.user_id, ga.game_id, 0
-           FROM game_attendance ga
-           JOIN games g ON g.id = ga.game_id
-           WHERE ga.user_id IS NOT NULL
-             AND g.league_id = ${leagueId}
-             AND g.is_completed = true
-             ${seasonFilter}
-           UNION ALL
-           SELECT 'placeholder:' || ga.placeholder_player_id, ga.game_id, 0
-           FROM game_attendance ga
-           JOIN games g ON g.id = ga.game_id
-           WHERE ga.placeholder_player_id IS NOT NULL
-             AND g.league_id = ${leagueId}
-             AND g.is_completed = true
-             ${seasonFilter}
-        ),
-        player_game_totals AS (
-           -- One row per player/game. A scoreless penalty-only game remains 0 points.
-           SELECT rs.user_id, rs.game_id, g.scheduled_at,
-                  SUM(rs.pts)::int AS points
-           FROM recorded_stats rs
-           JOIN games g ON g.id = rs.game_id
-           GROUP BY rs.user_id, rs.game_id, g.scheduled_at
-        ),
-        ranked AS (
-          SELECT user_id, game_id, points, scheduled_at,
-            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY scheduled_at DESC) AS rn,
-            COUNT(*) OVER (PARTITION BY user_id)::int AS total_games
-          FROM player_game_totals
-        ),
-        streak_data AS (
-          SELECT
-            user_id,
-            MAX(total_games) AS total_games,
-            (SUM(CASE WHEN rn <= ${RECENT_GAME_COUNT} THEN points ELSE 0 END)::float / ${RECENT_GAME_COUNT}) AS recent_ppg,
-            COALESCE(SUM(CASE WHEN rn > ${RECENT_GAME_COUNT} THEN points ELSE 0 END), 0)::float AS prior_points,
-            COALESCE(SUM(CASE WHEN rn > ${RECENT_GAME_COUNT} THEN 1 ELSE 0 END), 0)::int AS prior_games
-          FROM ranked
-          GROUP BY user_id
-          HAVING MAX(total_games) >= ${RECENT_GAME_COUNT}
-        )
-        SELECT
-          user_id,
-          total_games,
-          recent_ppg,
-          prior_points,
-          prior_games,
-           (prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}) AS baseline_ppg,
-          CASE
-             WHEN (prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}) = 0 THEN 1.0
-             ELSE recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}))
-          END AS ratio,
-          CASE
-             WHEN (prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}) = 0 THEN 'NEUTRAL'
-             WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT})) >= 1.25 THEN 'HOT'
-             WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT})) <= 0.75 THEN 'COLD'
-            ELSE 'NEUTRAL'
-          END AS streak
-        FROM streak_data
-      `);
-
-      const rows = (result as any).rows ?? (result as any);
-      const streaks: Record<string, string> = {};
-      for (const row of rows) {
-        if (row.streak && row.streak !== 'NEUTRAL') {
-          streaks[row.user_id] = row.streak;
-        }
-      }
+      const streaks = await getTeamStreaks(teamId, leagueId, seasonId);
 
       return res.json({ streaks });
     } catch (err) {
