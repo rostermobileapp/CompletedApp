@@ -1504,6 +1504,7 @@ export default function GameDetails() {
                       viewerTeamIds={[predictionViewerTeamId]}
                       notAttending={predictionRsvpSummary?.notAttending || []}
                       compact
+                      className="w-auto px-4 py-2"
                       dataTestId="button-view-odds"
                     />
                   )}
