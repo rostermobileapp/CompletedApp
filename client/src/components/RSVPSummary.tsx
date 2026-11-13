@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Users, UserCheck, UserX } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -10,11 +9,10 @@ interface RSVPSummaryProps {
   gameId: string;
   teamId?: string; // If specified, show only this team's RSVP data
   showTeamSeparation?: boolean; // If true, show both teams separately
-  onViewDetails?: () => void;
   className?: string;
 }
 
-export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails, className }: RSVPSummaryProps) {
+export function RSVPSummary({ gameId, teamId, showTeamSeparation, className }: RSVPSummaryProps) {
   const { data: rsvpSummary, isLoading } = useQuery({
     queryKey: teamId
       ? [`/api/games/${gameId}/rsvp-summary?teamId=${teamId}`]
@@ -132,17 +130,6 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
           {totalPlayers} total player{totalPlayers !== 1 ? 's' : ''}
         </CardDescription>
       </CardHeader>
-      <CardContent className="pt-[4px] pb-[4px]">
-        {onViewDetails && (
-          <Button 
-            onClick={onViewDetails}
-            className="w-full bg-primary text-primary-foreground hover:bg-primary"
-            data-testid="button-rsvp-find-substitutes"
-          >
-            Find Substitutes
-          </Button>
-        )}
-      </CardContent>
     </Card>
   );
 }

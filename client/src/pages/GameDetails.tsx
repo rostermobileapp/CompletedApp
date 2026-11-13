@@ -1533,6 +1533,7 @@ export default function GameDetails() {
                     userTeamId={userTeam.id}
                     isCaptain={isCaptain}
                     isCommissioner={isCommissioner}
+                    onFindSubstitutes={() => setShowRSVPModal(true)}
                     onRequestSubstitute={isCaptain ? (playerId, playerName) => {
                       setSubstituteRequestData({ 
                         playerId, 
@@ -1553,7 +1554,6 @@ export default function GameDetails() {
                     gameId={game.id}
                     teamId={userTeam?.id}
                     showTeamSeparation={isCommissioner && !userTeam}
-                    onViewDetails={() => setShowRSVPModal(true)}
                   />
                 </div>
               )}

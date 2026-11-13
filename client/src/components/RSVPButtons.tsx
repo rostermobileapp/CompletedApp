@@ -34,12 +34,13 @@ interface RSVPButtonsProps {
   userId: string;
   userTeamId?: string;
   className?: string;
+  onFindSubstitutes?: () => void;
   onRequestSubstitute?: (playerId: string, playerName: string) => void;
   isCaptain?: boolean;
   isCommissioner?: boolean;
 }
 
-export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSubstitute, isCaptain, isCommissioner }: RSVPButtonsProps) {
+export function RSVPButtons({ gameId, userId, userTeamId, className, onFindSubstitutes, onRequestSubstitute, isCaptain, isCommissioner }: RSVPButtonsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [detailsModalPlayer, setDetailsModalPlayer] = useState<string | null>(null);
@@ -173,6 +174,16 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
 
   return (
     <div className={cn("grid grid-cols-2 gap-3", className)} data-testid="rsvp-buttons">
+      {onFindSubstitutes && notAttendingPlayers.length > 0 && (
+        <Button
+          size="sm"
+          onClick={onFindSubstitutes}
+          className="col-start-2 w-full border-2 text-xs px-2"
+          data-testid="button-rsvp-find-substitutes"
+        >
+          Find Substitutes
+        </Button>
+      )}
       {/* In Column */}
       <div className="flex flex-col">
         <Button
