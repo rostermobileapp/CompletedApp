@@ -1549,7 +1549,6 @@ export default function GameDetails() {
               {/* Team Attendance Summary - Show for all users with a team or commissioners */}
               {(userTeam || isCommissioner) && (
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Team Attendance:</p>
                   <RSVPSummary 
                     gameId={game.id}
                     teamId={userTeam?.id}
