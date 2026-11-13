@@ -7,6 +7,10 @@ const migration = readFileSync(
   resolve(process.cwd(), "migrations/0047_game_win_predictions.sql"),
   "utf8",
 );
+const dispatchScopeMigration = readFileSync(
+  resolve(process.cwd(), "migrations/0049_win_chance_dispatch_scope.sql"),
+  "utf8",
+);
 const routes = readFileSync(resolve(process.cwd(), "server/routes.ts"), "utf8");
 const createTriggerStatements = [...migration.matchAll(/CREATE TRIGGER[\s\S]*?;/g)]
   .map(([statement]) => statement);
@@ -27,11 +31,9 @@ test("win-chance triggers are limited to the permitted data events", () => {
     "win_chance_player_stats_deleted",
     "win_chance_player_stats_inserted",
     "win_chance_player_stats_updated",
-    "win_chance_rsvp_no",
-    "win_chance_rsvp_no_updated",
     "win_chance_team_record_saved",
-    "win_chance_tie_setting_saved",
   ].sort());
+  assert.doesNotMatch(migration, /win_chance_rsvp_no|win_chance_tie_setting_saved/);
 
   const gameTriggerStatements = createTriggerStatements.filter((statement) =>
     /ON public\.games\b/i.test(statement),
@@ -42,6 +44,12 @@ test("win-chance triggers are limited to the permitted data events", () => {
     /AFTER UPDATE OF home_score,\s*away_score,\s*is_completed ON public\.games/i,
   );
   assert.ok(createTriggerStatements.every((statement) => !/scheduled_at/i.test(statement)));
+});
+
+test("the scope migration removes RSVP and league-setting dispatches", () => {
+  assert.match(dispatchScopeMigration, /DROP TRIGGER IF EXISTS win_chance_rsvp_no ON public\.game_rsvps/i);
+  assert.match(dispatchScopeMigration, /DROP TRIGGER IF EXISTS win_chance_rsvp_no_updated ON public\.game_rsvps/i);
+  assert.match(dispatchScopeMigration, /DROP TRIGGER IF EXISTS win_chance_tie_setting_saved ON public\.leagues/i);
 });
 
 test("the database enforces the per-team 30-second dispatch guard", () => {

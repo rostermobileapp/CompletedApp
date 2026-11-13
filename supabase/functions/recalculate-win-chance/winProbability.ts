@@ -2,8 +2,9 @@
  * Roster — Game Win Probability ("Odds") Engine
  * ------------------------------------------------
  * Pure function: give it the current stats for both teams and it returns a
- * win probability. Re-run it whenever a score, player stat, goalie stat, or
- * RSVP changes and the prediction is automatically up to date.
+ * win probability. Recalculate after a game is finalized or a completed result,
+ * relevant player stat, or team record changes. RSVP values are read as model
+ * inputs during those recalculations but do not trigger them.
  *
  * THE MODEL (3 stages)
  *

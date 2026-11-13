@@ -8,8 +8,9 @@ requests with `pg_net`; requests do not run in the application process.
 1. In Supabase Vault, create two secrets with these exact names:
    - `win_chance_project_url`: the project's Supabase URL.
    - `win_chance_secret_key`: the project's **default API secret key**.
-2. Apply `migrations/0047_game_win_predictions.sql` and
-   `migrations/0048_win_chance_safe_save.sql`.
+2. Apply `migrations/0047_game_win_predictions.sql`,
+   `migrations/0048_win_chance_safe_save.sql`, and
+   `migrations/0049_win_chance_dispatch_scope.sql`.
 3. Deploy `recalculate-win-chance` from `supabase/functions`, including
    `calculator.ts`, `modelInputs.ts`, `gameTime.ts`, and the unchanged model.
 
@@ -32,12 +33,12 @@ WHERE league_id IS NOT NULL;
 For a one-team smoke test, run `SELECT public.win_chance_dispatch_team('<team-id>');`
 in the SQL editor and then read that team's upcoming `game_predictions` rows.
 
-Schedule changes do not invoke the worker. After the initial seed, automatic
-updates are limited to completed-game scores, scorekeeper attendance,
-goals/goalie/player stats, completed OT/shootout-result corrections, team records, a league tie-setting change, and an RSVP
-becoming “No.” Reads and page opens never invoke the worker. If a later schedule
-needs an initial prediction before any eligible data event occurs, run the
-one-team SQL dispatch above as an explicit administrative seed.
+Schedule changes, RSVP changes, league tie-setting changes, reads, and page
+opens do not invoke the worker. Automatic updates follow completed-game
+score/result changes, scorekeeper attendance/goals/goalie inputs for completed
+games, player-stat changes, and team record changes. If a later schedule needs
+an initial prediction before an eligible data event occurs, run the one-team
+SQL dispatch above as an explicit administrative seed.
 
 Migration 0048 must be applied **before** deploying the corrected worker: its
 service-role-only save function locks the game row and rejects started, scored,

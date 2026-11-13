@@ -285,41 +285,6 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.win_chance_tie_setting_trigger()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_team_id varchar;
-BEGIN
-  IF OLD.allow_ties IS DISTINCT FROM NEW.allow_ties THEN
-    FOR v_team_id IN
-      SELECT id FROM public.teams WHERE league_id = NEW.id
-    LOOP
-      PERFORM public.win_chance_dispatch_team(v_team_id);
-    END LOOP;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.win_chance_rsvp_no_trigger()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  IF NEW.status = 'not_attending'
-     AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM NEW.status) THEN
-    PERFORM public.win_chance_dispatch_team(NEW.team_id);
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
 DROP TRIGGER IF EXISTS win_chance_game_insert ON public.games;
 DROP FUNCTION IF EXISTS public.win_chance_game_insert_trigger();
 
@@ -370,13 +335,6 @@ CREATE TRIGGER win_chance_team_record_saved
   AFTER UPDATE OF wins, losses, ties, goals_for, goals_against ON public.teams
   FOR EACH ROW EXECUTE FUNCTION public.win_chance_team_record_trigger();
 
-DROP TRIGGER IF EXISTS win_chance_tie_setting_saved ON public.leagues;
-CREATE TRIGGER win_chance_tie_setting_saved
-  AFTER UPDATE OF allow_ties ON public.leagues
-  FOR EACH ROW
-  WHEN (OLD.allow_ties IS DISTINCT FROM NEW.allow_ties)
-  EXECUTE FUNCTION public.win_chance_tie_setting_trigger();
-
 DROP TRIGGER IF EXISTS win_chance_player_stats_inserted ON public.player_stats;
 CREATE TRIGGER win_chance_player_stats_inserted
   AFTER INSERT ON public.player_stats
@@ -402,26 +360,10 @@ CREATE TRIGGER win_chance_player_stats_deleted
   WHEN (OLD.games_played > 0 OR OLD.goals > 0 OR OLD.assists > 0)
   EXECUTE FUNCTION public.win_chance_player_stats_trigger();
 
-DROP TRIGGER IF EXISTS win_chance_rsvp_no ON public.game_rsvps;
-CREATE TRIGGER win_chance_rsvp_no
-  AFTER INSERT ON public.game_rsvps
-  FOR EACH ROW WHEN (NEW.status = 'not_attending')
-  EXECUTE FUNCTION public.win_chance_rsvp_no_trigger();
-
-DROP TRIGGER IF EXISTS win_chance_rsvp_no_updated ON public.game_rsvps;
-CREATE TRIGGER win_chance_rsvp_no_updated
-  AFTER UPDATE OF status ON public.game_rsvps
-  FOR EACH ROW
-  WHEN (OLD.status IS DISTINCT FROM NEW.status AND NEW.status = 'not_attending')
-  EXECUTE FUNCTION public.win_chance_rsvp_no_trigger();
-
 REVOKE ALL ON FUNCTION public.win_chance_dispatch_team(varchar) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_dispatch_game_if_completed(varchar) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_game_score_trigger() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_game_stats_trigger() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_team_record_trigger() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.win_chance_player_stats_trigger() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.win_chance_tie_setting_trigger() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.win_chance_rsvp_no_trigger() FROM PUBLIC, anon, authenticated;
-
 COMMIT;
