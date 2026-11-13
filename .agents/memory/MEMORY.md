@@ -95,3 +95,5 @@
 - [Prediction visibility verification](prediction-visibility-verification.md) — test parent-card eligibility and roster identity; stored rows and child tests do not establish signed-in visibility.
 - [Schedule card action alignment](schedule-card-action-alignment.md) — center View and chevron one-third down from the top, never one-third up from the bottom.
 - [Prediction standings authority](prediction-standings-authority.md) — team-summary counters can stay zero; prediction inputs must match result-derived season standings, including OT losses.
+- [Supabase Edge Function deployment](supabase-edge-function-deployment.md) — use remote bundling when local Docker bundling fails through Replit’s package proxy.
+- [View Odds premium scope](win-chance-premium-scope.md) — detailed prediction popup is Player Pro/Commissioner; keep the basic win-chance display separate.

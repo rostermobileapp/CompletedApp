@@ -9,6 +9,7 @@ import { QueryClient } from "@tanstack/react-query";
 
 const nativeRequire = createRequire(import.meta.url);
 const prediction = {
+  canViewDetails: true,
   homeTeamId: "home", awayTeamId: "away",
   homeWinProbability: 0.62, awayWinProbability: 0.38,
   moneylineHome: "-1900", moneylineAway: "+1900",
@@ -169,6 +170,28 @@ test("Game Details keeps View Odds and exposes recoverable loading/error states"
   assert.match(renderButton({ data: prediction }), /View Odds/);
   assert.match(renderButton({ isLoading: true }), /Loading game prediction/);
   assert.match(renderButton({ isError: true }), /Retry game prediction/);
+  const locked = renderButton({ data: { ...prediction, canViewDetails: false } });
+  assert.match(locked, /button-game-prediction-locked/);
+  assert.match(locked, /href="\/subscription"/);
+  assert.match(locked, /Player Pro or Commissioner/);
+  assert.doesNotMatch(locked, /dialog-win-chance/);
+});
+
+test("opening View Odds fetches the latest saved forecast instead of retaining three cached skaters", () => {
+  let reads = 0;
+  let opened = false;
+  const { GamePredictionButton } = load("client/src/components/GamePredictionButton.tsx", {
+    react: { ...nativeRequire("react"), useState: () => [false, (value: boolean) => { opened = value; }] },
+    "@/hooks/useGamePrediction": { useGamePrediction: () => ({
+      data: prediction, refetch: async () => { reads++; },
+    }) },
+    "@/lib/utils": { cn: (...values: unknown[]) => values.filter(Boolean).join(" ") },
+    "@/components/WinChanceSheet": { WinChanceSheet: () => null },
+  });
+  const element = GamePredictionButton(props);
+  element.props.children[0].props.onClick({ stopPropagation() {} });
+  assert.equal(reads, 1);
+  assert.equal(opened, true);
 });
 
 function optionsFor(request: () => Promise<unknown>) {

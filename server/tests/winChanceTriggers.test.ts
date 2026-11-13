@@ -70,7 +70,7 @@ test("prediction rows are team-readable and writable only by the service role", 
 
 test("the authenticated prediction endpoint reads stored rows only", () => {
   const route = routes.match(
-    /app\.get\('\/api\/games\/:gameId\/prediction'[\s\S]*?^\s*\}\);/m,
+    /app\.get\('\/api\/games\/:gameId\/prediction'[\s\S]*?^  \}\);/m,
   )?.[0];
   assert.ok(route, "prediction route exists");
   assert.match(route, /isAuthenticated/);

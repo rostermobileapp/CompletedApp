@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Lock } from "lucide-react";
 import { useGamePrediction } from "@/hooks/useGamePrediction";
 import { cn } from "@/lib/utils";
 import { WinChanceSheet } from "@/components/WinChanceSheet";
@@ -67,6 +68,30 @@ export function GamePredictionButton({
     );
   }
 
+  if (!prediction.canViewDetails) {
+    return (
+      <a
+        href="/subscription"
+        className={cn(
+          compact
+            ? "flex h-10 w-[148px] shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm text-muted-foreground"
+            : "flex min-h-14 w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground",
+          className,
+        )}
+        onClick={event => event.stopPropagation()}
+        aria-label="View Odds requires Player Pro or Commissioner"
+        title="Player Pro or Commissioner required"
+        data-testid={`${dataTestId}-locked`}
+      >
+        <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>
+          <span className="block font-semibold">View Odds</span>
+          {!compact && <span className="block text-xs">Player Pro or Commissioner required</span>}
+        </span>
+      </a>
+    );
+  }
+
   const chance = viewerTeamId === prediction.homeTeamId
     ? prediction.homeWinProbability
     : prediction.awayWinProbability;
@@ -78,6 +103,8 @@ export function GamePredictionButton({
         type="button"
         onClick={(event) => {
           event.stopPropagation();
+          // Read the latest saved forecast; this never runs the calculator.
+          void refetch();
           setOpen(true);
         }}
         className={cn(

@@ -12059,12 +12059,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Read-only prediction lookup. Recalculation is handled only by database
   // triggers dispatching the Supabase Edge Function.
-  app.get('/api/games/:gameId/prediction', isAuthenticated, async (req: any, res) => {
+  app.get('/api/games/:gameId/prediction', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
+      res.set('Cache-Control', 'no-store');
       const userId = req.user.claims.sub;
       const gameId = req.params.gameId;
       const [game] = await db
-        .select({ homeTeamId: games.homeTeamId, awayTeamId: games.awayTeamId })
+        .select({ homeTeamId: games.homeTeamId, awayTeamId: games.awayTeamId, leagueId: games.leagueId })
         .from(games)
         .where(eq(games.id, gameId))
         .limit(1);
@@ -12098,6 +12099,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You must be on one of these teams to view this prediction' });
       }
 
+      const canViewDetails = game.leagueId
+        ? await canAccessLeaguePremiumFeatures(req.userWithPermissions, game.leagueId)
+        : canAccessPremiumFeatures(req.userWithPermissions);
+      const asNumber = (value: unknown) => value == null ? null : Number(value);
+      if (!canViewDetails) {
+        // Keep the basic win-chance bar available, without exposing paid details.
+        const [summary] = await db.select({
+          gameId: gamePredictions.gameId,
+          homeTeamId: gamePredictions.homeTeamId,
+          awayTeamId: gamePredictions.awayTeamId,
+          homeWinProbability: gamePredictions.homeWinProbability,
+          awayWinProbability: gamePredictions.awayWinProbability,
+          tieProbability: gamePredictions.tieProbability,
+        }).from(gamePredictions).where(eq(gamePredictions.gameId, gameId)).limit(1);
+        if (!summary || summary.homeTeamId !== game.homeTeamId || summary.awayTeamId !== game.awayTeamId) {
+          return res.json(null);
+        }
+        return res.json({
+          ...summary, canViewDetails: false,
+          homeWinProbability: asNumber(summary.homeWinProbability),
+          awayWinProbability: asNumber(summary.awayWinProbability),
+          tieProbability: asNumber(summary.tieProbability),
+        });
+      }
+
       const [prediction] = await db
         .select()
         .from(gamePredictions)
@@ -12107,9 +12133,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(null);
       }
 
-      const asNumber = (value: unknown) => value == null ? null : Number(value);
       res.json({
         ...prediction,
+        canViewDetails: true,
         homeWinProbability: asNumber(prediction.homeWinProbability),
         awayWinProbability: asNumber(prediction.awayWinProbability),
         tieProbability: asNumber(prediction.tieProbability),

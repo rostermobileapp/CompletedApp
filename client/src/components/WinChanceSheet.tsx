@@ -17,6 +17,7 @@ type ScorerProjection = {
 };
 
 export type WinChanceData = {
+  canViewDetails: true;
   homeTeamId: string;
   awayTeamId: string;
   homeWinProbability: number | null;
@@ -43,6 +44,11 @@ export type WinChanceData = {
   goalieAway: string | null;
   calculatedAt: string;
 };
+
+export type WinChanceSummary = Pick<
+  WinChanceData,
+  "homeTeamId" | "awayTeamId" | "homeWinProbability" | "awayWinProbability" | "tieProbability"
+> & { canViewDetails: false };
 
 type RsvpPlayer = {
   user?: { id?: string; firstName?: string | null; lastName?: string | null };
@@ -77,7 +83,7 @@ export function WinChanceSheet({
   viewerTeamId,
   notAttending = [],
 }: WinChanceSheetProps) {
-  if (!prediction) return null;
+  if (!prediction?.canViewDetails) return null;
 
   const viewerIsHome = viewerTeamId === prediction.homeTeamId;
   const viewerScorers = viewerIsHome ? prediction.topScorersHome : prediction.topScorersAway;
