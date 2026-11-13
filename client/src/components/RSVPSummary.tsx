@@ -133,35 +133,6 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-[4px] pb-[4px]">
-        <div className="flex gap-2 mb-3">
-          <Badge 
-            variant="secondary" 
-            className="hover:bg-green-200 flex items-center gap-1 text-[#ffffff] bg-[#16a34a]"
-            data-testid="badge-attending"
-          >
-            <UserCheck className="h-3 w-3" />
-            {attendingCount} In
-          </Badge>
-          <Badge 
-            variant="secondary" 
-            className="hover:bg-red-200 flex items-center gap-1 text-[#ffffff] bg-[#dc2626]"
-            data-testid="badge-not-attending"
-          >
-            <UserX className="h-3 w-3" />
-            {notAttendingCount} Out
-          </Badge>
-          {noResponseCount > 0 && (
-            <Badge 
-              variant="outline" 
-              className="flex items-center gap-1"
-              data-testid="badge-no-response"
-            >
-              <Users className="h-3 w-3" />
-              {noResponseCount} no response
-            </Badge>
-          )}
-        </div>
-        
         {onViewDetails && (
           <Button 
             onClick={onViewDetails}
