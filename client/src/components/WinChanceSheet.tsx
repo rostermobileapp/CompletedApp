@@ -90,6 +90,7 @@ export function WinChanceSheet({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         disableAnimation
+        closeClassName="z-10 flex h-10 w-10 items-center justify-center rounded-lg border border-primary/40 bg-primary/20 p-2 text-foreground opacity-100 shadow-sm transition-colors hover:bg-primary/30"
         className="max-h-[88dvh] w-[calc(100vw-2rem)] max-w-xl overflow-y-auto rounded-2xl border border-border bg-background px-4 py-5 shadow-2xl sm:px-6 sm:py-6"
         data-testid="dialog-win-chance"
       >
@@ -106,6 +107,7 @@ export function WinChanceSheet({
               <TeamChance
                 name={homeTeamName}
                 chance={homeChance}
+                odds={prediction.moneylineHome}
                 record={prediction.homeRecordSnapshot}
                 streak={prediction.homeStreak}
                 align="left"
@@ -121,6 +123,7 @@ export function WinChanceSheet({
               <TeamChance
                 name={awayTeamName}
                 chance={awayChance}
+                odds={prediction.moneylineAway}
                 record={prediction.awayRecordSnapshot}
                 streak={prediction.awayStreak}
                 align="right"
@@ -193,12 +196,14 @@ export function WinChanceSheet({
 function TeamChance({
   name,
   chance,
+  odds,
   record,
   streak,
   align,
 }: {
   name: string;
   chance: number;
+  odds: string;
   record: WinChanceRecord;
   streak: number;
   align: "left" | "right";
@@ -207,6 +212,7 @@ function TeamChance({
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div className="truncate text-sm font-semibold">{name}</div>
       <div className="mt-1 text-2xl font-bold tabular-nums">{percent(chance)}</div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums">Odds {odds}</div>
       <div className="mt-1 text-xs text-muted-foreground" title={record.shootoutLosses == null ? "Wins–Losses–Ties" : "Wins–Losses–Ties–Overtime/shootout losses"}>
         Record {formatWinChanceRecord(record)}
       </div>

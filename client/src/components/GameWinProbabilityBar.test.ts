@@ -11,6 +11,7 @@ const nativeRequire = createRequire(import.meta.url);
 const prediction = {
   homeTeamId: "home", awayTeamId: "away",
   homeWinProbability: 0.62, awayWinProbability: 0.38,
+  moneylineHome: "-1900", moneylineAway: "+1900",
 };
 const props = {
   gameId: "game", homeTeamId: "home", awayTeamId: "away",
@@ -21,7 +22,7 @@ function load(path: string, mocks: Record<string, unknown>) {
   const code = buildSync({
     entryPoints: [path], bundle: true, write: false, format: "cjs",
     platform: "node", jsx: "automatic", packages: "external",
-    external: ["@/hooks/useGamePrediction", "@/lib/queryClient", "@/lib/utils", "@/components/WinChanceSheet", "@/components/ui/dialog", "@/components/ui/badge"],
+    external: ["@/hooks/useGamePrediction", "@/lib/queryClient", "@/lib/utils", "@/components/WinChanceSheet", "@/components/ui/dialog", "@/components/ui/badge", "@radix-ui/react-dialog", "lucide-react"],
   }).outputFiles[0].text;
   const module = { exports: {} as any };
   runInNewContext(code, {
@@ -60,6 +61,7 @@ test("the prediction popup matches Home's thin green/red track and white marker"
     open: true, onOpenChange: () => {}, ...props, viewerTeamId,
     prediction: {
       ...prediction,
+      homeWinProbability: 0.95, awayWinProbability: 0.05,
       homeRecordSnapshot: { wins: 8, losses: 0, ties: 0, shootoutLosses: 1 },
       awayRecordSnapshot: { wins: 1, losses: 7, ties: 1, shootoutLosses: 0 },
       homeStreak: 3, awayStreak: -6,
@@ -71,15 +73,36 @@ test("the prediction popup matches Home's thin green/red track and white marker"
   assert.match(home, /h-1\.5/);
   assert.match(home, /h-3\.5/);
   assert.match(home, /bg-white/);
-  assert.match(home, /bg-\[#22c55e\]" style="width:62%"/);
-  assert.match(home, /left:62%/);
+  assert.match(home, /bg-\[#22c55e\]" style="width:95%"/);
+  assert.match(home, /left:95%/);
   assert.match(home, /Record 8-0-0-1/);
+  assert.match(home, /Odds -1900/);
   assert.match(home, /rounded-xl border border-primary\/20 bg-primary\/10 p-4/);
   assert.match(home, /rounded-xl border border-primary\/30 bg-primary\/20 p-3/);
   assert.doesNotMatch(home, /dark:bg-\[/);
   const away = renderSheet("away");
-  assert.match(away, /bg-\[#ef4444\]" style="width:62%"/);
-  assert.match(away, /bg-\[#22c55e\]" style="width:38%"/);
+  assert.match(away, /bg-\[#ef4444\]" style="width:95%"/);
+  assert.match(away, /bg-\[#22c55e\]" style="width:5%"/);
+  assert.match(away, /Odds \+1900/);
+});
+
+test("the prediction close button is easy to spot and keeps its accessible label", () => {
+  const primitive = Object.fromEntries(
+    ["Root", "Trigger", "Portal", "Overlay", "Content", "Close", "Title", "Description"].map(name => [
+      name, ({ children, ...props }: any) => createElement(name === "Close" ? "button" : "div", props, children),
+    ]),
+  );
+  const { DialogContent } = load("client/src/components/ui/dialog.tsx", {
+    "@/lib/utils": { cn: (...values: unknown[]) => values.filter(Boolean).join(" ") },
+    "@radix-ui/react-dialog": primitive,
+    "lucide-react": { X: () => createElement("svg") },
+  });
+  const html = renderToStaticMarkup(createElement(DialogContent, {
+    open: true, closeClassName: "h-10 w-10 border-primary/40 bg-primary/20",
+  }));
+  assert.match(html, /h-10 w-10 border-primary\/40 bg-primary\/20/);
+  assert.match(html, /<svg/);
+  assert.match(html, /class="sr-only">Close<\/span>/);
 });
 
 test("loading, failed and absent predictions never silently disappear for a rostered player", () => {
