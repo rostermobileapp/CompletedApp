@@ -3098,11 +3098,6 @@ function DashboardMobile() {
           <div className="flex min-h-[58px] items-center justify-between mb-[4px] whitespace-nowrap">
             <div className="flex shrink-0 items-center gap-2">
               <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
-              {import.meta.env.DEV && import.meta.env.VITE_LIVE_PROJECT_PREVIEW === 'true' && (
-                <span className="text-[9px] text-amber-500" data-testid="prediction-preview-check">
-                  Prediction check
-                </span>
-              )}
               <Button
                 onClick={() => setShowAddEventDialog(true)}
                 className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
@@ -3801,10 +3796,6 @@ function DashboardMobile() {
                           {game.venue}
                         </p>
                       )}
-                      <ScheduledGamePrediction
-                        game={game}
-                        viewerTeams={Array.isArray(userTeams) ? userTeams : []}
-                      />
                       {/* Score display for completed games */}
                       {(game.isCompleted || (game.homeScore !== null && game.awayScore !== null)) && !game.isScrimmage && (
                         <div className="text-sm font-medium" data-testid={`text-game-score-${game.id}`}>
@@ -3890,6 +3881,12 @@ function DashboardMobile() {
                         />
                       </div>
                     </div>
+                  </div>
+                  <div className="ml-16">
+                    <ScheduledGamePrediction
+                      game={game}
+                      viewerTeams={Array.isArray(userTeams) ? userTeams : []}
+                    />
                   </div>
                 </div>
               ))}
