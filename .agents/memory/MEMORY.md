@@ -92,3 +92,4 @@
 - [Mobile entry routing](mobile-entry-routing.md) — explicit push intent beats saved-screen restoration, even at Home; preserve destinations through authentication.
 - [Custom team awards scope](custom-team-awards-scope.md) — captain-only grants, transparent art, recipient celebrations, and automatic routine database updates.
 - [RosterHockey brand naming](rosterhockey-brand-naming.md) — use RosterHockey in public copy; retain legal entity, store labels, and stable technical identifiers.
+- [Prediction visibility verification](prediction-visibility-verification.md) — test parent-card eligibility and roster identity; stored rows and child tests do not establish signed-in visibility.

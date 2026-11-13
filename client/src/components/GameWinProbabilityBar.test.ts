@@ -53,7 +53,30 @@ test("loading, failed and absent predictions never silently disappear for a rost
   assert.match(render({ isError: true }), /Retry win chance/);
   assert.match(render({ data: null, isPending: false }), /Win chance unavailable/);
   assert.doesNotMatch(render({ isPending: true }), /role="meter"/);
-  assert.equal(render({ data: prediction }, []), "");
+  assert.match(render({ data: prediction }, []), /Win chance unavailable for this team/);
+});
+
+test("the Home schedule integration renders predictions from the card's selected roster", () => {
+  const { ScheduledGamePrediction } = load("client/src/components/ScheduledGamePrediction.tsx", {
+    "@/hooks/useGamePrediction": { useGamePrediction: () => ({ data: prediction }) },
+    "@/lib/utils": { cn: (...values: unknown[]) => values.filter(Boolean).join(" ") },
+  });
+  const game = {
+    id: "game", homeTeamId: "home", awayTeamId: "away",
+    homeTeam: { id: "home", name: "Mavericks" },
+    awayTeam: { id: "away", name: "Neon Green" },
+    isCompleted: false, homeScore: null, awayScore: null,
+  };
+  const renderSchedule = (overrides = {}, viewerTeams = [{ id: "home" }]) =>
+    renderToStaticMarkup(createElement(ScheduledGamePrediction, { game: { ...game, ...overrides }, viewerTeams }));
+  assert.match(renderSchedule(), /aria-valuenow="62"/);
+  assert.match(renderSchedule(), /Mavericks estimated chance to win/);
+  assert.match(renderSchedule({ homeTeamId: null, awayTeamId: null }), /aria-valuenow="62"/);
+  assert.match(renderSchedule({ homeScore: 0, awayScore: 0 }), /aria-valuenow="62"/);
+  assert.match(renderSchedule({}, []), /Win chance unavailable for this team/);
+  assert.equal(renderSchedule({ isCompleted: true }), "");
+  assert.equal(renderSchedule({ isTournamentMatch: true }), "");
+  assert.equal(renderSchedule({ isScrimmage: true }), "");
 });
 
 test("Game Details keeps View Odds and exposes recoverable loading/error states", () => {
@@ -98,6 +121,14 @@ test("retries remain bounded and never replay unauthorized requests", () => {
   assert.equal(retry(1, { status: 503 }), true);
   assert.equal(retry(2, { status: 503 }), false);
   for (const status of [400, 401, 403, 404]) assert.equal(retry(0, { status }), false);
+});
+
+test("missing roster identity never enables a prediction request", () => {
+  const hook = load("client/src/hooks/useGamePrediction.ts", {
+    "@tanstack/react-query": { useQuery: (options: unknown) => options },
+    "@/lib/queryClient": { apiRequest: () => { throw new Error("must not fetch"); } },
+  });
+  assert.equal(hook.useGamePrediction("game", undefined).enabled, false);
 });
 
 test("Home and Game Details share one request/cache key", async () => {

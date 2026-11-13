@@ -51,7 +51,7 @@ import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
 import { TeamAwardHolderStrip } from '@/components/team-awards/TeamAwardHolders';
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
-import { GameWinProbabilityBar } from '@/components/GameWinProbabilityBar';
+import { ScheduledGamePrediction } from '@/components/ScheduledGamePrediction';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -1223,11 +1223,6 @@ function ScrimmageRequestsBadge({ scrimmageId }: { scrimmageId: string }) {
 export default function Dashboard() {
   const isDesktopWeb = useIsDesktopWeb();
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
-  React.useEffect(() => {
-    if (import.meta.env.DEV && import.meta.env.VITE_LIVE_PROJECT_PREVIEW === 'true') {
-      console.log('[Home prediction render check]', JSON.stringify({ view: isDesktopWeb ? 'desktop' : 'mobile' }));
-    }
-  }, [isDesktopWeb]);
 
   if (isDesktopWeb) {
     return (
@@ -1840,26 +1835,6 @@ function DashboardMobile() {
 
     return games;
   }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll]);
-
-  React.useEffect(() => {
-    if (!import.meta.env.DEV || import.meta.env.VITE_LIVE_PROJECT_PREVIEW !== 'true') return;
-    if (!Array.isArray(upcomingGames)) return;
-    const viewerTeamIds = Array.isArray(userTeamsAll) ? userTeamsAll.map((team: any) => String(team.id)) : [];
-    console.log('[Home prediction eligibility check]', JSON.stringify({
-      scheduleView,
-      teamsLoaded: Array.isArray(userTeamsAll),
-      teamCount: viewerTeamIds.length,
-      games: upcomingGames.slice(0, 5).map((game: any) => ({
-        scrimmage: !!game.isScrimmage,
-        tournament: !!game.isTournamentMatch,
-        completed: !!game.isCompleted,
-        unscored: game.homeScore == null && game.awayScore == null,
-        homeTeamPresent: !!game.homeTeamId,
-        awayTeamPresent: !!game.awayTeamId,
-        viewerMatches: viewerTeamIds.includes(game.homeTeamId) || viewerTeamIds.includes(game.awayTeamId),
-      })),
-    }));
-  }, [upcomingGames, userTeamsAll, scheduleView]);
 
   // Fetch duty assignments for upcoming games
   const { data: dutyAssignments = [] } = useQuery({
@@ -3123,6 +3098,11 @@ function DashboardMobile() {
           <div className="flex min-h-[58px] items-center justify-between mb-[4px] whitespace-nowrap">
             <div className="flex shrink-0 items-center gap-2">
               <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
+              {import.meta.env.DEV && import.meta.env.VITE_LIVE_PROJECT_PREVIEW === 'true' && (
+                <span className="text-[9px] text-amber-500" data-testid="prediction-preview-check">
+                  Prediction check
+                </span>
+              )}
               <Button
                 onClick={() => setShowAddEventDialog(true)}
                 className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
@@ -3821,24 +3801,10 @@ function DashboardMobile() {
                           {game.venue}
                         </p>
                       )}
-                      {!game.isScrimmage
-                        && !game.isTournamentMatch
-                        && !game.isCompleted
-                        && game.homeScore == null
-                        && game.awayScore == null
-                        && game.homeTeamId
-                        && game.awayTeamId && (
-                          <GameWinProbabilityBar
-                            gameId={game.id}
-                            homeTeamId={game.homeTeamId}
-                            awayTeamId={game.awayTeamId}
-                            homeTeamName={game.homeTeam?.name || "Home team"}
-                            awayTeamName={game.awayTeam?.name || "Away team"}
-                            viewerTeamIds={Array.isArray(userTeamsAll)
-                              ? userTeamsAll.map((team: any) => String(team.id))
-                              : []}
-                          />
-                        )}
+                      <ScheduledGamePrediction
+                        game={game}
+                        viewerTeams={Array.isArray(userTeams) ? userTeams : []}
+                      />
                       {/* Score display for completed games */}
                       {(game.isCompleted || (game.homeScore !== null && game.awayScore !== null)) && !game.isScrimmage && (
                         <div className="text-sm font-medium" data-testid={`text-game-score-${game.id}`}>

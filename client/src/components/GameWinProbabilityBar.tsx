@@ -26,12 +26,13 @@ export function GameWinProbabilityBar({
 
   const { data: prediction, isPending, isError, refetch } = useGamePrediction(gameId, viewerTeamId);
 
-  if (!viewerTeamId) return null;
-  if (!prediction) {
+  if (!viewerTeamId || !prediction) {
     return (
       <div className={cn("flex min-h-7 items-center text-[10px] text-muted-foreground", className)}
         data-testid={`game-win-probability-status-${gameId}`}>
-        {isError ? (
+        {!viewerTeamId ? (
+          <span role="status">Win chance unavailable for this team</span>
+        ) : isError ? (
           <button type="button" className="text-primary underline"
             onClick={event => { event.stopPropagation(); void refetch(); }}>
             Retry win chance
