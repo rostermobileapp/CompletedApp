@@ -1579,24 +1579,6 @@ export default function GameDetails() {
                 </Button>
               )}
 
-              {/* Line Combos Button - visible to all team members for non-scrimmage games */}
-              {userTeam && !isScrimmage && game.id && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full mt-2"
-                  onClick={() => {
-                    setLineCombosTeamId(userTeam.id);
-                    setLineCombosGameId(game.id);
-                    setShowLineCombosModal(true);
-                  }}
-                  data-testid="button-line-combos"
-                >
-                  <LayoutList className="w-4 h-4 mr-2" />
-                  Line Combos
-                </Button>
-              )}
-
             </div>
           </div>
         )}
