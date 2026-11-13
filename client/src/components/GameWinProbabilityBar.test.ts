@@ -21,7 +21,7 @@ function load(path: string, mocks: Record<string, unknown>) {
   const code = buildSync({
     entryPoints: [path], bundle: true, write: false, format: "cjs",
     platform: "node", jsx: "automatic", packages: "external",
-    external: ["@/hooks/useGamePrediction", "@/lib/queryClient", "@/lib/utils", "@/components/WinChanceSheet"],
+    external: ["@/hooks/useGamePrediction", "@/lib/queryClient", "@/lib/utils", "@/components/WinChanceSheet", "@/components/ui/dialog", "@/components/ui/badge"],
   }).outputFiles[0].text;
   const module = { exports: {} as any };
   runInNewContext(code, {
@@ -46,6 +46,37 @@ test("Home shows the signed-in team's green/red probability bar", () => {
   assert.match(home, /#22c55e/);
   assert.match(home, /#ef4444/);
   assert.match(render({ data: prediction }, ["away"]), /aria-valuenow="38"/);
+});
+
+test("the prediction popup matches Home's thin green/red track and white marker", () => {
+  const box = ({ children }: { children: any }) => createElement("div", null, children);
+  const { WinChanceSheet } = load("client/src/components/WinChanceSheet.tsx", {
+    "@/components/ui/dialog": Object.fromEntries(
+      ["Dialog", "DialogContent", "DialogDescription", "DialogHeader", "DialogTitle"].map(name => [name, box]),
+    ),
+    "@/components/ui/badge": { Badge: box },
+  });
+  const renderSheet = (viewerTeamId: string) => renderToStaticMarkup(createElement(WinChanceSheet, {
+    open: true, onOpenChange: () => {}, ...props, viewerTeamId,
+    prediction: {
+      ...prediction,
+      homeRecordSnapshot: { wins: 8, losses: 0, ties: 0, shootoutLosses: 1 },
+      awayRecordSnapshot: { wins: 1, losses: 7, ties: 1, shootoutLosses: 0 },
+      homeStreak: 3, awayStreak: -6,
+      topScorersHome: [], topScorersAway: [],
+      expectedGoalsHome: 8.3, expectedGoalsAway: 3.5,
+    },
+  }));
+  const home = renderSheet("home");
+  assert.match(home, /h-1\.5/);
+  assert.match(home, /h-3\.5/);
+  assert.match(home, /bg-white/);
+  assert.match(home, /bg-\[#22c55e\]" style="width:62%"/);
+  assert.match(home, /left:62%/);
+  assert.match(home, /Record 8-0-0-1/);
+  const away = renderSheet("away");
+  assert.match(away, /bg-\[#ef4444\]" style="width:62%"/);
+  assert.match(away, /bg-\[#22c55e\]" style="width:38%"/);
 });
 
 test("loading, failed and absent predictions never silently disappear for a rostered player", () => {

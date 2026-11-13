@@ -126,9 +126,15 @@ export function WinChanceSheet({
                 align="right"
               />
             </div>
-            <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-              <div className="bg-primary transition-all" style={{ width: `${homeChance * 100}%` }} />
-              <div className="bg-muted-foreground/40 transition-all" style={{ width: `${awayChance * 100}%` }} />
+            <div className="relative mt-4 h-5" aria-hidden="true">
+              <div className="absolute inset-x-0 top-1/2 flex h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-muted">
+                <div className={viewerIsHome ? "h-full bg-[#22c55e]" : "h-full bg-[#ef4444]"} style={{ width: `${homeChance * 100}%` }} />
+                <div className={viewerIsHome ? "h-full bg-[#ef4444]" : "h-full bg-[#22c55e]"} style={{ width: `${awayChance * 100}%` }} />
+              </div>
+              <div
+                className="absolute left-0 top-1/2 z-10 h-3.5 w-[2px] -translate-x-1/2 -translate-y-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+                style={{ left: `${homeChance * 100}%` }}
+              />
             </div>
           </section>
 
