@@ -149,6 +149,9 @@ app.use((req, res, next) => {
     processCompletedGameRecalculation: async (gameId) => {
       await scorekeeperRecalculation.processCompletedGame(gameId);
     },
+    processCompletedGamesRecalculation: async (gameIds) => {
+      await scorekeeperRecalculation.processCompletedGames(gameIds);
+    },
   });
   if (isVerifiedProductionRuntime()) {
   await reconcileApplePurchaseLinks();

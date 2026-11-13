@@ -245,6 +245,21 @@ export async function recalculateSourceGame(admin: Db, sourceGameId: string, now
   return recalculateTeams(admin, [game.home_team_id ?? "", game.away_team_id ?? ""], now);
 }
 
+export async function recalculateSourceGames(admin: Db, sourceGameIds: string[], now = Date.now()) {
+  const uniqueIds = Array.from(new Set(sourceGameIds.filter(Boolean)));
+  const teams = new Set<string>();
+  for (let start = 0; start < uniqueIds.length; start += 100) {
+    const result = await admin.from("games").select("home_team_id, away_team_id")
+      .in("id", uniqueIds.slice(start, start + 100));
+    if (result.error) throw new Error("Source games unavailable");
+    for (const game of result.data ?? []) {
+      if (game.home_team_id) teams.add(game.home_team_id);
+      if (game.away_team_id) teams.add(game.away_team_id);
+    }
+  }
+  return recalculateTeams(admin, Array.from(teams), now);
+}
+
 export async function recalculateTeam(admin: Db, teamId: string, now = Date.now()) {
   return recalculateTeams(admin, [teamId], now);
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import pg from "pg";
 import { fixtureAdmin } from "./helpers/predictionFixtureDb.js";
-import { loadScope, loadTeamData, recalculateTeam } from "../../supabase/functions/recalculate-win-chance/calculator.js";
+import { loadScope, loadTeamData, recalculateSourceGames, recalculateTeam } from "../../supabase/functions/recalculate-win-chance/calculator.js";
 import { aggregateResults, buildTeamInput, headToHead, type GameRow } from "../../supabase/functions/recalculate-win-chance/modelInputs.js";
 import { isFutureGame, localTimestamp } from "../../supabase/functions/recalculate-win-chance/gameTime.js";
 import { formatWinChanceRecord } from "../../shared/winChanceRecord.js";
@@ -182,6 +182,13 @@ describe("prediction loader and guarded persistence", { skip: !url }, () => {
     assert.ok(Math.abs(Number(first.home_win_probability)+Number(first.away_win_probability)+Number(first.tie_probability)-1)<0.00002);
     await recalculateTeam(admin,"mavs",now);
     assert.deepEqual((await pool.query("SELECT * FROM game_predictions")).rows[0],first);
+  });
+  test("recalculates shared teams once for a completed-game batch", async () => {
+    await recalculateSourceGames(admin, ["mavs-0", "neon-0", "missing"], now);
+    const first = (await pool.query("SELECT * FROM game_predictions")).rows;
+    assert.equal(first.length, 1);
+    await recalculateSourceGames(admin, ["mavs-0", "neon-0"], now);
+    assert.deepEqual((await pool.query("SELECT * FROM game_predictions")).rows, first);
   });
   test("excludes stale team assignments while retaining unassigned direct members", async () => {
     await pool.query("UPDATE league_memberships SET assigned_team_id='neon' WHERE user_id='mavs-star'");

@@ -50,6 +50,11 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db, pool } from "./db";
+import {
+  finalizeScorekeeperGame,
+  normalizeScorekeeperAttendees,
+  saveScorekeeperGame,
+} from "./scorekeeperFinalization";
 import { gamePenalties } from "@shared/schema";
 import { dutyAssignments, dutyTemplates } from "@shared/schema";
 import { withBeverageDutyAssignments } from "@shared/beverageDutyCounts";
@@ -1084,6 +1089,7 @@ async function applyAdditionalTeamPaymentFromSession(
 
 type RouteServices = {
   processCompletedGameRecalculation?: (gameId: string) => Promise<void>;
+  processCompletedGamesRecalculation?: (gameIds: string[]) => Promise<void>;
 };
 
 export async function registerRoutes(app: Express, services: RouteServices = {}): Promise<Server> {
@@ -13114,6 +13120,14 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const { teamId, scorerId, primaryAssistId, secondaryAssistId, period, timestamp } = req.body;
+      const requestedGoalId = typeof req.body?.id === 'string' ? req.body.id : undefined;
+      if (requestedGoalId) {
+        const [existing] = await db.select().from(gameGoals).where(eq(gameGoals.id, requestedGoalId)).limit(1);
+        if (existing) {
+          if (existing.gameId !== gameId) return res.status(409).json({ message: 'Goal identifier is already in use.' });
+          return res.json(existing);
+        }
+      }
       const normalizedScorerId = scorerId === 'substitute' ? null : scorerId;
       const normalizedPrimaryAssistId = primaryAssistId === 'substitute' ? null : (primaryAssistId || null);
       const normalizedSecondaryAssistId = secondaryAssistId === 'substitute' ? null : (secondaryAssistId || null);
@@ -13123,6 +13137,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       const goalNumber = existingGoals.length + 1;
 
       const goal = await storage.createGameGoal({
+        ...(requestedGoalId ? { id: requestedGoalId } : {}),
         gameId,
         teamId,
         scorerId: normalizedScorerId,
@@ -13297,12 +13312,21 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const { teamId, playerId, minutes, penaltyType, period, timestamp } = req.body;
+      const requestedPenaltyId = typeof req.body?.id === 'string' ? req.body.id : undefined;
+      if (requestedPenaltyId) {
+        const [existing] = await db.select().from(gamePenalties).where(eq(gamePenalties.id, requestedPenaltyId)).limit(1);
+        if (existing) {
+          if (existing.gameId !== gameId) return res.status(409).json({ message: 'Penalty identifier is already in use.' });
+          return res.json(existing);
+        }
+      }
       
       // Get the current penalty count for this game to set the penalty number
       const existingPenalties = await storage.getGamePenalties(gameId);
       const penaltyNumber = existingPenalties.length + 1;
 
       const penalty = await storage.createGamePenalty({
+        ...(requestedPenaltyId ? { id: requestedPenaltyId } : {}),
         gameId,
         teamId,
         playerId,
@@ -13450,6 +13474,87 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   });
 
   // Scorekeeper Dashboard - Finalize game and update stats
+  app.post('/api/games/:gameId/save', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      const game = await storage.getGameById(gameId);
+      if (!game) return res.status(404).json({ message: 'Game not found' });
+      if (!(await checkScorekeeperPermission(userId, game))) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+      if (game.isCompleted) return res.status(409).json({ message: 'Completed games must be edited through Save Stats.' });
+      if (!Number.isInteger(game.homeScore) || !Number.isInteger(game.awayScore)) {
+        return res.status(400).json({ message: 'Save both game scores before saving this game.' });
+      }
+      const requestedResultType = req.body?.resultType;
+      if (requestedResultType !== undefined && !['regulation', 'overtime', 'shootout'].includes(requestedResultType)) {
+        return res.status(400).json({ message: 'Invalid game result type' });
+      }
+      if (!Array.isArray(req.body?.attendees)) {
+        return res.status(400).json({ message: 'Attendance must be supplied when saving a game.' });
+      }
+      const attendees = await normalizeScorekeeperAttendees(gameId, game, req.body.attendees, userId);
+      await saveScorekeeperGame(gameId, userId, attendees, requestedResultType);
+      return res.json({ ok: true });
+    } catch (error: any) {
+      console.error('Error saving scorekeeper game:', error);
+      if (error?.status === 400) return res.status(400).json({ message: error.message });
+      return res.status(500).json({ message: 'Failed to save game' });
+    }
+  });
+
+  app.post('/api/scorekeeper/finalize-batch', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const leagueId = typeof req.body?.leagueId === 'string' ? req.body.leagueId : '';
+      if (!leagueId) return res.status(400).json({ message: 'League ID is required.' });
+      if (!(await checkScorekeeperPermission(userId, { leagueId }))) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const candidateGames = await db.select().from(games).where(and(
+        eq(games.leagueId, leagueId),
+        eq(games.isCompleted, false),
+        isNotNull(games.scorekeeperSavedAt),
+        isNotNull(games.homeScore),
+        isNotNull(games.awayScore),
+        sql`NOT EXISTS (SELECT 1 FROM tournament_matches tm WHERE tm.game_id = ${games.id})`,
+      )).orderBy(games.scorekeeperSavedAt, games.id).limit(25);
+
+      let finalizedCount = 0;
+      const finalizedGameIds: string[] = [];
+      for (const game of candidateGames) {
+        await finalizeScorekeeperGame(game.id, userId);
+        finalizedCount++;
+        finalizedGameIds.push(game.id);
+      }
+
+      if (finalizedGameIds.length && services.processCompletedGamesRecalculation) {
+        void services.processCompletedGamesRecalculation(finalizedGameIds).catch((error: any) => {
+          console.error("[ScorekeeperRecalculation] Batched finalization follow-up failed.", {
+            gameCount: finalizedGameIds.length,
+            code: error?.code ?? "unknown",
+          });
+        });
+      }
+
+      const [remaining] = await db.select({ count: sql<number>`count(*)::int` })
+        .from(games).where(and(
+          eq(games.leagueId, leagueId),
+          eq(games.isCompleted, false),
+          isNotNull(games.scorekeeperSavedAt),
+          isNotNull(games.homeScore),
+          isNotNull(games.awayScore),
+        ));
+      return res.json({ ok: true, finalizedCount, remainingCount: Number(remaining?.count ?? 0) });
+    } catch (error: any) {
+      console.error('Error bulk-finalizing scorekeeper games:', error);
+      if (error?.status === 400) return res.status(400).json({ message: error.message });
+      return res.status(500).json({ message: 'Failed to finalize saved games' });
+    }
+  });
+
   app.post('/api/games/:gameId/finalize', isAuthenticated, async (req: any, res) => {
     try {
       const { gameId } = req.params;

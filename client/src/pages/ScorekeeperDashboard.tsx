@@ -10,6 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import {
+  flushScorekeeperOfflineQueue,
+  getPendingScorekeeperOperationCount,
+  requestWithOfflineBackup,
+} from '@/lib/scorekeeperOfflineQueue';
 import { 
   ArrowLeft, 
   Plus, 
@@ -39,6 +44,7 @@ interface Game {
   resultType?: 'regulation' | 'overtime' | 'shootout' | null;
   status: string | null;
   isCompleted?: boolean;
+  scorekeeperSavedAt?: string | null;
   leagueId: string | null;
   seasonName?: string | null;
   tournamentId?: string;
@@ -125,6 +131,30 @@ export default function ScorekeeperDashboard() {
   const [isOvertime, setIsOvertime] = useState(false);
   const [selectedAttendanceIds, setSelectedAttendanceIds] = useState<Set<string>>(new Set());
   const [attendanceInitializedGameId, setAttendanceInitializedGameId] = useState<string | null>(null);
+  const [offlineOperationCount, setOfflineOperationCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const refreshPendingCount = () => setOfflineOperationCount(getPendingScorekeeperOperationCount(user.id));
+    const retryOfflineWrites = async () => {
+      if (!navigator.onLine) return refreshPendingCount();
+      const sent = await flushScorekeeperOfflineQueue(user.id);
+      refreshPendingCount();
+      if (sent > 0) {
+        await queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = String(query.queryKey[0] ?? '');
+            return key.startsWith('/api/games/')
+              || key.startsWith('/api/scorekeeper/games');
+          },
+        });
+      }
+    };
+    refreshPendingCount();
+    void retryOfflineWrites();
+    window.addEventListener('online', retryOfflineWrites);
+    return () => window.removeEventListener('online', retryOfflineWrites);
+  }, [user?.id]);
 
   // Fetch scorekeeper options (leagues + tournaments)
   const { data: scorekeeperOptions } = useQuery<ScorekeeperOptions>({
@@ -244,10 +274,39 @@ export default function ScorekeeperDashboard() {
   }, [attendanceData?.rsvps]);
 
   const createGoalMutation = useMutation({
-    mutationFn: async (data: { gameId: string; teamId: string; scorerId: string; primaryAssistId?: string; secondaryAssistId?: string; period?: number }) => {
-      return apiRequest('POST', `/api/games/${data.gameId}/goals`, data);
+    mutationFn: async (data: { id: string; gameId: string; teamId: string; scorerId: string; primaryAssistId?: string; secondaryAssistId?: string; period?: number }) => {
+      if (!user?.id) throw new Error('You must be signed in to save scoring details.');
+      return requestWithOfflineBackup(user.id, 'POST', `/api/games/${data.gameId}/goals`, data, `POST:/api/games/${data.gameId}/goals:${data.id}`);
     },
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      if ('queuedOffline' in result) {
+        queryClient.setQueryData<GameGoal[]>([`/api/games/${variables.gameId}/goals`], (previous = []) => previous.some((goal) => goal.id === variables.id)
+          ? previous
+          : [...previous, {
+            id: variables.id,
+            gameId: variables.gameId,
+            teamId: variables.teamId,
+            scorerId: variables.scorerId === 'substitute' ? null : variables.scorerId,
+            primaryAssistId: variables.primaryAssistId === 'substitute' ? null : variables.primaryAssistId ?? null,
+            secondaryAssistId: variables.secondaryAssistId === 'substitute' ? null : variables.secondaryAssistId ?? null,
+            goalNumber: previous.length + 1,
+            period: variables.period ?? 1,
+            timestamp: null,
+            isSubmitted: false,
+            scorer: null,
+            primaryAssist: null,
+            secondaryAssist: null,
+            team: {
+              id: variables.teamId,
+              name: variables.gameId === selectedGame?.id && variables.teamId === selectedGame?.homeTeam?.id
+                ? selectedGame?.homeTeam?.name || 'Team'
+                : variables.gameId === selectedGame?.id ? selectedGame?.awayTeam?.name || 'Team' : 'Team',
+            },
+          }]);
+        setOfflineOperationCount(user?.id ? getPendingScorekeeperOperationCount(user.id) : 0);
+        toast({ title: 'Goal saved on this device', description: 'It will sync when you reconnect.' });
+        return;
+      }
       refetchGoals();
       toast({ title: 'Goal added' });
     },
@@ -257,10 +316,17 @@ export default function ScorekeeperDashboard() {
   });
 
   const deleteGoalMutation = useMutation({
-    mutationFn: async (goalId: string) => {
-      return apiRequest('DELETE', `/api/games/${selectedGame?.id}/goals/${goalId}`);
+    mutationFn: async (variables: { gameId: string; goalId: string }) => {
+      if (!user?.id) throw new Error('You must be signed in to remove a goal.');
+      return requestWithOfflineBackup(user.id, 'DELETE', `/api/games/${variables.gameId}/goals/${variables.goalId}`, undefined, `DELETE:/api/games/${variables.gameId}/goals/${variables.goalId}`);
     },
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      if ('queuedOffline' in result) {
+        queryClient.setQueryData<GameGoal[]>([`/api/games/${variables.gameId}/goals`], (previous = []) => previous.filter((goal) => goal.id !== variables.goalId));
+        setOfflineOperationCount(user?.id ? getPendingScorekeeperOperationCount(user.id) : 0);
+        toast({ title: 'Goal removal saved on this device', description: 'It will sync when you reconnect.' });
+        return;
+      }
       refetchGoals();
       toast({ title: 'Goal removed' });
     },
@@ -270,10 +336,37 @@ export default function ScorekeeperDashboard() {
   });
 
   const createPenaltyMutation = useMutation({
-    mutationFn: async (data: { gameId: string; teamId: string; playerId: string; minutes?: number; penaltyType?: string; period?: number }) => {
-      return apiRequest('POST', `/api/games/${data.gameId}/penalties`, data);
+    mutationFn: async (data: { id: string; gameId: string; teamId: string; playerId: string; minutes?: number; penaltyType?: string; period?: number }) => {
+      if (!user?.id) throw new Error('You must be signed in to save scoring details.');
+      return requestWithOfflineBackup(user.id, 'POST', `/api/games/${data.gameId}/penalties`, data, `POST:/api/games/${data.gameId}/penalties:${data.id}`);
     },
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      if ('queuedOffline' in result) {
+        queryClient.setQueryData<GamePenalty[]>([`/api/games/${variables.gameId}/penalties`], (previous = []) => previous.some((penalty) => penalty.id === variables.id)
+          ? previous
+          : [...previous, {
+            id: variables.id,
+            gameId: variables.gameId,
+            teamId: variables.teamId,
+            playerId: variables.playerId,
+            penaltyNumber: previous.length + 1,
+            minutes: variables.minutes ?? 2,
+            penaltyType: variables.penaltyType ?? null,
+            period: variables.period ?? 1,
+            timestamp: null,
+            isSubmitted: false,
+            player: null,
+            team: {
+              id: variables.teamId,
+              name: variables.gameId === selectedGame?.id && variables.teamId === selectedGame?.homeTeam?.id
+                ? selectedGame?.homeTeam?.name || 'Team'
+                : variables.gameId === selectedGame?.id ? selectedGame?.awayTeam?.name || 'Team' : 'Team',
+            },
+          }]);
+        setOfflineOperationCount(user?.id ? getPendingScorekeeperOperationCount(user.id) : 0);
+        toast({ title: 'Penalty saved on this device', description: 'It will sync when you reconnect.' });
+        return;
+      }
       refetchPenalties();
       toast({ title: 'Penalty added' });
     },
@@ -283,10 +376,17 @@ export default function ScorekeeperDashboard() {
   });
 
   const deletePenaltyMutation = useMutation({
-    mutationFn: async (penaltyId: string) => {
-      return apiRequest('DELETE', `/api/games/${selectedGame?.id}/penalties/${penaltyId}`);
+    mutationFn: async (variables: { gameId: string; penaltyId: string }) => {
+      if (!user?.id) throw new Error('You must be signed in to remove a penalty.');
+      return requestWithOfflineBackup(user.id, 'DELETE', `/api/games/${variables.gameId}/penalties/${variables.penaltyId}`, undefined, `DELETE:/api/games/${variables.gameId}/penalties/${variables.penaltyId}`);
     },
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      if ('queuedOffline' in result) {
+        queryClient.setQueryData<GamePenalty[]>([`/api/games/${variables.gameId}/penalties`], (previous = []) => previous.filter((penalty) => penalty.id !== variables.penaltyId));
+        setOfflineOperationCount(user?.id ? getPendingScorekeeperOperationCount(user.id) : 0);
+        toast({ title: 'Penalty removal saved on this device', description: 'It will sync when you reconnect.' });
+        return;
+      }
       refetchPenalties();
       toast({ title: 'Penalty removed' });
     },
@@ -297,9 +397,20 @@ export default function ScorekeeperDashboard() {
 
   const finalizeGameMutation = useMutation({
     mutationFn: async (data: { gameId: string; attendees: { playerId: string; teamId: string }[]; resultType: 'regulation' | 'overtime' }) => {
-      return apiRequest('POST', `/api/games/${data.gameId}/finalize`, { attendees: data.attendees, resultType: data.resultType });
+      if (!user?.id) throw new Error('You must be signed in to finalize this game.');
+      return requestWithOfflineBackup(user.id, 'POST', `/api/games/${data.gameId}/finalize`, {
+        attendees: data.attendees,
+        resultType: data.resultType,
+      }, `POST:/api/games/${data.gameId}/finalize`);
     },
-    onSuccess: (_result, variables) => {
+    onSuccess: (result, variables) => {
+      if ('queuedOffline' in result) {
+        setOfflineOperationCount(user?.id ? getPendingScorekeeperOperationCount(user.id) : 0);
+        toast({ title: 'Finalization saved on this device', description: 'It will retry when you reconnect.' });
+        setSelectedGame(null);
+        setActiveTab('schedule');
+        return;
+      }
       // Keep the exact attendance selection available when a completed game is
       // reopened; the scoring view closes immediately after saving.
       queryClient.setQueryData<GameAttendanceData>(
@@ -334,9 +445,13 @@ export default function ScorekeeperDashboard() {
 
   const updateScoresMutation = useMutation({
     mutationFn: async (data: { gameId: string; homeScore: number; awayScore: number }) => {
-      return apiRequest('PATCH', `/api/games/${data.gameId}/scores`, data);
+      if (!user?.id) throw new Error('You must be signed in to save scores.');
+      return requestWithOfflineBackup(user.id, 'PATCH', `/api/games/${data.gameId}/scores`, data, `PATCH:/api/games/${data.gameId}/scores`);
     },
-    onSuccess: (_result, variables) => {
+    onSuccess: (result, variables) => {
+      if ('queuedOffline' in result) {
+        setOfflineOperationCount(user?.id ? getPendingScorekeeperOperationCount(user.id) : 0);
+      }
       queryClient.setQueryData<Game[]>([gamesQueryKey], (previous) => previous?.map((game) =>
         game.id === variables.gameId
           ? { ...game, homeScore: variables.homeScore, awayScore: variables.awayScore }
@@ -346,6 +461,55 @@ export default function ScorekeeperDashboard() {
     onError: (error: any) => {
       toast({ title: 'Failed to update scores', description: error.message, variant: 'destructive' });
     }
+  });
+
+  const saveGameMutation = useMutation({
+    mutationFn: async (data: { gameId: string; resultType: 'regulation' | 'overtime'; attendees: { playerId: string; teamId: string }[] }) => {
+      if (!user?.id) throw new Error('You must be signed in to save this game.');
+      return requestWithOfflineBackup(user.id, 'POST', `/api/games/${data.gameId}/save`, {
+        resultType: data.resultType,
+        attendees: data.attendees,
+      }, `POST:/api/games/${data.gameId}/save`);
+    },
+    onSuccess: (result, variables) => {
+      if ('queuedOffline' in result) {
+        setOfflineOperationCount(user?.id ? getPendingScorekeeperOperationCount(user.id) : 0);
+        toast({ title: 'Game saved on this device', description: 'Scores and details will sync when you reconnect.' });
+      } else {
+        const savedAt = new Date().toISOString();
+        queryClient.setQueryData<Game[]>([gamesQueryKey], (previous) => previous?.map((game) =>
+          game.id === variables.gameId
+            ? { ...game, scorekeeperSavedAt: savedAt, resultType: variables.resultType }
+            : game,
+        ));
+        toast({ title: 'Game saved', description: 'You can finalize it with the other saved scores later.' });
+      }
+      setSelectedGame(null);
+      setActiveTab('schedule');
+    },
+    onError: (error: any) => toast({ title: 'Failed to save game', description: error.message, variant: 'destructive' }),
+  });
+
+  const finalizeAllMutation = useMutation({
+    mutationFn: async (leagueId: string) => {
+      let finalizedCount = 0;
+      let remainingCount = 0;
+      do {
+        const response = await apiRequest('POST', '/api/scorekeeper/finalize-batch', { leagueId });
+        const result = await response.json() as { finalizedCount: number; remainingCount: number };
+        finalizedCount += result.finalizedCount;
+        remainingCount = result.remainingCount;
+        if (result.finalizedCount === 0 && remainingCount > 0) {
+          throw new Error('Some saved games could not be finalized. Try again after checking the game details.');
+        }
+      } while (remainingCount > 0);
+      return finalizedCount;
+    },
+    onSuccess: async (count) => {
+      await queryClient.invalidateQueries({ queryKey: [gamesQueryKey] });
+      toast({ title: 'Saved scores finalized', description: `${count} ${count === 1 ? 'game was' : 'games were'} processed.` });
+    },
+    onError: (error: any) => toast({ title: 'Failed to finalize saved games', description: error.message, variant: 'destructive' }),
   });
 
   const homeGoals = gameGoals.filter(g => g.teamId === selectedGame?.homeTeam?.id);
@@ -483,6 +647,7 @@ export default function ScorekeeperDashboard() {
     team, 
     teamName,
     teamId,
+    gameId,
     goals, 
     displayedScore,
     scoreDetailsPending,
@@ -495,6 +660,7 @@ export default function ScorekeeperDashboard() {
     team: 'home' | 'away';
     teamName: string;
     teamId: string;
+    gameId: string;
     goals: GameGoal[];
     displayedScore: number;
     scoreDetailsPending: boolean;
@@ -597,6 +763,7 @@ export default function ScorekeeperDashboard() {
         return;
       }
       createGoalMutation.mutate({
+        id: crypto.randomUUID(),
         gameId: selectedGame.id,
         teamId,
         scorerId,
@@ -615,6 +782,7 @@ export default function ScorekeeperDashboard() {
         return;
       }
       createPenaltyMutation.mutate({
+        id: crypto.randomUUID(),
         gameId: selectedGame.id,
         teamId,
         playerId: penaltyPlayerId,
@@ -833,7 +1001,7 @@ export default function ScorekeeperDashboard() {
                       variant="ghost" 
                       size="icon"
                       className="h-6 w-6"
-                      onClick={() => deleteGoalMutation.mutate(goal.id)}
+                      onClick={() => deleteGoalMutation.mutate({ gameId, goalId: goal.id })}
                       disabled={deleteGoalMutation.isPending}
                       data-testid={`delete-goal-${team}-${idx}`}
                     >
@@ -908,7 +1076,7 @@ export default function ScorekeeperDashboard() {
                       variant="ghost" 
                       size="icon"
                       className="h-6 w-6"
-                      onClick={() => deletePenaltyMutation.mutate(penalty.id)}
+                      onClick={() => deletePenaltyMutation.mutate({ gameId, penaltyId: penalty.id })}
                       disabled={deletePenaltyMutation.isPending}
                       data-testid={`delete-penalty-${team}-${idx}`}
                     >
@@ -1041,27 +1209,28 @@ export default function ScorekeeperDashboard() {
                 size="sm"
                 onClick={() => {
                   const resultType = canMarkOvertime && isOvertime ? 'overtime' : 'regulation';
-                  if (window.confirm(`${selectedGameIsCompleted ? 'Save added game details?' : 'Finalize game?'}\n\n${selectedGame.awayTeam?.name}: ${displayedAwayScore}\n${selectedGame.homeTeam?.name}: ${displayedHomeScore}${resultType === 'overtime' ? ' (OT)' : ''}\n\nThis will update player stats for newly entered details.`)) {
-                    finalizeGameMutation.mutate({
-                      gameId: selectedGame.id,
-                      resultType,
-                      attendees: Array.from(selectedAttendanceIds)
-                        .filter((key) => currentGameRosterKeys.has(key))
-                        .map((key) => {
-                        const separatorIndex = key.indexOf(':');
-                        return {
-                          teamId: key.slice(0, separatorIndex),
-                          playerId: key.slice(separatorIndex + 1),
-                        };
-                        }),
+                  const attendees = Array.from(selectedAttendanceIds)
+                    .filter((key) => currentGameRosterKeys.has(key))
+                    .map((key) => {
+                      const separatorIndex = key.indexOf(':');
+                      return {
+                        teamId: key.slice(0, separatorIndex),
+                        playerId: key.slice(separatorIndex + 1),
+                      };
                     });
+                  if (selectedGameIsCompleted) {
+                    if (window.confirm(`Save added game details?\n\n${selectedGame.awayTeam?.name}: ${displayedAwayScore}\n${selectedGame.homeTeam?.name}: ${displayedHomeScore}${resultType === 'overtime' ? ' (OT)' : ''}\n\nThis updates player stats for new details.`)) {
+                      finalizeGameMutation.mutate({ gameId: selectedGame.id, resultType, attendees });
+                    }
+                  } else {
+                    saveGameMutation.mutate({ gameId: selectedGame.id, resultType, attendees });
                   }
                 }}
-                disabled={finalizeGameMutation.isPending || updateScoresMutation.isPending || rostersLoading}
+                disabled={finalizeGameMutation.isPending || saveGameMutation.isPending || updateScoresMutation.isPending || rostersLoading}
                 data-testid="finalize-game"
               >
                 <Check className="mr-1 h-4 w-4" />
-                {selectedGameIsCompleted ? 'Save Stats' : 'Finalize'}
+                {selectedGameIsCompleted ? 'Save Stats' : 'Save Game'}
               </Button>
             </div>
           </div>
@@ -1090,6 +1259,7 @@ export default function ScorekeeperDashboard() {
               team="away"
               teamName={selectedGame.awayTeam?.name || 'Away'}
               teamId={selectedGame.awayTeam?.id || ''}
+              gameId={selectedGame.id}
               goals={awayGoals}
                displayedScore={displayedAwayScore}
                scoreDetailsPending={isBackfillingCompletedGame && awayGoals.length < displayedAwayScore}
@@ -1103,6 +1273,7 @@ export default function ScorekeeperDashboard() {
               team="home"
               teamName={selectedGame.homeTeam?.name || 'Home'}
               teamId={selectedGame.homeTeam?.id || ''}
+              gameId={selectedGame.id}
               goals={homeGoals}
                displayedScore={displayedHomeScore}
                scoreDetailsPending={isBackfillingCompletedGame && homeGoals.length < displayedHomeScore}
@@ -1200,6 +1371,39 @@ export default function ScorekeeperDashboard() {
           )}
 
           <TabsContent value="schedule">
+            {offlineOperationCount > 0 && (
+              <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="status">
+                {offlineOperationCount} unsent score {offlineOperationCount === 1 ? 'change is' : 'changes are'} backed up on this device and will retry when online.
+              </div>
+            )}
+            {selectionType === 'league' && games.filter((game) =>
+              !game.isCompleted && game.status !== 'completed' && !!game.scorekeeperSavedAt
+                && game.homeScore !== null && game.homeScore !== undefined
+                && game.awayScore !== null && game.awayScore !== undefined
+            ).length > 0 && (
+              <Card className="mb-4">
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div>
+                    <p className="font-semibold">
+                      {games.filter((game) => !game.isCompleted && game.status !== 'completed' && !!game.scorekeeperSavedAt).length} saved game(s) waiting to be finalized
+                    </p>
+                    <p className="text-sm text-muted-foreground">Finalize saved scores together after score entry is complete.</p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (window.confirm('Finalize all saved scores for this league?')) {
+                        finalizeAllMutation.mutate(selectedId);
+                      }
+                    }}
+                    disabled={finalizeAllMutation.isPending || !navigator.onLine}
+                    data-testid="finalize-all-scores"
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    {finalizeAllMutation.isPending ? 'Finalizing…' : 'Finalize All Scores'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader className="pb-2">
@@ -1229,6 +1433,9 @@ export default function ScorekeeperDashboard() {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {format(new Date(game.scheduledAt), 'MMM d, h:mm a')}
+                              {!game.isCompleted && game.scorekeeperSavedAt && (
+                                <span className="ml-2 text-amber-700 dark:text-amber-300">Saved · pending finalization</span>
+                              )}
                               {game.seasonName && (
                                 <span className="ml-2">— {game.seasonName}</span>
                               )}

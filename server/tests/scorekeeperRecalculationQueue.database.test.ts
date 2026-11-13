@@ -19,6 +19,7 @@ test("scorekeeper and win-chance changes are queued and debounced", { timeout: 3
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN EXECUTE 'CREATE ROLE authenticated NOLOGIN'; END IF;
       END $$;
       CREATE TABLE leagues(id varchar PRIMARY KEY, timezone text);
+      CREATE TABLE users(id varchar PRIMARY KEY);
       CREATE TABLE teams(id varchar PRIMARY KEY, league_id varchar, wins integer DEFAULT 0,
         losses integer DEFAULT 0, ties integer DEFAULT 0, goals_for integer DEFAULT 0, goals_against integer DEFAULT 0);
       CREATE TABLE games(id varchar PRIMARY KEY, league_id varchar, home_team_id varchar, away_team_id varchar,
@@ -46,6 +47,32 @@ test("scorekeeper and win-chance changes are queued and debounced", { timeout: 3
       "utf8",
     );
     await pool.query(migration);
+    const saveMigration = await readFile(
+      new URL("../../migrations/0051_deferred_scorekeeper_finalization.sql", import.meta.url),
+      "utf8",
+    );
+    await pool.query(saveMigration);
+
+    await t.test("saved games can be identified and attributed without completing them", async () => {
+      await pool!.query("INSERT INTO users(id) VALUES('scorekeeper')");
+      await pool!.query(`
+        UPDATE games SET home_score=2, away_score=1,
+          scorekeeper_saved_at=clock_timestamp(), scorekeeper_saved_by='scorekeeper'
+        WHERE id='upcoming'
+      `);
+      const saved = (await pool!.query(`
+        SELECT scorekeeper_saved_at, scorekeeper_saved_by, is_completed
+        FROM games WHERE id='upcoming'
+      `)).rows[0];
+      assert.ok(saved.scorekeeper_saved_at);
+      assert.equal(saved.scorekeeper_saved_by, "scorekeeper");
+      assert.equal(saved.is_completed, false);
+      await pool!.query(`
+        UPDATE games SET home_score=NULL, away_score=NULL,
+          scorekeeper_saved_at=NULL, scorekeeper_saved_by=NULL
+        WHERE id='upcoming'
+      `);
+    });
 
     await t.test("first completion is immediate; later edits debounce per game", async () => {
       await pool!.query("UPDATE games SET is_completed=true, home_score=2, away_score=1 WHERE id='final'");

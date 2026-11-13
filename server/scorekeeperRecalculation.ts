@@ -4,6 +4,7 @@ import { db, pool } from "./db";
 import { storage } from "./storage";
 import { evaluateBadgesForUsers } from "./badges";
 import { supabase } from "./supabaseAuth";
+import { finalizeOvernightScorekeeperSaves } from "./scorekeeperFinalization";
 
 type LineComboRequest = (teamIds: string[]) => Promise<void>;
 
@@ -28,7 +29,7 @@ function errorCode(error: any): string {
     : "unknown";
 }
 
-async function invokeWinChance(body: Record<string, string>, scope: string) {
+async function invokeWinChance(body: Record<string, string | string[]>, scope: string) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
@@ -156,6 +157,90 @@ async function deferWinChanceJob(job: WinChanceJob, code: string) {
   `, [job.event_type, job.entity_id, job.revision, code]);
 }
 
+async function processClaimedCompletedGames(
+  jobs: CompletedGameJob[],
+  requestLineComboLearning: LineComboRequest,
+) {
+  const eligibleJobs: CompletedGameJob[] = [];
+  try {
+    const gameWork = await Promise.all(jobs.map((job) => gameBadgeEvaluations(job.game_id)));
+    const allEvaluations: Array<{ userId: string; context: { leagueId: string | null; seasonId: string | null; year: number } }> = [];
+    const evaluationKeys = new Set<string>();
+    const teamIds = new Set<string>();
+
+    for (let index = 0; index < jobs.length; index++) {
+      const job = jobs[index];
+      const work = gameWork[index];
+      if (!work.game || work.game.isCompleted !== true) {
+        await pool.query(
+          "DELETE FROM public.scorekeeper_game_recalculation_queue WHERE game_id = $1 AND revision = $2",
+          [job.game_id, job.revision],
+        );
+        continue;
+      }
+      eligibleJobs.push(job);
+      work.teamIds.forEach((teamId) => teamIds.add(teamId));
+      if (!job.badges_done) {
+        for (const evaluation of work.evaluations) {
+          const key = `${evaluation.userId}:${evaluation.context.leagueId ?? ""}:${evaluation.context.seasonId ?? ""}:${evaluation.context.year}`;
+          if (evaluationKeys.has(key)) continue;
+          evaluationKeys.add(key);
+          allEvaluations.push(evaluation);
+        }
+      }
+    }
+    if (!eligibleJobs.length) return;
+
+    if (eligibleJobs.some((job) => !job.badges_done)) {
+      const results = await evaluateBadgesForUsers(allEvaluations);
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") {
+        throw Object.assign(new Error("One or more badge evaluations failed"), { code: errorCode(failure.reason) });
+      }
+      for (const job of eligibleJobs) {
+        if (!job.badges_done) await markCompletedGameComponent(job, "badges_done");
+      }
+    }
+
+    if (eligibleJobs.some((job) => !job.line_combo_done)) {
+      await requestLineComboLearning(Array.from(teamIds));
+      for (const job of eligibleJobs) {
+        if (!job.line_combo_done) await markCompletedGameComponent(job, "line_combo_done");
+      }
+    }
+
+    if (eligibleJobs.some((job) => !job.win_odds_done)) {
+      const dispatchStartedAt = new Date();
+      await invokeWinChance(
+        { source_game_ids: eligibleJobs.filter((job) => !job.win_odds_done).map((job) => job.game_id) },
+        `completed-game-batch:${eligibleJobs.length}`,
+      );
+      await pool.query(`
+        DELETE FROM public.win_chance_recalculation_queue
+        WHERE event_type = 'team' AND entity_id = ANY($1::varchar[])
+          AND updated_at <= $2
+      `, [Array.from(teamIds), dispatchStartedAt]);
+      for (const job of eligibleJobs) {
+        if (!job.win_odds_done) await markCompletedGameComponent(job, "win_odds_done");
+      }
+    }
+
+    await Promise.all(eligibleJobs.map((job) => pool.query(`
+      DELETE FROM public.scorekeeper_game_recalculation_queue
+      WHERE game_id = $1 AND revision = $2
+        AND badges_done AND line_combo_done AND win_odds_done
+    `, [job.game_id, job.revision])));
+  } catch (error) {
+    const code = errorCode(error);
+    console.error("[ScorekeeperRecalculation] Batched game recalculation failed.", {
+      gameCount: jobs.length,
+      code,
+    });
+    await Promise.all(jobs.map((job) => deferCompletedGame(job, code).catch(() => {})));
+    throw error;
+  }
+}
+
 export function createScorekeeperRecalculationWorker(requestLineComboLearning: LineComboRequest) {
   let started = false;
   let tickRunning = false;
@@ -223,6 +308,15 @@ export function createScorekeeperRecalculationWorker(requestLineComboLearning: L
     return processClaimedCompletedGame(job);
   };
 
+  const processCompletedGames = async (gameIds: string[]) => {
+    const jobs: CompletedGameJob[] = [];
+    for (const gameId of Array.from(new Set(gameIds.filter(Boolean))).slice(0, 25)) {
+      const job = await claimCompletedGame(gameId, true);
+      if (job) jobs.push(job);
+    }
+    if (jobs.length) await processClaimedCompletedGames(jobs, requestLineComboLearning);
+  };
+
   const processNextCompletedGame = async () => {
     const job = await claimCompletedGame(undefined, false);
     if (!job) return false;
@@ -280,12 +374,17 @@ export function createScorekeeperRecalculationWorker(requestLineComboLearning: L
     const today = `${parts.year}-${parts.month}-${parts.day}`;
     if (Number(parts.hour) < 3 || today === lastCatchupDate) return;
     lastCatchupDate = today;
-    console.info("[ScorekeeperRecalculation] Running nightly catch-up for dirty upcoming predictions.");
+    console.info("[ScorekeeperRecalculation] Finalizing saved games left overnight and catching up recalculations.");
+    for (let batch = 0; batch < 20; batch++) {
+      const finalized = await finalizeOvernightScorekeeperSaves(25);
+      if (finalized < 25) break;
+    }
     await processDue(500);
   };
 
   return {
     processCompletedGame,
+    processCompletedGames,
     processDue,
     start() {
       if (started) return;
