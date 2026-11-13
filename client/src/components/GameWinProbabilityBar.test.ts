@@ -76,14 +76,14 @@ test("the prediction popup matches Home's thin green/red track and white marker"
   assert.match(home, /bg-\[#22c55e\]" style="width:95%"/);
   assert.match(home, /left:95%/);
   assert.match(home, /Record 8-0-0-1/);
-  assert.match(home, /Odds -1900/);
+  assert.match(home, /Odds <span class="text-base font-extrabold text-primary tabular-nums">-1900<\/span>/);
   assert.match(home, /rounded-xl border border-primary\/20 bg-primary\/10 p-4/);
   assert.match(home, /rounded-xl border border-primary\/30 bg-primary\/20 p-3/);
   assert.doesNotMatch(home, /dark:bg-\[/);
   const away = renderSheet("away");
   assert.match(away, /bg-\[#ef4444\]" style="width:95%"/);
   assert.match(away, /bg-\[#22c55e\]" style="width:5%"/);
-  assert.match(away, /Odds \+1900/);
+  assert.match(away, /Odds <span class="text-base font-extrabold text-primary tabular-nums">\+1900<\/span>/);
 });
 
 test("the prediction close button is easy to spot and keeps its accessible label", () => {

@@ -212,7 +212,9 @@ function TeamChance({
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div className="truncate text-sm font-semibold">{name}</div>
       <div className="mt-1 text-2xl font-bold tabular-nums">{percent(chance)}</div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums">Odds {odds}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">
+        Odds <span className="text-base font-extrabold text-primary tabular-nums">{odds}</span>
+      </div>
       <div className="mt-1 text-xs text-muted-foreground" title={record.shootoutLosses == null ? "Wins–Losses–Ties" : "Wins–Losses–Ties–Overtime/shootout losses"}>
         Record {formatWinChanceRecord(record)}
       </div>
