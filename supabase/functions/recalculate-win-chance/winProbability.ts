@@ -45,7 +45,7 @@
  *    • Projected score: most likely exact final in which the favorite wins
  *    • Win by 2+: each team's chance of a 2+ goal win
  *    • Over/under: line = floor(λ_A + λ_B) + 0.5; total goals ~ Poisson(λ_A + λ_B)
- *    • Skater projections: each skater's projected points tonight =
+ *    • Top scorers: each player's projected points tonight =
  *        team expected goals × team points-per-goal × player's share,
  *        share = (attendance × form-adjusted points/game) ÷ Σ same over roster.
  *      Chance of at least 1 point = 1 − e^(−projected points).
@@ -332,14 +332,14 @@ function headToHeadScore(h2h: HeadToHeadGame[]): number {
   return (rSum / wSum) * confidence;
 }
 
-function projectSkaters(l: LineupResult, teamXG: number): PlayerProjection[] {
+function projectScorers(l: LineupResult, teamXG: number, top = 3): PlayerProjection[] {
   const weightSum = l.players.reduce((s, p) => s + p.att * p.pointRate, 0);
+  if (weightSum <= 0) return [];
   const teamPoints = teamXG * l.teamPointsPerGoal;
   return l.players
+    .filter((p) => p.att > 0)
     .map((p) => {
-      const projectedPoints = weightSum > 0
-        ? (teamPoints * p.att * p.pointRate) / weightSum
-        : 0;
+      const projectedPoints = (teamPoints * p.att * p.pointRate) / weightSum;
       return {
         id: p.id,
         name: p.name,
@@ -349,6 +349,7 @@ function projectSkaters(l: LineupResult, teamXG: number): PlayerProjection[] {
       };
     })
     .sort((a, b) => b.projectedPoints - a.projectedPoints)
+    .slice(0, top);
 }
 
 // ---------- Main ----------
@@ -485,8 +486,8 @@ export function predictGame(
     winBy2A: by2A,
     winBy2B: by2B,
     overUnder: { line: ouLine, overProb: 1 - under },
-    topScorersA: projectSkaters(lineupA, lambdaA),
-    topScorersB: projectSkaters(lineupB, lambdaB),
+    topScorersA: projectScorers(lineupA, lambdaA),
+    topScorersB: projectScorers(lineupB, lambdaB),
     breakdown: {
       mu,
       lineupA,
