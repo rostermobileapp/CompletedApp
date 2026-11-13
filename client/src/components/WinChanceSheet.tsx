@@ -91,7 +91,7 @@ export function WinChanceSheet({
       <DialogContent
         disableAnimation
         closeClassName="z-10 flex h-10 w-10 items-center justify-center rounded-lg border border-primary/40 bg-primary/20 p-2 text-foreground opacity-100 shadow-sm transition-colors hover:bg-primary/30"
-        className="max-h-[88dvh] w-[calc(100vw-2rem)] max-w-xl overflow-y-auto rounded-2xl border border-border bg-background px-4 py-5 shadow-2xl sm:px-6 sm:py-6"
+        className="max-h-[92dvh] w-[calc(100vw-2rem)] max-w-xl overflow-y-auto rounded-2xl border border-border bg-background px-4 py-5 shadow-2xl sm:px-6 sm:py-6"
         data-testid="dialog-win-chance"
       >
         <DialogHeader className="mb-1 pr-8 text-left">
@@ -143,7 +143,11 @@ export function WinChanceSheet({
 
           <section className="grid grid-cols-2 gap-3" aria-label="Prediction metrics">
             <Metric label="Projected score" value={`${prediction.projectedScoreHome} – ${prediction.projectedScoreAway}`} />
-            <Metric label="Expected goals" value={`${(prediction.expectedGoalsHome ?? 0).toFixed(1)} – ${(prediction.expectedGoalsAway ?? 0).toFixed(1)}`} />
+            <Metric
+              label="Over/under"
+              value={prediction.overUnderLine == null ? "Unavailable" : `${prediction.overUnderLine.toFixed(1)} goals`}
+              detail={`Over ${percent(prediction.overProbability)} · Under ${percent(prediction.underProbability)}`}
+            />
             <Metric label="Win by 2+ goals" value={`${percent(prediction.winByTwoHome)} / ${percent(prediction.winByTwoAway)}`} detail="Home / away" />
             <Metric
               label="Estimated total goals"
@@ -153,16 +157,16 @@ export function WinChanceSheet({
 
           <section className="rounded-xl border border-primary/20 bg-primary/10 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">Top scorers for your team</h3>
+              <h3 className="text-sm font-semibold">All skaters for your team</h3>
               <Badge variant="secondary">{viewerIsHome ? homeTeamName : awayTeamName}</Badge>
             </div>
             {unavailableScorers.length > 0 && (
               <p className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                RSVP update: {unavailableScorers.map((player) => player.name).join(", ")} {unavailableScorers.length === 1 ? "is" : "are"} marked out. That response is reflected in the latest saved estimate.
+                RSVP update: {unavailableScorers.map((player) => player.name).join(", ")} {unavailableScorers.length === 1 ? "is" : "are"} marked out. Saved projections may not reflect recent RSVP changes until the next recalculation.
               </p>
             )}
             {viewerScorers.length ? (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {viewerScorers.map((player) => (
                   <li key={player.id} className="flex items-center justify-between gap-3 text-sm">
                     <span className="min-w-0 truncate font-medium">
@@ -174,7 +178,7 @@ export function WinChanceSheet({
                       )}
                     </span>
                     <span className="shrink-0 text-right text-muted-foreground">
-                      {player.projectedPoints.toFixed(1)} pts · {percent(player.chanceOfPoint)}
+                      {Math.round(player.projectedPoints)} pts · {percent(player.chanceOfPoint)}
                     </span>
                   </li>
                 ))}

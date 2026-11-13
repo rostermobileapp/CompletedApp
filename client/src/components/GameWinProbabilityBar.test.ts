@@ -12,6 +12,7 @@ const prediction = {
   homeTeamId: "home", awayTeamId: "away",
   homeWinProbability: 0.62, awayWinProbability: 0.38,
   moneylineHome: "-1900", moneylineAway: "+1900",
+  overUnderLine: 8.5, overProbability: 0.64, underProbability: 0.36,
 };
 const props = {
   gameId: "game", homeTeamId: "home", awayTeamId: "away",
@@ -50,10 +51,14 @@ test("Home shows the signed-in team's green/red probability bar", () => {
 });
 
 test("the prediction popup matches Home's thin green/red track and white marker", () => {
-  const box = ({ children }: { children: any }) => createElement("div", null, children);
+  const box = ({ children, ...props }: any) => createElement("div", props, children);
+  const contentBox = ({ children, disableAnimation, closeClassName, ...props }: any) =>
+    createElement("div", props, children);
   const { WinChanceSheet } = load("client/src/components/WinChanceSheet.tsx", {
     "@/components/ui/dialog": Object.fromEntries(
-      ["Dialog", "DialogContent", "DialogDescription", "DialogHeader", "DialogTitle"].map(name => [name, box]),
+      ["Dialog", "DialogContent", "DialogDescription", "DialogHeader", "DialogTitle"].map(name => [
+        name, name === "DialogContent" ? contentBox : box,
+      ]),
     ),
     "@/components/ui/badge": { Badge: box },
   });
@@ -65,7 +70,14 @@ test("the prediction popup matches Home's thin green/red track and white marker"
       homeRecordSnapshot: { wins: 8, losses: 0, ties: 0, shootoutLosses: 1 },
       awayRecordSnapshot: { wins: 1, losses: 7, ties: 1, shootoutLosses: 0 },
       homeStreak: 3, awayStreak: -6,
-      topScorersHome: [], topScorersAway: [],
+      topScorersHome: Array.from({ length: 10 }, (_, index) => ({
+        id: `skater-${index + 1}`,
+        name: `Skater ${index + 1}`,
+        projectedPoints: index === 0 ? 3.4 : index / 10,
+        chanceOfPoint: 0.25,
+        form: null,
+      })),
+      topScorersAway: [],
       expectedGoalsHome: 8.3, expectedGoalsAway: 3.5,
     },
   }));
@@ -77,6 +89,15 @@ test("the prediction popup matches Home's thin green/red track and white marker"
   assert.match(home, /left:95%/);
   assert.match(home, /Record 8-0-0-1/);
   assert.match(home, /Odds <span class="text-base font-extrabold text-primary tabular-nums">-1900<\/span>/);
+  assert.match(home, /Over\/under/);
+  assert.match(home, /8\.5 goals/);
+  assert.match(home, /Over 64% · Under 36%/);
+  assert.doesNotMatch(home, /Expected goals/);
+  assert.match(home, /All skaters for your team/);
+  assert.equal((home.match(/<li\b/g) ?? []).length, 10);
+  assert.match(home, /3 pts · 25%/);
+  assert.doesNotMatch(home, /3\.4 pts/);
+  assert.match(home, /max-h-\[92dvh\]/);
   assert.match(home, /rounded-xl border border-primary\/20 bg-primary\/10 p-4/);
   assert.match(home, /rounded-xl border border-primary\/30 bg-primary\/20 p-3/);
   assert.doesNotMatch(home, /dark:bg-\[/);

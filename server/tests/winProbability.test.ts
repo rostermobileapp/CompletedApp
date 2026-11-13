@@ -71,6 +71,31 @@ describe("win-chance model", () => {
     assert.match(result.moneylineA, /^[+−-]?\d+$/);
   });
 
+  test("projects every skater, including zero-point out RSVPs, and excludes goalies", () => {
+    const skaters = Array.from({ length: 10 }, (_, index) => ({
+      id: `skater-${index + 1}`,
+      name: `Skater ${index + 1}`,
+      gamesPlayed: 8,
+      goals: index + 1,
+      assists: index,
+      recentGames: [],
+      rsvp: (index === 9 ? "out" : "none") as "out" | "none",
+    }));
+    const result = predictGame(
+      { ...home, skaters, goalies: [{ id: "goalie", gamesPlayed: 8, goalsAgainst: 20, recentGoalsAgainst: [], rsvp: "in" }] },
+      away,
+      [],
+      { leagueAvgGoals: 3.2 },
+    );
+    assert.equal(result.topScorersA.length, skaters.length);
+    assert.deepEqual(
+      new Set(result.topScorersA.map((player) => player.id)),
+      new Set(skaters.map((player) => player.id)),
+    );
+    assert.equal(result.topScorersA.some((player) => player.id === "goalie"), false);
+    assert.equal(result.topScorersA.find((player) => player.id === "skater-10")?.projectedPoints, 0);
+  });
+
   test("reports ties only when the league allows them", () => {
     const result = predictGame(home, away, [], { leagueAvgGoals: 3.2, allowTies: true });
     assert.ok(result.tieProb > 0);
