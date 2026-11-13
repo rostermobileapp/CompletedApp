@@ -31939,6 +31939,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       let streakRatio = 1.0;
 
       const RECENT_GAME_COUNT = 2;
+      const ASSUMED_BASELINE_PPG = 0.5;
       const priorBoost = RECENT_GAME_COUNT * ASSUMED_BASELINE_PPG;
       if (streakGameLog.length >= RECENT_GAME_COUNT) {
         // streakGameLog is newest-first; last-2 = most recent 2 participated games
