@@ -541,8 +541,10 @@ export async function getSeasonEarlyBirdStatus(userId: string, seasonId: string)
     && total === early && Number(result.rows[0]?.unfinished ?? 0) === 0 };
 }
 
-export async function evaluateSeasonEarlyBirdBadgeForUser(userId: string, definition: DefinitionWithTiers, seasonId: string) {
-  const status = await getSeasonEarlyBirdStatus(userId, seasonId);
+export async function evaluateSeasonEarlyBirdBadgeForUser(
+  userId: string, definition: DefinitionWithTiers, seasonId: string, statusOverride?: EarlyBirdStatus,
+) {
+  const status = statusOverride ?? await getSeasonEarlyBirdStatus(userId, seasonId);
   const scopeKey = `season:${seasonId}`;
   const [award] = status.qualified ? await db.insert(badgeAwards).values({
     badgeDefinitionId: definition.id, userId, seasonId, scopeKey,
@@ -1287,7 +1289,347 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
 
 type DefinitionWithTiers = Awaited<ReturnType<typeof definitionsWithTiers>>[number];
 
-export async function evaluateCalendarYearBeerBadgeForUser(userId: string, definition: DefinitionWithTiers, year: number) {
+type EarlyBirdStatus = Awaited<ReturnType<typeof getSeasonEarlyBirdStatus>>;
+type RsvpKingStatus = Awaited<ReturnType<typeof getSeasonRsvpKingStatus>>;
+type BatchBadgeMetrics = {
+  values: Map<string, Map<string, number>>;
+  careerGoalieEligible: Set<string>;
+  earlyBirdStatuses: Map<string, EarlyBirdStatus>;
+  rsvpKingStatuses: Map<string, RsvpKingStatus>;
+};
+
+async function loadBatchBadgeMetrics(
+  userIds: string[],
+  definitions: DefinitionWithTiers[],
+  context?: BadgeEvaluationContext,
+): Promise<BatchBadgeMetrics> {
+  const users = Array.from(new Set(userIds.filter(Boolean)));
+  const requestedKeys = new Set(definitions.map((definition) => definition.triggerKey ?? ""));
+  const values = new Map(users.map((userId) => [userId, new Map<string, number>()]));
+  const careerGoalieEligible = new Set<string>();
+  const earlyBirdStatuses = new Map<string, EarlyBirdStatus>();
+  const rsvpKingStatuses = new Map<string, RsvpKingStatus>();
+  if (!users.length) return { values, careerGoalieEligible, earlyBirdStatuses, rsvpKingStatuses };
+
+  const inputUsers = sql`unnest(${users}::text[]) AS participants(user_id)`;
+  const metrics = await db.execute(sql`
+    SELECT participants.user_id,
+      EXISTS (
+        SELECT 1 FROM games g WHERE g.is_completed = true AND (
+          EXISTS (SELECT 1 FROM game_attendance ga WHERE ga.game_id = g.id AND ga.user_id = participants.user_id)
+          OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.game_id = g.id AND goalie.goalie_user_id = participants.user_id)
+          OR EXISTS (SELECT 1 FROM game_goals goal WHERE goal.game_id = g.id AND
+            (goal.scorer_id = participants.user_id OR goal.primary_assist_id = participants.user_id
+              OR goal.secondary_assist_id = participants.user_id))
+          OR EXISTS (SELECT 1 FROM game_penalties penalty
+            WHERE penalty.game_id = g.id AND penalty.player_id = participants.user_id)
+        )
+      )::int AS first_game_logged,
+      (SELECT COUNT(*)::int FROM game_attendance ga JOIN games g ON g.id = ga.game_id
+        WHERE ga.user_id = participants.user_id AND g.is_completed = true) AS career_games_played,
+      (SELECT COUNT(*)::int FROM substitute_requests sr
+        WHERE sr.substitute_player_id = participants.user_id AND sr.status = 'approved') AS career_sub_appearances,
+      EXISTS (SELECT 1 FROM substitute_requests sr
+        WHERE sr.substitute_player_id = participants.user_id AND sr.status = 'approved'
+          AND sr.game_id IS NOT NULL AND sr.original_player_id <> participants.user_id)::int AS first_sub_appearance,
+      (SELECT COUNT(DISTINCT lm.league_id)::int FROM league_memberships lm
+        WHERE lm.user_id = participants.user_id AND lm.status = 'approved') AS career_leagues_played,
+      (SELECT COALESCE(SUM(
+        (CASE WHEN gs.first_star_user_id = participants.user_id THEN 3 ELSE 0 END) +
+        (CASE WHEN gs.second_star_user_id = participants.user_id THEN 2 ELSE 0 END) +
+        (CASE WHEN gs.third_star_user_id = participants.user_id THEN 1 ELSE 0 END)
+      ), 0)::int FROM game_stars gs
+        WHERE gs.first_star_user_id = participants.user_id
+          OR gs.second_star_user_id = participants.user_id
+          OR gs.third_star_user_id = participants.user_id) AS career_three_stars,
+      (SELECT COALESCE(SUM(gbc.count), 0)::int FROM game_beer_counts gbc
+        JOIN games g ON g.id = gbc.game_id
+        WHERE gbc.user_id = participants.user_id
+          AND g.scheduled_at >= ${`${context?.year ?? currentCenturyClubYear()}-01-01 00:00:00`}::timestamp
+          AND g.scheduled_at < ${`${(context?.year ?? currentCenturyClubYear()) + 1}-01-01 00:00:00`}::timestamp
+      ) AS calendar_year_beers,
+      (SELECT COUNT(DISTINCT ga.game_id)::int FROM game_attendance ga
+        JOIN games g ON g.id = ga.game_id
+        WHERE ga.user_id = participants.user_id AND g.is_completed = true
+          AND g.scheduled_at >= ${`${currentCenturyClubYear()}-01-01 00:00:00`}::timestamp
+          AND g.scheduled_at < ${`${currentCenturyClubYear() + 1}-01-01 00:00:00`}::timestamp
+      ) + (SELECT COUNT(DISTINCT sr.scrimmage_id)::int FROM scrimmage_requests sr
+        JOIN scrimmages s ON s.id = sr.scrimmage_id
+        WHERE sr.player_id = participants.user_id AND sr.status = 'approved'
+          AND s.status <> 'cancelled' AND s.time_tbd = false
+          AND s.date_time < (NOW() AT TIME ZONE s.timezone)
+          AND s.date_time >= ${`${currentCenturyClubYear()}-01-01 00:00:00`}::timestamp
+          AND s.date_time < ${`${currentCenturyClubYear() + 1}-01-01 00:00:00`}::timestamp
+      ) AS calendar_year_appearances
+    FROM ${inputUsers}
+  `);
+
+  for (const row of metrics.rows) {
+    const userId = String(row.user_id);
+    const userMetrics = values.get(userId)!;
+    for (const key of [
+      "first_game_logged", "career_games_played", "career_sub_appearances",
+      "first_sub_appearance", "career_leagues_played", "career_three_stars",
+      "calendar_year_beers", "calendar_year_appearances",
+    ]) userMetrics.set(key, Number((row as any)[key] ?? 0));
+  }
+
+  if (requestedKeys.has("season_hat_tricks") && context?.seasonId) {
+    const result = await db.execute(sql`
+      WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+      qualifying AS (
+        SELECT gg.scorer_id AS user_id, gg.game_id
+        FROM game_goals gg JOIN games g ON g.id = gg.game_id
+        WHERE gg.scorer_id = ANY(${users}::text[])
+          AND g.season_id = ${context.seasonId} AND g.is_completed = true
+        GROUP BY gg.scorer_id, gg.game_id HAVING COUNT(*) >= 3
+      )
+      SELECT participants.user_id, COUNT(qualifying.game_id)::int AS value
+      FROM participants LEFT JOIN qualifying ON qualifying.user_id = participants.user_id
+      GROUP BY participants.user_id
+    `);
+    for (const row of result.rows) values.get(String(row.user_id))?.set("season_hat_tricks", Number(row.value ?? 0));
+  }
+
+  if (requestedKeys.has("career_shutouts")) {
+    const result = await db.execute(sql`
+      WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+      eligible AS (
+        SELECT p.user_id FROM participants p
+        WHERE EXISTS (SELECT 1 FROM league_memberships lm WHERE lm.user_id = p.user_id
+          AND lm.status = 'approved' AND lm.is_goalie = true)
+          OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id = p.user_id
+            AND tm.status = 'approved' AND tm.position ~* 'goalie|goaltender|goalkeeper')
+          OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.goalie_user_id = p.user_id)
+      ),
+      shutouts AS (
+        SELECT goalie.goalie_user_id AS user_id, g.id AS game_id
+        FROM game_goalies goalie JOIN games g ON g.id = goalie.game_id
+        WHERE goalie.goalie_user_id = ANY(${users}::text[])
+          AND goalie.team_id IN (g.home_team_id, g.away_team_id)
+          AND g.is_completed = true AND g.is_scrimmage = false
+          AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+          AND ((goalie.team_id = g.home_team_id AND g.away_score = 0)
+            OR (goalie.team_id = g.away_team_id AND g.home_score = 0))
+        UNION
+        SELECT ga.user_id, g.id
+        FROM game_attendance ga JOIN games g ON g.id = ga.game_id
+        WHERE ga.user_id = ANY(${users}::text[])
+          AND ga.team_id IN (g.home_team_id, g.away_team_id)
+          AND g.is_completed = true AND g.is_scrimmage = false
+          AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+          AND ((ga.team_id = g.home_team_id AND g.away_score = 0)
+            OR (ga.team_id = g.away_team_id AND g.home_score = 0))
+          AND NOT EXISTS (SELECT 1 FROM game_goalies other
+            WHERE other.game_id = g.id AND other.team_id = ga.team_id)
+          AND (
+            EXISTS (SELECT 1 FROM league_memberships lm
+              WHERE lm.user_id = ga.user_id AND lm.assigned_team_id = ga.team_id
+                AND lm.is_goalie = true AND lm.status = 'approved')
+            OR EXISTS (SELECT 1 FROM team_memberships tm
+              WHERE tm.user_id = ga.user_id AND tm.team_id = ga.team_id
+                AND tm.status = 'approved' AND tm.position ~* 'goalie|goaltender|goalkeeper')
+          )
+      )
+      SELECT p.user_id, (eligible.user_id IS NOT NULL) AS eligible,
+        COUNT(DISTINCT shutouts.game_id)::int AS value
+      FROM participants p
+      LEFT JOIN eligible ON eligible.user_id = p.user_id
+      LEFT JOIN shutouts ON shutouts.user_id = p.user_id
+      GROUP BY p.user_id, eligible.user_id
+    `);
+    for (const row of result.rows) {
+      const userId = String(row.user_id);
+      if (row.eligible === true) careerGoalieEligible.add(userId);
+      values.get(userId)?.set("career_shutouts", Number(row.value ?? 0));
+    }
+  }
+
+  if (requestedKeys.has("consecutive_games_out")) {
+    const result = await db.execute(sql`
+      WITH ordered AS (
+        SELECT r.user_id, r.status,
+          ROW_NUMBER() OVER (PARTITION BY r.user_id ORDER BY g.scheduled_at) -
+          ROW_NUMBER() OVER (PARTITION BY r.user_id, r.status ORDER BY g.scheduled_at) AS run_id
+        FROM game_rsvps r JOIN games g ON g.id = r.game_id
+        WHERE r.user_id = ANY(${users}::text[]) AND g.is_completed = true
+      )
+      SELECT participants.user_id, COALESCE(MAX(runs.run_length), 0)::int AS value
+      FROM ${inputUsers}
+      LEFT JOIN (
+        SELECT user_id, run_id, COUNT(*)::int AS run_length FROM ordered
+        WHERE status = 'not_attending' GROUP BY user_id, run_id
+      ) runs ON runs.user_id = participants.user_id
+      GROUP BY participants.user_id
+    `);
+    for (const row of result.rows) values.get(String(row.user_id))?.set("consecutive_games_out", Number(row.value ?? 0));
+  }
+
+  if (requestedKeys.has("consecutive_games_played")) {
+    const result = await db.execute(sql`
+      WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+      eligible_games AS (
+        SELECT DISTINCT p.user_id, g.id, g.scheduled_at,
+          (
+            EXISTS (SELECT 1 FROM game_attendance ga WHERE ga.game_id = g.id AND ga.user_id = p.user_id)
+            OR EXISTS (SELECT 1 FROM game_goals gg WHERE gg.game_id = g.id AND
+              (gg.scorer_id = p.user_id OR gg.primary_assist_id = p.user_id OR gg.secondary_assist_id = p.user_id))
+            OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.game_id = g.id AND goalie.goalie_user_id = p.user_id)
+            OR EXISTS (SELECT 1 FROM game_penalties penalty WHERE penalty.game_id = g.id AND penalty.player_id = p.user_id)
+          ) AS played
+        FROM participants p CROSS JOIN games g
+        WHERE g.is_completed = true AND g.is_scrimmage = false
+          AND (
+            EXISTS (SELECT 1 FROM team_memberships tm
+              WHERE tm.user_id = p.user_id AND tm.status = 'approved'
+                AND tm.team_id IN (g.home_team_id, g.away_team_id) AND tm.joined_at <= g.scheduled_at)
+            OR EXISTS (SELECT 1 FROM league_memberships lm
+              WHERE lm.user_id = p.user_id AND lm.status = 'approved'
+                AND lm.assigned_team_id IN (g.home_team_id, g.away_team_id) AND lm.requested_at <= g.scheduled_at)
+            OR EXISTS (SELECT 1 FROM game_rsvps r WHERE r.game_id = g.id AND r.user_id = p.user_id)
+            OR EXISTS (SELECT 1 FROM game_attendance ga WHERE ga.game_id = g.id AND ga.user_id = p.user_id)
+            OR EXISTS (SELECT 1 FROM game_goals gg WHERE gg.game_id = g.id AND
+              (gg.scorer_id = p.user_id OR gg.primary_assist_id = p.user_id OR gg.secondary_assist_id = p.user_id))
+            OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.game_id = g.id AND goalie.goalie_user_id = p.user_id)
+            OR EXISTS (SELECT 1 FROM game_penalties penalty WHERE penalty.game_id = g.id AND penalty.player_id = p.user_id)
+          )
+      ),
+      numbered AS (
+        SELECT user_id, played,
+          ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY scheduled_at DESC, id DESC) AS position
+        FROM eligible_games
+      ),
+      first_miss AS (
+        SELECT user_id, MIN(position) AS position
+        FROM numbered WHERE played = false GROUP BY user_id
+      )
+      SELECT participants.user_id, COUNT(numbered.position)::int AS value
+      FROM participants
+      LEFT JOIN first_miss ON first_miss.user_id = participants.user_id
+      LEFT JOIN numbered ON numbered.user_id = participants.user_id
+        AND numbered.played = true
+        AND (first_miss.position IS NULL OR numbered.position < first_miss.position)
+      GROUP BY participants.user_id
+    `);
+    for (const row of result.rows) values.get(String(row.user_id))?.set("consecutive_games_played", Number(row.value ?? 0));
+  }
+
+  if (requestedKeys.has("season_scoring_streak") && context?.seasonId) {
+    const result = await db.execute(sql`
+      SELECT participants.user_id, g.id, EXISTS (
+        SELECT 1 FROM game_goals gg WHERE gg.game_id = g.id AND gg.scorer_id = participants.user_id
+      ) AS scored
+      FROM ${inputUsers}
+      JOIN games g ON g.season_id = ${context.seasonId} AND g.is_completed = true
+      WHERE EXISTS (SELECT 1 FROM game_attendance ga
+          WHERE ga.game_id = g.id AND ga.user_id = participants.user_id)
+        OR EXISTS (SELECT 1 FROM game_goals gg
+          WHERE gg.game_id = g.id AND gg.scorer_id = participants.user_id)
+      ORDER BY participants.user_id, g.scheduled_at, g.id
+    `);
+    const runs = new Map(users.map((userId) => [userId, { current: 0, longest: 0 }]));
+    for (const row of result.rows) {
+      const run = runs.get(String(row.user_id))!;
+      run.current = row.scored === true ? run.current + 1 : 0;
+      run.longest = Math.max(run.longest, run.current);
+    }
+    runs.forEach((run, userId) => values.get(userId)?.set("season_scoring_streak", run.longest));
+  }
+
+  if ((requestedKeys.has("season_48hr_rsvp_perfect") || requestedKeys.has("season_rsvp_perfect")) && context?.seasonId) {
+    const endedResult = await db.execute(sql`
+      SELECT (NOT is_active OR (end_date IS NOT NULL AND end_date <= NOW())) AS ended
+      FROM seasons WHERE id = ${context.seasonId}
+    `);
+    const seasonEnded = endedResult.rows[0]?.ended === true;
+
+    if (requestedKeys.has("season_48hr_rsvp_perfect")) {
+      const result = await db.execute(sql`
+        WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+        eligible_games AS (
+          SELECT DISTINCT p.user_id, g.id, g.home_team_id, g.away_team_id, g.is_completed,
+            ((g.scheduled_at AT TIME ZONE COALESCE(l.timezone, 'America/New_York'))
+              AT TIME ZONE 'UTC') - INTERVAL '48 hours' AS cutoff_utc
+          FROM participants p CROSS JOIN games g
+          LEFT JOIN leagues l ON l.id = g.league_id
+          WHERE g.season_id = ${context.seasonId} AND g.is_scrimmage = false
+            AND (
+              EXISTS (SELECT 1 FROM team_memberships tm
+                WHERE tm.user_id = p.user_id AND tm.status = 'approved'
+                  AND tm.team_id IN (g.home_team_id, g.away_team_id) AND tm.joined_at <= g.scheduled_at)
+              OR EXISTS (SELECT 1 FROM league_memberships lm
+                WHERE lm.user_id = p.user_id AND lm.status = 'approved'
+                  AND lm.assigned_team_id IN (g.home_team_id, g.away_team_id) AND lm.requested_at <= g.scheduled_at)
+              OR EXISTS (SELECT 1 FROM game_rsvps r
+                WHERE r.user_id = p.user_id AND r.game_id = g.id AND r.team_id IN (g.home_team_id, g.away_team_id))
+            )
+        )
+        SELECT user_id, COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE EXISTS (
+            SELECT 1 FROM game_rsvps r WHERE r.game_id = eg.id AND r.user_id = eg.user_id
+              AND r.team_id IN (eg.home_team_id, eg.away_team_id)
+              AND r.status = 'attending' AND r.updated_at <= eg.cutoff_utc
+          ))::int AS early,
+          COUNT(*) FILTER (WHERE NOT is_completed)::int AS unfinished
+        FROM eligible_games eg GROUP BY user_id
+      `);
+      const byUser = new Map(result.rows.map((row) => [String(row.user_id), row]));
+      for (const userId of users) {
+        const row: any = byUser.get(userId);
+        const total = Number(row?.total ?? 0);
+        const early = Number(row?.early ?? 0);
+        const unfinished = Number(row?.unfinished ?? 0);
+        earlyBirdStatuses.set(userId, {
+          total, early, qualified: seasonEnded && total > 0 && total === early && unfinished === 0,
+        });
+      }
+    }
+
+    if (requestedKeys.has("season_rsvp_perfect")) {
+      const result = await db.execute(sql`
+        WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+        eligible_games AS (
+          SELECT DISTINCT p.user_id, g.id, g.home_team_id, g.away_team_id
+          FROM participants p CROSS JOIN games g
+          JOIN seasons s ON s.id = g.season_id AND s.league_id = g.league_id
+          WHERE g.season_id = ${context.seasonId} AND g.is_scrimmage = false
+            AND (
+              EXISTS (SELECT 1 FROM team_memberships tm
+                WHERE tm.user_id = p.user_id AND tm.status = 'approved'
+                  AND tm.team_id IN (g.home_team_id, g.away_team_id) AND tm.joined_at <= g.scheduled_at)
+              OR EXISTS (SELECT 1 FROM league_memberships lm
+                WHERE lm.user_id = p.user_id AND lm.status = 'approved'
+                  AND lm.assigned_team_id IN (g.home_team_id, g.away_team_id) AND lm.requested_at <= g.scheduled_at)
+              OR EXISTS (SELECT 1 FROM game_rsvps r
+                WHERE r.user_id = p.user_id AND r.game_id = g.id AND r.team_id IN (g.home_team_id, g.away_team_id))
+            )
+        )
+        SELECT user_id, COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE EXISTS (
+            SELECT 1 FROM game_rsvps r WHERE r.game_id = eg.id AND r.user_id = eg.user_id
+              AND r.team_id IN (eg.home_team_id, eg.away_team_id)
+              AND r.status IN ('attending', 'not_attending')
+          ))::int AS responded
+        FROM eligible_games eg GROUP BY user_id
+      `);
+      const byUser = new Map(result.rows.map((row) => [String(row.user_id), row]));
+      for (const userId of users) {
+        const row: any = byUser.get(userId);
+        const total = Number(row?.total ?? 0);
+        const responded = Number(row?.responded ?? 0);
+        rsvpKingStatuses.set(userId, {
+          total, responded, qualified: seasonEnded && total > 0 && responded === total,
+        });
+      }
+    }
+  }
+
+  return { values, careerGoalieEligible, earlyBirdStatuses, rsvpKingStatuses };
+}
+
+export async function evaluateCalendarYearBeerBadgeForUser(
+  userId: string, definition: DefinitionWithTiers, year: number, countOverride?: number,
+) {
   const scopeKey = `year:${year}`;
   const emitted = await db.transaction(async (tx) => {
     // Serialize app requests and queued SQL changes, even when a progress row
@@ -1298,14 +1640,14 @@ export async function evaluateCalendarYearBeerBadgeForUser(userId: string, defin
       eq(badgeProgress.userId, userId),
       eq(badgeProgress.scopeKey, scopeKey),
     )).for("update").limit(1);
-    const result = await tx.execute(sql`
+    const result = countOverride === undefined ? await tx.execute(sql`
       SELECT COALESCE(SUM(gbc.count), 0)::int AS count
       FROM game_beer_counts gbc JOIN games g ON g.id = gbc.game_id
       WHERE gbc.user_id = ${userId}
         AND g.scheduled_at >= ${`${year}-01-01 00:00:00`}::timestamp
         AND g.scheduled_at < ${`${year + 1}-01-01 00:00:00`}::timestamp
-    `);
-    const count = Number((result.rows?.[0] as any)?.count ?? 0);
+    `) : undefined;
+    const count = countOverride ?? Number((result?.rows?.[0] as any)?.count ?? 0);
     const reached = reachedTiers(definition.tiers, count);
     const events: Array<{ event: BadgeEarnedEvent; payload: Record<string, unknown> }> = [];
 
@@ -1363,7 +1705,9 @@ export async function evaluateCalendarYearBeerBadgeForUser(userId: string, defin
   return emitted.map(({ event }) => event);
 }
 
-export async function evaluateSeasonHatTrickBadgeForUser(userId: string, definition: DefinitionWithTiers, seasonId: string) {
+export async function evaluateSeasonHatTrickBadgeForUser(
+  userId: string, definition: DefinitionWithTiers, seasonId: string, countOverride?: number,
+) {
   const emitted = await db.transaction(async (tx) => {
     // Serialize evaluations for the same player and season, including corrected
     // goals committed immediately after another evaluation started.
@@ -1374,14 +1718,14 @@ export async function evaluateSeasonHatTrickBadgeForUser(userId: string, definit
       eq(badgeProgress.userId, userId),
       eq(badgeProgress.scopeKey, scopeKey),
     )).for("update").limit(1);
-    const result = await tx.execute(sql`
+    const result = countOverride === undefined ? await tx.execute(sql`
       SELECT COUNT(*)::int AS count FROM (
         SELECT gg.game_id FROM game_goals gg JOIN games g ON g.id = gg.game_id
         WHERE gg.scorer_id = ${userId} AND g.season_id = ${seasonId} AND g.is_completed = true
         GROUP BY gg.game_id HAVING COUNT(*) >= 3
       ) qualifying_games
-    `);
-    const count = Number(result.rows[0]?.count ?? 0);
+    `) : undefined;
+    const count = countOverride ?? Number(result?.rows[0]?.count ?? 0);
     const reached = reachedTiers(definition.tiers, count);
     const events: Array<{ event: BadgeEarnedEvent; payload: Record<string, unknown> }> = [];
     for (const tier of newlyReachedTiers(definition.tiers, previous?.progress ?? 0, count)) {
@@ -1432,7 +1776,9 @@ export async function evaluateSeasonHatTrickBadgeForUser(userId: string, definit
   return emitted.map(({ event }) => event);
 }
 
-export async function evaluateSeasonOnFireBadgeForUser(userId: string, definition: DefinitionWithTiers, seasonId: string) {
+export async function evaluateSeasonOnFireBadgeForUser(
+  userId: string, definition: DefinitionWithTiers, seasonId: string, countOverride?: number,
+) {
   const emitted = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`on_fire:${userId}:${seasonId}`}))`);
     const scopeKey = `season:${seasonId}`;
@@ -1441,8 +1787,8 @@ export async function evaluateSeasonOnFireBadgeForUser(userId: string, definitio
       eq(badgeProgress.userId, userId),
       eq(badgeProgress.scopeKey, scopeKey),
     )).for("update").limit(1);
-    const result = await tx.execute(seasonScoringGamesQuery(userId, seasonId));
-    const count = longestScoringRun(result.rows);
+    const result = countOverride === undefined ? await tx.execute(seasonScoringGamesQuery(userId, seasonId)) : undefined;
+    const count = countOverride ?? longestScoringRun(result?.rows ?? []);
     const reached = reachedTiers(definition.tiers, count);
     const events: Array<{ event: BadgeEarnedEvent; payload: Record<string, unknown> }> = [];
     for (const tier of newlyReachedTiers(definition.tiers, previous?.progress ?? 0, count)) {
@@ -1511,35 +1857,56 @@ async function evaluateBadgesForUserWithDefinitions(
   context: BadgeEvaluationContext | undefined,
   onlyTriggerKey: string | undefined,
   definitions: DefinitionWithTiers[],
+  batchMetrics?: BatchBadgeMetrics,
 ) {
   const earned: Array<Record<string, unknown>> = [];
   for (const definition of definitions.filter((item) => item.category === "achievement" && item.achievementType
     && !isTriviaDefinition(item)
     && (!onlyTriggerKey || item.triggerKey === onlyTriggerKey))) {
     if (definition.triggerKey === "calendar_year_beers") {
-      earned.push(...await evaluateCalendarYearBeerBadgeForUser(userId, definition, context?.year ?? currentCenturyClubYear()));
+      earned.push(...await evaluateCalendarYearBeerBadgeForUser(
+        userId, definition, context?.year ?? currentCenturyClubYear(),
+        batchMetrics?.values.get(userId)?.get("calendar_year_beers"),
+      ));
       continue;
     }
     if (definition.triggerKey === "season_hat_tricks") {
-      if (context?.seasonId) earned.push(...await evaluateSeasonHatTrickBadgeForUser(userId, definition, context.seasonId));
+      if (context?.seasonId) earned.push(...await evaluateSeasonHatTrickBadgeForUser(
+        userId, definition, context.seasonId, batchMetrics?.values.get(userId)?.get("season_hat_tricks"),
+      ));
       continue;
     }
     if (definition.triggerKey === "season_scoring_streak") {
-      if (context?.seasonId) earned.push(...await evaluateSeasonOnFireBadgeForUser(userId, definition, context.seasonId));
+      if (context?.seasonId) earned.push(...await evaluateSeasonOnFireBadgeForUser(
+        userId, definition, context.seasonId, batchMetrics?.values.get(userId)?.get("season_scoring_streak"),
+      ));
       continue;
     }
     if (definition.triggerKey === "season_48hr_rsvp_perfect") {
-      if (context?.seasonId) earned.push(...await evaluateSeasonEarlyBirdBadgeForUser(userId, definition, context.seasonId));
+      if (context?.seasonId) earned.push(...await evaluateSeasonEarlyBirdBadgeForUser(
+        userId, definition, context.seasonId, batchMetrics?.earlyBirdStatuses.get(userId),
+      ));
       continue;
     }
     if (definition.triggerKey === "season_rsvp_perfect") {
-      if (context?.seasonId) earned.push(...await evaluateSeasonRsvpKingForUser(userId, definition, context.seasonId));
+      if (context?.seasonId) earned.push(...await evaluateSeasonRsvpKingForUser(
+        userId, definition, context.seasonId, batchMetrics?.rsvpKingStatuses.get(userId),
+      ));
       continue;
     }
-    if (definition.triggerKey === "career_shutouts" && !(await isCareerGoalie(userId))) continue;
+    if (definition.triggerKey === "career_shutouts") {
+      const eligible = batchMetrics
+        ? batchMetrics.careerGoalieEligible.has(userId)
+        : await isCareerGoalie(userId);
+      if (!eligible) continue;
+    }
     const centuryYear = definition.triggerKey === "calendar_year_appearances" ? currentCenturyClubYear() : null;
     const scopeKey = centuryYear === null ? "global" : `year:${centuryYear}`;
-    const currentValue = await getMetricValue(userId, definition.triggerKey ?? "", context);
+    const triggerKey = definition.triggerKey ?? "";
+    const batchedValue = batchMetrics?.values.get(userId)?.get(triggerKey);
+    const currentValue = batchedValue === undefined
+      ? await getMetricValue(userId, triggerKey, context)
+      : batchedValue;
     const config = (definition.triggerConfig ?? {}) as Record<string, unknown>;
     const threshold = Number(config.threshold ?? 1);
     const [current] = await db.select().from(badgeProgress).where(and(
@@ -1615,18 +1982,39 @@ export async function evaluateBadgesForUser(
   return evaluateBadgesForUserWithDefinitions(userId, context, onlyTriggerKey, definitions);
 }
 
-/**
- * Evaluate several users from one fresh catalog snapshot. Per-user progress,
- * metrics, and awards remain live queries; the snapshot is never retained.
- */
+/** Evaluate participants using shared set-based metric reads and per-user writes. */
 export async function evaluateBadgesForUsers(evaluations: BadgeEvaluationInput[]) {
   if (evaluations.length === 0) return [];
   const definitions = await definitionsWithTiers();
-  return Promise.allSettled(
-    evaluations.map(({ userId, context, onlyTriggerKey }) =>
-      evaluateBadgesForUserWithDefinitions(userId, context, onlyTriggerKey, definitions),
-    ),
-  );
+  const grouped = new Map<string, Array<{ input: BadgeEvaluationInput; index: number }>>();
+  evaluations.forEach((input, index) => {
+    const key = JSON.stringify([input.context ?? null, input.onlyTriggerKey ?? null]);
+    grouped.set(key, [...(grouped.get(key) ?? []), { input, index }]);
+  });
+
+  const results: Array<PromiseSettledResult<Array<Record<string, unknown>>> | undefined> =
+    Array(evaluations.length).fill(undefined);
+  const groups = Array.from(grouped.values());
+  for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+    const group: Array<{ input: BadgeEvaluationInput; index: number }> = groups[groupIndex];
+    const { context, onlyTriggerKey } = group[0].input;
+    const relevantDefinitions = definitions.filter((definition) =>
+      definition.category === "achievement" && definition.achievementType && !isTriviaDefinition(definition)
+      && (!onlyTriggerKey || definition.triggerKey === onlyTriggerKey),
+    );
+    const batchMetrics = await loadBatchBadgeMetrics(
+      group.map(({ input }) => input.userId),
+      relevantDefinitions,
+      context,
+    );
+    const settled = await Promise.allSettled(group.map(({ input }) =>
+      evaluateBadgesForUserWithDefinitions(
+        input.userId, input.context, input.onlyTriggerKey, definitions, batchMetrics,
+      ),
+    ));
+    group.forEach(({ index }, offset) => { results[index] = settled[offset]; });
+  }
+  return results as PromiseSettledResult<Array<Record<string, unknown>>>[];
 }
 
 // Historical participants receive their one-time award without an old game

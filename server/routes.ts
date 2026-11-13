@@ -1082,7 +1082,11 @@ async function applyAdditionalTeamPaymentFromSession(
   return result.length > 0;
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+type RouteServices = {
+  processCompletedGameRecalculation?: (gameId: string) => Promise<void>;
+};
+
+export async function registerRoutes(app: Express, services: RouteServices = {}): Promise<Server> {
   const currentTeamIds = async (userId: string, leagueId?: string) => {
     const userTeams = await storage.getUserTeams(userId);
     return activeTeamIds(userTeams, leagueId);
@@ -10524,7 +10528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Versioned points model: old clients retain their existing goals-only contract.
       if (req.query.model === "points-v1" || req.query.model === "adaptive-v1" || req.query.model === "adaptive-v2") {
-        const learning = req.query.model !== "points-v1" ? await loadLineComboCalibration(pool, teamId) : undefined;
+        const learning = req.query.model !== "points-v1" ? await loadLineComboCalibration(pool, teamId, false) : undefined;
         const history = await db.execute(lineComboHistoryQuery(teamId, learning?.available === true));
         const stats = buildLineComboStats(history.rows as ComboHistoryRow[]);
         if (learning) stats.learning = learning;
@@ -13081,19 +13085,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Scorekeeper Dashboard Routes - Game Goals
-  const reevaluateSeasonScoringBadges = (game: { isCompleted: boolean; seasonId: string | null; leagueId: string | null }, scorerIds: Array<string | null | undefined>) => {
-    if (!game.isCompleted || !game.seasonId) return;
-    const evaluations = Array.from(new Set(scorerIds.filter((id): id is string => !!id)))
-      .flatMap((userId) => ["season_hat_tricks", "season_scoring_streak"].map((onlyTriggerKey) => ({
-        userId,
-        context: { seasonId: game.seasonId, leagueId: game.leagueId },
-        onlyTriggerKey,
-      })));
-    launchBadgeEvaluationBatch(
-      evaluations,
-      (evaluation) => `[Badges] ${evaluation.onlyTriggerKey} goal correction evaluation failed:`,
-    );
-  };
   app.get('/api/games/:gameId/goals', isAuthenticated, async (req: any, res) => {
     try {
       const { gameId } = req.params;
@@ -13142,7 +13133,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: timestamp || null,
       });
 
-      reevaluateSeasonScoringBadges(game, [goal.scorerId]);
       res.json(goal);
     } catch (error) {
       console.error('Error creating game goal:', error);
@@ -13201,6 +13191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const updatedGoal = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('app.scorekeeper_game_id', ${gameId}, true)`);
         const [lockedGoal] = await tx
           .select()
           .from(gameGoals)
@@ -13224,7 +13215,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return updated;
       });
 
-      reevaluateSeasonScoringBadges(game, [currentGoal.scorerId, updatedGoal.scorerId]);
       res.json(updatedGoal);
     } catch (error) {
       console.error('Error updating game goal:', error);
@@ -13255,6 +13245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('app.scorekeeper_game_id', ${gameId}, true)`);
         const [lockedGoal] = await tx
           .select()
           .from(gameGoals)
@@ -13269,7 +13260,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .delete(gameGoals)
           .where(and(eq(gameGoals.id, goalId), eq(gameGoals.gameId, gameId)));
       });
-      reevaluateSeasonScoringBadges(game, [currentGoal.scorerId]);
       res.json({ message: 'Goal deleted successfully' });
     } catch (error) {
       console.error('Error deleting game goal:', error);
@@ -13483,7 +13473,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const attendanceProvided = Array.isArray(req.body?.attendees);
-      let rosterUserIds: string[] = [];
       const normalizedAttendance: Array<{
         gameId: string;
         teamId: string;
@@ -13507,7 +13496,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const member of [...homeMembers, ...awayMembers]) {
           rosterUsers.set(member.userId, member.teamId);
         }
-        rosterUserIds = Array.from(rosterUsers.keys());
         const rosterPlaceholders = new Map<string, string>();
         for (const placeholder of placeholders) {
           if (placeholder.teamId) rosterPlaceholders.set(placeholder.id, placeholder.teamId);
@@ -13543,6 +13531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.transaction(async (tx) => {
         // Serialize finalization attempts and commit every related write
         // together so a failure cannot leave a game half-finalized.
+        await tx.execute(sql`SELECT set_config('app.scorekeeper_game_id', ${gameId}, true)`);
         await tx.execute(sql`SELECT id FROM games WHERE id = ${gameId} FOR UPDATE`);
 
         const [lockedGame] = await tx.select().from(games).where(eq(games.id, gameId));
@@ -13711,47 +13700,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         return {
-          game: updatedGame,
-          goalsCount: goals.length,
-          penaltiesCount: penalties.length,
-          scorerIds: goals.flatMap((goal) => goal.scorerId ? [goal.scorerId] : []),
+          wasAlreadyCompleted: lockedGame.isCompleted,
         };
       });
-      
-      if (rosterUserIds.length === 0) {
-        const [homeMembers, awayMembers] = await Promise.all([
-          storage.getTeamMembers(game.homeTeamId),
-          game.awayTeamId ? storage.getTeamMembers(game.awayTeamId) : Promise.resolve([]),
-        ]);
-        rosterUserIds = Array.from(new Set([...homeMembers, ...awayMembers].map((member) => member.userId)));
+
+      if (!result.wasAlreadyCompleted && services.processCompletedGameRecalculation) {
+        void services.processCompletedGameRecalculation(gameId).catch((error: any) => {
+          console.error("[ScorekeeperRecalculation] Finalized-game work failed.", {
+            gameId,
+            code: error?.code ?? "unknown",
+          });
+        });
       }
-      // Attendance may already be stored when finalization omits attendees;
-      // goalies and event-only players may not be on the current roster.
-      const participants = await db.execute(sql`
-        SELECT user_id FROM game_attendance WHERE game_id = ${gameId} AND user_id IS NOT NULL
-        UNION SELECT goalie_user_id FROM game_goalies WHERE game_id = ${gameId}
-        UNION SELECT scorer_id FROM game_goals WHERE game_id = ${gameId} AND scorer_id IS NOT NULL
-        UNION SELECT primary_assist_id FROM game_goals WHERE game_id = ${gameId} AND primary_assist_id IS NOT NULL
-        UNION SELECT secondary_assist_id FROM game_goals WHERE game_id = ${gameId} AND secondary_assist_id IS NOT NULL
-        UNION SELECT player_id FROM game_penalties WHERE game_id = ${gameId} AND player_id IS NOT NULL
-      `);
-      const evaluatedUserIds = Array.from(new Set([
-        ...rosterUserIds,
-        ...participants.rows.map((row) => String(row.user_id)),
-      ]));
-      launchBadgeEvaluationBatch(
-        evaluatedUserIds.map((userId) => ({
-          userId,
-          context: { leagueId: result.game.leagueId, seasonId: result.game.seasonId, year: Number(result.game.scheduledAt.slice(0, 4)) },
-        })),
-        () => '[Badges] Finalization evaluation failed:',
-      );
-      res.json({ 
-        message: 'Game finalized successfully', 
-        game: result.game,
-        goalsCount: result.goalsCount,
-        penaltiesCount: result.penaltiesCount
-      });
+      res.json({ ok: true, message: 'Game finalized successfully' });
     } catch (error) {
       console.error('Error finalizing game:', error);
       if ((error as { status?: number }).status === 400) {

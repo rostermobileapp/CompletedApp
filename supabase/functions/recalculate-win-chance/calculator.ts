@@ -138,39 +138,54 @@ export function predictionRow(game: GameRow, home: TeamData, away: TeamData, res
   };
 }
 
-export async function recalculateTeam(admin: Db, teamId: string, now = Date.now()) {
-  const teamResult = await admin.from("teams").select(TEAM_COLUMNS).eq("id", teamId).maybeSingle();
-  if (teamResult.error) throw new Error(`team: ${teamResult.error.message}`);
-  const team = teamResult.data as TeamRow | null;
-  if (!team?.league_id) return { updated: 0 };
-  const upcoming = await allRows<GameRow>(() => admin.from("games").select(GAME_COLUMNS)
-    .eq("is_completed", false).eq("is_scrimmage", false)
-    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-    .order("scheduled_at").order("id"), "upcoming games");
-  const leagueResult = await admin.from("leagues").select("allow_ties, timezone").eq("id", team.league_id).maybeSingle();
-  if (leagueResult.error || !leagueResult.data) throw new Error("League prediction settings unavailable");
-  const timezone = leagueResult.data.timezone || "America/New_York";
-  const eligible = upcoming.filter(game => game.away_team_id && game.home_score == null && game.away_score == null &&
-    isFutureGame(game.scheduled_at, now, timezone) && game.league_id === team.league_id);
+async function recalculateGames(admin: Db, upcoming: GameRow[], now: number, scopedTeamIds: Set<string>) {
+  const eligible = new Map<string, GameRow>();
+  const leagues = new Map<string, { allow_ties: boolean; timezone: string | null }>();
+  for (const game of upcoming) {
+    if (!game.away_team_id || game.home_score != null || game.away_score != null ||
+        game.is_completed || game.is_scrimmage || game.league_id == null ||
+        !scopedTeamIds.has(game.home_team_id) && !scopedTeamIds.has(game.away_team_id)) continue;
+    let league = leagues.get(game.league_id);
+    if (!league) {
+      const leagueResult = await admin.from("leagues").select("allow_ties, timezone").eq("id", game.league_id).maybeSingle();
+      if (leagueResult.error || !leagueResult.data) throw new Error("League prediction settings unavailable");
+      league = {
+        allow_ties: !!leagueResult.data.allow_ties,
+        timezone: leagueResult.data.timezone || "America/New_York",
+      };
+      leagues.set(game.league_id, league);
+    }
+    if (!isFutureGame(game.scheduled_at, now, league.timezone)) continue;
+    eligible.set(game.id, game);
+  }
+
   const scopes = new Map<string, Awaited<ReturnType<typeof loadScope>>>();
   const teamData = new Map<string, TeamData>();
   let updated = 0;
-  for (const game of eligible) {
-    const scopeKey = game.season_id ?? "unassigned";
-    if (!scopes.has(scopeKey)) scopes.set(scopeKey, await loadScope(admin, team.league_id, game.season_id, localTimestamp(now, timezone)));
+  for (const game of eligible.values()) {
+    const scopeKey = `${game.league_id}:${game.season_id ?? "unassigned"}`;
+    const league = leagues.get(game.league_id)!;
+    if (!scopes.has(scopeKey)) {
+      scopes.set(scopeKey, await loadScope(
+        admin,
+        game.league_id,
+        game.season_id,
+        localTimestamp(now, league.timezone),
+      ));
+    }
     const scope = scopes.get(scopeKey)!;
     const home = scope.teams.find(row => row.id === game.home_team_id);
     const away = scope.teams.find(row => row.id === game.away_team_id);
     if (!home || !away) continue;
     for (const participant of [home, away]) {
-      const key = `${scopeKey}:${participant.id}`;
+      const key = `${game.league_id}:${scopeKey}:${participant.id}`;
       if (!teamData.has(key)) teamData.set(key, await loadTeamData(admin, participant, scope.games, game.season_id));
     }
-    const homeData = teamData.get(`${scopeKey}:${home.id}`)!;
-    const awayData = teamData.get(`${scopeKey}:${away.id}`)!;
+    const homeData = teamData.get(`${game.league_id}:${scopeKey}:${home.id}`)!;
+    const awayData = teamData.get(`${game.league_id}:${scopeKey}:${away.id}`)!;
     const [homeInput, awayInput] = await Promise.all([inputsForGame(admin, homeData, game.id), inputsForGame(admin, awayData, game.id)]);
     const result = predictGame(homeInput, awayInput, headToHead(homeData, awayData), {
-      leagueAvgGoals: scope.leagueAverage, allowTies: !!leagueResult.data.allow_ties,
+      leagueAvgGoals: scope.leagueAverage, allowTies: !!leagues.get(game.league_id)!.allow_ties,
     });
     // Revalidate immediately before the privileged write. A scorekeeper may
     // have started/finalized this game while the history was being assembled.
@@ -179,13 +194,57 @@ export async function recalculateTeam(admin: Db, teamId: string, now = Date.now(
     const latest = current.data as GameRow | null;
     if (!latest || latest.is_completed || latest.is_scrimmage || latest.home_score != null || latest.away_score != null ||
       latest.home_team_id !== home.id || latest.away_team_id !== away.id || latest.season_id !== game.season_id ||
-      latest.league_id !== team.league_id || !isFutureGame(latest.scheduled_at, Math.max(now, Date.now()), timezone)) continue;
+      latest.league_id !== game.league_id ||
+      !isFutureGame(latest.scheduled_at, Math.max(now, Date.now()), leagues.get(game.league_id)!.timezone)) continue;
     const saved = await admin.rpc("win_chance_save_prediction", {
       p_prediction: predictionRow(game, homeData, awayData, result, now),
-      p_league_id: team.league_id, p_season_id: game.season_id,
+      p_league_id: game.league_id, p_season_id: game.season_id,
     });
     if (saved.error) throw new Error(`prediction save: ${saved.error.message}`);
     if (saved.data) updated++;
   }
   return { updated };
+}
+
+async function getUpcomingGamesForTeams(admin: Db, teamIds: string[]) {
+  const unique = Array.from(new Set(teamIds.filter(Boolean)));
+  const games = new Map<string, GameRow>();
+  for (const teamId of unique) {
+    const rows = await allRows<GameRow>(() => admin.from("games").select(GAME_COLUMNS)
+      .eq("is_completed", false).eq("is_scrimmage", false)
+      .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+      .order("scheduled_at").order("id"), "upcoming games");
+    for (const game of rows) games.set(game.id, game);
+  }
+  return Array.from(games.values());
+}
+
+export async function recalculateGame(admin: Db, gameId: string, now = Date.now()) {
+  const result = await admin.from("games").select(GAME_COLUMNS).eq("id", gameId).maybeSingle();
+  if (result.error) throw new Error("Prediction game unavailable");
+  const game = result.data as GameRow | null;
+  if (!game || !game.home_team_id || !game.away_team_id) return { updated: 0 };
+  return recalculateGames(admin, [game], now, new Set([game.home_team_id, game.away_team_id]));
+}
+
+export async function recalculateTeams(admin: Db, teamIds: string[], now = Date.now()) {
+  const uniqueTeamIds = Array.from(new Set(teamIds.filter(Boolean)));
+  if (uniqueTeamIds.length === 0) return { updated: 0 };
+  const teamRows = await allRows<TeamRow>(() => admin.from("teams").select(TEAM_COLUMNS).in("id", uniqueTeamIds), "target teams");
+  const scopedTeamIds = new Set(teamRows.filter(team => !!team.league_id).map(team => team.id));
+  if (scopedTeamIds.size === 0) return { updated: 0 };
+  const upcoming = await getUpcomingGamesForTeams(admin, Array.from(scopedTeamIds));
+  return recalculateGames(admin, upcoming, now, scopedTeamIds);
+}
+
+export async function recalculateSourceGame(admin: Db, sourceGameId: string, now = Date.now()) {
+  const result = await admin.from("games").select("home_team_id, away_team_id").eq("id", sourceGameId).maybeSingle();
+  if (result.error) throw new Error("Source game unavailable");
+  const game = result.data as { home_team_id: string | null; away_team_id: string | null } | null;
+  if (!game) return { updated: 0 };
+  return recalculateTeams(admin, [game.home_team_id ?? "", game.away_team_id ?? ""], now);
+}
+
+export async function recalculateTeam(admin: Db, teamId: string, now = Date.now()) {
+  return recalculateTeams(admin, [teamId], now);
 }

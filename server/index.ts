@@ -22,22 +22,13 @@ import { startTeamAwardPushJob } from "./teamAwardPushJob";
 import { ensureTeamAwardDatabaseUpdates } from "./teamAwardDbInit";
 import { ensureLineComboLearningDatabase } from "./lineComboLearningDb";
 import { createLineComboLearningWorker } from "./lineComboLearning";
+import { createScorekeeperRecalculationWorker } from "./scorekeeperRecalculation";
 import { pool } from "./db";
 
 const app = express();
 app.use(nonproductionHttpGuard);
 const lineComboLearner = createLineComboLearningWorker(pool);
-let lineComboLearningReady = false;
-// Successful line saves refresh prospective forecasts promptly, not just on the
-// one-minute sweep. This cannot create forecasts for already-started games.
-app.use((req, res, next) => {
-  if (req.method !== "GET" && req.path.includes("/line-combinations")) {
-    res.on("finish", () => {
-      if (lineComboLearningReady && res.statusCode >= 200 && res.statusCode < 300) void lineComboLearner.request();
-    });
-  }
-  next();
-});
+const scorekeeperRecalculation = createScorekeeperRecalculationWorker(lineComboLearner.request);
 if (isVerifiedProductionRuntime()) startTeamAwardPushJob();
 
 // CORS configuration for Vercel frontend
@@ -150,12 +141,15 @@ app.use((req, res, next) => {
 
   try {
     await ensureLineComboLearningDatabase(pool);
-    lineComboLearningReady = true;
   } catch (error: any) {
     console.error("[LineComboLearning] Automatic setup failed; learning is unavailable.", { code: error?.code ?? "unknown" });
   }
   }
-  const server = await registerRoutes(app);
+  const server = await registerRoutes(app, {
+    processCompletedGameRecalculation: async (gameId) => {
+      await scorekeeperRecalculation.processCompletedGame(gameId);
+    },
+  });
   if (isVerifiedProductionRuntime()) {
   await reconcileApplePurchaseLinks();
   startApplePurchaseLinkJob();
@@ -206,7 +200,9 @@ app.use((req, res, next) => {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    if (isVerifiedProductionRuntime() && lineComboLearningReady) lineComboLearner.start();
+    if (isVerifiedProductionRuntime() || process.env.NONPRODUCTION_ISOLATED === "1") {
+      scorekeeperRecalculation.start();
+    }
     log(`serving on port ${port}`);
     if (isVerifiedProductionRuntime()) {
     startDailyTriviaPushJob();

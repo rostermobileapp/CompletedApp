@@ -301,8 +301,7 @@ export default function ScorekeeperDashboard() {
     },
     onSuccess: (_result, variables) => {
       // Keep the exact attendance selection available when a completed game is
-      // reopened. The query is invalidated below, but the scoring view closes
-      // immediately and could otherwise briefly reuse its pre-save cache.
+      // reopened; the scoring view closes immediately after saving.
       queryClient.setQueryData<GameAttendanceData>(
         [`/api/games/${variables.gameId}/attendance`],
         (previous) => ({
@@ -311,11 +310,12 @@ export default function ScorekeeperDashboard() {
           attendanceRecorded: true,
         }),
       );
-      queryClient.invalidateQueries({ queryKey: [gamesQueryKey] });
+      queryClient.setQueryData<Game[]>([gamesQueryKey], (previous) => previous?.map((game) =>
+        game.id === variables.gameId
+          ? { ...game, isCompleted: true, status: 'completed', resultType: variables.resultType }
+          : game,
+      ));
       if (selectedGame?.leagueId) {
-        queryClient.invalidateQueries({
-          queryKey: ['/api/leagues', selectedGame.leagueId, 'stats'],
-        });
         queryClient.invalidateQueries({
           queryKey: ['/api/leagues', selectedGame.leagueId, 'games-needing-verification'],
         });
@@ -323,7 +323,6 @@ export default function ScorekeeperDashboard() {
           queryKey: ['/api/user/notification-counts'],
         });
       }
-      queryClient.invalidateQueries({ queryKey: [attendanceQueryKey] });
       toast({ title: 'Game finalized', description: 'Stats have been updated' });
       setSelectedGame(null);
       setActiveTab('schedule');
@@ -337,8 +336,12 @@ export default function ScorekeeperDashboard() {
     mutationFn: async (data: { gameId: string; homeScore: number; awayScore: number }) => {
       return apiRequest('PATCH', `/api/games/${data.gameId}/scores`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [gamesQueryKey] });
+    onSuccess: (_result, variables) => {
+      queryClient.setQueryData<Game[]>([gamesQueryKey], (previous) => previous?.map((game) =>
+        game.id === variables.gameId
+          ? { ...game, homeScore: variables.homeScore, awayScore: variables.awayScore }
+          : game,
+      ));
     },
     onError: (error: any) => {
       toast({ title: 'Failed to update scores', description: error.message, variant: 'destructive' });

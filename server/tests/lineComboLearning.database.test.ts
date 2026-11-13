@@ -53,9 +53,9 @@ test("future forecast capture, outcome validation and automatic recalibration", 
     await ensureLineComboLearningDatabase(pool);
     const capture = async () => {
       const client = await pool!.connect();
-      try { await captureUpcomingLineForecasts(client); } finally { client.release(); }
+      try { await captureUpcomingLineForecasts(client, ["team"]); } finally { client.release(); }
     };
-    const evaluate = () => pool!.query(evaluateLineForecastsSql, ["team"]);
+    const evaluate = () => pool!.query(evaluateLineForecastsSql, [["team"]]);
     const first = async () => (await pool!.query("SELECT * FROM line_combo_forecasts WHERE line_number=1")).rows[0];
     await t.test("automatic setup is idempotent and private", async () => {
       assert.equal((await pool!.query("SELECT relrowsecurity FROM pg_class WHERE relname='line_combo_forecasts'")).rows[0].relrowsecurity, true);

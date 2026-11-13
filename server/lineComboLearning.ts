@@ -32,7 +32,8 @@ export const upcomingLineForecastsSql = `
       SELECT 1 FROM line_combinations specific
       WHERE specific.team_id=u.team_id AND specific.game_id=u.game_id AND specific.is_active=true)))
   JOIN line_combination_assignments a ON a.line_combination_id=lc.id
-  WHERE lc.name NOT ILIKE '[TEST]%'
+   WHERE lc.name NOT ILIKE '[TEST]%'
+     AND ($1::text[] IS NULL OR u.team_id=ANY($1::text[]))
   GROUP BY u.game_id,u.team_id,u.starts_at,lc.id,lc.line_type,lc.line_number,lc.game_id
   HAVING count(*)=CASE WHEN lc.line_type='forward' THEN 3 ELSE 2 END
     AND count(DISTINCT a.player_id)=count(*)
@@ -78,7 +79,8 @@ export const evaluateLineForecastsSql = `
       END AS reason
     FROM line_combo_forecasts f JOIN games g ON g.id=f.game_id
     JOIN leagues l ON l.id=g.league_id
-    WHERE f.starts_at<=clock_timestamp() AND ($1::text IS NULL OR f.team_id=$1)
+     WHERE f.starts_at<=clock_timestamp()
+       AND ($1::text[] IS NULL OR f.team_id=ANY($1::text[]))
   )
   UPDATE line_combo_forecasts f SET
     actual_points=CASE WHEN o.reason IS NULL THEN o.points ELSE NULL END,
@@ -89,9 +91,9 @@ export const evaluateLineForecastsSql = `
       (f.actual_points,f.exclusion_reason) IS DISTINCT FROM (CASE WHEN o.reason IS NULL THEN o.points ELSE NULL END,o.reason))
 `;
 
-export async function loadLineComboCalibration(connection: Queryable, teamId: string, refresh = true) {
+export async function loadLineComboCalibration(connection: Queryable, teamId: string, refresh = false) {
   try {
-    if (refresh) await connection.query(evaluateLineForecastsSql, [teamId]);
+    if (refresh) await connection.query(evaluateLineForecastsSql, [[teamId]]);
     const { rows } = await connection.query(`
       WITH ranked AS (
         SELECT game_id AS "gameId",line_type AS "lineType",player_ids AS "playerIds",
@@ -115,8 +117,10 @@ type Candidate = {
   lineNumber: number; source: "game" | "template"; playerIds: string[];
 };
 
-export async function captureUpcomingLineForecasts(client: PoolClient) {
-  const { rows } = await client.query(upcomingLineForecastsSql);
+export async function captureUpcomingLineForecasts(client: PoolClient, teamIds: string[]) {
+  const scopedTeamIds = Array.from(new Set(teamIds.filter(Boolean)));
+  if (scopedTeamIds.length === 0) return;
+  const { rows } = await client.query(upcomingLineForecastsSql, [scopedTeamIds]);
   const historyByTeam = new Map<string, ReturnType<typeof buildLineComboStats>>();
   const opponents = new Map<string, Awaited<ReturnType<typeof loadLineComboOpponent>>>();
   for (const candidate of rows as Candidate[]) {
@@ -171,20 +175,28 @@ export async function captureUpcomingLineForecasts(client: PoolClient) {
 /** Pinned connection and advisory transaction lock coordinate multiple replicas. */
 export function createLineComboLearningWorker(pool: Pick<Pool, "connect">) {
   let running: Promise<void> | undefined;
+  const pendingTeamIds = new Set<string>();
   let rerun = false;
-  const request = (): Promise<void> => {
+  const request = (teamIds: string[]): Promise<void> => {
+    for (const teamId of teamIds) if (teamId) pendingTeamIds.add(teamId);
+    if (pendingTeamIds.size === 0) return Promise.resolve();
     if (running) { rerun = true; return running; }
     running = (async () => {
       do {
         rerun = false;
+        const scopedTeamIds = Array.from(pendingTeamIds);
+        pendingTeamIds.clear();
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
           await client.query("SET LOCAL statement_timeout='20s'");
           const lock = await client.query("SELECT pg_try_advisory_xact_lock(hashtext('roster:line-combo-learning')) AS acquired");
-          if (!lock.rows[0].acquired) { await client.query("ROLLBACK"); return; }
-          await client.query(evaluateLineForecastsSql, [null]);
-          await captureUpcomingLineForecasts(client);
+          if (!lock.rows[0].acquired) {
+            await client.query("ROLLBACK");
+            throw Object.assign(new Error("Line-combo learning is already running"), { code: "LOCK_BUSY" });
+          }
+          await client.query(evaluateLineForecastsSql, [scopedTeamIds]);
+          await captureUpcomingLineForecasts(client, scopedTeamIds);
           await client.query("COMMIT");
         } catch (error) {
           await client.query("ROLLBACK").catch(() => {});
@@ -193,16 +205,9 @@ export function createLineComboLearningWorker(pool: Pick<Pool, "connect">) {
       } while (rerun);
     })().catch((error: any) => {
       console.error("[LineComboLearning] Update failed; will retry.", { code: error?.code ?? "unknown" });
+      throw error;
     }).finally(() => { running = undefined; });
     return running;
   };
-  return {
-    request,
-    start() {
-      void request();
-      const timer = setInterval(() => void request(), 60_000);
-      timer.unref();
-      return () => clearInterval(timer);
-    },
-  };
+  return { request };
 }
