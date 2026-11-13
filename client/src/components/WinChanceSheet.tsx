@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { formatWinChanceRecord, type WinChanceRecord } from "@shared/winChanceRecord";
 import {
   Dialog,
   DialogContent,
@@ -34,8 +35,8 @@ export type WinChanceData = {
   underProbability: number | null;
   topScorersHome: ScorerProjection[];
   topScorersAway: ScorerProjection[];
-  homeRecordSnapshot: { wins: number; losses: number; ties: number };
-  awayRecordSnapshot: { wins: number; losses: number; ties: number };
+  homeRecordSnapshot: WinChanceRecord;
+  awayRecordSnapshot: WinChanceRecord;
   homeStreak: number;
   awayStreak: number;
   goalieHome: string | null;
@@ -60,10 +61,6 @@ interface WinChanceSheetProps {
 
 function percent(value: number | null | undefined): string {
   return `${Math.round((value ?? 0) * 100)}%`;
-}
-
-function recordLine(record: { wins: number; losses: number; ties: number }): string {
-  return `${record.wins}-${record.losses}-${record.ties}`;
 }
 
 function streakLine(streak: number): string {
@@ -196,7 +193,7 @@ function TeamChance({
 }: {
   name: string;
   chance: number;
-  record: { wins: number; losses: number; ties: number };
+  record: WinChanceRecord;
   streak: number;
   align: "left" | "right";
 }) {
@@ -204,7 +201,9 @@ function TeamChance({
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div className="truncate text-sm font-semibold">{name}</div>
       <div className="mt-1 text-2xl font-bold tabular-nums">{percent(chance)}</div>
-      <div className="mt-1 text-xs text-muted-foreground">Record {recordLine(record)}</div>
+      <div className="mt-1 text-xs text-muted-foreground" title={record.shootoutLosses == null ? "Wins–Losses–Ties" : "Wins–Losses–Ties–Overtime/shootout losses"}>
+        Record {formatWinChanceRecord(record)}
+      </div>
       <div className="text-xs text-muted-foreground">{streakLine(streak)}</div>
     </div>
   );

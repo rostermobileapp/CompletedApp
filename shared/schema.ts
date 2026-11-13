@@ -742,8 +742,8 @@ export const gamePredictions = pgTable("game_predictions", {
     chanceOfPoint: number;
     form: "hot" | "cold" | null;
   }>>().notNull().default([]),
-  homeRecordSnapshot: jsonb("home_record_snapshot").$type<{ wins: number; losses: number; ties: number }>().notNull(),
-  awayRecordSnapshot: jsonb("away_record_snapshot").$type<{ wins: number; losses: number; ties: number }>().notNull(),
+  homeRecordSnapshot: jsonb("home_record_snapshot").$type<{ wins: number; losses: number; ties: number; shootoutLosses?: number }>().notNull(),
+  awayRecordSnapshot: jsonb("away_record_snapshot").$type<{ wins: number; losses: number; ties: number; shootoutLosses?: number }>().notNull(),
   homeStreak: integer("home_streak").notNull().default(0),
   awayStreak: integer("away_streak").notNull().default(0),
   goalieHome: varchar("goalie_home"),
