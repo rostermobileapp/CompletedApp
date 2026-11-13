@@ -1433,7 +1433,7 @@ export default function GameDetails() {
             .map((team: any) => String(team.id))}
         />
         <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px] bg-[#e2e2e2] dark:bg-[#212121]">
-          <div className="flex items-center gap-4 mb-2">
+          <div className="flex items-center gap-4 mb-0">
             <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
               {opponentTeam?.logoUrl ? (
                 <img 
@@ -1479,7 +1479,7 @@ export default function GameDetails() {
                 </div>
               )}
               {!isGameCompleted && opponentTeam && (
-                <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="mt-1 flex items-end justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex shrink-0 items-center gap-1">
                       <Users className="w-4 h-4 text-green-600" />
