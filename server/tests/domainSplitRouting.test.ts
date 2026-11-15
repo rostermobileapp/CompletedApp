@@ -13,16 +13,20 @@ function pathMatcher(source: string) {
 const appHostMarketingRedirect = config.redirects.find((route: any) =>
   route.destination === 'https://www.rosterhockey.com/:path',
 );
+const retiredSportRedirects = config.redirects.filter((route: any) =>
+  route.destination === 'https://www.rosterhockey.com/hockey' &&
+  route.statusCode === 301,
+);
 const marketingHostAppRedirect = config.redirects.find((route: any) =>
   route.destination === 'https://www.roster-app.com/:path*' &&
   route.has?.some((condition: any) => condition.type === 'host' && condition.value === 'www.rosterhockey.com'),
 );
 
-test('the app host redirects only exact marketing paths and preserves their queries', () => {
+test('the app host permanently redirects exact marketing paths and preserves their queries', () => {
   assert.ok(appHostMarketingRedirect);
   const matches = pathMatcher(appHostMarketingRedirect.source);
   for (const path of [
-    '/features', '/pricing', '/about', '/hockey', '/baseball', '/soccer',
+    '/features', '/pricing', '/about', '/hockey',
     '/for-adult-leagues', '/for-youth-teams', '/for-varsity',
     '/referral-program', '/faq', '/support', '/sitemap.xml', '/llms.txt',
   ]) {
@@ -36,8 +40,34 @@ test('the app host redirects only exact marketing paths and preserves their quer
   ]) {
     assert.equal(matches.test(path), false, path);
   }
-  assert.equal(appHostMarketingRedirect.statusCode, 302);
+  assert.equal(appHostMarketingRedirect.statusCode, 301);
   assert.equal(appHostMarketingRedirect.preserveQueryParams, true);
+});
+
+test('retired sport paths on both hosts go directly to hockey permanently', () => {
+  assert.equal(retiredSportRedirects.length, 2);
+  const oldApp = retiredSportRedirects.find((route: any) =>
+    route.has?.some((condition: any) => condition.type === 'host' &&
+      condition.value?.re === '^(?:www\\.)?roster-app\\.com$'),
+  );
+  const marketingHost = retiredSportRedirects.find((route: any) =>
+    route.has?.some((condition: any) => condition.type === 'host' &&
+      condition.value === 'www.rosterhockey.com'),
+  );
+  assert.ok(oldApp);
+  assert.ok(marketingHost);
+  for (const route of [oldApp, marketingHost]) {
+    assert.equal(route.source, '/(baseball|soccer)(/.*)?');
+    const matches = new RegExp(`^${route.source}$`);
+    for (const path of ['/baseball', '/soccer', '/baseball/archive', '/soccer/archive']) {
+      assert.equal(matches.test(path), true, path);
+    }
+    assert.equal(route.statusCode, 301);
+    assert.equal(route.destination, 'https://www.rosterhockey.com/hockey');
+    assert.equal(route.preserveQueryParams, true);
+  }
+  assert.ok(config.redirects.indexOf(oldApp) < config.redirects.indexOf(appHostMarketingRedirect));
+  assert.ok(config.redirects.indexOf(marketingHost) < config.redirects.indexOf(marketingHostAppRedirect));
 });
 
 test('the marketing host sends app paths to the app but keeps marketing and static files', () => {
@@ -62,6 +92,8 @@ test('the marketing host sends app paths to the app but keeps marketing and stat
   }
   assert.equal(marketingHostAppRedirect.statusCode, 302);
   assert.equal(marketingHostAppRedirect.preserveQueryParams, true);
+  assert.equal(marketingHostAppRedirect.source.includes('baseball'), false);
+  assert.equal(marketingHostAppRedirect.source.includes('soccer'), false);
 });
 
 test('the app root is not redirected and only the apex marketing host is canonicalized', () => {
@@ -72,6 +104,7 @@ test('the app root is not redirected and only the apex marketing host is canonic
     ) && route.source === '/',
   ), false);
   const apexMarketingRedirect = config.redirects.find((route: any) =>
+    route.source === '/:path*' &&
     route.has?.some((condition: any) => condition.type === 'host' && condition.value === 'rosterhockey.com'),
   );
   assert.ok(apexMarketingRedirect);

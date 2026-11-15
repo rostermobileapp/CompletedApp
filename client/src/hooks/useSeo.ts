@@ -1,7 +1,6 @@
 import { useContext, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { applyCanonicalUrl, canonicalOriginForPath, canonicalUrl, SeoMetadataContext } from '@/lib/seoMetadata';
-import { isUnindexedPublicPage } from '@shared/publicPagePolicy';
 
 interface SeoOptions {
   title: string;
@@ -48,14 +47,6 @@ export function useSeo({ title, description, ogTitle, ogDescription, canonical }
 
     setMeta('description', description);
     setMeta('og:site_name', 'RosterHockey', true);
-    const robots = document.querySelector('meta[name="robots"]');
-    if (isUnindexedPublicPage(location)) {
-      setMeta('robots', robots?.getAttribute('content')?.includes('nofollow') ? 'noindex,nofollow' : 'noindex');
-    } else if (robots?.getAttribute('content') === 'noindex') {
-      // Do not carry an unlaunched sport's directive into a live public page.
-      // Preserve preview deployments' separate noindex,nofollow protection.
-      robots.remove();
-    }
     setMeta('og:title', resolvedOgTitle, true);
     setMeta('og:description', resolvedOgDesc, true);
     setMeta('og:type', 'website', true);

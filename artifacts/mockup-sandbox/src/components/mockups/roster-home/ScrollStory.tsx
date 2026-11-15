@@ -6,7 +6,7 @@ import "./ScrollStory.css";
 const image = (name: string) => `/__mockup/images/roster-home/${name}`;
 const signupDestination = "/get-started";
 const appStore = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
-const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
+const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively";
 const patchItems = [
   ["hat-trick", "Hat Trick"], ["beer-me", "Beer Me"], ["iron-man", "Iron Man"],
   ["on-fire", "On Fire"], ["century-club", "Century Club"], ["locked-in", "Locked In"],

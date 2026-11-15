@@ -11,7 +11,7 @@ import "./ScrollStory.css";
 const image = (name: string) => `/marketing/roster-home/${name}`;
 const signupDestination = `${APP_SITE_ORIGIN}/get-started`;
 const appStore = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
-const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
+const playStore = "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively";
 const heroWords = ["HOCKEY", "MEMORIES", "LAUGHS", "JOKES", "CHEERS", "GOOD TIMES", "FRIENDS", "CHIRPS", "FELLOWSHIP"];
 const patchItems = [
   ["hat-trick", "Hat Trick"], ["beer-me", "Beer Me"], ["iron-man", "Iron Man"],

@@ -23,8 +23,6 @@ const publicPages: Record<string, () => ReactElement> = {
   '/pricing': () => createElement(PricingPage),
   '/about': () => createElement(AboutPage),
   '/hockey': () => createElement(SportLanding, { sport: 'hockey' }),
-  '/soccer': () => createElement(SportLanding, { sport: 'soccer' }),
-  '/baseball': () => createElement(SportLanding, { sport: 'baseball' }),
   '/for-youth-teams': () => createElement(SegmentLanding, { segment: 'for-youth-teams' }),
   '/for-adult-leagues': () => createElement(SegmentLanding, { segment: 'for-adult-leagues' }),
   '/for-varsity': () => createElement(SegmentLanding, { segment: 'for-varsity' }),

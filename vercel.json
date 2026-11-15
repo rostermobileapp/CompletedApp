@@ -5,7 +5,28 @@
   "framework": null,
   "redirects": [
     {
-      "source": "/:path(features|pricing|about|hockey|baseball|soccer|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|sitemap\\.xml|llms\\.txt)",
+      "source": "/(baseball|soccer)(/.*)?",
+      "has": [
+        {
+          "type": "host",
+          "value": {
+            "re": "^(?:www\\.)?roster-app\\.com$"
+          }
+        }
+      ],
+      "destination": "https://www.rosterhockey.com/hockey",
+      "statusCode": 301,
+      "preserveQueryParams": true
+    },
+    {
+      "source": "/(baseball|soccer)(/.*)?",
+      "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
+      "destination": "https://www.rosterhockey.com/hockey",
+      "statusCode": 301,
+      "preserveQueryParams": true
+    },
+    {
+      "source": "/:path(features|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|sitemap\\.xml|llms\\.txt)",
       "has": [
         {
           "type": "host",
@@ -15,25 +36,29 @@
         }
       ],
       "destination": "https://www.rosterhockey.com/:path",
-      "statusCode": 302
+      "statusCode": 301,
+      "preserveQueryParams": true
     },
     {
       "source": "/",
       "has": [{ "type": "host", "value": "rosterhockey.com" }],
       "destination": "https://www.rosterhockey.com/",
-      "statusCode": 302
+      "statusCode": 302,
+      "preserveQueryParams": true
     },
     {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "rosterhockey.com" }],
       "destination": "https://www.rosterhockey.com/:path*",
-      "statusCode": 302
+      "statusCode": 302,
+      "preserveQueryParams": true
     },
     {
-      "source": "/:path((?!$|(?:features|pricing|about|hockey|baseball|soccer|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|privacy-policy|privacy|terms-of-service|sitemap\\.xml|robots\\.txt|llms\\.txt|manifest\\.json)(?:/?$)|(?:assets|marketing|badges)(?:/|$)|(?:favicon\\.png|icon-192\\.png|icon-512\\.png|roster-logo(?:-transparent)?\\.png)$).*)",
+      "source": "/:path((?!$|(?:features|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|privacy-policy|privacy|terms-of-service|sitemap\\.xml|robots\\.txt|llms\\.txt|manifest\\.json)(?:/?$)|(?:assets|marketing|badges)(?:/|$)|(?:favicon\\.png|icon-192\\.png|icon-512\\.png|roster-logo(?:-transparent)?\\.png)$).*)",
       "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
       "destination": "https://www.roster-app.com/:path*",
-      "statusCode": 302
+      "statusCode": 302,
+      "preserveQueryParams": true
     }
   ],
   "rewrites": [
@@ -124,12 +149,6 @@
     { "source": "/admin/metrics", "destination": "/index.html" }
   ],
   "headers": [
-    {
-      "source": "/(soccer|baseball)(/.*)?",
-      "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex" }
-      ]
-    },
     {
       "source": "/robots.txt",
       "headers": [

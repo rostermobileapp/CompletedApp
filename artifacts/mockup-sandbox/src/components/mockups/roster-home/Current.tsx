@@ -203,7 +203,7 @@ export default function Current() {
               </a>
               {!isIos && (
                 <a
-                  href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med"
+                  href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors pl-[4px] pr-[4px]"
@@ -722,7 +722,7 @@ export default function Current() {
             </a>
             {!isIos && (
               <a
-                href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med"
+                href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"

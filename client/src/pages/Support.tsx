@@ -32,7 +32,7 @@ export const supportFaqs = [
   {
     question: 'Can I use RosterHockey for sports other than hockey?',
     answer:
-      'Yes. RosterHockey supports hockey, soccer, baseball, and more. When creating a team or league, select your sport and the app will tailor the stats tracking, positions, and scheduling to that sport.',
+      "RosterHockey is built for hockey: beer league, adult rec, youth and varsity teams and leagues. Other sports aren't officially supported.",
   },
   {
     question: 'How do I cancel or change my subscription?',

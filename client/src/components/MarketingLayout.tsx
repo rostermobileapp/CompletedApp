@@ -124,7 +124,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
                     App Store
                   </a>
                   {!isIos && (
-                    <a href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
+                    <a href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
                       <SiGoogleplay className="w-4 h-4" />
                       Google Play
                     </a>

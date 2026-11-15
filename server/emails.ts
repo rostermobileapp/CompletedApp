@@ -6,7 +6,7 @@ const APP_URL = process.env.REPLIT_DEV_DOMAIN
   : 'https://rosters.replit.app';
 
 const APPLE_URL = 'https://apps.apple.com/us/app/roster-hockey/id6756852981';
-const GOOGLE_URL = 'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med';
+const GOOGLE_URL = 'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively';
 
 // Use a publicly hosted URL for the logo so email clients can load it.
 // base64 data URIs are blocked by Gmail and inflate email size past Gmail's

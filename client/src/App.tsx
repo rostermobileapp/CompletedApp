@@ -278,8 +278,6 @@ export function Router() {
           <Route path="/pricing" component={Pricing} />
           <Route path="/about" component={About} />
           <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>
-          <Route path="/soccer">{() => <SportLanding sport="soccer" />}</Route>
-          <Route path="/baseball">{() => <SportLanding sport="baseball" />}</Route>
           <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
           <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
           <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>

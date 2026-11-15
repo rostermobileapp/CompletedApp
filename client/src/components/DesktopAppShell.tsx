@@ -464,7 +464,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
               id: 'google-play',
               label: 'Google Play',
               icon: SiGoogleplay,
-              href: 'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med',
+              href: 'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively',
             },
           ] as const).map((item) => {
             const Icon = item.icon;

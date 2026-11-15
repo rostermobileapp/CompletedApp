@@ -11,8 +11,6 @@ const marketingPagePaths = new Set([
   '/pricing',
   '/about',
   '/hockey',
-  '/baseball',
-  '/soccer',
   '/for-adult-leagues',
   '/for-youth-teams',
   '/for-varsity',

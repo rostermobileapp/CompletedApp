@@ -10,13 +10,17 @@ import {
 
 test('marketing routes are exact, including referral portal boundary', () => {
   for (const path of [
-    '/', '/features', '/pricing', '/about', '/hockey', '/baseball', '/soccer',
+    '/', '/features', '/pricing', '/about', '/hockey',
     '/for-adult-leagues', '/for-youth-teams', '/for-varsity', '/referral-program',
     '/faq', '/support', '/privacy-policy', '/privacy', '/terms-of-service',
     '/sitemap.xml', '/robots.txt', '/llms.txt',
   ]) {
     assert.equal(isMarketingPagePath(path), true, path);
   }
+  assert.equal(isMarketingPagePath('/baseball'), false);
+  assert.equal(isMarketingPagePath('/soccer'), false);
+  assert.equal(canonicalUrl('/baseball'), `${APP_SITE_ORIGIN}/baseball`);
+  assert.equal(canonicalUrl('/soccer'), `${APP_SITE_ORIGIN}/soccer`);
   assert.equal(isMarketingPagePath('/referral-program/portal/login'), false);
   assert.equal(isMarketingPagePath('/referral-program/verify'), false);
   assert.equal(isMarketingPagePath('/privacy-policy/subpage'), false);

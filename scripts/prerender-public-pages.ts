@@ -1,7 +1,6 @@
 import { createServer } from 'vite';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { isUnindexedPublicPage } from '../shared/publicPagePolicy';
 
 const SITE_ORIGIN = 'https://www.rosterhockey.com';
 const APP_ORIGIN = 'https://www.roster-app.com';
@@ -33,7 +32,12 @@ async function fetchRealPrices() {
   const prices = await response.json() as Record<string, { amount?: number | null; currency?: string | null }>;
   const available = Object.values(prices).filter(price => Number.isFinite(price.amount) && price.currency);
   if (available.length === 0) throw new Error('Stripe price endpoint returned no verified prices for application structured data.');
-  for (const key of ['player_pro_monthly', 'commissioner_monthly']) {
+  for (const key of [
+    'player_pro_monthly',
+    'player_pro_yearly',
+    'commissioner_monthly',
+    'commissioner_yearly',
+  ]) {
     if (!Number.isFinite(prices[key]?.amount) || !prices[key]?.currency) {
       throw new Error(`Missing verified ${key} price; refusing to publish incomplete pricing HTML.`);
     }
@@ -46,6 +50,10 @@ function structuredData(
   prices: Record<string, { amount?: number | null; currency?: string | null }>,
   faqPage: Record<string, unknown>,
 ) {
+  const structuredYearlyAmounts: Record<string, number> = {
+    player_pro_yearly: 64.99,
+    commissioner_yearly: 119.99,
+  };
   const storeLinks = [
     'https://apps.apple.com/us/app/roster-hockey/id6756852981',
     'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively',
@@ -59,25 +67,29 @@ function structuredData(
     url: `${SITE_ORIGIN}/pricing`,
   }, ...Object.entries(prices)
     .filter(([, price]) => Number.isFinite(price.amount) && price.currency)
-    .map(([key, price]) => ({
-      '@type': 'Offer',
-      name: ({
-        player_pro_monthly: 'Player Pro monthly',
-        player_pro_yearly: 'Player Pro yearly',
-        commissioner_monthly: 'Commissioner monthly',
-        commissioner_yearly: 'Commissioner yearly',
-      } as Record<string, string>)[key] || key.replaceAll('_', ' '),
-      price: price.amount,
-      priceCurrency: price.currency!.toUpperCase(),
-      priceSpecification: {
-        '@type': 'UnitPriceSpecification',
-        price: price.amount,
-        priceCurrency: price.currency!.toUpperCase(),
-        billingDuration: key.endsWith('_yearly') ? 'P1Y' : 'P1M',
-      },
-      availability: 'https://schema.org/InStock',
-      url: `${SITE_ORIGIN}/pricing`,
-    }))];
+    .map(([key, price]) => {
+      const amount = structuredYearlyAmounts[key] ?? price.amount;
+      const currency = key.endsWith('_yearly') ? 'USD' : price.currency!.toUpperCase();
+      return {
+        '@type': 'Offer',
+        name: ({
+          player_pro_monthly: 'Player Pro monthly',
+          player_pro_yearly: 'Player Pro yearly',
+          commissioner_monthly: 'Commissioner monthly',
+          commissioner_yearly: 'Commissioner yearly',
+        } as Record<string, string>)[key] || key.replaceAll('_', ' '),
+        price: amount,
+        priceCurrency: currency,
+        priceSpecification: {
+          '@type': 'UnitPriceSpecification',
+          price: amount,
+          priceCurrency: currency,
+          billingDuration: key.endsWith('_yearly') ? 'P1Y' : 'P1M',
+        },
+        availability: 'https://schema.org/InStock',
+        url: `${SITE_ORIGIN}/pricing`,
+      };
+    })];
   const entities: Record<string, unknown>[] = [
     {
       '@context': 'https://schema.org',
@@ -141,7 +153,7 @@ async function main() {
       ],
     },
     esbuild: { jsx: 'automatic' },
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false },
     appType: 'custom',
     logLevel: 'error',
   });
@@ -190,9 +202,7 @@ async function main() {
         `<meta name="twitter:description" content="${escapeHtml(metadata.ogDescription || description)}" />`);
       html = putMeta(html, /<meta\s+name="twitter:image"[^>]*>/i,
         `<meta name="twitter:image" content="${SITE_ORIGIN}/roster-logo.png" />`);
-      if (isUnindexedPublicPage(pathname)) {
-        html = putMeta(html, /<meta\s+name="robots"[^>]*>/i, '<meta name="robots" content="noindex" />');
-      } else if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
+      if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
         html = putMeta(html, /<meta\s+name="robots"[^>]*>/i, '<meta name="robots" content="noindex,nofollow" />');
       }
       html = putMeta(html, /<meta\s+property="og:site_name"[^>]*>/i,
@@ -211,7 +221,7 @@ async function main() {
     }
     await fs.writeFile(path.join(outputDir, '404.html'),
       `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Page not found | RosterHockey</title><meta property="og:site_name" content="RosterHockey" /><link rel="canonical" href="${APP_ORIGIN}/"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="${APP_ORIGIN}/">Return to RosterHockey</a></main></body></html>`);
-    await writeSitemap(renderer.publicPagePaths.filter(path => !isUnindexedPublicPage(path)), new Date().toISOString().slice(0, 10));
+    await writeSitemap(renderer.publicPagePaths, new Date().toISOString().slice(0, 10));
     if (seoErrors.length) throw new Error(`SEO validation failed:\n${seoErrors.map(error => `- ${error}`).join('\n')}`);
     if (!rootHtml) throw new Error('The homepage was not prerendered.');
     await fs.writeFile(indexPath, rootHtml);

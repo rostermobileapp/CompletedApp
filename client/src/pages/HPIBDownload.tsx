@@ -3,7 +3,7 @@ import rosterLogo from "@assets/less_admin,_more_hockey_1781211414957.png";
 
 const APPLE_URL = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
 const GOOGLE_URL =
-  "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
+  "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively";
 const WEBSITE_URL = "https://roster-app.com";
 
 async function trackHpib(event: "page_view" | "apple_tap" | "google_tap") {
