@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from 'wouter';
 import Landing from '@/components/marketing/ScrollStory';
+import LineCombosPage, { lineCombosFaqs } from '@/components/marketing/line-combos/LineCombosPage';
 import { FeaturesPage } from '@/components/marketing/FeaturesPage';
 import { PricingPage } from '@/components/marketing/PricingPage';
 import { AboutPage } from '@/components/marketing/AboutPage';
@@ -20,6 +21,7 @@ import { SeoMetadataCollector, type SeoMetadata } from '@/lib/seoMetadata';
 const publicPages: Record<string, () => ReactElement> = {
   '/': () => createElement(Landing),
   '/features': () => createElement(FeaturesPage),
+  '/line-combos-predictions': () => createElement(LineCombosPage),
   '/pricing': () => createElement(PricingPage),
   '/about': () => createElement(AboutPage),
   '/hockey': () => createElement(SportLanding, { sport: 'hockey' }),
@@ -77,11 +79,12 @@ export function renderPublicPage(path: string, stripePrices: unknown) {
   return { content, metadata: metadata.current };
 }
 
-export function faqStructuredData() {
+export function faqStructuredData(pathname = '/faq') {
+  const faqs = pathname === '/line-combos-predictions' ? lineCombosFaqs : supportFaqs;
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: supportFaqs.map(({ question, answer }) => ({
+    mainEntity: faqs.map(({ question, answer }) => ({
       '@type': 'Question',
       name: question,
       acceptedAnswer: { '@type': 'Answer', text: answer },

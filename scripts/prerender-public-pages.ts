@@ -118,7 +118,7 @@ function structuredData(
       offers,
     },
   ];
-  if (pathname === '/faq' || pathname === '/support') {
+  if (pathname === '/faq' || pathname === '/support' || pathname === '/line-combos-predictions') {
     entities.push(faqPage);
   }
   return entities;
@@ -168,7 +168,7 @@ async function main() {
         content: string;
         metadata: { title: string; description: string; ogTitle?: string; ogDescription?: string; ogImage?: string; canonical?: string };
       };
-      faqStructuredData: () => Record<string, unknown>;
+      faqStructuredData: (pathname: string) => Record<string, unknown>;
     };
     const titles = new Set<string>();
     const seoErrors: string[] = [];
@@ -212,7 +212,7 @@ async function main() {
       html = putMeta(html, /<meta\s+property="og:site_name"[^>]*>/i,
         '<meta property="og:site_name" content="RosterHockey" />');
       html = html.replace('</head>',
-        `    ${jsonLdScript(structuredData(pathname, prices, renderer.faqStructuredData()))}\n  </head>`);
+        `    ${jsonLdScript(structuredData(pathname, prices, renderer.faqStructuredData(pathname)))}\n  </head>`);
       const relativePath = pathname === '/' ? 'index.html' : path.join(pathname.slice(1), 'index.html');
       const destination = path.join(outputDir, relativePath);
       if (pathname === '/') {

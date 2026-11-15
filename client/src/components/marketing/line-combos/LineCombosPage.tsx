@@ -45,7 +45,6 @@ function RosterPhone({ variant, priority = false }: { variant: "home" | "odds"; 
           height="1190"
           alt={alt}
           loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "auto"}
         />
       </picture>
     </div>
@@ -54,9 +53,10 @@ function RosterPhone({ variant, priority = false }: { variant: "home" | "odds"; 
 
 export function LineCombosPage() {
   useSeo({
-    title: "RosterHockey line combos, score predictions and winning odds",
-    description: "RosterHockey is the hockey team and league app that gives captains and coaches line combos plus pre-game predictions for winning odds, score, points and player production — like having a coach in your pocket.",
+    title: "Line Combos, Score Predictions & Winning Odds | RosterHockey",
+    description: "RosterHockey line combos and pre-game score, points, production and winning-odds predictions. Player Pro and Commissioner — like having a coach in your pocket.",
     canonical: "/line-combos-predictions",
+    ogImage: "/images/line-combos/og-line-combos.png",
   });
 
   const handleParallax = (event: PointerEvent<HTMLDivElement>) => {
@@ -74,7 +74,7 @@ export function LineCombosPage() {
 
   return (
     <main className="rp-page lc-page">
-      <RosterPageNav active="line-combos-predictions" />
+      <RosterPageNav active="line-combos" />
       <section className="lc-hero">
         <div className="lc-container">
           <div className="lc-hero-copy">
@@ -86,7 +86,7 @@ export function LineCombosPage() {
               <a className="lc-button lc-button--quiet" href="https://www.roster-app.com/login">Log in</a>
             </div>
           </div>
-          <div className="lc-hero-art" aria-label="RosterHockey app previews" onPointerMove={handleParallax} onPointerLeave={resetParallax}>
+          <div className="lc-hero-art" role="group" aria-label="RosterHockey app previews" onPointerMove={handleParallax} onPointerLeave={resetParallax}>
             <div className="lc-glow" aria-hidden="true" />
             <div className="lc-phone-wrap lc-phone-wrap--home"><RosterPhone variant="home" priority /></div>
             <div className="lc-phone-wrap lc-phone-wrap--odds"><RosterPhone variant="odds" /></div>
