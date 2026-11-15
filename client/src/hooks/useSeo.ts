@@ -7,16 +7,18 @@ interface SeoOptions {
   description: string;
   ogTitle?: string;
   ogDescription?: string;
+  ogImage?: string;
   canonical?: string;
 }
 
 const DEFAULT_TITLE = 'RosterHockey | Beer League Hockey Team & League Management App';
-export function useSeo({ title, description, ogTitle, ogDescription, canonical }: SeoOptions) {
+export function useSeo({ title, description, ogTitle, ogDescription, ogImage, canonical }: SeoOptions) {
   const [location] = useLocation();
   const collector = useContext(SeoMetadataContext);
   const resolvedCanonical = canonicalUrl(canonical ?? location);
-  const ogImage = `${canonicalOriginForPath(canonical ?? location)}/roster-logo.png`;
-  if (collector) collector.current = { title, description, ogTitle, ogDescription, canonical: resolvedCanonical };
+  const imageOrigin = canonicalOriginForPath(canonical ?? location);
+  const resolvedOgImage = ogImage ? new URL(ogImage, `${imageOrigin}/`).href : `${imageOrigin}/roster-logo.png`;
+  if (collector) collector.current = { title, description, ogTitle, ogDescription, ogImage: resolvedOgImage, canonical: resolvedCanonical };
 
   useEffect(() => {
     document.title = title;
@@ -50,17 +52,17 @@ export function useSeo({ title, description, ogTitle, ogDescription, canonical }
     setMeta('og:title', resolvedOgTitle, true);
     setMeta('og:description', resolvedOgDesc, true);
     setMeta('og:type', 'website', true);
-    setMeta('og:image', ogImage, true);
+    setMeta('og:image', resolvedOgImage, true);
     setMeta('og:url', resolvedCanonical, true);
     setMeta('twitter:card', 'summary_large_image');
     setMeta('twitter:title', resolvedOgTitle);
     setMeta('twitter:description', resolvedOgDesc);
-    setMeta('twitter:image', ogImage);
+    setMeta('twitter:image', resolvedOgImage);
     setCanonical(resolvedCanonical);
     applyCanonicalUrl(canonical ?? location);
 
     return () => {
       document.title = DEFAULT_TITLE;
     };
-  }, [title, description, ogTitle, ogDescription, canonical, location, resolvedCanonical, ogImage]);
+  }, [title, description, ogTitle, ogDescription, ogImage, canonical, location, resolvedCanonical, resolvedOgImage]);
 }

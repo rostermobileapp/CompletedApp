@@ -121,6 +121,7 @@ function ScrollStory() {
         <nav className="rs-nav-links" aria-label="Main navigation">
           <a href="#top" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>Home</a>
           <a href="/features">Features</a>
+          <a href="/line-combos-predictions">Line combos</a>
           <a href="/pricing">Pricing</a>
           <a href="/about">About</a>
           <a href="/referral-program">Partners</a>
@@ -141,6 +142,7 @@ function ScrollStory() {
           <a href="#top" onClick={(event) => { event.preventDefault(); jumpTo("top"); }}>Home</a>
           {[
             ["features", "/features"],
+            ["line combos", "/line-combos-predictions"],
             ["pricing", "/pricing"],
             ["about", "/about"],
             ["partners", "/referral-program"],
@@ -289,6 +291,7 @@ function ScrollStory() {
           <a href="#top" onClick={(e) => { e.preventDefault(); jumpTo("top"); }}><img src={image("logo-dark.png")} alt="RosterHockey logo" style={{ width: 96, height: 34, objectFit: "contain" }} /></a>
           <div className="rs-footer-links">
           <a href="/features">Features</a>
+          <a href="/line-combos-predictions">Line combos</a>
           <a href="/pricing">Pricing</a>
           <a href="/about">About</a>
           <a href="/referral-program">Partners</a>

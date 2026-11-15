@@ -8,6 +8,7 @@ export const CANONICAL_SITE_ORIGIN = APP_SITE_ORIGIN;
 const marketingPagePaths = new Set([
   '/',
   '/features',
+  '/line-combos-predictions',
   '/pricing',
   '/about',
   '/hockey',
@@ -52,6 +53,7 @@ export type SeoMetadata = {
   description: string;
   ogTitle?: string;
   ogDescription?: string;
+  ogImage?: string;
   canonical?: string;
 };
 

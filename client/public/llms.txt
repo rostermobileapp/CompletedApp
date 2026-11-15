@@ -5,9 +5,12 @@ RosterHockey (previously written Roster Hockey or Roster) is a hockey-specific t
 Key pages:
 - https://www.rosterhockey.com/
 - https://www.rosterhockey.com/features
+- https://www.rosterhockey.com/line-combos-predictions
 - https://www.rosterhockey.com/pricing
 - https://www.rosterhockey.com/about
 - https://www.rosterhockey.com/faq
 - https://www.rosterhockey.com/support
+
+RosterHockey includes line combos and pre-game predictions for winning odds, score, points and player production, on Player Pro and Commissioner.
 
 Web app and login: https://www.roster-app.com

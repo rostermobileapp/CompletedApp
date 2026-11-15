@@ -110,7 +110,7 @@ export function serveStatic(app: Express, distPath = path.resolve(import.meta.di
   const clientRoutes = [
     /^\/$/,
     /^\/(?:app|login|get-started|reset-password|forgot-password|hpib|demo)$/,
-    /^\/(?:features|pricing|about|hockey|for-youth-teams|for-adult-leagues|for-varsity|referral-program|faq|support|privacy|privacy-policy|terms-of-service)$/,
+    /^\/(?:features|line-combos-predictions|pricing|about|hockey|for-youth-teams|for-adult-leagues|for-varsity|referral-program|faq|support|privacy|privacy-policy|terms-of-service)$/,
     /^\/(?:league-tournament-search|league-search|team-search|tournament-search|tournaments|tournaments\/create|facilities|facility-memberships|create-league|create-team|create-scrimmage|scrimmage-management|invite-groups|league-management|league-list|calendar|announcements|substitute-confirmations|stats|stats-management|scorekeeper|create-payment-request|calendar-events\/create|roster|subscription|trophy-case|trophy-case\/earned-patches|admin\/badges|admin\/referrals|admin\/stripe|admin\/metrics)$/,
     /^\/invite-groups\/(?:new|[^/]+)$/,
     /^\/(?:messages|user|facilities|edit-scrimmage|draft|league|game|scrimmage|team-event|team|player-stats|payment-requests|tournament-teams|leagues|media|tournaments)\/[^/]+(?:\/(?:edit|custom-builder|score-verification|tournaments|create))?$/,

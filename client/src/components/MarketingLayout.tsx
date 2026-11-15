@@ -40,6 +40,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
           <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
             <Link href="/" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Home</Link>
             <Link href="/features" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Features</Link>
+            <Link href="/line-combos-predictions" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Line combos</Link>
             <Link href="/pricing" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Pricing</Link>
             <Link href="/about" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">About</Link>
             <Link href="/referral-program" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Partners</Link>
@@ -75,6 +76,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
             <div className="px-6 py-4 space-y-3">
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Home</Link>
               <Link href="/features" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Features</Link>
+              <Link href="/line-combos-predictions" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Line combos</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
               <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">About</Link>
               <Link href="/referral-program" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Partners</Link>
@@ -103,6 +105,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
                 <p className="font-semibold text-gray-900 mb-3">Product</p>
                 <ul className="space-y-2 text-gray-500">
                   <li><Link href="/#features" className="hover:text-gray-900 transition-colors">Features</Link></li>
+                    <li><Link href="/line-combos-predictions" className="hover:text-gray-900 transition-colors">Line combos</Link></li>
                   <li><Link href="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link></li>
                 </ul>
               </div>

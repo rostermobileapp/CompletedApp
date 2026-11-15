@@ -5,8 +5,10 @@ import { RosterPageFooter, RosterPageNav } from "./RosterPageNav";
 import "./PricingPage.css";
 
 const freeFeatures = ["Daily Hockey Trivia", "Beer Counter (Adult Players)", "Earn Patch Progress", "Team Schedule", "In-App Only RSVP", "In App Messaging (Team Chat)", "Facility Event Calendar", "Website Portal", "Team Stats", "Standings"];
-const proFeatures = ["Trophy Case & Patch Artwork (21+)", "Create Team Events/Games", "Roster Management", "Player/Attendance Tracking", "Intelligent Sub Request Tool", "Polls/Bulletins", "Fee & Payment Tracking", "Links to Venmo/CashApp", "Team Expense Tracking", "Multi-Team/Org Management", "Registration Notices", "Volunteer/Role Assignment", "League Stats"];
-const commissionerFeatures = ["A-Z League Management", "Bracket Generation Tool", "In-Game Scorekeeping", "League Drafts", "3 Stars of the Game", "Custom Awards", "Tournaments Mode"];
+const lineCombosFeature = "Line combos and pre-game predictions";
+const proFeatures = ["Trophy Case & Patch Artwork (21+)", "Create Team Events/Games", "Roster Management", "Player/Attendance Tracking", "Intelligent Sub Request Tool", "Polls/Bulletins", "Fee & Payment Tracking", "Links to Venmo/CashApp", "Team Expense Tracking", "Multi-Team/Org Management", "Registration Notices", "Volunteer/Role Assignment", "League Stats", lineCombosFeature];
+const commissionerFeatures = ["A-Z League Management", "Bracket Generation Tool", "In-Game Scorekeeping", "League Drafts", "3 Stars of the Game", "Custom Awards", "Tournaments Mode", lineCombosFeature];
+const comparisonFeatures = [...new Set([...proFeatures.slice(1), ...commissionerFeatures])];
 const comparison = [
   ["No ads", "never", "never", "never"],
   ["Team Schedule", "yes", "yes", "yes"],
@@ -19,8 +21,10 @@ const comparison = [
   ["Personal Beer Counter", "yes", "yes", "yes"],
   ["Earn Patch Progress", "yes", "yes", "yes"],
   ["Trophy Case & Patch Artwork (21+)", "no", "yes", "yes"],
-  ...proFeatures.slice(1).map(label => [label, "no", "yes", "yes"]),
-  ...commissionerFeatures.map(label => [label, "no", "no", "yes"]),
+  ...comparisonFeatures.map(label => {
+    const includedInPro = proFeatures.includes(label);
+    return [label, "no", includedInPro ? "yes" : "no", includedInPro || commissionerFeatures.includes(label) ? "yes" : "no"];
+  }),
 ];
 
 const prices = {

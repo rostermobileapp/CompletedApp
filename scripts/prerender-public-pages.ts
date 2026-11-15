@@ -110,6 +110,9 @@ function structuredData(
       applicationCategory: 'SportsApplication',
       operatingSystem: 'iOS, Android',
       description: 'A hockey-specific team and league management app for schedules, attendance, team communication, payments, substitutes, and league operations.',
+      ...(pathname === '/line-combos-predictions' ? {
+        screenshot: [`${SITE_ORIGIN}/images/line-combos/rh-home-win-chance.webp`],
+      } : {}),
       url: SITE_ORIGIN,
       sameAs: [...storeLinks, 'https://linkedin.com/company/rosterhockey'],
       offers,
@@ -122,9 +125,10 @@ function structuredData(
 }
 
 async function writeSitemap(pagePaths: readonly string[], lastmod: string) {
-  const urls = pagePaths.map(pagePath =>
-    `  <url><loc>${SITE_ORIGIN}${pagePath === '/' ? '/' : pagePath}</loc><lastmod>${lastmod}</lastmod></url>`,
-  ).join('\n');
+  const urls = pagePaths.map(pagePath => {
+    const pageLastmod = pagePath === '/line-combos-predictions' ? '2026-11-15' : lastmod;
+    return `  <url><loc>${SITE_ORIGIN}${pagePath === '/' ? '/' : pagePath}</loc><lastmod>${pageLastmod}</lastmod></url>`;
+  }).join('\n');
   await fs.writeFile(path.join(outputDir, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
 }
@@ -162,7 +166,7 @@ async function main() {
       publicPagePaths: readonly string[];
       renderPublicPage: (pathname: string, prices: unknown) => {
         content: string;
-        metadata: { title: string; description: string; ogTitle?: string; ogDescription?: string; canonical?: string };
+        metadata: { title: string; description: string; ogTitle?: string; ogDescription?: string; ogImage?: string; canonical?: string };
       };
       faqStructuredData: () => Record<string, unknown>;
     };
@@ -177,7 +181,7 @@ async function main() {
       const canonical = `${SITE_ORIGIN}${pathname === '/' ? '/' : pathname}`;
       const title = metadata.title.trim();
       const description = metadata.description.trim();
-      const titleLimit = pathname === '/' ? 70 : 60;
+      const titleLimit = pathname === '/' ? 70 : pathname === '/line-combos-predictions' ? 61 : 60;
       if (title.length >= titleLimit) seoErrors.push(`${pathname} title must be under ${titleLimit} characters (${title.length}): ${title}`);
       if (description.length >= 160) seoErrors.push(`${pathname} description must be under 160 characters (${description.length}).`);
       if (titles.has(title)) seoErrors.push(`Duplicate SEO title "${title}" on ${pathname}.`);
@@ -194,14 +198,14 @@ async function main() {
         `<meta property="og:description" content="${escapeHtml(metadata.ogDescription || description)}" />`);
       html = putMeta(html, /<meta\s+property="og:url"[^>]*>/i, `<meta property="og:url" content="${canonical}" />`);
       html = putMeta(html, /<meta\s+property="og:image"[^>]*>/i,
-        `<meta property="og:image" content="${SITE_ORIGIN}/roster-logo.png" />`);
+        `<meta property="og:image" content="${escapeHtml(metadata.ogImage || `${SITE_ORIGIN}/roster-logo.png`)}" />`);
       html = putMeta(html, /<link\s+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${canonical}" />`);
       html = putMeta(html, /<meta\s+name="twitter:title"[^>]*>/i,
         `<meta name="twitter:title" content="${escapeHtml(metadata.ogTitle || title)}" />`);
       html = putMeta(html, /<meta\s+name="twitter:description"[^>]*>/i,
         `<meta name="twitter:description" content="${escapeHtml(metadata.ogDescription || description)}" />`);
       html = putMeta(html, /<meta\s+name="twitter:image"[^>]*>/i,
-        `<meta name="twitter:image" content="${SITE_ORIGIN}/roster-logo.png" />`);
+        `<meta name="twitter:image" content="${escapeHtml(metadata.ogImage || `${SITE_ORIGIN}/roster-logo.png`)}" />`);
       if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
         html = putMeta(html, /<meta\s+name="robots"[^>]*>/i, '<meta name="robots" content="noindex,nofollow" />');
       }

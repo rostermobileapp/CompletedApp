@@ -36,6 +36,10 @@ export function FeaturesPage() {
         </div>
       </section>
 
+      <div className="rp-container px-6 py-6 text-center text-sm text-gray-600">
+        See how <a className="font-semibold text-[#3c82f4] hover:underline" href="/line-combos-predictions">line combos and pre-game predictions</a> help your team prepare.
+      </div>
+
       <section className="rp-season-section" id="season-tools">
         <div className="rp-container">
           <div className="rp-section-heading">

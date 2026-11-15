@@ -5,6 +5,7 @@ import { APP_SITE_ORIGIN } from "@/lib/seoMetadata";
 
 const pages = [
   { key: "features", label: "Features", href: "/features" },
+  { key: "line-combos", label: "Line combos", href: "/line-combos-predictions" },
   { key: "pricing", label: "Pricing", href: "/pricing" },
   { key: "about", label: "About", href: "/about" },
   { key: "partners", label: "Partners", href: "/referral-program" },

@@ -127,6 +127,12 @@ export default function SportLanding({ sport }: SportLandingProps) {
       </section>
 
       {sport === 'hockey' && (
+        <p className="px-6 py-4 text-center text-sm text-gray-600">
+          See how <a className="font-semibold text-[#3c82f4] hover:underline" href="/line-combos-predictions">line combos and pre-game predictions</a> help your team prepare.
+        </p>
+      )}
+
+      {sport === 'hockey' && (
         <div className="px-6">
           <FunFeaturesNudge />
         </div>
