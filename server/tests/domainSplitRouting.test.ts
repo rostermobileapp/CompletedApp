@@ -86,6 +86,7 @@ test('the marketing host sends app paths to the app but keeps marketing and stat
     '/privacy-policy', '/terms-of-service', '/sitemap.xml', '/robots.txt',
     '/llms.txt', '/manifest.json', '/assets/app.js',
     '/marketing/roster-home/logo-dark.png', '/badges/beer-me/tier-3.webp',
+    '/images/line-combos/og-line-combos.png',
     '/favicon.png', '/roster-logo.png',
   ]) {
     assert.equal(matches.test(path), false, path);
