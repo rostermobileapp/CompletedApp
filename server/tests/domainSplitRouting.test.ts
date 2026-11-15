@@ -22,7 +22,7 @@ const marketingHostAppRedirect = config.redirects.find((route: any) =>
   route.has?.some((condition: any) => condition.type === 'host' && condition.value === 'www.rosterhockey.com'),
 );
 
-test('the app host permanently redirects exact marketing paths and preserves their queries', () => {
+test('the app host permanently redirects exact marketing paths and keeps their paths', () => {
   assert.ok(appHostMarketingRedirect);
   const matches = pathMatcher(appHostMarketingRedirect.source);
   for (const path of [
@@ -41,7 +41,7 @@ test('the app host permanently redirects exact marketing paths and preserves the
     assert.equal(matches.test(path), false, path);
   }
   assert.equal(appHostMarketingRedirect.statusCode, 301);
-  assert.equal(appHostMarketingRedirect.preserveQueryParams, true);
+  assert.equal('preserveQueryParams' in appHostMarketingRedirect, false);
 });
 
 test('retired sport paths on both hosts go directly to hockey permanently', () => {
@@ -64,7 +64,7 @@ test('retired sport paths on both hosts go directly to hockey permanently', () =
     }
     assert.equal(route.statusCode, 301);
     assert.equal(route.destination, 'https://www.rosterhockey.com/hockey');
-    assert.equal(route.preserveQueryParams, true);
+    assert.equal('preserveQueryParams' in route, false);
   }
   assert.ok(config.redirects.indexOf(oldApp) < config.redirects.indexOf(appHostMarketingRedirect));
   assert.ok(config.redirects.indexOf(marketingHost) < config.redirects.indexOf(marketingHostAppRedirect));
@@ -91,7 +91,7 @@ test('the marketing host sends app paths to the app but keeps marketing and stat
     assert.equal(matches.test(path), false, path);
   }
   assert.equal(marketingHostAppRedirect.statusCode, 302);
-  assert.equal(marketingHostAppRedirect.preserveQueryParams, true);
+  assert.equal('preserveQueryParams' in marketingHostAppRedirect, false);
   assert.equal(marketingHostAppRedirect.source.includes('baseball'), false);
   assert.equal(marketingHostAppRedirect.source.includes('soccer'), false);
 });
@@ -110,5 +110,5 @@ test('the app root is not redirected and only the apex marketing host is canonic
   assert.ok(apexMarketingRedirect);
   assert.equal(apexMarketingRedirect.destination, 'https://www.rosterhockey.com/:path*');
   assert.equal(apexMarketingRedirect.statusCode, 302);
-  assert.equal(apexMarketingRedirect.preserveQueryParams, true);
+  assert.equal('preserveQueryParams' in apexMarketingRedirect, false);
 });
