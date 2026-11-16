@@ -11,6 +11,7 @@ const marketingPagePaths = new Set([
   '/line-combos-predictions',
   '/rosterhockey-vs-benchapp',
   '/rosterhockey-vs-teamsnap',
+  '/rosterhockey-vs-rosterlytic',
   '/pricing',
   '/about',
   '/hockey',

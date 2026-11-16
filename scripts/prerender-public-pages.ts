@@ -119,7 +119,8 @@ function structuredData(
     },
   ];
   if (pathname === '/faq' || pathname === '/support' || pathname === '/line-combos-predictions' ||
-      pathname === '/rosterhockey-vs-teamsnap' || pathname === '/rosterhockey-vs-benchapp') {
+      pathname === '/rosterhockey-vs-teamsnap' || pathname === '/rosterhockey-vs-benchapp' ||
+      pathname === '/rosterhockey-vs-rosterlytic') {
     entities.push(faqPage);
   }
   return entities;
@@ -127,7 +128,9 @@ function structuredData(
 
 async function writeSitemap(pagePaths: readonly string[], lastmod: string) {
   const urls = pagePaths.map(pagePath => {
-    const pageLastmod = pagePath === '/line-combos-predictions'
+    const pageLastmod = pagePath === '/rosterhockey-vs-rosterlytic'
+      ? '2026-11-16'
+      : pagePath === '/line-combos-predictions'
       ? '2026-11-15'
       : pagePath === '/rosterhockey-vs-teamsnap' || pagePath === '/rosterhockey-vs-benchapp' ? '2026-11-16' : lastmod;
     return `  <url><loc>${SITE_ORIGIN}${pagePath === '/' ? '/' : pagePath}</loc><lastmod>${pageLastmod}</lastmod></url>`;
@@ -188,10 +191,12 @@ async function main() {
         ? 70
         : pathname === '/line-combos-predictions' ? 61
           : pathname === '/rosterhockey-vs-benchapp' ? 67
-          : pathname === '/rosterhockey-vs-teamsnap' ? 69 : 60;
+          : pathname === '/rosterhockey-vs-teamsnap' ? 69
+          : pathname === '/rosterhockey-vs-rosterlytic' ? 86 : 60;
       if (title.length >= titleLimit) seoErrors.push(`${pathname} title must be under ${titleLimit} characters (${title.length}): ${title}`);
       const descriptionLimit = pathname === '/rosterhockey-vs-teamsnap' ? 174
-        : pathname === '/rosterhockey-vs-benchapp' ? 161 : 160;
+        : pathname === '/rosterhockey-vs-benchapp' ? 161
+        : pathname === '/rosterhockey-vs-rosterlytic' ? 173 : 160;
       if (description.length >= descriptionLimit) seoErrors.push(`${pathname} description must be under ${descriptionLimit} characters (${description.length}).`);
       if (titles.has(title)) seoErrors.push(`Duplicate SEO title "${title}" on ${pathname}.`);
       titles.add(title);

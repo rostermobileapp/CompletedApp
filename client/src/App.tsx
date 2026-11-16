@@ -34,6 +34,7 @@ import Landing from "@/components/marketing/ScrollStory";
 import LineCombosPage from "@/components/marketing/line-combos/LineCombosPage";
 import RosterHockeyVsTeamSnapPage from "@/components/marketing/RosterHockeyVsTeamSnapPage";
 import RosterHockeyVsBenchAppPage from "@/components/marketing/RosterHockeyVsBenchAppPage";
+import RosterHockeyVsRosterlyticPage from "@/components/marketing/RosterHockeyVsRosterlyticPage";
 import { PricingPage as Pricing } from "@/components/marketing/PricingPage";
 import { AboutPage as About } from "@/components/marketing/AboutPage";
 import SportLanding from "@/pages/SportLanding";
@@ -251,6 +252,7 @@ export function Router() {
     : location === '/line-combos-predictions' ? <LineCombosPage />
     : location === '/rosterhockey-vs-benchapp' ? <RosterHockeyVsBenchAppPage />
     : location === '/rosterhockey-vs-teamsnap' ? <RosterHockeyVsTeamSnapPage />
+    : location === '/rosterhockey-vs-rosterlytic' ? <RosterHockeyVsRosterlyticPage />
     : location === '/pricing' ? <Pricing />
     : location === '/about' ? <About />
     : location === '/faq' ? <Support />
@@ -284,6 +286,7 @@ export function Router() {
           <Route path="/line-combos-predictions" component={LineCombosPage} />
           <Route path="/rosterhockey-vs-benchapp" component={RosterHockeyVsBenchAppPage} />
           <Route path="/rosterhockey-vs-teamsnap" component={RosterHockeyVsTeamSnapPage} />
+          <Route path="/rosterhockey-vs-rosterlytic" component={RosterHockeyVsRosterlyticPage} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/about" component={About} />
           <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>

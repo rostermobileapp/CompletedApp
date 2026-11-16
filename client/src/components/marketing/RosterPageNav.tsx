@@ -48,6 +48,7 @@ export function RosterPageFooter() {
           <span>Compare</span>
           <a href="/rosterhockey-vs-benchapp">RosterHockey vs BenchApp</a>
           <a href="/rosterhockey-vs-teamsnap">RosterHockey vs TeamSnap</a>
+          <a href="/rosterhockey-vs-rosterlytic">RosterHockey vs Rosterlytic</a>
         </div>
         <a href="/terms-of-service">Terms</a>
         <a href="/privacy-policy">Privacy</a>

@@ -6,6 +6,7 @@ import Landing from '@/components/marketing/ScrollStory';
 import LineCombosPage, { lineCombosFaqs } from '@/components/marketing/line-combos/LineCombosPage';
 import RosterHockeyVsTeamSnapPage, { teamSnapFaqs } from '@/components/marketing/RosterHockeyVsTeamSnapPage';
 import RosterHockeyVsBenchAppPage, { benchAppFaqs } from '@/components/marketing/RosterHockeyVsBenchAppPage';
+import RosterHockeyVsRosterlyticPage, { rosterlyticFaqs } from '@/components/marketing/RosterHockeyVsRosterlyticPage';
 import { FeaturesPage } from '@/components/marketing/FeaturesPage';
 import { PricingPage } from '@/components/marketing/PricingPage';
 import { AboutPage } from '@/components/marketing/AboutPage';
@@ -26,6 +27,7 @@ const publicPages: Record<string, () => ReactElement> = {
   '/line-combos-predictions': () => createElement(LineCombosPage),
   '/rosterhockey-vs-benchapp': () => createElement(RosterHockeyVsBenchAppPage),
   '/rosterhockey-vs-teamsnap': () => createElement(RosterHockeyVsTeamSnapPage),
+  '/rosterhockey-vs-rosterlytic': () => createElement(RosterHockeyVsRosterlyticPage),
   '/pricing': () => createElement(PricingPage),
   '/about': () => createElement(AboutPage),
   '/hockey': () => createElement(SportLanding, { sport: 'hockey' }),
@@ -90,6 +92,8 @@ export function faqStructuredData(pathname = '/faq') {
       ? benchAppFaqs
     : pathname === '/rosterhockey-vs-teamsnap'
       ? teamSnapFaqs
+    : pathname === '/rosterhockey-vs-rosterlytic'
+      ? rosterlyticFaqs
       : supportFaqs;
   return {
     '@context': 'https://schema.org',

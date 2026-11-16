@@ -114,6 +114,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
                 <ul className="space-y-2 text-gray-500">
                   <li><Link href="/rosterhockey-vs-benchapp" className="hover:text-gray-900 transition-colors">RosterHockey vs BenchApp</Link></li>
                   <li><Link href="/rosterhockey-vs-teamsnap" className="hover:text-gray-900 transition-colors">RosterHockey vs TeamSnap</Link></li>
+                  <li><Link href="/rosterhockey-vs-rosterlytic" className="hover:text-gray-900 transition-colors">RosterHockey vs Rosterlytic</Link></li>
                 </ul>
               </div>
               <div>

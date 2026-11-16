@@ -29,7 +29,7 @@ test('the app host permanently redirects exact marketing paths and keeps their p
   ));
   const matches = pathMatcher(appHostMarketingRedirect.source);
   for (const path of [
-    '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/pricing', '/about', '/hockey',
+    '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/rosterhockey-vs-rosterlytic', '/pricing', '/about', '/hockey',
     '/for-adult-leagues', '/for-youth-teams', '/for-varsity',
     '/referral-program', '/faq', '/support', '/sitemap.xml', '/llms.txt',
   ]) {
@@ -87,7 +87,7 @@ test('the marketing host sends app paths to the app but keeps marketing and stat
     assert.equal(matches.test(path), true, path);
   }
   for (const path of [
-    '/', '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/pricing', '/referral-program', '/privacy',
+    '/', '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/rosterhockey-vs-rosterlytic', '/pricing', '/referral-program', '/privacy',
     '/privacy-policy', '/terms-of-service', '/sitemap.xml', '/robots.txt',
     '/llms.txt', '/manifest.json', '/assets/app.js',
     '/marketing/roster-home/logo-dark.png', '/badges/beer-me/tier-3.webp',

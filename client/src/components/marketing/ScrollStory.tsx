@@ -299,6 +299,7 @@ function ScrollStory() {
               <strong>Compare</strong>
               <a href="/rosterhockey-vs-benchapp">RosterHockey vs BenchApp</a>
               <a href="/rosterhockey-vs-teamsnap">RosterHockey vs TeamSnap</a>
+              <a href="/rosterhockey-vs-rosterlytic">RosterHockey vs Rosterlytic</a>
             </div>
             <a href="#patches" onClick={(e) => { e.preventDefault(); jumpTo("patches"); }}>Patches</a>
             <a href="#trivia" onClick={(e) => { e.preventDefault(); jumpTo("trivia"); }}>Trivia</a>
