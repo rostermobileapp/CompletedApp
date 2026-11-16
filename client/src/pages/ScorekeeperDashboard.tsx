@@ -612,6 +612,10 @@ export default function ScorekeeperDashboard() {
     });
   };
 
+  const onSelectAllAttendance = () => {
+    setSelectedAttendanceIds(new Set(currentGameRosterKeys));
+  };
+
   const upcomingGames = games.filter(g => {
     return g.isCompleted !== true && g.status !== 'completed';
   }).sort((a, b) => 
@@ -1234,6 +1238,25 @@ export default function ScorekeeperDashboard() {
               </Button>
             </div>
           </div>
+        </div>
+
+        <div className="mb-3 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onSelectAllAttendance}
+            disabled={
+              rostersLoading ||
+              !attendanceData ||
+              attendanceInitializedGameId !== selectedGame.id ||
+              currentGameRosterKeys.size === 0
+            }
+            data-testid="select-all-attendance"
+          >
+            <Users className="mr-1.5 h-4 w-4" />
+            Select All Players
+          </Button>
         </div>
 
         {/* Loading/Error States */}
