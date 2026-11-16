@@ -24,7 +24,7 @@
       "statusCode": 301
     },
     {
-      "source": "/:path(features|line-combos-predictions|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|sitemap\\.xml|llms\\.txt)",
+      "source": "/:path(features|line-combos-predictions|rosterhockey-vs-teamsnap|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|sitemap\\.xml|llms\\.txt)",
       "has": [
         {
           "type": "host",
@@ -49,7 +49,7 @@
       "statusCode": 302
     },
     {
-      "source": "/:path((?!$|(?:features|line-combos-predictions|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|privacy-policy|privacy|terms-of-service|sitemap\\.xml|robots\\.txt|llms\\.txt|manifest\\.json)(?:/?$)|(?:assets|marketing|badges|images)(?:/|$)|(?:favicon\\.png|icon-192\\.png|icon-512\\.png|roster-logo(?:-transparent)?\\.png)$).*)",
+      "source": "/:path((?!$|(?:features|line-combos-predictions|rosterhockey-vs-teamsnap|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|privacy-policy|privacy|terms-of-service|sitemap\\.xml|robots\\.txt|llms\\.txt|manifest\\.json)(?:/?$)|(?:assets|marketing|badges|images)(?:/|$)|(?:favicon\\.png|icon-192\\.png|icon-512\\.png|roster-logo(?:-transparent)?\\.png)$).*)",
       "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
       "destination": "https://www.roster-app.com/:path*",
       "statusCode": 302

@@ -44,6 +44,11 @@ export function RosterPageFooter() {
       <span>Built for hockey. Made for the people around it.</span>
       <nav aria-label="Footer navigation">
         {pages.map(page => <a key={page.key} href={page.href}>{page.label}</a>)}
+        <div className="rp-footer-compare">
+          <span>Compare</span>
+          <a href="/rosterhockey-vs-benchapp">RosterHockey vs BenchApp</a>
+          <a href="/rosterhockey-vs-teamsnap">RosterHockey vs TeamSnap</a>
+        </div>
         <a href="/terms-of-service">Terms</a>
         <a href="/privacy-policy">Privacy</a>
         <a href="/support">Support</a>

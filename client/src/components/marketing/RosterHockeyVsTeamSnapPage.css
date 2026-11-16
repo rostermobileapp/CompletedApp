@@ -1,0 +1,34 @@
+.rhvs-page .rhvs-hero .lc-container { grid-template-columns: minmax(0, 1fr); }
+.rhvs-page .rhvs-hero .lc-hero-copy { max-width: 940px; }
+.rhvs-page .rhvs-hero .lc-hero-copy > p { max-width: 880px; }
+.rhvs-page .rhvs-verdict { max-width: 940px; font-size: 17px; }
+.rhvs-page .rhvs-pick-list,
+.rhvs-page .rhvs-switch-list { max-width: 940px; margin: 0; padding-left: 24px; color: #35566b; font-size: 15px; line-height: 1.8; }
+.rhvs-page .rhvs-pick-list { display: grid; gap: 18px; }
+.rhvs-page .rhvs-pick-list strong { color: #163a53; }
+.rhvs-page .rhvs-switch-list { display: grid; gap: 11px; }
+.rhvs-page .rhvs-copy { max-width: 940px; color: #456477; font-size: 15px; line-height: 1.8; }
+.rhvs-page .rhvs-copy p { margin: 0 0 18px; }
+.rhvs-page .rhvs-copy p:last-child { margin-bottom: 0; }
+.rhvs-page .rhvs-copy a,
+.rhvs-page .rhvs-switch-list a,
+.rhvs-page .rhvs-also-compare a { color: #176eac; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.rhvs-page .rhvs-copy a:focus-visible,
+.rhvs-page .rhvs-switch-list a:focus-visible,
+.rhvs-page .rhvs-also-compare a:focus-visible { outline: 3px solid #1877bb; outline-offset: 4px; }
+.rhvs-page .rhvs-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid rgba(25, 76, 110, .16); border-radius: 18px; background: #fff; -webkit-overflow-scrolling: touch; }
+.rhvs-page .rhvs-table-wrap:focus-visible { outline: 3px solid #1877bb; outline-offset: 4px; }
+.rhvs-page .rhvs-table { width: 100%; min-width: 820px; border-collapse: collapse; color: #35566b; font-size: 13px; line-height: 1.6; }
+.rhvs-page .rhvs-table caption { padding: 15px 18px; color: #456477; font-size: 12px; text-align: left; }
+.rhvs-page .rhvs-table th,
+.rhvs-page .rhvs-table td { padding: 13px 16px; border-top: 1px solid rgba(25, 76, 110, .12); text-align: left; vertical-align: top; }
+.rhvs-page .rhvs-table thead { background: #12314a; color: #edf7fc; }
+.rhvs-page .rhvs-table thead th { border-top: 0; font-size: 13px; }
+.rhvs-page .rhvs-table tbody th { min-width: 160px; color: #163a53; font-weight: 700; }
+.rhvs-page .rhvs-table td { min-width: 240px; }
+.rhvs-page .rhvs-also-compare { margin: 22px 0 0; color: #456477; font-size: 13px; }
+
+@media (max-width: 560px) {
+  .rhvs-page .rhvs-hero { padding-bottom: 68px; }
+  .rhvs-page .rhvs-table { min-width: 760px; }
+}

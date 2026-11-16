@@ -23,6 +23,8 @@
 .rp-footer { display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px max(7vw,24px);border-top:1px solid rgba(151,195,236,.12);background:#06101e;color:#91a7be;font:12px "DM Sans",sans-serif; }
 .rp-footer img { width:105px;height:34px;object-fit:contain; }
 .rp-footer nav { display:flex;gap:20px;flex-wrap:wrap; }
+.rp-footer-compare { display:grid;gap:6px; }
+.rp-footer-compare span { color:#91a7be;font-weight:700; }
 .rp-footer nav a { color:#b9c9da;text-decoration:none; }
 .rp-footer nav a:hover { color:#fff; }
 @media (max-width:1000px) {

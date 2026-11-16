@@ -9,6 +9,7 @@ const marketingPagePaths = new Set([
   '/',
   '/features',
   '/line-combos-predictions',
+  '/rosterhockey-vs-teamsnap',
   '/pricing',
   '/about',
   '/hockey',

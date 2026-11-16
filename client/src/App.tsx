@@ -32,6 +32,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
 import Landing from "@/components/marketing/ScrollStory";
 import LineCombosPage from "@/components/marketing/line-combos/LineCombosPage";
+import RosterHockeyVsTeamSnapPage from "@/components/marketing/RosterHockeyVsTeamSnapPage";
 import { PricingPage as Pricing } from "@/components/marketing/PricingPage";
 import { AboutPage as About } from "@/components/marketing/AboutPage";
 import SportLanding from "@/pages/SportLanding";
@@ -247,6 +248,7 @@ export function Router() {
   // Public marketing pages use their own navigation, including for signed-in users.
   const marketingPage = location === '/features' ? <FeaturesLanding />
     : location === '/line-combos-predictions' ? <LineCombosPage />
+    : location === '/rosterhockey-vs-teamsnap' ? <RosterHockeyVsTeamSnapPage />
     : location === '/pricing' ? <Pricing />
     : location === '/about' ? <About />
     : location === '/faq' ? <Support />
@@ -278,6 +280,7 @@ export function Router() {
           <Route path="/" component={Landing} />
           <Route path="/features" component={FeaturesLanding} />
           <Route path="/line-combos-predictions" component={LineCombosPage} />
+          <Route path="/rosterhockey-vs-teamsnap" component={RosterHockeyVsTeamSnapPage} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/about" component={About} />
           <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>

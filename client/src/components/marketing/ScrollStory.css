@@ -146,6 +146,8 @@
 .rs-footer { background:#06101e;padding:34px 7vw;color:#7e94aa;font-size:11px; }
 .rs-footer-inner { max-width:1160px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:25px; }
 .rs-footer-links { display:flex;gap:20px;flex-wrap:wrap; }
+.rs-footer-compare { display:grid;gap:6px; }
+.rs-footer-compare strong { color:#e1edf8;font-weight:700; }
 .rs-footer a { color:#afc1d3;text-decoration:none; }
 .rs-notice { position:fixed;z-index:60;bottom:24px;left:50%;transform:translateX(-50%);max-width:min(570px,calc(100% - 28px));border:1px solid #82b8eb;background:rgba(9,27,47,.96);color:#e6f3ff;padding:16px 20px;border-radius:14px;box-shadow:0 15px 45px #020a14aa;font-size:13px;line-height:1.5; }
 .rs-notice button { margin-left:12px;min-width:44px;min-height:44px;border:0;background:transparent;color:#acd5ff;cursor:pointer; }

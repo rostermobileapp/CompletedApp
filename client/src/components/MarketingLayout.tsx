@@ -100,13 +100,20 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
               <img src={rosterLightLogo} alt="RosterHockey logo" className="h-8 object-contain mb-3" />
               <p className="text-sm text-gray-400 max-w-xs">Built for hockey players, by hockey players. No ads. Ever.</p>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-8 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
               <div>
                 <p className="font-semibold text-gray-900 mb-3">Product</p>
                 <ul className="space-y-2 text-gray-500">
                   <li><Link href="/#features" className="hover:text-gray-900 transition-colors">Features</Link></li>
                     <li><Link href="/line-combos-predictions" className="hover:text-gray-900 transition-colors">Line combos</Link></li>
                   <li><Link href="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link></li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 mb-3">Compare</p>
+                <ul className="space-y-2 text-gray-500">
+                  <li><Link href="/rosterhockey-vs-benchapp" className="hover:text-gray-900 transition-colors">RosterHockey vs BenchApp</Link></li>
+                  <li><Link href="/rosterhockey-vs-teamsnap" className="hover:text-gray-900 transition-colors">RosterHockey vs TeamSnap</Link></li>
                 </ul>
               </div>
               <div>

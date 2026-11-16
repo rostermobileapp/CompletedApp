@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from 'wouter';
 import Landing from '@/components/marketing/ScrollStory';
 import LineCombosPage, { lineCombosFaqs } from '@/components/marketing/line-combos/LineCombosPage';
+import RosterHockeyVsTeamSnapPage, { teamSnapFaqs } from '@/components/marketing/RosterHockeyVsTeamSnapPage';
 import { FeaturesPage } from '@/components/marketing/FeaturesPage';
 import { PricingPage } from '@/components/marketing/PricingPage';
 import { AboutPage } from '@/components/marketing/AboutPage';
@@ -22,6 +23,7 @@ const publicPages: Record<string, () => ReactElement> = {
   '/': () => createElement(Landing),
   '/features': () => createElement(FeaturesPage),
   '/line-combos-predictions': () => createElement(LineCombosPage),
+  '/rosterhockey-vs-teamsnap': () => createElement(RosterHockeyVsTeamSnapPage),
   '/pricing': () => createElement(PricingPage),
   '/about': () => createElement(AboutPage),
   '/hockey': () => createElement(SportLanding, { sport: 'hockey' }),
@@ -80,7 +82,11 @@ export function renderPublicPage(path: string, stripePrices: unknown) {
 }
 
 export function faqStructuredData(pathname = '/faq') {
-  const faqs = pathname === '/line-combos-predictions' ? lineCombosFaqs : supportFaqs;
+  const faqs = pathname === '/line-combos-predictions'
+    ? lineCombosFaqs
+    : pathname === '/rosterhockey-vs-teamsnap'
+      ? teamSnapFaqs
+      : supportFaqs;
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',

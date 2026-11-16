@@ -295,6 +295,11 @@ function ScrollStory() {
           <a href="/pricing">Pricing</a>
           <a href="/about">About</a>
           <a href="/referral-program">Partners</a>
+            <div className="rs-footer-compare">
+              <strong>Compare</strong>
+              <a href="/rosterhockey-vs-benchapp">RosterHockey vs BenchApp</a>
+              <a href="/rosterhockey-vs-teamsnap">RosterHockey vs TeamSnap</a>
+            </div>
             <a href="#patches" onClick={(e) => { e.preventDefault(); jumpTo("patches"); }}>Patches</a>
             <a href="#trivia" onClick={(e) => { e.preventDefault(); jumpTo("trivia"); }}>Trivia</a>
             <a href={appStore} target="_blank" rel="noreferrer">App Store</a>

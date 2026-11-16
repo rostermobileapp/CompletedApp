@@ -10,7 +10,7 @@ import {
 
 test('marketing routes are exact, including referral portal boundary', () => {
   for (const path of [
-    '/', '/features', '/line-combos-predictions', '/pricing', '/about', '/hockey',
+    '/', '/features', '/line-combos-predictions', '/rosterhockey-vs-teamsnap', '/pricing', '/about', '/hockey',
     '/for-adult-leagues', '/for-youth-teams', '/for-varsity', '/referral-program',
     '/faq', '/support', '/privacy-policy', '/privacy', '/terms-of-service',
     '/sitemap.xml', '/robots.txt', '/llms.txt',
@@ -30,6 +30,7 @@ test('marketing routes are exact, including referral portal boundary', () => {
 test('canonical URLs split marketing paths from app paths and normalize trailing slashes', () => {
   assert.equal(canonicalUrl('/features/'), `${MARKETING_SITE_ORIGIN}/features`);
   assert.equal(canonicalUrl('/line-combos-predictions'), `${MARKETING_SITE_ORIGIN}/line-combos-predictions`);
+  assert.equal(canonicalUrl('/rosterhockey-vs-teamsnap'), `${MARKETING_SITE_ORIGIN}/rosterhockey-vs-teamsnap`);
   assert.equal(canonicalUrl('/privacy'), `${MARKETING_SITE_ORIGIN}/privacy`);
   assert.equal(canonicalUrl('/referral-program/portal/login'), `${APP_SITE_ORIGIN}/referral-program/portal/login`);
   assert.equal(canonicalUrl('/manifest.json'), `${APP_SITE_ORIGIN}/manifest.json`);

@@ -24,9 +24,12 @@ const marketingHostAppRedirect = config.redirects.find((route: any) =>
 
 test('the app host permanently redirects exact marketing paths and keeps their paths', () => {
   assert.ok(appHostMarketingRedirect);
+  assert.ok(appHostMarketingRedirect.has?.some((condition: any) =>
+    condition.type === 'host' && condition.value?.re === '^(?:www\\.)?roster-app\\.com$',
+  ));
   const matches = pathMatcher(appHostMarketingRedirect.source);
   for (const path of [
-    '/features', '/line-combos-predictions', '/pricing', '/about', '/hockey',
+    '/features', '/line-combos-predictions', '/rosterhockey-vs-teamsnap', '/pricing', '/about', '/hockey',
     '/for-adult-leagues', '/for-youth-teams', '/for-varsity',
     '/referral-program', '/faq', '/support', '/sitemap.xml', '/llms.txt',
   ]) {
@@ -40,6 +43,7 @@ test('the app host permanently redirects exact marketing paths and keeps their p
   ]) {
     assert.equal(matches.test(path), false, path);
   }
+  assert.equal(matches.test('/rosterhockey-vs-teamsnap/extra'), false);
   assert.equal(appHostMarketingRedirect.statusCode, 301);
   assert.equal('preserveQueryParams' in appHostMarketingRedirect, false);
 });
@@ -82,7 +86,7 @@ test('the marketing host sends app paths to the app but keeps marketing and stat
     assert.equal(matches.test(path), true, path);
   }
   for (const path of [
-    '/', '/features', '/line-combos-predictions', '/pricing', '/referral-program', '/privacy',
+    '/', '/features', '/line-combos-predictions', '/rosterhockey-vs-teamsnap', '/pricing', '/referral-program', '/privacy',
     '/privacy-policy', '/terms-of-service', '/sitemap.xml', '/robots.txt',
     '/llms.txt', '/manifest.json', '/assets/app.js',
     '/marketing/roster-home/logo-dark.png', '/badges/beer-me/tier-3.webp',
