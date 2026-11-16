@@ -5,6 +5,7 @@ import { Router } from 'wouter';
 import Landing from '@/components/marketing/ScrollStory';
 import LineCombosPage, { lineCombosFaqs } from '@/components/marketing/line-combos/LineCombosPage';
 import RosterHockeyVsTeamSnapPage, { teamSnapFaqs } from '@/components/marketing/RosterHockeyVsTeamSnapPage';
+import RosterHockeyVsBenchAppPage, { benchAppFaqs } from '@/components/marketing/RosterHockeyVsBenchAppPage';
 import { FeaturesPage } from '@/components/marketing/FeaturesPage';
 import { PricingPage } from '@/components/marketing/PricingPage';
 import { AboutPage } from '@/components/marketing/AboutPage';
@@ -23,6 +24,7 @@ const publicPages: Record<string, () => ReactElement> = {
   '/': () => createElement(Landing),
   '/features': () => createElement(FeaturesPage),
   '/line-combos-predictions': () => createElement(LineCombosPage),
+  '/rosterhockey-vs-benchapp': () => createElement(RosterHockeyVsBenchAppPage),
   '/rosterhockey-vs-teamsnap': () => createElement(RosterHockeyVsTeamSnapPage),
   '/pricing': () => createElement(PricingPage),
   '/about': () => createElement(AboutPage),
@@ -84,6 +86,8 @@ export function renderPublicPage(path: string, stripePrices: unknown) {
 export function faqStructuredData(pathname = '/faq') {
   const faqs = pathname === '/line-combos-predictions'
     ? lineCombosFaqs
+    : pathname === '/rosterhockey-vs-benchapp'
+      ? benchAppFaqs
     : pathname === '/rosterhockey-vs-teamsnap'
       ? teamSnapFaqs
       : supportFaqs;

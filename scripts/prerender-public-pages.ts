@@ -119,7 +119,7 @@ function structuredData(
     },
   ];
   if (pathname === '/faq' || pathname === '/support' || pathname === '/line-combos-predictions' ||
-      pathname === '/rosterhockey-vs-teamsnap') {
+      pathname === '/rosterhockey-vs-teamsnap' || pathname === '/rosterhockey-vs-benchapp') {
     entities.push(faqPage);
   }
   return entities;
@@ -129,7 +129,7 @@ async function writeSitemap(pagePaths: readonly string[], lastmod: string) {
   const urls = pagePaths.map(pagePath => {
     const pageLastmod = pagePath === '/line-combos-predictions'
       ? '2026-11-15'
-      : pagePath === '/rosterhockey-vs-teamsnap' ? '2026-11-16' : lastmod;
+      : pagePath === '/rosterhockey-vs-teamsnap' || pagePath === '/rosterhockey-vs-benchapp' ? '2026-11-16' : lastmod;
     return `  <url><loc>${SITE_ORIGIN}${pagePath === '/' ? '/' : pagePath}</loc><lastmod>${pageLastmod}</lastmod></url>`;
   }).join('\n');
   await fs.writeFile(path.join(outputDir, 'sitemap.xml'),
@@ -187,9 +187,11 @@ async function main() {
       const titleLimit = pathname === '/'
         ? 70
         : pathname === '/line-combos-predictions' ? 61
+          : pathname === '/rosterhockey-vs-benchapp' ? 67
           : pathname === '/rosterhockey-vs-teamsnap' ? 69 : 60;
       if (title.length >= titleLimit) seoErrors.push(`${pathname} title must be under ${titleLimit} characters (${title.length}): ${title}`);
-      const descriptionLimit = pathname === '/rosterhockey-vs-teamsnap' ? 174 : 160;
+      const descriptionLimit = pathname === '/rosterhockey-vs-teamsnap' ? 174
+        : pathname === '/rosterhockey-vs-benchapp' ? 161 : 160;
       if (description.length >= descriptionLimit) seoErrors.push(`${pathname} description must be under ${descriptionLimit} characters (${description.length}).`);
       if (titles.has(title)) seoErrors.push(`Duplicate SEO title "${title}" on ${pathname}.`);
       titles.add(title);
