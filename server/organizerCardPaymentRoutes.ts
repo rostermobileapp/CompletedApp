@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { isConnectPlatformNotRegistered } from "./organizerConnectErrors";
 import { readFinalizedOrganizerCharge } from "./organizerChargeAccounting";
 import { isOrganizerInvoiceRefunded, organizerInvoiceRefundParams, organizerRefundAccountingUpdate } from "./organizerRefundAccounting";
+import { matchesOrganizerDispute, organizerDisputeTransition, lostDisputeRecipientReset } from "./organizerDisputeState";
 import {
   lockInvoiceRefundScrimmage, releaseRefundedScrimmageRequest,
   type CommittedInvoiceRefund,
@@ -37,6 +38,9 @@ type PaymentRow = {
   idempotency_key: string;
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
+  stripe_charge_id?: string | null;
+  dispute_id?: string | null;
+  dispute_status?: string | null;
 };
 
 function userIdFromRequest(req: any): string | null {
@@ -251,7 +255,7 @@ async function applyStripeEvent(
   let paymentId: string | null = object?.metadata?.organizerCardPaymentId ?? null;
   let paymentIntentId: string | null = null;
   let effect: "success" | "processing" | "failed" | "cancelled" | "refund" | "dispute_created" | "dispute_closed" | "account_updated" | "none" = "none";
-  let disputeStatus: string | null = null;
+  let verifiedDispute: Stripe.Dispute | null = null;
   let refundInfo: any = null;
   let verifiedRefundedCents = 0;
   let verifiedTransferReversedCents = 0;
@@ -284,14 +288,20 @@ async function applyStripeEvent(
     paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id ?? null;
     refundInfo = object.refunds?.data?.[0] ?? null;
     effect = "refund";
-  } else if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
+  } else if (event.type === "charge.dispute.created" || event.type === "charge.dispute.updated" || event.type === "charge.dispute.closed") {
     paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id ?? null;
-    disputeStatus = object.status ?? null;
-    effect = event.type === "charge.dispute.created" ? "dispute_created" : "dispute_closed";
+    effect = event.type === "charge.dispute.closed" ? "dispute_closed" : "dispute_created";
   }
   if ((scope === "connect" && event.type !== "account.updated") ||
       (scope === "platform" && event.type === "account.updated")) {
     effect = "none";
+  }
+  if (effect === "dispute_created" || effect === "dispute_closed") {
+    // Use current Stripe state, not an older webhook snapshot. A late "created"
+    // event can arrive after a genuine won/lost closure.
+    verifiedDispute = await stripe.disputes.retrieve(object.id);
+    paymentIntentId = typeof verifiedDispute.payment_intent === "string"
+      ? verifiedDispute.payment_intent : verifiedDispute.payment_intent?.id ?? null;
   }
 
   let payment: PaymentRow | undefined;
@@ -307,7 +317,29 @@ async function applyStripeEvent(
     payment = result.rows[0];
     paymentId = payment?.id ?? null;
   }
+  if (!payment && verifiedDispute && paymentIntentId) {
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const candidateId = intent.metadata?.organizerCardPaymentId;
+    if (candidateId) {
+      const result = await pool.query<PaymentRow>(
+        "SELECT * FROM public.organizer_card_payments WHERE id=$1 LIMIT 1", [candidateId],
+      );
+      payment = result.rows[0];
+      paymentId = payment?.id ?? null;
+    }
+  }
   if (!payment) paymentId = null;
+  if (verifiedDispute && payment) {
+    if (!payment.stripe_payment_intent_id) {
+      // The dispute may precede success delivery. Retry rather than permanently
+      // acknowledging an unmapped dispute and losing it.
+      throw new OrganizerCardPaymentError(
+        "The disputed payment is still being finalized. Delivery can be retried.",
+        503, "disputed_payment_pending",
+      );
+    }
+    if (!matchesOrganizerDispute(payment, verifiedDispute)) effect = "none";
+  }
 
   let verifiedSuccess: Awaited<ReturnType<typeof validateStripePaymentIntent>> | null = null;
   if (effect === "success" && payment && paymentIntentId) {
@@ -488,30 +520,19 @@ async function applyStripeEvent(
               ...released,
             };
           }
-        } else if (effect === "dispute_created") {
-          await client.query(
-            `UPDATE public.organizer_card_payments
-              SET status=CASE WHEN status IN ('refunded','refund_pending') THEN status ELSE 'disputed' END,
-                  dispute_id=$2, dispute_status=$3, updated_at=now()
-             WHERE id=$1`,
-            [row.id, object.id, disputeStatus],
-          );
-        } else if (effect === "dispute_closed") {
-          await client.query(
-            `UPDATE public.organizer_card_payments
-              SET status=CASE WHEN status IN ('refunded','refund_pending') THEN status
-                              WHEN $2='won' THEN 'paid' ELSE 'disputed' END,
-                 dispute_status=$2, updated_at=now()
-             WHERE id=$1`,
-            [row.id, disputeStatus],
-          );
-          if (disputeStatus === "lost") {
+        } else if ((effect === "dispute_created" || effect === "dispute_closed") && verifiedDispute) {
+          const transition = organizerDisputeTransition(row, verifiedDispute);
+          if (row.status !== transition.paymentStatus ||
+              row.dispute_id !== verifiedDispute.id || row.dispute_status !== transition.disputeStatus) {
             await client.query(
-              `UPDATE public.payment_request_recipients
-               SET is_paid=false, payment_method=NULL, paid_at=NULL, updated_at=now()
-               WHERE id=$1 AND payment_request_id=$2`,
-              [row.recipient_id, row.payment_request_id],
+              `UPDATE public.organizer_card_payments
+                SET status=$2, dispute_id=$3, dispute_status=$4, updated_at=now()
+               WHERE id=$1`,
+              [row.id, transition.paymentStatus, verifiedDispute.id, transition.disputeStatus],
             );
+          }
+          if (transition.clearRecipient) {
+            await client.query(lostDisputeRecipientReset(row));
           }
         }
       }

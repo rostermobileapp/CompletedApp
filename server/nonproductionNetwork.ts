@@ -16,7 +16,8 @@ export function assertDevelopmentRequest(
       authorization === `Bearer ${stripeTestSecret}` &&
       url.origin === "https://api.stripe.com" &&
       !url.username && !url.password &&
-      /^\/v1\/(?:accounts|account_links|checkout\/sessions|payment_intents|charges|balance_transactions|refunds)(?:\/[a-zA-Z0-9_]+)*$/.test(url.pathname)) {
+      (/^\/v1\/(?:accounts|account_links|checkout\/sessions|payment_intents|charges|balance_transactions|refunds)(?:\/[a-zA-Z0-9_]+)*$/.test(url.pathname) ||
+       (method.toUpperCase() === "GET" && /^\/v1\/disputes\/[a-zA-Z0-9_]+$/.test(url.pathname)))) {
     return;
   }
   const path = decodeURIComponent(url.pathname).replace(/\/+$/, "");

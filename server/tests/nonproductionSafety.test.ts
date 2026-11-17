@@ -193,6 +193,11 @@ test("organizer test payments allow only the configured test credential and paym
   const headers = { Authorization: `Bearer ${key}` };
   const paymentUrl = new URL("https://api.stripe.com/v1/checkout/sessions");
   assert.doesNotThrow(() => assertDevelopmentRequest(paymentUrl, dev, "POST", headers, key));
+  const disputeUrl = new URL("https://api.stripe.com/v1/disputes/dp_test");
+  assert.doesNotThrow(() => assertDevelopmentRequest(disputeUrl, dev, "GET", headers, key));
+  assert.throws(() => assertDevelopmentRequest(disputeUrl, dev, "POST", headers, key), /disabled/);
+  assert.throws(() => assertDevelopmentRequest(disputeUrl, dev, "GET",
+    { Authorization: "Bearer sk_live_synthetic" }, key), /disabled/);
   for (const authorization of ["Bearer sk_live_synthetic", "Bearer sk_test_other", ""]) {
     assert.throws(() => assertDevelopmentRequest(paymentUrl, dev, "POST", { Authorization: authorization }, key), /disabled/);
   }

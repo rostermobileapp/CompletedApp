@@ -68,3 +68,9 @@ Stripe can replay a cached HTTP 400 saying Connect is not registered even after 
 **Why:** A sandbox activation succeeded, but retries with the same account-creation idempotency key continued returning the earlier error with `idempotent-replayed: true`. A fresh key after the definitive rejection allowed onboarding.
 
 **How to apply:** Check whether a prerequisite error is a replay before asking the owner to repeat dashboard setup. Only release a key after a definitive no-account-created rejection; retain it after timeouts, transport failures, or uncertain server errors.
+
+Dispute notifications are not ordered, and finalization must protect a later replacement payment as well as the disputed transaction.
+
+**Why:** Genuine sandbox checks reproduced a won dispute reopening after a late creation notification. A lost-case replay check also initially undid a later manual repayment; checking the dispute outcome alone was insufficient protection.
+
+**How to apply:** Read Stripe's current dispute and verify its charge/PaymentIntent association. Keep won/lost outcomes final for the same dispute under the database lock, and make repeated terminal notifications no-ops for invoice payment flags. Protect replacement manual payments and newer card transactions in the recipient-update SQL itself. If a dispute arrives before its payment can be linked, return a retryable failure instead of acknowledging and dropping it.
