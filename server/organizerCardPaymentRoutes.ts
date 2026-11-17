@@ -5,6 +5,8 @@ import { isConnectPlatformNotRegistered } from "./organizerConnectErrors";
 import { readFinalizedOrganizerCharge } from "./organizerChargeAccounting";
 import { isOrganizerInvoiceRefunded, organizerInvoiceRefundParams, organizerRefundAccountingUpdate } from "./organizerRefundAccounting";
 import { matchesOrganizerDispute, organizerDisputeTransition, lostDisputeRecipientReset } from "./organizerDisputeState";
+import { organizerDisputeAccounting } from "./organizerDisputeAccounting";
+import { loadOrganizerPaymentReport, organizerReportFilters, organizerReportCsv } from "./organizerPaymentReport";
 import {
   lockInvoiceRefundScrimmage, releaseRefundedScrimmageRequest,
   type CommittedInvoiceRefund,
@@ -41,6 +43,10 @@ type PaymentRow = {
   stripe_charge_id?: string | null;
   dispute_id?: string | null;
   dispute_status?: string | null;
+  disputed_amount_cents?: number | null;
+  dispute_fee_cents?: number | null;
+  dispute_balance_net_cents?: number | null;
+  dispute_balance_transaction_count?: number;
 };
 
 function userIdFromRequest(req: any): string | null {
@@ -259,6 +265,7 @@ async function applyStripeEvent(
   let refundInfo: any = null;
   let verifiedRefundedCents = 0;
   let verifiedTransferReversedCents = 0;
+  let verifiedApplicationFeeRefundedCents = 0;
   let sessionId: string | null = null;
 
   if (event.type === "account.updated") {
@@ -288,7 +295,8 @@ async function applyStripeEvent(
     paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id ?? null;
     refundInfo = object.refunds?.data?.[0] ?? null;
     effect = "refund";
-  } else if (event.type === "charge.dispute.created" || event.type === "charge.dispute.updated" || event.type === "charge.dispute.closed") {
+  } else if (["charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed",
+    "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated"].includes(event.type)) {
     paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id ?? null;
     effect = event.type === "charge.dispute.closed" ? "dispute_closed" : "dispute_created";
   }
@@ -365,7 +373,7 @@ async function applyStripeEvent(
     // Stripe's current charge/transfer so dashboard refunds and late deliveries
     // cannot invent a reversal or replace a real amount with the invoice base.
     const currentCharge = await stripe.charges.retrieve(object.id, {
-      expand: ["transfer"],
+      expand: ["transfer", "application_fee"],
     });
     const refunds = await stripe.refunds.list({ charge: currentCharge.id, limit: 100 });
     refundInfo = refunds.data.find(refund => refund.status === "succeeded")
@@ -378,6 +386,11 @@ async function applyStripeEvent(
     const transfer: any = currentCharge.transfer;
     verifiedTransferReversedCents = typeof transfer === "object" && transfer
       ? transfer.amount_reversed ?? 0 : 0;
+    const applicationFee = currentCharge.application_fee;
+    if (!applicationFee || typeof applicationFee === "string") {
+      throw new OrganizerCardPaymentError("Refund accounting is still being finalized.", 503, "refund_accounting_pending");
+    }
+    verifiedApplicationFeeRefundedCents = applicationFee.amount_refunded;
   }
 
   let committedRefund: CommittedInvoiceRefund | null = null;
@@ -452,7 +465,7 @@ async function applyStripeEvent(
               charge?.id ?? null,
               typeof appFee === "string" ? appFee : appFee?.id ?? null,
               typeof transfer === "string" ? transfer : transfer?.id ?? null,
-              row.base_amount_cents,
+              transfer.amount,
               balanceTransaction?.fee ?? null,
               charge?.receipt_url ?? null,
               sessionId,
@@ -489,6 +502,7 @@ async function applyStripeEvent(
                  transfer_reversal_id=COALESCE($5, transfer_reversal_id),
                   transfer_reversed_cents=GREATEST(transfer_reversed_cents,$6),
                   refunded_amount_cents=GREATEST(refunded_amount_cents,$7),
+                   application_fee_refunded_cents=GREATEST(application_fee_refunded_cents,$8),
                  updated_at=now()
              WHERE id=$1`,
             [
@@ -499,6 +513,7 @@ async function applyStripeEvent(
               typeof reversal === "string" ? reversal : reversal?.id ?? null,
               verifiedTransferReversedCents,
                verifiedRefundedCents,
+                verifiedApplicationFeeRefundedCents,
             ],
           );
           // Only the first completed refund may mutate the recipient/roster.
@@ -522,13 +537,30 @@ async function applyStripeEvent(
           }
         } else if ((effect === "dispute_created" || effect === "dispute_closed") && verifiedDispute) {
           const transition = organizerDisputeTransition(row, verifiedDispute);
+          const accounting = organizerDisputeAccounting(verifiedDispute);
+          // A provider read made before another delivery obtained the lock must
+          // not replace a final outcome or a more complete append-only ledger.
+          const acceptAccounting = verifiedDispute.status === transition.disputeStatus &&
+            (row.dispute_id !== verifiedDispute.id ||
+             accounting.entries >= (row.dispute_balance_transaction_count ?? 0));
+          const accountingChanged = acceptAccounting && (
+            row.disputed_amount_cents !== accounting.amount || row.dispute_fee_cents !== accounting.fees ||
+            row.dispute_balance_net_cents !== accounting.net ||
+            row.dispute_balance_transaction_count !== accounting.entries
+          );
           if (row.status !== transition.paymentStatus ||
-              row.dispute_id !== verifiedDispute.id || row.dispute_status !== transition.disputeStatus) {
+              row.dispute_id !== verifiedDispute.id || row.dispute_status !== transition.disputeStatus || accountingChanged) {
             await client.query(
               `UPDATE public.organizer_card_payments
-                SET status=$2, dispute_id=$3, dispute_status=$4, updated_at=now()
+                SET status=$2, dispute_id=$3, dispute_status=$4,
+                    disputed_amount_cents=CASE WHEN $5 THEN $6 ELSE disputed_amount_cents END,
+                    dispute_fee_cents=CASE WHEN $5 THEN $7 ELSE dispute_fee_cents END,
+                    dispute_balance_net_cents=CASE WHEN $5 THEN $8 ELSE dispute_balance_net_cents END,
+                    dispute_balance_transaction_count=CASE WHEN $5 THEN $9 ELSE dispute_balance_transaction_count END,
+                    updated_at=now()
                WHERE id=$1`,
-              [row.id, transition.paymentStatus, verifiedDispute.id, transition.disputeStatus],
+              [row.id, transition.paymentStatus, verifiedDispute.id, transition.disputeStatus,
+                acceptAccounting, accounting.amount, accounting.fees, accounting.net, accounting.entries],
             );
           }
           if (transition.clearRecipient) {
@@ -981,86 +1013,22 @@ export function registerOrganizerCardPaymentRoutes(
       return res.status(503).json({ message: "Organizer card payment reporting is disabled in this environment." });
     }
     try {
-      const from = typeof req.query.from === "string" ? req.query.from : null;
-      const to = typeof req.query.to === "string" ? req.query.to : null;
-      const eventType = typeof req.query.eventType === "string" ? req.query.eventType : "all";
-      const isDateOnly = (value: string) => {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-        const date = new Date(`${value}T00:00:00.000Z`);
-        return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-      };
-      if (from && !isDateOnly(from)) return res.status(400).json({ message: "Invalid start date." });
-      if (to && !isDateOnly(to)) return res.status(400).json({ message: "Invalid end date." });
-      if (from && to && from > to) return res.status(400).json({ message: "Start date must not be after the end date." });
-      if (!["all", "scrimmage", "league_fee", "message"].includes(eventType)) return res.status(400).json({ message: "Invalid event type." });
-      const conditions = [
-        `($1::date IS NULL OR p.created_at >= $1::date)`,
-        `($2::date IS NULL OR p.created_at < ($2::date + interval '1 day'))`,
-        `($3 = 'all' OR CASE
-          WHEN pr.related_scrimmage_id IS NOT NULL THEN 'scrimmage'
-          WHEN pr.related_conversation_id IS NOT NULL THEN 'message'
-          ELSE 'league_fee'
-        END = $3)`,
-      ];
-      const where = conditions.join(" AND ");
-      const [summary, details] = await Promise.all([
-        pool.query(`
-          SELECT
-            COALESCE(SUM(p.total_amount_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS gross_volume_cents,
-            COALESCE(SUM(p.service_fee_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS service_fees_cents,
-            COALESCE(SUM(p.stripe_processing_fee_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS processing_fees_cents,
-            COALESCE(SUM(COALESCE(p.transfer_amount_cents,p.base_amount_cents) - COALESCE(p.transfer_reversed_cents,0)) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS organizer_transfers_cents,
-            COALESCE(SUM(p.refunded_amount_cents),0)::bigint AS refunds_cents,
-            COALESCE(SUM(p.transfer_reversed_cents),0)::bigint AS transfer_reversals_cents,
-            COUNT(*) FILTER (WHERE p.dispute_id IS NOT NULL)::int AS disputes_count,
-            COALESCE(SUM(p.total_amount_cents) FILTER (WHERE p.dispute_id IS NOT NULL),0)::bigint AS disputed_cents
-          FROM public.organizer_card_payments p
-          JOIN public.payment_requests pr ON pr.id=p.payment_request_id
-          WHERE ${where}
-        `, [from, to, eventType]),
-        pool.query(`
-          SELECT p.id, p.payment_request_id, pr.title,
-                  CASE
-                    WHEN pr.related_scrimmage_id IS NOT NULL THEN 'scrimmage'
-                    WHEN pr.related_conversation_id IS NOT NULL THEN 'message'
-                    ELSE 'league_fee'
-                  END AS event_type,
-                 p.organizer_user_id, organizer.display_id AS organizer_display_id,
-                 p.payer_user_id, payer.display_id AS payer_display_id,
-                 p.status, p.currency, p.base_amount_cents, p.service_fee_cents, p.total_amount_cents,
-                 p.stripe_processing_fee_cents, p.transfer_amount_cents, p.transfer_reversed_cents,
-                 p.refunded_amount_cents, p.refund_status, p.refunded_at, p.dispute_status, p.created_at
-          FROM public.organizer_card_payments p
-          JOIN public.payment_requests pr ON pr.id=p.payment_request_id
-          JOIN public.users organizer ON organizer.id=p.organizer_user_id
-          JOIN public.users payer ON payer.id=p.payer_user_id
-          WHERE ${where}
-          ORDER BY p.created_at DESC
-          LIMIT 5000
-        `, [from, to, eventType]),
-      ]);
+      let filters;
+      try {
+        filters = organizerReportFilters(req.query);
+      } catch (error) {
+        return res.status(400).json({ message: (error as Error).message });
+      }
+      const report = await loadOrganizerPaymentReport(pool, filters);
       if (req.query.format === "csv") {
-        const headers = Object.keys(details.rows[0] ?? {
-          id: "", payment_request_id: "", title: "", event_type: "", organizer_user_id: "",
-          organizer_display_id: "", payer_user_id: "", payer_display_id: "", status: "",
-          currency: "", base_amount_cents: "", service_fee_cents: "", total_amount_cents: "",
-          stripe_processing_fee_cents: "", transfer_amount_cents: "", transfer_reversed_cents: "",
-          refunded_amount_cents: "", refund_status: "", refunded_at: "", dispute_status: "", created_at: "",
-        });
-        const csvValue = (value: unknown) => {
-          const raw = String(value ?? "");
-          const safe = /^[\t\r\n=+\-@]/.test(raw) ? `'${raw}` : raw;
-          return `"${safe.replace(/"/g, '""')}"`;
-        };
-        const body = [
-          headers.map(csvValue).join(","),
-          ...details.rows.map((row) => headers.map((key) => csvValue((row as any)[key])).join(",")),
-        ].join("\r\n");
+        if (report.summary.payments_count > report.payments.length) {
+          return res.status(400).json({ message: "Narrow the date or payment-type filters to export at most 5,000 complete rows." });
+        }
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader("Content-Disposition", 'attachment; filename="organizer-card-payments.csv"');
-        return res.send(body);
+        return res.send(organizerReportCsv(report.payments));
       }
-      res.json({ summary: summary.rows[0], payments: details.rows });
+      res.json(report);
     } catch (error) {
       sendPaymentError(res, error);
     }

@@ -55,7 +55,7 @@ Destination-charge transfers are gross, while organizer proceeds are net of the 
 
 **Why:** Stripe's actual sandbox ledger showed a $21.50 transfer, a $1.50 application fee, and $20 organizer proceeds. Refunding the full $21.50 reversed $21.50 while the $1.50 fee remained unrefunded; treating the reversal as $20 misreported the organizer balance.
 
-**How to apply:** Reconcile against Stripe's actual transfer, application fee, balance transaction and reversal amounts. Disclose who bears a retained service fee in refund confirmation, and obtain approval before changing that financial policy.
+**How to apply:** Reconcile against Stripe's actual transfer, application fee, balance transaction and reversal amounts. Keep gross transfer movements separate from organizer proceeds; the invoice base is not Stripe's gross transfer. Disclose who bears a retained service fee in refund confirmation, and obtain approval before changing that financial policy.
 
 Payment success can precede final destination-transfer, application-fee and balance-transaction details.
 
@@ -74,3 +74,9 @@ Dispute notifications are not ordered, and finalization must protect a later rep
 **Why:** Genuine sandbox checks reproduced a won dispute reopening after a late creation notification. A lost-case replay check also initially undid a later manual repayment; checking the dispute outcome alone was insufficient protection.
 
 **How to apply:** Read Stripe's current dispute and verify its charge/PaymentIntent association. Keep won/lost outcomes final for the same dispute under the database lock, and make repeated terminal notifications no-ops for invoice payment flags. Protect replacement manual payments and newer card transactions in the recipient-update SQL itself. If a dispute arrives before its payment can be linked, return a retryable failure instead of acknowledging and dropping it.
+
+Winning a dispute does not guarantee that Stripe returns the dispute fee. Processing fees alone are not the platform's full costs.
+
+**Why:** The actual sandbox balance entries retained a $15 fee even for won disputes. Reporting only service fees less card processing incorrectly implied a profit while the platform had lost money.
+
+**How to apply:** Reconcile platform net to independent Stripe balance entries, including dispute fees and principal withdrawals/reinstatements. Track gross transfers, net organizer proceeds and retained application fees separately. Preserve unknown accounting as unreconciled, and refresh dispute accounting on funds-withdrawn/reinstated events without letting an older, shorter balance-entry list overwrite a more complete one. Do not infer financial costs from the dispute outcome alone.

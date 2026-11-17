@@ -265,11 +265,11 @@ async function main() {
     assert.equal(intent.amount_received, 2150);
     assert.equal(intent.application_fee_amount, 150);
     assert.equal(intent.transfer_data?.destination, settled.stripe_account_id);
-    assert.equal(settled.transfer_amount_cents, 2000);
     assert.ok(settled.stripe_transfer_id);
     assert.ok(settled.stripe_application_fee_id);
     assert.ok(Number.isInteger(settled.stripe_processing_fee_cents));
     const actualTransfer = await stripe.transfers.retrieve(settled.stripe_transfer_id);
+    assert.equal(settled.transfer_amount_cents, actualTransfer.amount);
     const actualFee = await stripe.applicationFees.retrieve(settled.stripe_application_fee_id);
     assert.equal(actualTransfer.amount - actualFee.amount, 2000);
     console.log("[Checkout test] Genuine Stripe TEST payment settled the invoice; base $20, fee $1.50; receipt recorded.");

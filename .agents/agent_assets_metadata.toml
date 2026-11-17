@@ -7,3 +7,17 @@ uri = "file://roster-app-qr.png"
 type = "image"
 title = "QR Code — roster-app.com/hpib"
 logical_id = "f60eb079-5972-4473-8ac5-7ffdff8ae9dc"
+
+[[outputs]]
+id = "VQ-Bw6YJFGEOiFDXHc763"
+uri = "file://generated-artifacts/card-payment-failures/reconciled-founder-report.csv"
+type = "table"
+title = "Reconciled founder report — TEST data"
+description = "Verified accounting for 15 sandbox payment attempts, including 13 charges, refunds, dispute fees, transfers, and platform net."
+logical_id = "183f0467-e336-4727-9e1e-193ca59fb589"
+content_hash = "sha256:365bcdc4cd54da915dc07e21592877a7da8113578bba5de048f68ae0d465fbd3"
+size = 6671
+mtime_ms = 1794941335429
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/183f0467-e336-4727-9e1e-193ca59fb589/2f60f317-7343-429d-927d-a51bae252cf4"
+storage_version_token = "1794941586554444"
+content_type = "text/csv"
