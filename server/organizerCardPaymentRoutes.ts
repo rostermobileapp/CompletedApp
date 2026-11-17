@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Express, RequestHandler } from "express";
 import Stripe from "stripe";
+import { isConnectPlatformNotRegistered } from "./organizerConnectErrors";
 import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import {
@@ -518,14 +519,32 @@ export function registerOrganizerCardPaymentRoutes(
 
       let accountId = mapping.stripe_account_id;
       if (!accountId) {
-        const account = await stripe.accounts.create({
-          type: "express",
-          country: "US",
-          business_type: "individual",
-          capabilities: { transfers: { requested: true } },
-          metadata: { rosterHockeyUserId: userId },
-          settings: { payouts: { schedule: { interval: "weekly", weekly_anchor: "monday" } } },
-        }, { idempotencyKey: mapping.creation_idempotency_key });
+        let account: Stripe.Account;
+        try {
+          account = await stripe.accounts.create({
+            type: "express",
+            country: "US",
+            business_type: "individual",
+            capabilities: { transfers: { requested: true } },
+            metadata: { rosterHockeyUserId: userId },
+            settings: { payouts: { schedule: { interval: "weekly", weekly_anchor: "monday" } } },
+          }, { idempotencyKey: mapping.creation_idempotency_key });
+        } catch (error) {
+          if (!isConnectPlatformNotRegistered(error)) throw error;
+          // No account was created for this key. Compare-and-swap means a
+          // concurrent retry cannot overwrite a newer key or a saved account.
+          await pool.query(
+            `UPDATE public.stripe_connected_accounts
+             SET creation_idempotency_key=$3, updated_at=now()
+             WHERE user_id=$1 AND creation_idempotency_key=$2 AND stripe_account_id IS NULL`,
+            [userId, mapping.creation_idempotency_key, `organizer-connect:${randomUUID()}`],
+          );
+          throw new OrganizerCardPaymentError(
+            "Stripe Connect platform setup is required. Complete setup in the same Stripe account or sandbox, then retry.",
+            409,
+            "connect_platform_setup_required",
+          );
+        }
         accountId = account.id;
         await pool.query(
           `UPDATE public.stripe_connected_accounts SET stripe_account_id=$2, updated_at=now()

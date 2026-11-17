@@ -26,3 +26,9 @@ Destination-charge payment events and connected-account lifecycle events require
 **Why:** Destination charges belong to the platform Stripe account, whereas `account.updated` belongs to the connected-account event scope. A connected-accounts-only webhook will not settle platform destination-charge invoices.
 
 **How to apply:** Configure separate platform-payment and connected-account snapshot destinations; verify mode, signature, and event scope independently. Never reuse the subscription webhook for organizer payments.
+
+Stripe can replay a cached HTTP 400 saying Connect is not registered even after Connect has been enabled.
+
+**Why:** A sandbox activation succeeded, but retries with the same account-creation idempotency key continued returning the earlier error with `idempotent-replayed: true`. A fresh key after the definitive rejection allowed onboarding.
+
+**How to apply:** Check whether a prerequisite error is a replay before asking the owner to repeat dashboard setup. Only release a key after a definitive no-account-created rejection; retain it after timeouts, transport failures, or uncertain server errors.
