@@ -3,6 +3,12 @@ name: Scrimmage and league-fee card payments
 description: Organizer-to-player fee collection is transaction-only and must not alter subscription tier.
 ---
 
+Organizer-initiated refunds return the invoice base amount only and reverse that same amount from the organizer. The player does not receive the service fee back; RosterHockey retains it before Stripe processing costs.
+
+**Why:** The owner explicitly clarified: “the player should only get $20 back. The organizer gets reversed $20 and RosterHockey Keeps the difference.” For a $20 invoice plus $1.50 fee, refund $20, reverse $20, retain $1.50; the organizer nets zero.
+
+**How to apply:** Disclose the non-refundable fee before payment and in refund confirmation. Treat refunding the full invoice base as a completed invoice refund, even though Stripe calls it a partial charge refund. Reporting must use actual refunded money, not the original charge total.
+
 Organizer card collection for scrimmage charges and league fees is a separate transaction flow. A verified full Stripe payment must automatically mark the linked recipient paid in the existing invoice tracking so the organizer sees the settled status; pending, failed, or cancelled attempts must not. A successful, failed, or refunded fee payment, or Connect onboarding, must never promote or downgrade a RosterHockey account or update subscription access. Player Pro or higher is only an organizer eligibility gate; a payer's card purchase is not a subscription event.
 
 **Why:** The owner clarified that this feature supports scrimmage setup and league-fee collection, that successful Stripe payments must synchronize to the existing invoice paid indicator, and that these transactions do not change anyone's account subscription tier.

@@ -72,7 +72,7 @@ export default function PaymentRequestDetail() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: 'Full refund requested', description: 'The card transaction will update when Stripe confirms it.' });
+      toast({ title: 'Invoice refund requested', description: 'The invoice amount will be returned. The service fee is non-refundable.' });
       refetchCardPaymentInfo();
       queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
@@ -352,6 +352,7 @@ export default function PaymentRequestDetail() {
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               Invoice amount {`$${(cardPaymentInfo.baseAmountCents / 100).toFixed(2)}`} + service fee {`$${(cardPaymentInfo.serviceFeeCents / 100).toFixed(2)}`} = total {`$${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)}`}.
+              {' '}Refunds return the invoice amount only; the service fee is non-refundable.
             </p>
             {!cardPaymentInfo.webhookReady ? (
               <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
@@ -425,6 +426,11 @@ export default function PaymentRequestDetail() {
                         Total ${(payment.totalAmountCents / 100).toFixed(2)} · Base amount ${(payment.baseAmountCents / 100).toFixed(2)}
                         {payment.serviceFeeCents > 0 && ` · Fee $${(payment.serviceFeeCents / 100).toFixed(2)}`}
                       </p>
+                      {payment.refundedAmountCents > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Refunded ${(payment.refundedAmountCents / 100).toFixed(2)}
+                        </p>
+                      )}
                       {payment.disputeStatus && (
                         <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                           Dispute status: {payment.disputeStatus}
@@ -440,17 +446,17 @@ export default function PaymentRequestDetail() {
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="outline" size="sm" disabled={refundCardPaymentMutation.isPending}>
-                            Refund full payment
+                            Refund invoice amount
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Refund this card payment?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Stripe will refund ${(payment.totalAmountCents / 100).toFixed(2)} to the payer
-                              and reverse ${(payment.totalAmountCents / 100).toFixed(2)} from the organizer’s
+                              Stripe will refund ${(payment.baseAmountCents / 100).toFixed(2)} to the payer
+                              and reverse ${(payment.baseAmountCents / 100).toFixed(2)} from the organizer’s
                               Stripe balance. RosterHockey retains the ${(payment.serviceFeeCents / 100).toFixed(2)} service fee,
-                              so the organizer bears that fee in addition to returning the invoice amount.
+                              which is non-refundable to the payer.
                               This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
@@ -460,7 +466,7 @@ export default function PaymentRequestDetail() {
                               onClick={() => refundCardPaymentMutation.mutate(payment.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                              Refund full amount
+                              Refund invoice amount
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

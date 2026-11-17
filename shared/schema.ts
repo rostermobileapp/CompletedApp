@@ -1853,6 +1853,7 @@ export const organizerCardPayments = pgTable("organizer_card_payments", {
   receiptUrl: text("receipt_url"),
   refundId: varchar("refund_id").unique(),
   refundStatus: varchar("refund_status"),
+  refundedAmountCents: integer("refunded_amount_cents").default(0).notNull(),
   refundedAt: timestamp("refunded_at"),
   transferReversalId: varchar("transfer_reversal_id").unique(),
   transferReversedCents: integer("transfer_reversed_cents"),

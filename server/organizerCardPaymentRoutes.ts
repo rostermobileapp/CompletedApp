@@ -3,7 +3,7 @@ import type { Express, RequestHandler } from "express";
 import Stripe from "stripe";
 import { isConnectPlatformNotRegistered } from "./organizerConnectErrors";
 import { readFinalizedOrganizerCharge } from "./organizerChargeAccounting";
-import { organizerRefundAccountingUpdate } from "./organizerRefundAccounting";
+import { isOrganizerInvoiceRefunded, organizerInvoiceRefundParams, organizerRefundAccountingUpdate } from "./organizerRefundAccounting";
 import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import {
@@ -430,7 +430,8 @@ async function applyStripeEvent(
             [row.id, effect, paymentIntentId],
           );
         } else if (effect === "refund") {
-          const fullRefund = verifiedRefundedCents >= row.total_amount_cents;
+          // A completed invoice refund excludes the non-refundable service fee.
+          const fullRefund = isOrganizerInvoiceRefunded(row.base_amount_cents, verifiedRefundedCents);
           const reversal: any = refundInfo?.transfer_reversal;
           await client.query(
             `UPDATE public.organizer_card_payments
@@ -440,6 +441,7 @@ async function applyStripeEvent(
                  refunded_at=CASE WHEN $2 THEN now() ELSE refunded_at END,
                  transfer_reversal_id=COALESCE($5, transfer_reversal_id),
                   transfer_reversed_cents=GREATEST(transfer_reversed_cents,$6),
+                  refunded_amount_cents=GREATEST(refunded_amount_cents,$7),
                  updated_at=now()
              WHERE id=$1`,
             [
@@ -449,6 +451,7 @@ async function applyStripeEvent(
               refundInfo?.status ?? null,
               typeof reversal === "string" ? reversal : reversal?.id ?? null,
               verifiedTransferReversedCents,
+               verifiedRefundedCents,
             ],
           );
           if (fullRefund) {
@@ -702,7 +705,7 @@ export function registerOrganizerCardPaymentRoutes(
             price_data: {
               currency: "usd",
               unit_amount: payment.service_fee_cents,
-              product_data: { name: "RosterHockey service fee" },
+              product_data: { name: "RosterHockey service fee (non-refundable)" },
             },
           },
         ],
@@ -767,6 +770,7 @@ export function registerOrganizerCardPaymentRoutes(
                organizer_user_id AS "organizerUserId", base_amount_cents AS "baseAmountCents",
                service_fee_cents AS "serviceFeeCents", total_amount_cents AS "totalAmountCents",
                currency, status, receipt_url AS "receiptUrl", refund_status AS "refundStatus",
+               refunded_amount_cents AS "refundedAmountCents",
                refunded_at AS "refundedAt", dispute_status AS "disputeStatus",
                created_at AS "createdAt"
         FROM public.organizer_card_payments
@@ -866,12 +870,10 @@ export function registerOrganizerCardPaymentRoutes(
         [payment.id],
       );
       try {
-        const refund = await stripe.refunds.create({
-          payment_intent: payment.stripe_payment_intent_id,
-          reverse_transfer: true,
-          refund_application_fee: false,
-          expand: ["transfer_reversal"],
-        }, { idempotencyKey: `organizer-card-refund:${payment.id}` });
+        const refund = await stripe.refunds.create(organizerInvoiceRefundParams({
+          stripe_payment_intent_id: payment.stripe_payment_intent_id,
+          base_amount_cents: payment.base_amount_cents,
+        }), { idempotencyKey: `organizer-card-refund:${payment.id}` });
         await pool.query(organizerRefundAccountingUpdate(payment.id, refund));
         res.json({ status: "refund_pending", refundStatus: refund.status });
       } catch (error) {
@@ -952,7 +954,7 @@ export function registerOrganizerCardPaymentRoutes(
             COALESCE(SUM(p.service_fee_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS service_fees_cents,
             COALESCE(SUM(p.stripe_processing_fee_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS processing_fees_cents,
             COALESCE(SUM(COALESCE(p.transfer_amount_cents,p.base_amount_cents) - COALESCE(p.transfer_reversed_cents,0)) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS organizer_transfers_cents,
-            COALESCE(SUM(p.total_amount_cents) FILTER (WHERE p.status='refunded'),0)::bigint AS refunds_cents,
+            COALESCE(SUM(p.refunded_amount_cents),0)::bigint AS refunds_cents,
             COALESCE(SUM(p.transfer_reversed_cents),0)::bigint AS transfer_reversals_cents,
             COUNT(*) FILTER (WHERE p.dispute_id IS NOT NULL)::int AS disputes_count,
             COALESCE(SUM(p.total_amount_cents) FILTER (WHERE p.dispute_id IS NOT NULL),0)::bigint AS disputed_cents
@@ -971,7 +973,7 @@ export function registerOrganizerCardPaymentRoutes(
                  p.payer_user_id, payer.display_id AS payer_display_id,
                  p.status, p.currency, p.base_amount_cents, p.service_fee_cents, p.total_amount_cents,
                  p.stripe_processing_fee_cents, p.transfer_amount_cents, p.transfer_reversed_cents,
-                 p.refund_status, p.refunded_at, p.dispute_status, p.created_at
+                 p.refunded_amount_cents, p.refund_status, p.refunded_at, p.dispute_status, p.created_at
           FROM public.organizer_card_payments p
           JOIN public.payment_requests pr ON pr.id=p.payment_request_id
           JOIN public.users organizer ON organizer.id=p.organizer_user_id
@@ -987,7 +989,7 @@ export function registerOrganizerCardPaymentRoutes(
           organizer_display_id: "", payer_user_id: "", payer_display_id: "", status: "",
           currency: "", base_amount_cents: "", service_fee_cents: "", total_amount_cents: "",
           stripe_processing_fee_cents: "", transfer_amount_cents: "", transfer_reversed_cents: "",
-          refund_status: "", refunded_at: "", dispute_status: "", created_at: "",
+          refunded_amount_cents: "", refund_status: "", refunded_at: "", dispute_status: "", created_at: "",
         });
         const csvValue = (value: unknown) => {
           const raw = String(value ?? "");

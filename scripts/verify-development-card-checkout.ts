@@ -217,7 +217,7 @@ async function main() {
     assert.equal((await rest(payer.access_token, "stripe_connect_webhook_events", "select=event_id&limit=1")).status, 403);
     console.log("[Checkout test] Real Supabase RLS allowed payer/organizer reads and rejected outsiders, anonymous reads and direct writes.");
 
-    stage = "full refund and transfer reversal";
+    stage = "invoice-only refund and transfer reversal";
     assert.equal((await api(payer.access_token, `/api/organizer-card-payments/${payment.id}/refund`, "POST", {})).status, 404);
     const refund = await api(organizer.access_token, `/api/organizer-card-payments/${payment.id}/refund`, "POST", {});
     assert.equal(refund.status, 200);
@@ -232,15 +232,17 @@ async function main() {
     }
     assert.equal(refunded.status, "refunded");
     assert.equal(refunded.is_paid, false);
-    assert.equal(refunded.transfer_reversed_cents, 2150);
+    assert.equal(refunded.transfer_reversed_cents, 2000);
+    assert.equal(refunded.refunded_amount_cents, 2000);
     assert.ok(refunded.refund_id);
     const stripeRefund = await stripe.refunds.retrieve(refunded.refund_id);
-    assert.equal(stripeRefund.amount, 2150);
+    assert.equal(stripeRefund.amount, 2000);
     assert.equal(stripeRefund.status, "succeeded");
     assert.ok(stripeRefund.transfer_reversal);
     const refundedTransfer = await stripe.transfers.retrieve(settled.stripe_transfer_id);
     const retainedFee = await stripe.applicationFees.retrieve(settled.stripe_application_fee_id);
-    assert.equal(refundedTransfer.amount_reversed, 2150);
+    assert.equal(refundedTransfer.amount_reversed, 2000);
+    assert.equal(refundedTransfer.amount - refundedTransfer.amount_reversed - retainedFee.amount, 0);
     assert.equal(retainedFee.amount_refunded, 0);
     assert.equal((await api(organizer.access_token, `/api/organizer-card-payments/${payment.id}/refund`, "POST", {})).status, 200);
     stage = "duplicate and reordered signed webhook replay";
@@ -271,7 +273,7 @@ async function main() {
     assert.equal(afterReplay.is_paid, false);
     const roles = await sql`SELECT id,role FROM users WHERE id IN (${organizer.user.id},${payer.user.id}) ORDER BY id`;
     assert.deepEqual(roles, beforeRoles, "Fee payments and refunds must never change subscription roles");
-    console.log("[Checkout test] Full $21.50 refund and actual $21.50 reversal verified; $1.50 fee retained; subscription roles unchanged.");
+    console.log("[Checkout test] $20 invoice refund and $20 reversal verified; $1.50 fee retained; organizer net zero; subscription roles unchanged.");
     console.log("[Checkout test] Repeated refund request and duplicate/late success events did not create another refund or re-pay the invoice.");
   } finally {
     await browser.close();
