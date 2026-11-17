@@ -447,7 +447,11 @@ export default function PaymentRequestDetail() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Refund this card payment?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Stripe will refund the full amount charged and reverse the organizer transfer. The service fee is retained by RosterHockey. This action cannot be undone.
+                              Stripe will refund ${(payment.totalAmountCents / 100).toFixed(2)} to the payer
+                              and reverse ${(payment.totalAmountCents / 100).toFixed(2)} from the organizer’s
+                              Stripe balance. RosterHockey retains the ${(payment.serviceFeeCents / 100).toFixed(2)} service fee,
+                              so the organizer bears that fee in addition to returning the invoice amount.
+                              This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

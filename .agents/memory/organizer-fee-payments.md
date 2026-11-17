@@ -33,6 +33,18 @@ Webhook delivery probes must identify a newly generated event, not merely find a
 
 **How to apply:** In isolated tests, change a synthetic account's metadata value, match the resulting event's request ID to the Stripe update response, and verify that exact event ID was processed by the app. Do not infer success or a routing failure from an unrelated historical event.
 
+Destination-charge transfers are gross, while organizer proceeds are net of the application fee. A full refund with `reverse_transfer=true` and `refund_application_fee=false` debits the gross transfer and leaves the organizer bearing the retained service fee.
+
+**Why:** Stripe's actual sandbox ledger showed a $21.50 transfer, a $1.50 application fee, and $20 organizer proceeds. Refunding the full $21.50 reversed $21.50 while the $1.50 fee remained unrefunded; treating the reversal as $20 misreported the organizer balance.
+
+**How to apply:** Reconcile against Stripe's actual transfer, application fee, balance transaction and reversal amounts. Disclose who bears a retained service fee in refund confirmation, and obtain approval before changing that financial policy.
+
+Payment success can precede final destination-transfer, application-fee and balance-transaction details.
+
+**Why:** Genuine payment-success webhooks initially returned missing accounting fields, which appeared on subsequent charge retrievals. Recording those nulls as final produced incomplete reporting despite successful invoice settlement.
+
+**How to apply:** Retrieve the expanded charge and allow a short, bounded accounting-finalization wait. If details are still unavailable, return a retryable failure rather than inventing fee or reversal amounts.
+
 Stripe can replay a cached HTTP 400 saying Connect is not registered even after Connect has been enabled.
 
 **Why:** A sandbox activation succeeded, but retries with the same account-creation idempotency key continued returning the earlier error with `idempotent-replayed: true`. A fresh key after the definitive rejection allowed onboarding.

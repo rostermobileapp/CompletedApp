@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Express, RequestHandler } from "express";
 import Stripe from "stripe";
 import { isConnectPlatformNotRegistered } from "./organizerConnectErrors";
+import { readFinalizedOrganizerCharge } from "./organizerChargeAccounting";
+import { organizerRefundAccountingUpdate } from "./organizerRefundAccounting";
 import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import {
@@ -191,10 +193,24 @@ async function validateStripePaymentIntent(
 
   const chargeValue = intent.latest_charge;
   const chargeId = typeof chargeValue === "string" ? chargeValue : chargeValue?.id;
-  if (!chargeId) return { intent, charge: null, balanceTransaction: null, valid: true };
-  const charge = typeof chargeValue === "string"
-    ? await stripe.charges.retrieve(chargeId, { expand: ["balance_transaction", "application_fee", "transfer"] })
-    : chargeValue;
+  if (!chargeId) {
+    throw new OrganizerCardPaymentError(
+      "Stripe charge details are still being finalized. Delivery can be retried.",
+      503, "stripe_accounting_pending",
+    );
+  }
+  // An expanded latest_charge on a PaymentIntent can precede its transfer,
+  // application fee and balance transaction. Retrieve the complete charge
+  // explicitly instead of recording an incomplete financial snapshot.
+  const charge = await readFinalizedOrganizerCharge(() => stripe.charges.retrieve(chargeId, {
+    expand: ["balance_transaction", "application_fee", "transfer"],
+  }));
+  if (!charge) {
+    throw new OrganizerCardPaymentError(
+      "Stripe payment accounting is still being finalized. Delivery can be retried.",
+      503, "stripe_accounting_pending",
+    );
+  }
   if (expectedSessionId && payment.stripe_checkout_session_id && payment.stripe_checkout_session_id !== expectedSessionId) {
     return null;
   }
@@ -202,6 +218,22 @@ async function validateStripePaymentIntent(
   const balanceTransaction = typeof balance === "string" && balance
     ? await stripe.balanceTransactions.retrieve(balance)
     : balance;
+  const transfer: any = charge.transfer;
+  const fee: any = charge.application_fee;
+  if (!transfer || typeof transfer === "string" ||
+      !fee || typeof fee === "string" || !balanceTransaction) {
+    throw new OrganizerCardPaymentError(
+      "Stripe payment accounting is still being finalized. Delivery can be retried.",
+      503, "stripe_accounting_pending",
+    );
+  }
+  if (charge.amount !== payment.total_amount_cents ||
+      charge.currency !== "usd" || !charge.paid ||
+      transfer.amount !== payment.total_amount_cents ||
+      transfer.destination !== payment.stripe_account_id ||
+      fee.amount !== payment.service_fee_cents) {
+    return null;
+  }
   return { intent, charge, balanceTransaction, valid: true };
 }
 
@@ -216,6 +248,8 @@ async function applyStripeEvent(
   let effect: "success" | "processing" | "failed" | "cancelled" | "refund" | "dispute_created" | "dispute_closed" | "account_updated" | "none" = "none";
   let disputeStatus: string | null = null;
   let refundInfo: any = null;
+  let verifiedRefundedCents = 0;
+  let verifiedTransferReversedCents = 0;
   let sessionId: string | null = null;
 
   if (event.type === "account.updated") {
@@ -288,6 +322,25 @@ async function applyStripeEvent(
       verifiedSuccess = await validateStripePaymentIntent(stripe, payment, paymentIntentId);
     }
     if (!verifiedSuccess?.valid) effect = "none";
+  }
+  if (effect === "refund" && payment) {
+    // charge.refunded snapshots do not always include the refunds list. Read
+    // Stripe's current charge/transfer so dashboard refunds and late deliveries
+    // cannot invent a reversal or replace a real amount with the invoice base.
+    const currentCharge = await stripe.charges.retrieve(object.id, {
+      expand: ["transfer"],
+    });
+    const refunds = await stripe.refunds.list({ charge: currentCharge.id, limit: 100 });
+    refundInfo = refunds.data.find(refund => refund.status === "succeeded")
+      ?? refunds.data[0] ?? null;
+    verifiedRefundedCents = Math.min(
+      currentCharge.amount_refunded,
+      refunds.data.filter(refund => refund.status === "succeeded")
+        .reduce((total, refund) => total + refund.amount, 0),
+    );
+    const transfer: any = currentCharge.transfer;
+    verifiedTransferReversedCents = typeof transfer === "object" && transfer
+      ? transfer.amount_reversed ?? 0 : 0;
   }
 
   const client = await pool.connect();
@@ -377,8 +430,7 @@ async function applyStripeEvent(
             [row.id, effect, paymentIntentId],
           );
         } else if (effect === "refund") {
-          const amountRefunded = Number(object.amount_refunded ?? 0);
-          const fullRefund = amountRefunded >= row.total_amount_cents;
+          const fullRefund = verifiedRefundedCents >= row.total_amount_cents;
           const reversal: any = refundInfo?.transfer_reversal;
           await client.query(
             `UPDATE public.organizer_card_payments
@@ -387,7 +439,7 @@ async function applyStripeEvent(
                  refund_status=COALESCE($4, 'succeeded'),
                  refunded_at=CASE WHEN $2 THEN now() ELSE refunded_at END,
                  transfer_reversal_id=COALESCE($5, transfer_reversal_id),
-                 transfer_reversed_cents=CASE WHEN $2 THEN $6 ELSE transfer_reversed_cents END,
+                  transfer_reversed_cents=GREATEST(transfer_reversed_cents,$6),
                  updated_at=now()
              WHERE id=$1`,
             [
@@ -396,7 +448,7 @@ async function applyStripeEvent(
               refundInfo?.id ?? null,
               refundInfo?.status ?? null,
               typeof reversal === "string" ? reversal : reversal?.id ?? null,
-              fullRefund ? row.base_amount_cents : 0,
+              verifiedTransferReversedCents,
             ],
           );
           if (fullRefund) {
@@ -410,14 +462,16 @@ async function applyStripeEvent(
         } else if (effect === "dispute_created") {
           await client.query(
             `UPDATE public.organizer_card_payments
-             SET status='disputed', dispute_id=$2, dispute_status=$3, updated_at=now()
+              SET status=CASE WHEN status IN ('refunded','refund_pending') THEN status ELSE 'disputed' END,
+                  dispute_id=$2, dispute_status=$3, updated_at=now()
              WHERE id=$1`,
             [row.id, object.id, disputeStatus],
           );
         } else if (effect === "dispute_closed") {
           await client.query(
             `UPDATE public.organizer_card_payments
-             SET status=CASE WHEN $2='won' THEN 'paid' ELSE 'disputed' END,
+              SET status=CASE WHEN status IN ('refunded','refund_pending') THEN status
+                              WHEN $2='won' THEN 'paid' ELSE 'disputed' END,
                  dispute_status=$2, updated_at=now()
              WHERE id=$1`,
             [row.id, disputeStatus],
@@ -800,6 +854,9 @@ export function registerOrganizerCardPaymentRoutes(
       if (payment.status === "refund_pending") {
         return res.json({ status: "refund_pending" });
       }
+      if (payment.status === "refunded") {
+        return res.json({ status: "refunded" });
+      }
       if (payment.status !== "paid" || !payment.stripe_payment_intent_id) {
         throw new OrganizerCardPaymentError("Only a fully paid card transaction can be refunded.", 409, "payment_not_refundable");
       }
@@ -813,23 +870,9 @@ export function registerOrganizerCardPaymentRoutes(
           payment_intent: payment.stripe_payment_intent_id,
           reverse_transfer: true,
           refund_application_fee: false,
+          expand: ["transfer_reversal"],
         }, { idempotencyKey: `organizer-card-refund:${payment.id}` });
-        const reversal: any = refund.transfer_reversal;
-        await pool.query(
-          `UPDATE public.organizer_card_payments
-           SET refund_id=$2, refund_status=$3,
-               transfer_reversal_id=COALESCE($4, transfer_reversal_id),
-               transfer_reversed_cents=CASE WHEN $5='succeeded' THEN base_amount_cents ELSE transfer_reversed_cents END,
-               updated_at=now()
-           WHERE id=$1`,
-          [
-            payment.id,
-            refund.id,
-            refund.status,
-            typeof reversal === "string" ? reversal : reversal?.id ?? null,
-            refund.status,
-          ],
-        );
+        await pool.query(organizerRefundAccountingUpdate(payment.id, refund));
         res.json({ status: "refund_pending", refundStatus: refund.status });
       } catch (error) {
         await pool.query(
