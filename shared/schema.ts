@@ -209,7 +209,8 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "venmo",
   "cashapp",
   "cash",
-  "other"
+  "other",
+  "stripe"
 ]);
 
 // Player type enum
@@ -1811,6 +1812,70 @@ export const paymentRequestRecipients = pgTable("payment_request_recipients", {
   index("idx_payment_request_recipients_user").on(table.userId),
   index("idx_payment_request_recipients_placeholder").on(table.placeholderPlayerId),
 ]);
+
+// Organizer-to-player card collection is kept separate from subscription data.
+export const stripeConnectedAccounts = pgTable("stripe_connected_accounts", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  stripeAccountId: varchar("stripe_account_id").unique(),
+  creationIdempotencyKey: varchar("creation_idempotency_key").notNull().unique(),
+  country: varchar("country", { length: 2 }).default("US").notNull(),
+  detailsSubmitted: boolean("details_submitted").default(false).notNull(),
+  chargesEnabled: boolean("charges_enabled").default(false).notNull(),
+  transfersEnabled: boolean("transfers_enabled").default(false).notNull(),
+  payoutsEnabled: boolean("payouts_enabled").default(false).notNull(),
+  requirementsCurrentlyDue: text("requirements_currently_due").array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_stripe_connected_accounts_account").on(table.stripeAccountId),
+]);
+
+export const organizerCardPayments = pgTable("organizer_card_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentRequestId: varchar("payment_request_id").references(() => paymentRequests.id, { onDelete: "restrict" }).notNull(),
+  recipientId: varchar("recipient_id").references(() => paymentRequestRecipients.id, { onDelete: "restrict" }).notNull(),
+  payerUserId: varchar("payer_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  organizerUserId: varchar("organizer_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  stripeAccountId: varchar("stripe_account_id").references(() => stripeConnectedAccounts.stripeAccountId, { onDelete: "restrict" }).notNull(),
+  baseAmountCents: integer("base_amount_cents").notNull(),
+  serviceFeeCents: integer("service_fee_cents").notNull(),
+  totalAmountCents: integer("total_amount_cents").notNull(),
+  currency: varchar("currency", { length: 3 }).default("usd").notNull(),
+  status: varchar("status").default("pending").notNull(),
+  idempotencyKey: varchar("idempotency_key").notNull().unique(),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id").unique(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id").unique(),
+  stripeChargeId: varchar("stripe_charge_id").unique(),
+  stripeApplicationFeeId: varchar("stripe_application_fee_id"),
+  stripeTransferId: varchar("stripe_transfer_id").unique(),
+  transferAmountCents: integer("transfer_amount_cents"),
+  stripeProcessingFeeCents: integer("stripe_processing_fee_cents"),
+  receiptUrl: text("receipt_url"),
+  refundId: varchar("refund_id").unique(),
+  refundStatus: varchar("refund_status"),
+  refundedAt: timestamp("refunded_at"),
+  transferReversalId: varchar("transfer_reversal_id").unique(),
+  transferReversedCents: integer("transfer_reversed_cents"),
+  disputeId: varchar("dispute_id").unique(),
+  disputeStatus: varchar("dispute_status"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  check("organizer_card_payments_amounts_positive", sql`${table.baseAmountCents} > 0 AND ${table.serviceFeeCents} >= 0 AND ${table.totalAmountCents} = ${table.baseAmountCents} + ${table.serviceFeeCents}`),
+  check("organizer_card_payments_usd_only", sql`${table.currency} = 'usd'`),
+  check("organizer_card_payments_status_valid", sql`${table.status} IN ('pending', 'processing', 'paid', 'failed', 'cancelled', 'refund_pending', 'refunded', 'disputed')`),
+  index("idx_organizer_card_payments_request").on(table.paymentRequestId, table.createdAt),
+  index("idx_organizer_card_payments_payer").on(table.payerUserId, table.createdAt),
+  index("idx_organizer_card_payments_organizer").on(table.organizerUserId, table.createdAt),
+]);
+
+export const stripeConnectWebhookEvents = pgTable("stripe_connect_webhook_events", {
+  eventId: varchar("event_id").primaryKey(),
+  eventType: varchar("event_type").notNull(),
+  paymentId: varchar("payment_id").references(() => organizerCardPayments.id, { onDelete: "set null" }),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+});
 
 // Line combinations enum
 export const lineTypeEnum = pgEnum("line_type", [
@@ -3461,6 +3526,7 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
   venmoLinkOverride: true,   // Re-added below with normalization.
   cashappLinkOverride: true, // Re-added below with normalization.
 }).extend({
+  cardEnabled: z.boolean().default(false),
   // Keep datetime as string - stored as league-local time
   deadline: z.string().optional().nullable(),
   // League the invoice belongs to. Required so the server can authorize the
@@ -3483,6 +3549,7 @@ export const updatePaymentRequestRecipientSchema = z.object({
 export const updatePaymentRequestSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   description: z.string().optional().nullable(),
+  cardEnabled: z.boolean().optional(),
   amountPerPerson: z.union([z.string(), z.number()])
     .transform((v) => typeof v === 'number' ? v.toString() : v)
     .optional(),
@@ -3621,6 +3688,7 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
 }).partial().extend({
   // Keep datetime as string - stored as league-local time
   dateTime: z.string().optional(),
+  cardPaymentEnabled: z.boolean().optional(),
   venmoLinkOverride: venmoLinkOverrideField,
   cashappLinkOverride: cashappLinkOverrideField,
   // Narrow Drizzle's generated `string` to the two valid enum values.

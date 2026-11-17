@@ -35,6 +35,25 @@ export function isolateDevelopmentEnvironment(source: NodeJS.ProcessEnv): NodeJS
       }
     }
   }
+  const testStripeSecretKey = source.TESTING_STRIPE_SECRET_KEY;
+  const testStripePublicKey = source.TESTING_VITE_STRIPE_PUBLIC_KEY;
+  const testCardPaymentsWebhookSecret = source.TESTING_STRIPE_CARD_PAYMENTS_WEBHOOK_SECRET;
+  const testConnectWebhookSecret = source.TESTING_STRIPE_CONNECT_WEBHOOK_SECRET;
+  if (Boolean(testStripeSecretKey) !== Boolean(testStripePublicKey)) {
+    throw new Error("Isolated Stripe testing requires both test-mode API keys");
+  }
+  if (testStripeSecretKey && !testStripeSecretKey.startsWith("sk_test_")) {
+    throw new Error("Isolated Stripe secret must be a test-mode key");
+  }
+  if (testStripePublicKey && !testStripePublicKey.startsWith("pk_test_")) {
+    throw new Error("Isolated Stripe publishable key must be a test-mode key");
+  }
+  if (testConnectWebhookSecret && !testConnectWebhookSecret.startsWith("whsec_")) {
+    throw new Error("Stripe test Connect webhook secret has an invalid format");
+  }
+  if (testCardPaymentsWebhookSecret && !testCardPaymentsWebhookSecret.startsWith("whsec_")) {
+    throw new Error("Stripe test card payments webhook secret has an invalid format");
+  }
   const result = { ...source };
   for (const key of Object.keys(result)) {
     // Also remove connector auth: Resend can otherwise retrieve live keys even
@@ -56,6 +75,15 @@ export function isolateDevelopmentEnvironment(source: NodeJS.ProcessEnv): NodeJS
     SUPABASE_SERVICE_ROLE_KEY: source.DEV_SUPABASE_SERVICE_ROLE_KEY,
     VITE_SUPABASE_URL: url.origin,
     VITE_SUPABASE_ANON_KEY: source.DEV_SUPABASE_ANON_KEY,
+    ...(testStripeSecretKey ? { TESTING_STRIPE_SECRET_KEY: testStripeSecretKey } : {}),
+    ...(testStripePublicKey ? {
+      TESTING_VITE_STRIPE_PUBLIC_KEY: testStripePublicKey,
+      VITE_STRIPE_PUBLISHABLE_KEY: testStripePublicKey,
+    } : {}),
+    ...(testCardPaymentsWebhookSecret ? {
+      TESTING_STRIPE_CARD_PAYMENTS_WEBHOOK_SECRET: testCardPaymentsWebhookSecret,
+    } : {}),
+    ...(testConnectWebhookSecret ? { TESTING_STRIPE_CONNECT_WEBHOOK_SECRET: testConnectWebhookSecret } : {}),
     VITE_ISOLATED_DEVELOPMENT: "true",
     VITE_ISOLATED_APP_ORIGIN: source.REPLIT_DEV_DOMAIN ? `https://${source.REPLIT_DEV_DOMAIN}` : "",
     NONPRODUCTION_ISOLATED: "1",

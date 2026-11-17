@@ -5,7 +5,7 @@ import { SiCashapp, SiVenmo } from 'react-icons/si';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-export type PaymentMethod = 'venmo' | 'cashapp' | 'cash' | 'other';
+export type PaymentMethod = 'venmo' | 'cashapp' | 'cash' | 'other' | 'stripe';
 
 interface PaymentMethodPickerProps {
   creatorName: string;
@@ -51,6 +51,7 @@ export function PaymentMethodPicker({
     { value: 'cash', label: 'Cash', url: null, icon: DollarSign },
     { value: 'other', label: 'Other', url: null, icon: DollarSign },
   ];
+  const paidMethodLabel = paymentMethod === 'stripe' ? 'card' : paymentMethod || 'paid';
 
   return (
     <div
@@ -133,8 +134,8 @@ export function PaymentMethodPicker({
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <p className="text-xs text-emerald-600 dark:text-emerald-300">
             {isConfirmed
-              ? `Payment confirmed by the organizer as ${paymentMethod || 'paid'}.`
-              : `Payment marked as ${paymentMethod || 'paid'}.`}
+              ? `Payment confirmed by the organizer as ${paidMethodLabel}.`
+              : `Payment marked as ${paidMethodLabel}.`}
           </p>
           {!isConfirmed && (
             <Button

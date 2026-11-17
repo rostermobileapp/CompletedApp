@@ -1,0 +1,933 @@
+import { randomUUID } from "node:crypto";
+import type { Express, RequestHandler } from "express";
+import Stripe from "stripe";
+import { pool } from "./db";
+import { isVerifiedProductionRuntime } from "./runtimePolicy";
+import {
+  assertOrganizerCardWebhooksReady,
+  calculateOrganizerServiceFeeCents,
+  getOrganizerCardConnectWebhookSecret,
+  getOrganizerCardPaymentsWebhookSecret,
+  getOrganizerCardStripe,
+  getVerifiedConnectedAccountStatus,
+  hasPersonalProEntitlement,
+  isOrganizerCardPaymentsActiveInCurrentRuntime,
+  OrganizerCardPaymentError,
+  parseBaseAmountCents,
+} from "./organizerCardPaymentService";
+
+type PaymentRow = {
+  id: string;
+  payment_request_id: string;
+  recipient_id: string;
+  payer_user_id: string;
+  organizer_user_id: string;
+  stripe_account_id: string;
+  base_amount_cents: number;
+  service_fee_cents: number;
+  total_amount_cents: number;
+  status: string;
+  idempotency_key: string;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+};
+
+function userIdFromRequest(req: any): string | null {
+  const id = req.user?.claims?.sub;
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+
+function requestAppOrigin(req: any): string {
+  if (isVerifiedProductionRuntime()) {
+    const configured = process.env.FRONTEND_URL?.split(",")[0]?.trim();
+    if (!configured) throw new OrganizerCardPaymentError("The app return URL is not configured.", 503, "return_url_not_ready");
+    const parsed = new URL(configured);
+    if (parsed.protocol !== "https:") throw new OrganizerCardPaymentError("The app return URL must use HTTPS.", 503, "return_url_not_ready");
+    return parsed.origin;
+  }
+  const configuredDomain = process.env.REPLIT_DEV_DOMAIN?.split(",")[0]?.trim();
+  if (!configuredDomain) {
+    throw new OrganizerCardPaymentError("The isolated test return domain is not configured.", 503, "return_url_not_ready");
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(configuredDomain.includes("://") ? configuredDomain : `https://${configuredDomain}`);
+  } catch {
+    throw new OrganizerCardPaymentError("The isolated test return domain is invalid.", 503, "return_url_not_ready");
+  }
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.pathname !== "/") {
+    throw new OrganizerCardPaymentError("The isolated test return domain must use HTTPS.", 503, "return_url_not_ready");
+  }
+  return parsed.origin;
+}
+
+function sendPaymentError(res: any, error: unknown) {
+  if (error instanceof OrganizerCardPaymentError) {
+    return res.status(error.statusCode).json({ message: error.message, code: error.code });
+  }
+  const stripeStatus = (error as any)?.statusCode;
+  if (typeof stripeStatus === "number" && stripeStatus >= 400 && stripeStatus < 500) {
+    return res.status(400).json({ message: "Stripe could not complete this payment action." });
+  }
+  console.error("[OrganizerCardPayments] Request failed.", {
+    code: typeof (error as any)?.code === "string" ? (error as any).code : "unknown",
+  });
+  return res.status(500).json({ message: "Could not complete the card payment action." });
+}
+
+async function preparePaymentAttempt(paymentRequestId: string, payerUserId: string): Promise<PaymentRow> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const requestResult = await client.query<{
+      payment_request_id: string;
+      creator_id: string;
+      amount_per_person: string;
+      card_enabled: boolean;
+      recipient_id: string;
+      recipient_user_id: string;
+      is_paid: boolean;
+    }>(`
+      SELECT pr.id AS payment_request_id, pr.creator_id, pr.amount_per_person::text,
+             pr.card_enabled, rr.id AS recipient_id, rr.user_id AS recipient_user_id, rr.is_paid
+      FROM public.payment_requests pr
+      JOIN public.payment_request_recipients rr ON rr.payment_request_id = pr.id
+      WHERE pr.id = $1 AND rr.user_id = $2
+      FOR UPDATE OF pr, rr
+    `, [paymentRequestId, payerUserId]);
+    const request = requestResult.rows[0];
+    if (!request) throw new OrganizerCardPaymentError("This invoice is not assigned to your account.", 404, "recipient_not_found");
+    if (!request.card_enabled) throw new OrganizerCardPaymentError("The organizer has not enabled card payments for this invoice.", 409, "card_payment_not_enabled");
+    if (request.is_paid) throw new OrganizerCardPaymentError("This invoice is already marked paid.", 409, "already_paid");
+
+    const protectedPayment = await client.query(
+      `SELECT id FROM public.organizer_card_payments
+       WHERE recipient_id = $1 AND (
+         status IN ('paid', 'refund_pending')
+         OR (status='disputed' AND COALESCE(dispute_status,'') NOT IN ('lost','won'))
+       )
+       ORDER BY created_at DESC LIMIT 1`,
+      [request.recipient_id],
+    );
+    if (protectedPayment.rows.length) {
+      throw new OrganizerCardPaymentError("A completed or disputed card payment already exists for this invoice.", 409, "payment_already_exists");
+    }
+
+    const pending = await client.query<PaymentRow>(
+      `SELECT * FROM public.organizer_card_payments
+       WHERE recipient_id = $1 AND status IN ('pending', 'processing')
+       ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+      [request.recipient_id],
+    );
+    if (pending.rows[0]) {
+      await client.query("COMMIT");
+      return pending.rows[0];
+    }
+
+    const baseAmountCents = parseBaseAmountCents(request.amount_per_person);
+    const serviceFeeCents = calculateOrganizerServiceFeeCents(baseAmountCents);
+    const connected = await client.query<{ stripe_account_id: string }>(
+      `SELECT stripe_account_id FROM public.stripe_connected_accounts
+       WHERE user_id = $1 AND stripe_account_id IS NOT NULL`,
+      [request.creator_id],
+    );
+    const stripeAccountId = connected.rows[0]?.stripe_account_id;
+    if (!stripeAccountId) throw new OrganizerCardPaymentError("The organizer has not connected a receiving account.", 409, "organizer_not_connected");
+
+    const inserted = await client.query<PaymentRow>(`
+      INSERT INTO public.organizer_card_payments (
+        payment_request_id, recipient_id, payer_user_id, organizer_user_id, stripe_account_id,
+        base_amount_cents, service_fee_cents, total_amount_cents, currency, status, idempotency_key
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'usd','pending',$9)
+      RETURNING *
+    `, [
+      request.payment_request_id,
+      request.recipient_id,
+      payerUserId,
+      request.creator_id,
+      stripeAccountId,
+      baseAmountCents,
+      serviceFeeCents,
+      baseAmountCents + serviceFeeCents,
+      `organizer-card-payment:${randomUUID()}`,
+    ]);
+    await client.query("COMMIT");
+    return inserted.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function validateStripePaymentIntent(
+  stripe: Stripe,
+  payment: PaymentRow,
+  paymentIntentId: string,
+  expectedSessionId?: string,
+) {
+  const intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] });
+  const destination = typeof intent.transfer_data?.destination === "string"
+    ? intent.transfer_data.destination
+    : intent.transfer_data?.destination?.id;
+  const metadataMatches =
+    intent.metadata?.organizerCardPaymentId === payment.id &&
+    intent.metadata?.paymentRequestId === payment.payment_request_id &&
+    intent.metadata?.payerUserId === payment.payer_user_id &&
+    intent.metadata?.organizerUserId === payment.organizer_user_id;
+  if (
+    intent.status !== "succeeded" ||
+    intent.amount !== payment.total_amount_cents ||
+    intent.currency !== "usd" ||
+    intent.application_fee_amount !== payment.service_fee_cents ||
+    destination !== payment.stripe_account_id ||
+    !metadataMatches
+  ) {
+    return null;
+  }
+
+  const chargeValue = intent.latest_charge;
+  const chargeId = typeof chargeValue === "string" ? chargeValue : chargeValue?.id;
+  if (!chargeId) return { intent, charge: null, balanceTransaction: null, valid: true };
+  const charge = typeof chargeValue === "string"
+    ? await stripe.charges.retrieve(chargeId, { expand: ["balance_transaction", "application_fee", "transfer"] })
+    : chargeValue;
+  if (expectedSessionId && payment.stripe_checkout_session_id && payment.stripe_checkout_session_id !== expectedSessionId) {
+    return null;
+  }
+  const balance: any = charge?.balance_transaction;
+  const balanceTransaction = typeof balance === "string" && balance
+    ? await stripe.balanceTransactions.retrieve(balance)
+    : balance;
+  return { intent, charge, balanceTransaction, valid: true };
+}
+
+async function applyStripeEvent(
+  stripe: Stripe,
+  event: Stripe.Event,
+  scope: "platform" | "connect",
+): Promise<void> {
+  const object: any = event.data.object;
+  let paymentId: string | null = object?.metadata?.organizerCardPaymentId ?? null;
+  let paymentIntentId: string | null = null;
+  let effect: "success" | "processing" | "failed" | "cancelled" | "refund" | "dispute_created" | "dispute_closed" | "account_updated" | "none" = "none";
+  let disputeStatus: string | null = null;
+  let refundInfo: any = null;
+  let sessionId: string | null = null;
+
+  if (event.type === "account.updated") {
+    effect = "account_updated";
+  } else if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+    sessionId = object.id;
+    paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id ?? null;
+    if (object.payment_status === "paid") effect = "success";
+    else effect = "processing";
+  } else if (event.type === "checkout.session.expired") {
+    sessionId = object.id;
+    effect = "cancelled";
+  } else if (event.type === "checkout.session.async_payment_failed" || event.type === "payment_intent.payment_failed") {
+    paymentIntentId = object.id?.startsWith("pi_") ? object.id : null;
+    effect = "failed";
+  } else if (event.type === "payment_intent.canceled") {
+    paymentIntentId = object.id;
+    effect = "cancelled";
+  } else if (event.type === "payment_intent.succeeded") {
+    paymentIntentId = object.id;
+    effect = "success";
+  } else if (event.type === "charge.refunded") {
+    paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id ?? null;
+    refundInfo = object.refunds?.data?.[0] ?? null;
+    effect = "refund";
+  } else if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
+    paymentIntentId = typeof object.payment_intent === "string" ? object.payment_intent : object.payment_intent?.id ?? null;
+    disputeStatus = object.status ?? null;
+    effect = event.type === "charge.dispute.created" ? "dispute_created" : "dispute_closed";
+  }
+  if ((scope === "connect" && event.type !== "account.updated") ||
+      (scope === "platform" && event.type === "account.updated")) {
+    effect = "none";
+  }
+
+  let payment: PaymentRow | undefined;
+  if (paymentId) {
+    const result = await pool.query<PaymentRow>("SELECT * FROM public.organizer_card_payments WHERE id = $1 LIMIT 1", [paymentId]);
+    payment = result.rows[0];
+  }
+  if (!payment && paymentIntentId) {
+    const result = await pool.query<PaymentRow>(
+      "SELECT * FROM public.organizer_card_payments WHERE stripe_payment_intent_id = $1 LIMIT 1",
+      [paymentIntentId],
+    );
+    payment = result.rows[0];
+    paymentId = payment?.id ?? null;
+  }
+  if (!payment) paymentId = null;
+
+  let verifiedSuccess: Awaited<ReturnType<typeof validateStripePaymentIntent>> | null = null;
+  if (effect === "success" && payment && paymentIntentId) {
+    if (event.type.startsWith("checkout.session.")) {
+      if (
+        object.mode !== "payment" ||
+        object.currency !== "usd" ||
+        object.amount_total !== payment.total_amount_cents ||
+        object.client_reference_id !== payment.id ||
+        object.metadata?.organizerCardPaymentId !== payment.id
+      ) {
+        effect = "none";
+      } else {
+        verifiedSuccess = await validateStripePaymentIntent(stripe, payment, paymentIntentId, sessionId ?? undefined);
+      }
+    } else {
+      verifiedSuccess = await validateStripePaymentIntent(stripe, payment, paymentIntentId);
+    }
+    if (!verifiedSuccess?.valid) effect = "none";
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const inserted = await client.query(
+      `INSERT INTO public.stripe_connect_webhook_events (event_id, event_type, payment_id)
+       VALUES ($1,$2,$3) ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
+      [event.id, event.type, paymentId],
+    );
+    if (!inserted.rows.length) {
+      await client.query("COMMIT");
+      return;
+    }
+
+    if (effect === "account_updated") {
+      const current = object as Stripe.Account;
+      await client.query(
+        `UPDATE public.stripe_connected_accounts
+         SET details_submitted=$2, charges_enabled=$3, transfers_enabled=$4,
+             payouts_enabled=$5, requirements_currently_due=$6, updated_at=now()
+         WHERE stripe_account_id=$1`,
+        [
+          current.id,
+          current.details_submitted === true,
+          current.charges_enabled === true,
+          current.capabilities?.transfers === "active",
+          current.payouts_enabled === true,
+          current.requirements?.currently_due ?? [],
+        ],
+      );
+    } else if (payment) {
+      await client.query(
+        "SELECT id FROM public.payment_request_recipients WHERE id=$1 FOR UPDATE",
+        [payment.recipient_id],
+      );
+      const locked = await client.query<PaymentRow & { recipient_id: string }>(
+        "SELECT * FROM public.organizer_card_payments WHERE id = $1 FOR UPDATE",
+        [payment.id],
+      );
+      const row = locked.rows[0];
+      if (row) {
+        if (
+          effect === "success" && verifiedSuccess?.valid &&
+          !["refunded", "refund_pending", "disputed"].includes(row.status)
+        ) {
+          const charge: any = verifiedSuccess.charge;
+          const appFee: any = charge?.application_fee;
+          const transfer: any = charge?.transfer;
+          const balanceTransaction: any = verifiedSuccess.balanceTransaction;
+          await client.query(
+            `UPDATE public.organizer_card_payments
+             SET status='paid', stripe_payment_intent_id=$2, stripe_charge_id=$3,
+                 stripe_application_fee_id=$4, stripe_transfer_id=$5, transfer_amount_cents=$6,
+                 stripe_processing_fee_cents=$7, receipt_url=$8,
+                 stripe_checkout_session_id=COALESCE(stripe_checkout_session_id,$9),
+                 updated_at=now()
+             WHERE id=$1 AND status NOT IN ('refunded','refund_pending')`,
+            [
+              row.id,
+              paymentIntentId,
+              charge?.id ?? null,
+              typeof appFee === "string" ? appFee : appFee?.id ?? null,
+              typeof transfer === "string" ? transfer : transfer?.id ?? null,
+              row.base_amount_cents,
+              balanceTransaction?.fee ?? null,
+              charge?.receipt_url ?? null,
+              sessionId,
+            ],
+          );
+          await client.query(
+            `UPDATE public.payment_request_recipients
+             SET is_paid=true, payment_method='stripe', paid_at=now(), updated_at=now()
+             WHERE id=$1 AND payment_request_id=$2 AND user_id=$3`,
+            [row.recipient_id, row.payment_request_id, row.payer_user_id],
+          );
+        } else if (effect === "processing") {
+          await client.query(
+            `UPDATE public.organizer_card_payments SET status='processing', stripe_checkout_session_id=COALESCE(stripe_checkout_session_id,$2), updated_at=now()
+             WHERE id=$1 AND status IN ('pending','processing')`,
+            [row.id, sessionId],
+          );
+        } else if (effect === "failed" || effect === "cancelled") {
+          await client.query(
+            `UPDATE public.organizer_card_payments SET status=$2, stripe_payment_intent_id=COALESCE(stripe_payment_intent_id,$3), updated_at=now()
+             WHERE id=$1 AND status IN ('pending','processing')`,
+            [row.id, effect, paymentIntentId],
+          );
+        } else if (effect === "refund") {
+          const amountRefunded = Number(object.amount_refunded ?? 0);
+          const fullRefund = amountRefunded >= row.total_amount_cents;
+          const reversal: any = refundInfo?.transfer_reversal;
+          await client.query(
+            `UPDATE public.organizer_card_payments
+             SET status=CASE WHEN $2 THEN 'refunded' ELSE 'refund_pending' END,
+                 refund_id=COALESCE($3, refund_id),
+                 refund_status=COALESCE($4, 'succeeded'),
+                 refunded_at=CASE WHEN $2 THEN now() ELSE refunded_at END,
+                 transfer_reversal_id=COALESCE($5, transfer_reversal_id),
+                 transfer_reversed_cents=CASE WHEN $2 THEN $6 ELSE transfer_reversed_cents END,
+                 updated_at=now()
+             WHERE id=$1`,
+            [
+              row.id,
+              fullRefund,
+              refundInfo?.id ?? null,
+              refundInfo?.status ?? null,
+              typeof reversal === "string" ? reversal : reversal?.id ?? null,
+              fullRefund ? row.base_amount_cents : 0,
+            ],
+          );
+          if (fullRefund) {
+            await client.query(
+              `UPDATE public.payment_request_recipients
+               SET is_paid=false, payment_method=NULL, paid_at=NULL, updated_at=now()
+               WHERE id=$1 AND payment_request_id=$2`,
+              [row.recipient_id, row.payment_request_id],
+            );
+          }
+        } else if (effect === "dispute_created") {
+          await client.query(
+            `UPDATE public.organizer_card_payments
+             SET status='disputed', dispute_id=$2, dispute_status=$3, updated_at=now()
+             WHERE id=$1`,
+            [row.id, object.id, disputeStatus],
+          );
+        } else if (effect === "dispute_closed") {
+          await client.query(
+            `UPDATE public.organizer_card_payments
+             SET status=CASE WHEN $2='won' THEN 'paid' ELSE 'disputed' END,
+                 dispute_status=$2, updated_at=now()
+             WHERE id=$1`,
+            [row.id, disputeStatus],
+          );
+          if (disputeStatus === "lost") {
+            await client.query(
+              `UPDATE public.payment_request_recipients
+               SET is_paid=false, payment_method=NULL, paid_at=NULL, updated_at=now()
+               WHERE id=$1 AND payment_request_id=$2`,
+              [row.recipient_id, row.payment_request_id],
+            );
+          }
+        }
+      }
+    }
+
+    await client.query(
+      "UPDATE public.stripe_connect_webhook_events SET processed_at=now() WHERE event_id=$1",
+      [event.id],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export function registerOrganizerCardPaymentRoutes(
+  app: Express,
+  isAuthenticated: RequestHandler,
+  requireFounder: RequestHandler,
+) {
+  app.get("/api/organizer-card-payments/connect/status", isAuthenticated, async (req: any, res) => {
+    const userId = userIdFromRequest(req);
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+    const eligible = await hasPersonalProEntitlement(userId).catch(() => false);
+    let stripe: Stripe;
+    try {
+      stripe = getOrganizerCardStripe();
+    } catch {
+      return res.json({
+        enabled: false,
+        webhookReady: false,
+        eligible,
+        connected: false,
+        ready: false,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        transfersEnabled: false,
+        payoutsEnabled: false,
+        currentlyDue: [],
+      });
+    }
+    try {
+      let webhookReady = true;
+      try {
+        getOrganizerCardWebhookSecret();
+      } catch {
+        webhookReady = false;
+      }
+      const status = eligible
+        ? await getVerifiedConnectedAccountStatus(userId, stripe)
+        : { connected: false, accountId: null, ready: false, detailsSubmitted: false, chargesEnabled: false, transfersEnabled: false, payoutsEnabled: false, currentlyDue: [] };
+      const { accountId: _accountId, ...publicStatus } = status;
+      res.json({ enabled: true, webhookReady, eligible, ...publicStatus });
+    } catch (error) {
+      sendPaymentError(res, error);
+    }
+  });
+
+  app.post("/api/organizer-card-payments/connect/onboarding", isAuthenticated, async (req: any, res) => {
+    const userId = userIdFromRequest(req);
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+    try {
+      if (!await hasPersonalProEntitlement(userId)) {
+        throw new OrganizerCardPaymentError("Connecting a receiving account requires your own active Player Pro subscription or higher.", 403, "subscription_required");
+      }
+      const stripe = getOrganizerCardStripe();
+      const origin = requestAppOrigin(req);
+      const returnUrl = new URL("/payment-requests?connect=return", origin).toString();
+      const refreshUrl = new URL("/payment-requests?connect=refresh", origin).toString();
+
+      await pool.query(
+        `INSERT INTO public.stripe_connected_accounts (user_id, creation_idempotency_key)
+         VALUES ($1,$2) ON CONFLICT (user_id) DO NOTHING`,
+        [userId, `organizer-connect:${randomUUID()}`],
+      );
+      const result = await pool.query<{
+        stripe_account_id: string | null;
+        creation_idempotency_key: string;
+      }>(
+        "SELECT stripe_account_id, creation_idempotency_key FROM public.stripe_connected_accounts WHERE user_id=$1",
+        [userId],
+      );
+      const mapping = result.rows[0];
+      if (!mapping) throw new Error("Connected-account mapping could not be initialized");
+
+      let accountId = mapping.stripe_account_id;
+      if (!accountId) {
+        const account = await stripe.accounts.create({
+          type: "express",
+          country: "US",
+          business_type: "individual",
+          capabilities: { transfers: { requested: true } },
+          metadata: { rosterHockeyUserId: userId },
+          settings: { payouts: { schedule: { interval: "weekly", weekly_anchor: "monday" } } },
+        }, { idempotencyKey: mapping.creation_idempotency_key });
+        accountId = account.id;
+        await pool.query(
+          `UPDATE public.stripe_connected_accounts SET stripe_account_id=$2, updated_at=now()
+           WHERE user_id=$1 AND stripe_account_id IS NULL`,
+          [userId, accountId],
+        );
+        const saved = await pool.query<{ stripe_account_id: string }>(
+          "SELECT stripe_account_id FROM public.stripe_connected_accounts WHERE user_id=$1",
+          [userId],
+        );
+        if (saved.rows[0]?.stripe_account_id !== accountId) {
+          throw new OrganizerCardPaymentError("The receiving account mapping changed; retry safely.", 409, "account_mapping_conflict");
+        }
+      } else {
+        // Reuse the one mapped account on every retry; never create a second account.
+        await stripe.accounts.update(accountId, {
+          settings: { payouts: { schedule: { interval: "weekly", weekly_anchor: "monday" } } },
+        });
+      }
+
+      const accountLink = await stripe.accountLinks.create({
+        account: accountId,
+        type: "account_onboarding",
+        refresh_url: refreshUrl,
+        return_url: returnUrl,
+      });
+      res.json({ url: accountLink.url });
+    } catch (error) {
+      sendPaymentError(res, error);
+    }
+  });
+
+  app.post("/api/organizer-card-payments/checkout-session", isAuthenticated, async (req: any, res) => {
+    const payerUserId = userIdFromRequest(req);
+    if (!payerUserId) return res.status(401).json({ message: "Authentication required" });
+    const paymentRequestId = typeof req.body?.paymentRequestId === "string" ? req.body.paymentRequestId : "";
+    if (!paymentRequestId) return res.status(400).json({ message: "Payment request is required" });
+    try {
+      getOrganizerCardWebhookSecret();
+      const stripe = getOrganizerCardStripe();
+      const prepared = await preparePaymentAttempt(paymentRequestId, payerUserId);
+      if (!await hasPersonalProEntitlement(prepared.organizer_user_id)) {
+        throw new OrganizerCardPaymentError("The organizer is not eligible to collect card payments.", 409, "organizer_entitlement_inactive");
+      }
+      const accountStatus = await getVerifiedConnectedAccountStatus(prepared.organizer_user_id, stripe);
+      if (!accountStatus.ready || accountStatus.accountId !== prepared.stripe_account_id) {
+        throw new OrganizerCardPaymentError("The organizer’s receiving account is not ready for card payments.", 409, "organizer_account_not_ready");
+      }
+
+      let payment = prepared;
+      if (payment.stripe_checkout_session_id) {
+        const existingSession = await stripe.checkout.sessions.retrieve(payment.stripe_checkout_session_id);
+        if (existingSession.status === "open" && existingSession.client_secret) {
+          return res.json({
+            clientSecret: existingSession.client_secret,
+            paymentId: payment.id,
+            baseAmountCents: payment.base_amount_cents,
+            serviceFeeCents: payment.service_fee_cents,
+            totalAmountCents: payment.total_amount_cents,
+            currency: "usd",
+          });
+        }
+        if (existingSession.status === "complete") {
+          throw new OrganizerCardPaymentError("This payment is processing. Refresh the invoice shortly.", 409, "payment_processing");
+        }
+        await pool.query(
+          `UPDATE public.organizer_card_payments SET status='cancelled', updated_at=now()
+           WHERE id=$1 AND status IN ('pending','processing')`,
+          [payment.id],
+        );
+        payment = await preparePaymentAttempt(paymentRequestId, payerUserId);
+      }
+
+      const origin = requestAppOrigin(req);
+      const returnUrl = new URL(
+        `/payment-requests/${encodeURIComponent(paymentRequestId)}?checkout_session_id={CHECKOUT_SESSION_ID}`,
+        origin,
+      ).toString();
+      const metadata = {
+        organizerCardPaymentId: payment.id,
+        paymentRequestId: payment.payment_request_id,
+        recipientId: payment.recipient_id,
+        payerUserId: payment.payer_user_id,
+        organizerUserId: payment.organizer_user_id,
+      };
+      const session = await stripe.checkout.sessions.create({
+        ui_mode: "embedded",
+        mode: "payment",
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "usd",
+              unit_amount: payment.base_amount_cents,
+              product_data: { name: "Amount to organizer" },
+            },
+          },
+          {
+            quantity: 1,
+            price_data: {
+              currency: "usd",
+              unit_amount: payment.service_fee_cents,
+              product_data: { name: "RosterHockey service fee" },
+            },
+          },
+        ],
+        payment_intent_data: {
+          application_fee_amount: payment.service_fee_cents,
+          transfer_data: { destination: payment.stripe_account_id },
+          metadata,
+        },
+        client_reference_id: payment.id,
+        metadata,
+        redirect_on_completion: "if_required",
+        return_url: returnUrl,
+      }, { idempotencyKey: payment.idempotency_key });
+      if (!session.client_secret) {
+        throw new OrganizerCardPaymentError("Stripe did not return an embedded checkout secret.", 502, "checkout_secret_missing");
+      }
+      await pool.query(
+        `UPDATE public.organizer_card_payments SET status='processing',
+           stripe_checkout_session_id=$2, updated_at=now()
+         WHERE id=$1 AND status IN ('pending','processing')`,
+        [payment.id, session.id],
+      );
+      res.json({
+        clientSecret: session.client_secret,
+        paymentId: payment.id,
+        baseAmountCents: payment.base_amount_cents,
+        serviceFeeCents: payment.service_fee_cents,
+        totalAmountCents: payment.total_amount_cents,
+        currency: "usd",
+      });
+    } catch (error) {
+      sendPaymentError(res, error);
+    }
+  });
+
+  app.get("/api/organizer-card-payments/requests/:requestId", isAuthenticated, async (req: any, res) => {
+    const viewerId = userIdFromRequest(req);
+    if (!viewerId) return res.status(401).json({ message: "Authentication required" });
+    if (!isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+      return res.json({ enabled: false, webhookReady: false, cardEnabled: false, payments: [] });
+    }
+    try {
+      const requestId = String(req.params.requestId);
+      const access = await pool.query<{ allowed: boolean; card_enabled: boolean; amount_per_person: string; title: string }>(`
+        SELECT pr.card_enabled, pr.amount_per_person::text, pr.title, (
+          pr.creator_id=$2
+          OR EXISTS (
+            SELECT 1 FROM public.payment_request_recipients rr
+            WHERE rr.payment_request_id=pr.id AND rr.user_id=$2
+          )
+          OR EXISTS (
+            SELECT 1 FROM public.scrimmage_co_hosts ch
+            WHERE ch.scrimmage_id=pr.related_scrimmage_id AND ch.user_id=$2
+          )
+        ) AS allowed
+        FROM public.payment_requests pr WHERE pr.id=$1 LIMIT 1
+      `, [requestId, viewerId]);
+      if (!access.rows[0]) return res.status(404).json({ message: "Payment request not found." });
+      if (!access.rows[0].allowed) return res.status(403).json({ message: "You cannot view these card payments." });
+      const rows = await pool.query(`
+        SELECT id, recipient_id AS "recipientId", payer_user_id AS "payerUserId",
+               organizer_user_id AS "organizerUserId", base_amount_cents AS "baseAmountCents",
+               service_fee_cents AS "serviceFeeCents", total_amount_cents AS "totalAmountCents",
+               currency, status, receipt_url AS "receiptUrl", refund_status AS "refundStatus",
+               refunded_at AS "refundedAt", dispute_status AS "disputeStatus",
+               created_at AS "createdAt"
+        FROM public.organizer_card_payments
+        WHERE payment_request_id=$1 AND (payer_user_id=$2 OR organizer_user_id=$2 OR EXISTS (
+          SELECT 1 FROM public.scrimmage_co_hosts ch
+          JOIN public.payment_requests pr ON pr.related_scrimmage_id=ch.scrimmage_id
+          WHERE pr.id=$1 AND ch.user_id=$2
+        ))
+        ORDER BY created_at DESC
+      `, [requestId, viewerId]);
+      res.json({
+        enabled: true,
+        webhookReady: (() => {
+          try {
+            getOrganizerCardWebhookSecret();
+            return true;
+          } catch {
+            return false;
+          }
+        })(),
+        cardEnabled: access.rows[0].card_enabled,
+        amountPerPerson: access.rows[0].amount_per_person,
+        ...(access.rows[0].card_enabled ? (() => {
+          const baseAmountCents = parseBaseAmountCents(access.rows[0].amount_per_person);
+          const serviceFeeCents = calculateOrganizerServiceFeeCents(baseAmountCents);
+          return {
+            baseAmountCents,
+            serviceFeeCents,
+            totalAmountCents: baseAmountCents + serviceFeeCents,
+          };
+        })() : {}),
+        title: access.rows[0].title,
+        payments: rows.rows,
+      });
+    } catch (error) {
+      sendPaymentError(res, error);
+    }
+  });
+
+  app.get("/api/organizer-card-payments/scrimmages/:scrimmageId/settings", isAuthenticated, async (req: any, res) => {
+    const viewerId = userIdFromRequest(req);
+    if (!viewerId) return res.status(401).json({ message: "Authentication required" });
+    if (!isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+      return res.json({ enabled: false, cardPaymentEnabled: false });
+    }
+    try {
+      const result = await pool.query<{ creator_id: string; card_payment_enabled: boolean; is_co_host: boolean }>(`
+        SELECT s.creator_id, s.card_payment_enabled,
+               EXISTS (SELECT 1 FROM public.scrimmage_co_hosts ch
+                       WHERE ch.scrimmage_id=s.id AND ch.user_id=$2) AS is_co_host
+        FROM public.scrimmages s WHERE s.id=$1 LIMIT 1
+      `, [String(req.params.scrimmageId), viewerId]);
+      const scrimmage = result.rows[0];
+      if (!scrimmage) return res.status(404).json({ message: "Scrimmage not found." });
+      if (scrimmage.creator_id !== viewerId && !scrimmage.is_co_host) {
+        return res.status(403).json({ message: "You cannot manage this scrimmage." });
+      }
+      res.json({ enabled: true, cardPaymentEnabled: scrimmage.card_payment_enabled });
+    } catch (error) {
+      sendPaymentError(res, error);
+    }
+  });
+
+  app.post("/api/organizer-card-payments/:paymentId/refund", isAuthenticated, async (req: any, res) => {
+    const organizerUserId = userIdFromRequest(req);
+    if (!organizerUserId) return res.status(401).json({ message: "Authentication required" });
+    try {
+      getOrganizerCardWebhookSecret();
+      const stripe = getOrganizerCardStripe();
+      const result = await pool.query<PaymentRow>(
+        `SELECT p.* FROM public.organizer_card_payments p
+         WHERE p.id=$1 AND (
+           p.organizer_user_id=$2
+           OR EXISTS (
+             SELECT 1 FROM public.payment_requests pr
+             JOIN public.scrimmage_co_hosts ch ON ch.scrimmage_id=pr.related_scrimmage_id
+             WHERE pr.id=p.payment_request_id AND ch.user_id=$2 AND ch.can_manage_payments=true
+           )
+         )
+         LIMIT 1`,
+        [String(req.params.paymentId), organizerUserId],
+      );
+      const payment = result.rows[0];
+      if (!payment) throw new OrganizerCardPaymentError("Card payment not found.", 404, "payment_not_found");
+      if (payment.status === "refund_pending") {
+        return res.json({ status: "refund_pending" });
+      }
+      if (payment.status !== "paid" || !payment.stripe_payment_intent_id) {
+        throw new OrganizerCardPaymentError("Only a fully paid card transaction can be refunded.", 409, "payment_not_refundable");
+      }
+      await pool.query(
+        `UPDATE public.organizer_card_payments SET status='refund_pending', refund_status='pending', updated_at=now()
+         WHERE id=$1 AND status='paid'`,
+        [payment.id],
+      );
+      try {
+        const refund = await stripe.refunds.create({
+          payment_intent: payment.stripe_payment_intent_id,
+          reverse_transfer: true,
+          refund_application_fee: false,
+        }, { idempotencyKey: `organizer-card-refund:${payment.id}` });
+        const reversal: any = refund.transfer_reversal;
+        await pool.query(
+          `UPDATE public.organizer_card_payments
+           SET refund_id=$2, refund_status=$3,
+               transfer_reversal_id=COALESCE($4, transfer_reversal_id),
+               transfer_reversed_cents=CASE WHEN $5='succeeded' THEN base_amount_cents ELSE transfer_reversed_cents END,
+               updated_at=now()
+           WHERE id=$1`,
+          [
+            payment.id,
+            refund.id,
+            refund.status,
+            typeof reversal === "string" ? reversal : reversal?.id ?? null,
+            refund.status,
+          ],
+        );
+        res.json({ status: "refund_pending", refundStatus: refund.status });
+      } catch (error) {
+        await pool.query(
+          `UPDATE public.organizer_card_payments SET status='paid', refund_status='failed', updated_at=now()
+           WHERE id=$1 AND status='refund_pending'`,
+          [payment.id],
+        );
+        throw error;
+      }
+    } catch (error) {
+      sendPaymentError(res, error);
+    }
+  });
+
+  app.post("/api/stripe-connect-webhook", async (req: any, res) => {
+    const signature = req.headers["stripe-signature"];
+    if (!signature) return res.status(400).send("Missing stripe-signature header");
+    try {
+      const stripe = getOrganizerCardStripe();
+      const webhookSecret = getOrganizerCardWebhookSecret();
+      const event = stripe.webhooks.constructEvent(
+        req.body as Buffer,
+        Array.isArray(signature) ? signature[0] : signature,
+        webhookSecret,
+      );
+      await applyStripeEvent(stripe, event);
+      res.json({ received: true });
+    } catch (error: any) {
+      if (error instanceof Stripe.errors.StripeSignatureVerificationError) {
+        return res.status(400).send("Invalid webhook signature");
+      }
+      sendPaymentError(res, error);
+    }
+  });
+
+  app.get("/api/admin/organizer-card-payments/report", isAuthenticated, requireFounder, async (req: any, res) => {
+    if (!isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+      return res.status(503).json({ message: "Organizer card payment reporting is disabled in this environment." });
+    }
+    try {
+      const from = typeof req.query.from === "string" ? req.query.from : null;
+      const to = typeof req.query.to === "string" ? req.query.to : null;
+      const eventType = typeof req.query.eventType === "string" ? req.query.eventType : "all";
+      const isDateOnly = (value: string) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+        const date = new Date(`${value}T00:00:00.000Z`);
+        return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+      };
+      if (from && !isDateOnly(from)) return res.status(400).json({ message: "Invalid start date." });
+      if (to && !isDateOnly(to)) return res.status(400).json({ message: "Invalid end date." });
+      if (from && to && from > to) return res.status(400).json({ message: "Start date must not be after the end date." });
+      if (!["all", "scrimmage", "league_fee", "message"].includes(eventType)) return res.status(400).json({ message: "Invalid event type." });
+      const conditions = [
+        `($1::date IS NULL OR p.created_at >= $1::date)`,
+        `($2::date IS NULL OR p.created_at < ($2::date + interval '1 day'))`,
+        `($3 = 'all' OR CASE
+          WHEN pr.related_scrimmage_id IS NOT NULL THEN 'scrimmage'
+          WHEN pr.related_conversation_id IS NOT NULL THEN 'message'
+          ELSE 'league_fee'
+        END = $3)`,
+      ];
+      const where = conditions.join(" AND ");
+      const [summary, details] = await Promise.all([
+        pool.query(`
+          SELECT
+            COALESCE(SUM(p.total_amount_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS gross_volume_cents,
+            COALESCE(SUM(p.service_fee_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS service_fees_cents,
+            COALESCE(SUM(p.stripe_processing_fee_cents) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS processing_fees_cents,
+            COALESCE(SUM(COALESCE(p.transfer_amount_cents,p.base_amount_cents) - COALESCE(p.transfer_reversed_cents,0)) FILTER (WHERE p.status IN ('paid','refund_pending','refunded','disputed')),0)::bigint AS organizer_transfers_cents,
+            COALESCE(SUM(p.total_amount_cents) FILTER (WHERE p.status='refunded'),0)::bigint AS refunds_cents,
+            COALESCE(SUM(p.transfer_reversed_cents),0)::bigint AS transfer_reversals_cents,
+            COUNT(*) FILTER (WHERE p.dispute_id IS NOT NULL)::int AS disputes_count,
+            COALESCE(SUM(p.total_amount_cents) FILTER (WHERE p.dispute_id IS NOT NULL),0)::bigint AS disputed_cents
+          FROM public.organizer_card_payments p
+          JOIN public.payment_requests pr ON pr.id=p.payment_request_id
+          WHERE ${where}
+        `, [from, to, eventType]),
+        pool.query(`
+          SELECT p.id, p.payment_request_id, pr.title,
+                  CASE
+                    WHEN pr.related_scrimmage_id IS NOT NULL THEN 'scrimmage'
+                    WHEN pr.related_conversation_id IS NOT NULL THEN 'message'
+                    ELSE 'league_fee'
+                  END AS event_type,
+                 p.organizer_user_id, organizer.display_id AS organizer_display_id,
+                 p.payer_user_id, payer.display_id AS payer_display_id,
+                 p.status, p.currency, p.base_amount_cents, p.service_fee_cents, p.total_amount_cents,
+                 p.stripe_processing_fee_cents, p.transfer_amount_cents, p.transfer_reversed_cents,
+                 p.refund_status, p.refunded_at, p.dispute_status, p.created_at
+          FROM public.organizer_card_payments p
+          JOIN public.payment_requests pr ON pr.id=p.payment_request_id
+          JOIN public.users organizer ON organizer.id=p.organizer_user_id
+          JOIN public.users payer ON payer.id=p.payer_user_id
+          WHERE ${where}
+          ORDER BY p.created_at DESC
+          LIMIT 5000
+        `, [from, to, eventType]),
+      ]);
+      if (req.query.format === "csv") {
+        const headers = Object.keys(details.rows[0] ?? {
+          id: "", payment_request_id: "", title: "", event_type: "", organizer_user_id: "",
+          organizer_display_id: "", payer_user_id: "", payer_display_id: "", status: "",
+          currency: "", base_amount_cents: "", service_fee_cents: "", total_amount_cents: "",
+          stripe_processing_fee_cents: "", transfer_amount_cents: "", transfer_reversed_cents: "",
+          refund_status: "", refunded_at: "", dispute_status: "", created_at: "",
+        });
+        const csvValue = (value: unknown) => {
+          const raw = String(value ?? "");
+          const safe = /^[\t\r\n=+\-@]/.test(raw) ? `'${raw}` : raw;
+          return `"${safe.replace(/"/g, '""')}"`;
+        };
+        const body = [
+          headers.map(csvValue).join(","),
+          ...details.rows.map((row) => headers.map((key) => csvValue((row as any)[key])).join(",")),
+        ].join("\r\n");
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", 'attachment; filename="organizer-card-payments.csv"');
+        return res.send(body);
+      }
+      res.json({ summary: summary.rows[0], payments: details.rows });
+    } catch (error) {
+      sendPaymentError(res, error);
+    }
+  });
+}

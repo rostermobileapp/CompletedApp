@@ -12,6 +12,7 @@
     "setup:dev": "NODE_ENV=development tsx scripts/setup-development.ts",
     "seed:dev": "tsx scripts/seed-development.ts",
     "init:dev": "NODE_ENV=development tsx scripts/initialize-development-schema.ts",
+    "migrate:dev-card-payments": "NODE_ENV=development tsx scripts/apply-development-card-payments.ts",
     "storage:dev": "tsx scripts/setup-development-storage.ts",
     "win-chance:accuracy": "NODE_ENV=development tsx scripts/win-chance-accuracy.ts",
     "generate-trivia": "tsx scripts/trivia.ts generate",

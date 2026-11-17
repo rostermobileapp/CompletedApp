@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { AccountUserMerge } from '@/components/AccountUserMerge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -20,7 +21,7 @@ import {
   Line,
   Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Users, DollarSign, BarChart2, Handshake, QrCode } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, DollarSign, BarChart2, CreditCard, Handshake, QrCode } from 'lucide-react';
 
 const ADMIN_EMAIL = 'tobin@rosterhockey.com';
 
@@ -162,6 +163,16 @@ export default function AdminMetrics() {
             <p className="text-sm text-muted-foreground">Live data · founder access only</p>
           </div>
         </div>
+
+        <Button
+          variant="outline"
+          onClick={() => navigate('/admin/organizer-card-payments')}
+          className="w-full justify-start sm:w-auto"
+          data-testid="button-organizer-card-payment-report"
+        >
+          <CreditCard className="mr-2 h-4 w-4" />
+          Organizer card payments report
+        </Button>
 
         <section className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 space-y-2">
           <h2 className="font-semibold">Account support operations</h2>

@@ -8,6 +8,16 @@ const DEV_ONLY_KEYS = [
   "DEV_SUPABASE_ANON_KEY",
 ] as const;
 
+const TEST_ONLY_KEYS = [
+  "TESTING_STRIPE_SECRET_KEY",
+  "TESTING_VITE_STRIPE_PUBLIC_KEY",
+  "TESTING_STRIPE_CARD_PAYMENTS_WEBHOOK_SECRET",
+  "TESTING_STRIPE_CONNECT_WEBHOOK_SECRET",
+  "ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED",
+  "STRIPE_CARD_PAYMENTS_WEBHOOK_SECRET",
+  "STRIPE_CONNECT_WEBHOOK_SECRET",
+] as const;
+
 export function configureLiveProjectPreview(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   if (!isLiveProjectPreview(source)
     || source.NONPRODUCTION_ISOLATED === "1"
@@ -44,6 +54,7 @@ export function configureLiveProjectPreview(source: NodeJS.ProcessEnv): NodeJS.P
 
   const result = { ...source };
   for (const key of DEV_ONLY_KEYS) delete result[key];
+  for (const key of TEST_ONLY_KEYS) delete result[key];
   delete result.NONPRODUCTION_ISOLATED;
   delete result.NONPRODUCTION_FORBIDDEN_DATABASES;
   delete result.VITE_ISOLATED_DEVELOPMENT;

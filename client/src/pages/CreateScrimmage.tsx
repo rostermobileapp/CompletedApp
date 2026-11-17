@@ -6,7 +6,7 @@ import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { splitScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, ChevronRight, Check, ShieldHalf, PersonStanding, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, CreditCard, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, ChevronRight, Check, ShieldHalf, PersonStanding, AlertCircle } from 'lucide-react';
 import { SCRIMMAGE_COVER_OPTIONS } from '@/lib/scrimmageCoverOptions';
 import { RinkPickerField } from '@/components/RinkPickerField';
 import type { RinkSelection } from '@/components/RinkPickerField';
@@ -43,6 +43,7 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   venue: z.string().min(1, 'Venue is required'), // UI field that maps to location
   maxParticipants: z.number().min(2, 'Must have at least 2 participants'), // UI field that maps to maxPlayers
   costPerPlayer: z.string().optional(), // Optional cost field
+  cardPaymentEnabled: z.boolean().default(false),
   // Recurring event fields
   isRecurring: z.boolean().default(false),
   recurrenceType: z.enum(['none', 'daily', 'weekly', 'monthly']).default('none'),
@@ -206,6 +207,26 @@ export default function CreateScrimmage() {
     enabled: isEditMode && !permissionsLoading,
   });
 
+  const { data: cardPaymentSetup } = useQuery<any>({
+    queryKey: ['/api/organizer-card-payments/connect/status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/organizer-card-payments/connect/status');
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  const { data: savedCardPaymentSettings } = useQuery<any>({
+    queryKey: ['/api/organizer-card-payments/scrimmages', scrimmageId, 'settings'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/organizer-card-payments/scrimmages/${scrimmageId}/settings`);
+      return response.json();
+    },
+    enabled: isEditMode && !!scrimmageId,
+    staleTime: 0,
+  });
+
   const canManageScrimmages = hasGlobalScrimmageAccess || (
     isEditMode
       ? (!!existingScrimmage?.leagueId && hasLeagueProSeat(existingScrimmage.leagueId))
@@ -225,6 +246,7 @@ export default function CreateScrimmage() {
       venue: '', // UI field that maps to location
       maxParticipants: 20, // UI field that maps to maxPlayers
       costPerPlayer: '', // Optional cost field
+      cardPaymentEnabled: savedDraft?.formValues?.cardPaymentEnabled ?? false,
       venmoLinkOverride: '',
       cashappLinkOverride: '',
       // Recurring event defaults
@@ -424,6 +446,12 @@ export default function CreateScrimmage() {
     }
   }, [isEditMode, existingScrimmage, form, formInitialized]);
 
+  useEffect(() => {
+    if (savedCardPaymentSettings?.enabled) {
+      form.setValue('cardPaymentEnabled', savedCardPaymentSettings.cardPaymentEnabled === true);
+    }
+  }, [savedCardPaymentSettings, form]);
+
   // Close date picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -594,6 +622,7 @@ export default function CreateScrimmage() {
         dateTime: `${data.date}T${data.time || '00:00'}`, // Date-only anchor when the time is TBD
         timeTbd: !!data.timeTbd || !data.time,
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
+        cardPaymentEnabled: data.cardPaymentEnabled === true,
         // Per-scrimmage payment link overrides (validated + normalized server-side)
         venmoLinkOverride: data.venmoLinkOverride ?? null,
         cashappLinkOverride: data.cashappLinkOverride ?? null,
@@ -1717,6 +1746,44 @@ export default function CreateScrimmage() {
                 <p className="text-sm text-destructive mt-1">{form.formState.errors.costPerPlayer.message}</p>
               )}
             </div>
+
+            {cardPaymentSetup?.enabled && cardPaymentSetup?.eligible && (
+              <div className="rounded-lg border border-[hsl(var(--hairline))] bg-background/50 p-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="scrimmageCardPaymentEnabled"
+                    checked={form.watch('cardPaymentEnabled') === true}
+                    disabled={!cardPaymentSetup.ready || !cardPaymentSetup.webhookReady || Number(form.watch('costPerPlayer') ?? 0) <= 0}
+                    onCheckedChange={(checked) => form.setValue('cardPaymentEnabled', checked === true, { shouldDirty: true })}
+                    data-testid="checkbox-scrimmage-card-payments"
+                  />
+                  <div>
+                    <Label htmlFor="scrimmageCardPaymentEnabled" className="flex items-center gap-2 cursor-pointer">
+                      <CreditCard className="h-4 w-4" />
+                      Accept card payments
+                    </Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Players pay the scrimmage cost plus a 5% + $0.50 service fee. You receive the full per-player cost.
+                    </p>
+                    {!cardPaymentSetup.webhookReady ? (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                        Stripe test webhook setup is still required before card collection can be enabled.
+                      </p>
+                    ) : !cardPaymentSetup.ready && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="mt-1 h-auto p-0 text-xs"
+                        onClick={() => navigate('/payment-requests')}
+                      >
+                        Finish Stripe setup on Payment Requests
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="pt-1">
               <p className="text-sm text-muted-foreground mb-1\.5 font-bold">

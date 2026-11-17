@@ -229,6 +229,7 @@ import { getReusableUserDisplayId, shouldLookupUserByEmail } from "./userSyncPla
 import { collectUniqueTeamIdsFromGames } from "./teamQueryBatch";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
+import { isOrganizerCardPaymentsActiveInCurrentRuntime, OrganizerCardPaymentError } from "./organizerCardPaymentService";
 import { readVerifiedGameSummary } from "./verifiedGameSummaries";
 import { databaseGameSummaryStore } from "./verifiedGameSummaryStore";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists, type SQL } from "drizzle-orm";
@@ -659,12 +660,12 @@ export interface IStorage {
   getImportedSchedules(importId: string): Promise<ImportedSchedule[]>;
 
   // Scrimmage operations
-  createScrimmage(scrimmageData: InsertScrimmage): Promise<Scrimmage>;
+  createScrimmage(scrimmageData: InsertScrimmage & { cardPaymentEnabled?: boolean }): Promise<Scrimmage>;
   getScrimmage(scrimmageId: string): Promise<Scrimmage | undefined>;
   getLeagueScrimmages(leagueId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]>;
   getUserScrimmages(userId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]>;
   getVenueScrimmageMembers(facilityId: string, placeholderLeagueIds?: string[]): Promise<any[]>;
-  updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage>;
+  updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage> & { cardPaymentEnabled?: boolean }): Promise<Scrimmage>;
   deleteScrimmage(scrimmageId: string): Promise<void>;
   getScrimmageSeries(parentId: string): Promise<Scrimmage[]>;
   
@@ -772,7 +773,7 @@ export interface IStorage {
   createFeedbackSubmission(feedbackData: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
   
   // Payment request operations
-  createPaymentRequest(paymentRequest: InsertPaymentRequest, recipientUserIds: string[], placeholderPlayerIds?: string[]): Promise<PaymentRequest>;
+  createPaymentRequest(paymentRequest: InsertPaymentRequest & { cardEnabled?: boolean }, recipientUserIds: string[], placeholderPlayerIds?: string[]): Promise<PaymentRequest>;
   getPaymentRequest(id: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] }) | undefined>;
   getPaymentRequestsByCreator(creatorId: string): Promise<(PaymentRequest & { recipients: HydratedPaymentRequestRecipient[] })[]>;
   getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]>;
@@ -783,7 +784,7 @@ export interface IStorage {
   deletePaymentRequest(id: string): Promise<void>;
   updatePaymentRequest(
     id: string,
-    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline' | 'venmoLinkOverride' | 'cashappLinkOverride'>>,
+    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline' | 'venmoLinkOverride' | 'cashappLinkOverride'>> & { cardEnabled?: boolean },
     recipients?: { recipientUserIds: string[]; placeholderPlayerIds: string[] },
   ): Promise<PaymentRequest>;
   getUnpaidPaymentRequestCount(userId: string): Promise<number>;
@@ -9967,9 +9968,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Scrimmage operations
-  async createScrimmage(scrimmageData: InsertScrimmage): Promise<Scrimmage> {
-    const [newScrimmage] = await db.insert(scrimmages).values(scrimmageData).returning();
-    return newScrimmage;
+  async createScrimmage(scrimmageData: InsertScrimmage & { cardPaymentEnabled?: boolean }): Promise<Scrimmage> {
+    const { cardPaymentEnabled = false, ...insertData } = scrimmageData;
+    return db.transaction(async (tx) => {
+      const [newScrimmage] = await tx.insert(scrimmages).values(insertData).returning();
+      if (isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        await tx.execute(sql`
+          UPDATE public.scrimmages SET card_payment_enabled=${cardPaymentEnabled}, updated_at=now()
+          WHERE id=${newScrimmage.id}
+        `);
+      }
+      return newScrimmage;
+    });
   }
 
   async getScrimmage(scrimmageId: string): Promise<Scrimmage | undefined> {
@@ -10304,10 +10314,15 @@ export class DatabaseStorage implements IStorage {
       });
   }
 
-  async updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage> {
+  async updateScrimmage(
+    scrimmageId: string,
+    updates: Partial<InsertScrimmage> & { cardPaymentEnabled?: boolean },
+  ): Promise<Scrimmage> {
     return db.transaction(async (tx) => {
       const costIsBeingUpdated = Object.prototype.hasOwnProperty.call(updates, 'costPerPlayer');
-      if (costIsBeingUpdated) {
+      const cardSettingIsBeingUpdated = Object.prototype.hasOwnProperty.call(updates, 'cardPaymentEnabled');
+      const { cardPaymentEnabled, ...scrimmageUpdates } = updates;
+      if (costIsBeingUpdated || cardSettingIsBeingUpdated) {
         // Serialize edits with join-time/finalization invoice creation so a
         // newly-created request cannot retain the previous scrimmage price.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmageId}`}))`);
@@ -10315,9 +10330,22 @@ export class DatabaseStorage implements IStorage {
 
       const [updatedScrimmage] = await tx
         .update(scrimmages)
-        .set({ ...updates, updatedAt: new Date() })
+        .set({ ...scrimmageUpdates, updatedAt: new Date() })
         .where(eq(scrimmages.id, scrimmageId))
         .returning();
+
+      if (updatedScrimmage && cardSettingIsBeingUpdated && isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        await tx.execute(sql`
+          UPDATE public.scrimmages
+          SET card_payment_enabled=${cardPaymentEnabled === true}, updated_at=now()
+          WHERE id=${scrimmageId}
+        `);
+        await tx.execute(sql`
+          UPDATE public.payment_requests
+          SET card_enabled=${cardPaymentEnabled === true}, updated_at=now()
+          WHERE related_scrimmage_id=${scrimmageId}
+        `);
+      }
 
       if (updatedScrimmage && costIsBeingUpdated) {
         await tx
@@ -13470,15 +13498,23 @@ export class DatabaseStorage implements IStorage {
 
   // Payment request operations
   async createPaymentRequest(
-    paymentRequest: InsertPaymentRequest,
+    paymentRequest: InsertPaymentRequest & { cardEnabled?: boolean },
     recipientUserIds: string[],
     placeholderPlayerIds: string[] = [],
   ): Promise<PaymentRequest> {
     return await db.transaction(async (tx) => {
+      const { cardEnabled = false, ...insertData } = paymentRequest;
       const [newPaymentRequest] = await tx
         .insert(paymentRequests)
-        .values(paymentRequest)
+        .values(insertData)
         .returning();
+      if (isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        await tx.execute(sql`
+          UPDATE public.payment_requests
+          SET card_enabled=${cardEnabled}, updated_at=now()
+          WHERE id=${newPaymentRequest.id}
+        `);
+      }
 
       const rows: { paymentRequestId: string; userId?: string; placeholderPlayerId?: string; isPaid: boolean }[] = [];
       const seenUsers = new Set<string>();
@@ -13834,6 +13870,23 @@ export class DatabaseStorage implements IStorage {
         .from(paymentRequestRecipients)
         .where(eq(paymentRequestRecipients.id, recipientId))
         .for('update');
+      if (isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        const activeCardPayment = await tx.execute(sql`
+          SELECT id FROM public.organizer_card_payments
+          WHERE recipient_id=${recipientId} AND (
+            status IN ('pending','processing','paid','refund_pending')
+            OR (status='disputed' AND COALESCE(dispute_status,'') NOT IN ('lost','won'))
+          )
+          ORDER BY created_at DESC LIMIT 1 FOR UPDATE
+        `);
+        if (activeCardPayment.rows.length > 0) {
+          throw new OrganizerCardPaymentError(
+            "This invoice has a card transaction. Use the card refund flow or wait for its status before changing the manual payment record.",
+            409,
+            "card_payment_active",
+          );
+        }
+      }
       const [recipient] = await tx
         .update(paymentRequestRecipients)
         .set({
@@ -13874,7 +13927,7 @@ export class DatabaseStorage implements IStorage {
 
   async updatePaymentRequest(
     id: string,
-    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline' | 'venmoLinkOverride' | 'cashappLinkOverride'>>,
+    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline' | 'venmoLinkOverride' | 'cashappLinkOverride'>> & { cardEnabled?: boolean },
     recipients?: { recipientUserIds: string[]; placeholderPlayerIds: string[] },
   ): Promise<PaymentRequest> {
     return await db.transaction(async (tx) => {
@@ -13894,6 +13947,13 @@ export class DatabaseStorage implements IStorage {
 
       if (!updated) {
         throw new Error('Payment request not found');
+      }
+      if (updates.cardEnabled !== undefined && isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        await tx.execute(sql`
+          UPDATE public.payment_requests
+          SET card_enabled=${updates.cardEnabled}, updated_at=now()
+          WHERE id=${id}
+        `);
       }
 
       if (recipients) {

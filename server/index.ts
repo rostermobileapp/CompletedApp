@@ -67,6 +67,7 @@ app.use(cookieParser());
 
 // Stripe webhook needs raw body for signature verification
 app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
+app.use('/api/stripe-connect-webhook', express.raw({ type: 'application/json' }));
 
 // All other routes use JSON parsing
 app.use('/api/teams/:teamId/awards/:awardId', express.json({ limit: '8mb' }));

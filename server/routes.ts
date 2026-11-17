@@ -23,6 +23,12 @@ import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
 import { setupAuth, isAuthenticated, supabase, getAuthenticatedDatabaseUser } from "./supabaseAuth";
+import { registerOrganizerCardPaymentRoutes } from "./organizerCardPaymentRoutes";
+import {
+  assertOrganizerCardCollectionReady,
+  isOrganizerCardPaymentsActiveInCurrentRuntime,
+  OrganizerCardPaymentError,
+} from "./organizerCardPaymentService";
 import { ensureDemoTables, registerDemoRoutes, isDemoLeague } from "./demo";
 import { 
   loadUserPermissions, 
@@ -18492,6 +18498,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   }).extend({
     dateTime: z.string(),
     recurrenceEndDate: z.string().nullable().optional(),
+    cardPaymentEnabled: z.boolean().default(false),
     venmoLinkOverride: venmoLinkOverrideField,
     cashappLinkOverride: cashappLinkOverrideField,
   });
@@ -18643,6 +18650,14 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       // joins and finalization fallback. The transaction-scoped advisory lock
       // works across server processes and is released automatically.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmage.id}`}))`);
+      const cardPaymentEnabled = isOrganizerCardPaymentsActiveInCurrentRuntime()
+        ? Boolean((await tx.execute(sql`
+            SELECT card_payment_enabled
+            FROM public.scrimmages
+            WHERE id=${scrimmage.id}
+            FOR UPDATE
+          `) as any).rows?.[0]?.card_payment_enabled)
+        : false;
       const [currentScrimmage] = await tx
         .select({
           status: scrimmages.status,
@@ -18698,6 +18713,13 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
             relatedConversationId: null,
           })
           .returning();
+      }
+      if (isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        await tx.execute(sql`
+          UPDATE public.payment_requests
+          SET card_enabled=${cardPaymentEnabled}, updated_at=now()
+          WHERE id=${canonicalPaymentRequest.id}
+        `);
       }
 
       const linkedPaymentRequestIds = linkedPaymentRequests.map((request) => request.id);
@@ -18870,6 +18892,18 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
         .limit(1)
         .for('update');
       if (!lockedRecipient) return { kind: 'not_found' as const };
+
+      if (isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        const activeCardPayment = await tx.execute(sql`
+          SELECT id FROM public.organizer_card_payments
+          WHERE recipient_id=${recipientId} AND (
+            status IN ('pending','processing','paid','refund_pending')
+            OR (status='disputed' AND COALESCE(dispute_status,'') NOT IN ('lost','won'))
+          )
+          ORDER BY created_at DESC LIMIT 1 FOR UPDATE
+        `);
+        if (activeCardPayment.rows.length > 0) return { kind: 'card_payment_active' as const };
+      }
 
       const [paymentRequest] = await tx
         .select()
@@ -19151,6 +19185,16 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
       if (scrimmageData.joinMode === 'first_pay' && Number(scrimmageData.costPerPlayer ?? 0) <= 0) {
         return res.status(400).json({ message: 'First to Pay, First to Play requires a cost per player' });
+      }
+      if (scrimmageData.cardPaymentEnabled) {
+        if (Number(scrimmageData.costPerPlayer ?? 0) <= 0) {
+          return res.status(400).json({ message: 'Card payments require a positive cost per player' });
+        }
+        try {
+          await assertOrganizerCardCollectionReady(userId);
+        } catch (error: any) {
+          return res.status(error.statusCode || 500).json({ message: error.message || 'Card collection is unavailable.' });
+        }
       }
       
       // Verify league exists and user is a member
@@ -19663,6 +19707,18 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       } catch (validationError) {
         console.error('Validation error updating scrimmage:', validationError);
         return res.status(400).json({ message: "Invalid update data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
+      }
+
+      if (updateData.cardPaymentEnabled === true) {
+        const effectiveCost = Number(updateData.costPerPlayer ?? existingScrimmage.costPerPlayer ?? 0);
+        if (effectiveCost <= 0) {
+          return res.status(400).json({ message: 'Card payments require a positive cost per player' });
+        }
+        try {
+          await assertOrganizerCardCollectionReady(userId);
+        } catch (error: any) {
+          return res.status(error.statusCode || 500).json({ message: error.message || 'Card collection is unavailable.' });
+        }
       }
 
       if (updateData.facilityId) {
@@ -25253,6 +25309,13 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       // Validate request body using Zod schema
       const validatedData = createPaymentRequestSchema.parse(req.body);
       const { leagueId } = validatedData;
+      if (validatedData.cardEnabled) {
+        try {
+          await assertOrganizerCardCollectionReady(userId);
+        } catch (error: any) {
+          return res.status(error.statusCode || 500).json({ message: error.message || "Card collection is unavailable." });
+        }
+      }
       if (validatedData.relatedScrimmageId) {
         return res.status(400).json({
           message: 'Use the scrimmage payment action to send payment requests for a scrimmage',
@@ -25297,6 +25360,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
         title: validatedData.title,
         description: validatedData.description,
         amountPerPerson: validatedData.amountPerPerson,
+        cardEnabled: validatedData.cardEnabled,
         deadline: validatedData.deadline || null,
         relatedScrimmageId: validatedData.relatedScrimmageId || null,
         relatedConversationId: validatedData.relatedConversationId || null,
@@ -25465,13 +25529,21 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       // Scrimmage co-hosts receive the same organizer view as the creator.
       // Regular recipients only see their own recipient row.
       const hasOrganizerView = isCreator || isScrimmageCoHost;
+      const cardSetting = isOrganizerCardPaymentsActiveInCurrentRuntime()
+        ? await pool.query<{ card_enabled: boolean }>(
+            "SELECT card_enabled FROM public.payment_requests WHERE id=$1 LIMIT 1",
+            [id],
+          )
+        : null;
+      const cardEnabled = cardSetting?.rows[0]?.card_enabled === true;
       const responseData = hasOrganizerView
         ? {
             ...paymentRequest,
+            cardEnabled,
             viewerIsScrimmageOrganizer: true,
             viewerCanManagePayments: isCreator || canManagePayments,
           }
-        : { ...paymentRequest, recipients: paymentRequest.recipients.filter((r: any) => r.userId === userId) };
+        : { ...paymentRequest, cardEnabled, recipients: paymentRequest.recipients.filter((r: any) => r.userId === userId) };
 
       res.json(responseData);
     } catch (error) {
@@ -25536,6 +25608,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       const userId = req.user.claims.sub;
       const { scrimmageId } = req.params;
       const validatedData = updatePaymentRequestRecipientSchema.parse(req.body);
+      if (String(validatedData.paymentMethod ?? "") === "stripe") {
+        return res.status(400).json({ message: "Card payments are recorded only after Stripe confirms the transaction." });
+      }
       const scrimmage = await storage.getScrimmage(scrimmageId);
       if (!scrimmage) {
         return res.status(404).json({ message: 'Scrimmage not found' });
@@ -25586,6 +25661,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       if (updateResult.kind === 'confirmed') {
         return res.status(409).json({ message: 'The organizer has already confirmed this payment' });
       }
+      if (updateResult.kind === 'card_payment_active') {
+        return res.status(409).json({ message: 'A card transaction is active for this invoice. Use its card payment status or refund flow.' });
+      }
       if (updateResult.kind === 'ineligible') {
         return res.status(403).json({ message: 'This player is no longer eligible to pay for the scrimmage' });
       }
@@ -25635,6 +25713,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       
       // Validate request body using Zod schema
       const validatedData = updatePaymentRequestRecipientSchema.parse(req.body);
+      if (String(validatedData.paymentMethod ?? "") === "stripe") {
+        return res.status(400).json({ message: "Card payments are recorded only after Stripe confirms the transaction." });
+      }
 
       // Get the payment request to verify permissions
       const recipient = await db.query.paymentRequestRecipients.findFirst({
@@ -25661,6 +25742,22 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       if (!isCreator && !isRecipient && !isCoHostPaymentManager) {
         return res.status(403).json({ message: "You do not have permission to update this payment" });
       }
+      if (isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        const activeCardPayment = await pool.query(
+          `SELECT id FROM public.organizer_card_payments
+           WHERE recipient_id=$1 AND (
+             status IN ('pending','processing','paid','refund_pending')
+             OR (status='disputed' AND COALESCE(dispute_status,'') NOT IN ('lost','won'))
+           )
+           ORDER BY created_at DESC LIMIT 1`,
+          [recipientId],
+        );
+        if (activeCardPayment.rows.length > 0) {
+          return res.status(409).json({
+            message: "This invoice has a card transaction. Use the card refund flow or wait for its status before changing the manual payment record.",
+          });
+        }
+      }
       if (recipient.paymentRequest.relatedScrimmageId) {
         const updateResult = await updateLinkedScrimmagePaymentRecipient(recipientId, userId, {
           isPaid: validatedData.isPaid,
@@ -25668,6 +25765,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
         }, isCoHostPaymentManager);
         if (updateResult.kind === 'confirmed') {
           return res.status(409).json({ message: 'The organizer has already confirmed this payment' });
+        }
+        if (updateResult.kind === 'card_payment_active') {
+          return res.status(409).json({ message: 'A card transaction is active for this invoice. Use its card payment status or refund flow.' });
         }
         if (updateResult.kind === 'ineligible') {
           return res.status(403).json({ message: 'This player is no longer eligible to pay for the scrimmage' });
@@ -25687,6 +25787,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
 
       res.json(updatedRecipient);
     } catch (error) {
+      if (error instanceof OrganizerCardPaymentError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
       if (error instanceof ZodError) {
         return res.status(400).json({ 
           message: "Invalid payment recipient update data", 
@@ -25978,6 +26081,13 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const validated = updatePaymentRequestSchema.parse(req.body);
+      if (validated.cardEnabled === true) {
+        try {
+          await assertOrganizerCardCollectionReady(userId);
+        } catch (error: any) {
+          return res.status(error.statusCode || 500).json({ message: error.message || "Card collection is unavailable." });
+        }
+      }
       const leagueIdRaw = req.body?.leagueId;
       const leagueId = typeof leagueIdRaw === 'string' && leagueIdRaw.length > 0 ? leagueIdRaw : null;
 
@@ -26044,10 +26154,11 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
         recipientsArg = { recipientUserIds: finalUsers, placeholderPlayerIds: finalPlaceholders };
       }
 
-      const updates: Partial<{ title: string; description: string | null; amountPerPerson: string; deadline: string | null; venmoLinkOverride: string | null; cashappLinkOverride: string | null }> = {};
+      const updates: Partial<{ title: string; description: string | null; amountPerPerson: string; cardEnabled: boolean; deadline: string | null; venmoLinkOverride: string | null; cashappLinkOverride: string | null }> = {};
       if (validated.title !== undefined) updates.title = validated.title;
       if (validated.description !== undefined) updates.description = validated.description;
       if (validated.amountPerPerson !== undefined) updates.amountPerPerson = validated.amountPerPerson;
+      if (validated.cardEnabled !== undefined) updates.cardEnabled = validated.cardEnabled;
       if (validated.deadline !== undefined) {
         updates.deadline = validated.deadline || null;
       }
@@ -31144,6 +31255,8 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     }
     next();
   };
+
+  registerOrganizerCardPaymentRoutes(app, isAuthenticated, requireFounder);
 
   app.get('/api/admin/users/search', isAuthenticated, requireFounder, async (req: any, res) => {
     try {

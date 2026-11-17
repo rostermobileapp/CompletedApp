@@ -105,6 +105,7 @@ import ReferralAdmin from "@/pages/ReferralAdmin";
 import ReferralAdminLogin from "@/pages/ReferralAdminLogin";
 import ReferralAdminPartnerDetail from "@/pages/ReferralAdminPartnerDetail";
 import AdminMetrics from "@/pages/AdminMetrics";
+import AdminOrganizerCardPayments from "@/pages/AdminOrganizerCardPayments";
 import HPIBDownload from "@/pages/HPIBDownload";
 import Demo from "@/pages/Demo";
 import GerryHomePreview from "@/pages/GerryHomePreview";
@@ -433,6 +434,7 @@ export function Router() {
               <Route path="/about" component={About} />
               <Route path="/admin/stripe" component={StripeAdmin} />
               <Route path="/admin/metrics" component={AdminMetrics} />
+              <Route path="/admin/organizer-card-payments" component={AdminOrganizerCardPayments} />
               <Route component={NotFound} />
             </Switch>
   );

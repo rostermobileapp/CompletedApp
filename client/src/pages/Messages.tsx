@@ -3,7 +3,7 @@
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle, RefreshCw, Check } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, CreditCard, DollarSign, CheckCircle, RefreshCw, Check } from 'lucide-react';
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useLocation } from 'wouter';
@@ -745,6 +745,16 @@ export default function Messages() {
   const { send: wsSend, subscribe: wsSubscribe, isConnected: wsIsConnected } = useWebSocket();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const { data: organizerCardSetup } = useQuery<any>({
+    queryKey: ['/api/organizer-card-payments/connect/status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/organizer-card-payments/connect/status');
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
   
   // Media gallery state
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -769,6 +779,7 @@ export default function Messages() {
   const [paymentRequestTitle, setPaymentRequestTitle] = useState('');
   const [paymentRequestDescription, setPaymentRequestDescription] = useState('');
   const [paymentRequestAmount, setPaymentRequestAmount] = useState('');
+  const [paymentRequestCardEnabled, setPaymentRequestCardEnabled] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [inputBarHeight, setInputBarHeight] = useState(0);
@@ -1467,7 +1478,9 @@ export default function Messages() {
       title: string; 
       description?: string; 
       amountPerPerson: string;
+      cardEnabled: boolean;
       recipientUserIds: string[];
+      leagueId: string;
       relatedConversationId: string;
       relatedScrimmageId: null;
       deadline: null;
@@ -1482,6 +1495,7 @@ export default function Messages() {
       setPaymentRequestTitle('');
       setPaymentRequestDescription('');
       setPaymentRequestAmount('');
+      setPaymentRequestCardEnabled(false);
       setSelectedRecipients([]);
       toast({
         title: 'Payment request sent',
@@ -1575,7 +1589,9 @@ export default function Messages() {
       title: paymentRequestTitle.trim(),
       description: paymentRequestDescription.trim() || undefined,
       amountPerPerson: paymentRequestAmount,
+      cardEnabled: paymentRequestCardEnabled,
       recipientUserIds: selectedRecipients,
+      leagueId: currentConversation?.leagueId || '',
       relatedConversationId: selectedConversation,
       relatedScrimmageId: null,
       deadline: null
@@ -3415,7 +3431,10 @@ export default function Messages() {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-medium">Request Payment</h4>
                 <button
-                  onClick={() => setShowPaymentRequestCreator(false)}
+                  onClick={() => {
+                    setShowPaymentRequestCreator(false);
+                    setPaymentRequestCardEnabled(false);
+                  }}
                   className="p-1 hover:bg-accent rounded"
                   data-testid="button-close-payment-request"
                 >
@@ -3456,6 +3475,29 @@ export default function Messages() {
                     data-testid="input-payment-description"
                   />
                 </div>
+
+                {organizerCardSetup?.enabled && organizerCardSetup?.eligible && (
+                  <label className={`flex items-start gap-3 rounded-lg border p-3 ${organizerCardSetup.ready ? 'cursor-pointer' : 'opacity-60'}`}>
+                    <input
+                      type="checkbox"
+                      checked={paymentRequestCardEnabled}
+                      disabled={!organizerCardSetup.ready || !organizerCardSetup.webhookReady}
+                      onChange={(event) => setPaymentRequestCardEnabled(event.target.checked)}
+                      className="mt-1"
+                      data-testid="checkbox-message-card-payments"
+                    />
+                    <span>
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <CreditCard className="h-4 w-4" /> Accept card payments
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {!organizerCardSetup.webhookReady
+                          ? 'Stripe test webhook setup is still required before card collection can be enabled.'
+                          : 'Players pay a 5% + $0.50 service fee; you receive the full invoice amount.'}
+                      </span>
+                    </span>
+                  </label>
+                )}
                 
                 <div>
                   <label className="text-sm font-medium mb-1 block">Request from *</label>
@@ -3504,7 +3546,10 @@ export default function Messages() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => setShowPaymentRequestCreator(false)}
+                    onClick={() => {
+                      setShowPaymentRequestCreator(false);
+                      setPaymentRequestCardEnabled(false);
+                    }}
                     data-testid="button-cancel-payment-request"
                   >
                     Cancel

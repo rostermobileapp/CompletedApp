@@ -1,24 +1,55 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import CreatePaymentRequestPage from '@/pages/CreatePaymentRequest';
-import { ArrowLeft, DollarSign, Lock, Plus, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, CreditCard, DollarSign, ExternalLink, Loader2, Lock, Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { apiRequest } from '@/lib/queryClient';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { PaymentSummaryCard } from '@/components/PaymentSummaryCard';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const { openOverlay } = useSlideUpOverlay();
   const { selectedType, selectedTeamId, selectedLeagueId } = useDashboardSelection();
   const { canAccessPremiumFeatures, isLoading: permissionsLoading } = usePermissions();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const isFreeTier = !permissionsLoading && !canAccessPremiumFeatures();
+
+  const { data: cardSetup } = useQuery<any>({
+    queryKey: ['/api/organizer-card-payments/connect/status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/organizer-card-payments/connect/status');
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  const connectCardAccount = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/organizer-card-payments/connect/onboarding', {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (typeof data?.url === 'string') window.location.assign(data.url);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not open Stripe setup',
+        description: error?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/organizer-card-payments/connect/status'] });
+    },
+  });
 
   const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
 
@@ -166,6 +197,41 @@ export default function PaymentRequests() {
             </Button>
           )}
         </div>
+
+        {cardSetup?.enabled && cardSetup?.eligible && (
+          <section className="mb-6 rounded-xl border border-[hsl(var(--hairline))] bg-card p-4 shadow-[var(--elev-rest)]" data-testid="card-organizer-card-setup">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
+                {cardSetup.ready && cardSetup.webhookReady ? <CheckCircle2 className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-semibold">Card payment setup</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {!cardSetup.webhookReady
+                    ? 'Connect is separate from billing. Card collection stays disabled until the Stripe test webhook is configured.'
+                    : cardSetup.ready
+                    ? 'Your Stripe receiving account is ready. You can enable card payments on new invoices and scrimmages.'
+                    : cardSetup.connected
+                      ? 'Finish Stripe verification before enabling card collection.'
+                      : 'Connect a Stripe account to collect one-time card payments for your invoices.'}
+                </p>
+              </div>
+              {!cardSetup.ready && (
+                <Button
+                  size="sm"
+                  onClick={() => connectCardAccount.mutate()}
+                  disabled={connectCardAccount.isPending}
+                  data-testid="button-connect-stripe"
+                >
+                  {connectCardAccount.isPending
+                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    : <ExternalLink className="mr-2 h-4 w-4" />}
+                  {cardSetup.connected ? 'Continue setup' : 'Connect Stripe'}
+                </Button>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'created' | 'received')}>

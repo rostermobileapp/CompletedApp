@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
-import { ArrowLeft, DollarSign, Users, UserCircle2 } from 'lucide-react';
+import { ArrowLeft, CreditCard, DollarSign, Users, UserCircle2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { createPaymentRequestSchema } from '@shared/schema';
 import { z } from 'zod';
@@ -93,6 +93,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
       title: '',
       description: '',
       amountPerPerson: '',
+      cardEnabled: false,
       deadline: undefined,
       leagueId: '',
       recipientUserIds: [],
@@ -107,6 +108,16 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
   // Fetch user's leagues for fallback selection.
   const { data: userLeagues = [], isLoading: leaguesLoading } = useQuery<any[]>({
     queryKey: ['/api/user/leagues'],
+  });
+
+  const { data: cardSetup } = useQuery<any>({
+    queryKey: ['/api/organizer-card-payments/connect/status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/organizer-card-payments/connect/status');
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Fetch teams to look up team's parent league when dashboard selection is a team.
@@ -202,6 +213,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
     form.setValue('title', existingRequest.title ?? '');
     form.setValue('description', existingRequest.description ?? '');
     form.setValue('amountPerPerson', String(existingRequest.amountPerPerson ?? ''));
+    form.setValue('cardEnabled', existingRequest.cardEnabled === true);
     form.setValue('venmoLinkOverride', existingRequest.venmoLinkOverride ?? '');
     form.setValue('cashappLinkOverride', existingRequest.cashappLinkOverride ?? '');
     if (existingRequest.deadline) {
@@ -517,6 +529,45 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
                   data-testid="input-deadline"
                 />
               </div>
+
+              {cardSetup?.enabled && cardSetup?.eligible && (
+                <div className="rounded-lg border border-[hsl(var(--hairline))] bg-muted/30 p-3">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="cardEnabled"
+                      checked={form.watch('cardEnabled') === true}
+                      disabled={!cardSetup.ready || !cardSetup.webhookReady}
+                      onCheckedChange={(checked) => form.setValue('cardEnabled', checked === true, { shouldDirty: true })}
+                      data-testid="checkbox-card-payments"
+                    />
+                    <div className="min-w-0">
+                      <Label htmlFor="cardEnabled" className="flex items-center gap-2 cursor-pointer">
+                        <CreditCard className="h-4 w-4" />
+                        Accept card payments
+                      </Label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Players pay the invoice amount plus a 5% + $0.50 service fee. You receive the full invoice amount.
+                      </p>
+                      {!cardSetup.webhookReady ? (
+                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                          Stripe test webhook setup is still required before card collection can be enabled.
+                        </p>
+                      ) : !cardSetup.ready && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="mt-1 h-auto p-0 text-xs"
+                          onClick={() => closeWithSlideDown('/payment-requests')}
+                          data-testid="button-finish-stripe-setup"
+                        >
+                          Finish Stripe setup on Payment Requests
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-[hsl(var(--hairline))]">
                 <p className="text-sm text-muted-foreground mb-3">

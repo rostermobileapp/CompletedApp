@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, DollarSign, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, CreditCard, DollarSign, ExternalLink, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/paymentStatus';
 import { resolveVenmoLink, resolveCashAppLink } from '@/lib/paymentLinks';
 import { PaymentMethodPicker, type PaymentMethod } from '@/components/PaymentMethodPicker';
+import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import { SiVenmo, SiCashapp } from 'react-icons/si';
 
 export default function PaymentRequestDetail() {
@@ -30,6 +31,60 @@ export default function PaymentRequestDetail() {
   const { data: paymentRequest, isLoading } = useQuery({
     queryKey: [`/api/payment-requests/${id}`],
     enabled: !!id,
+  });
+
+  const { data: cardPaymentInfo, refetch: refetchCardPaymentInfo } = useQuery<any>({
+    queryKey: ['/api/organizer-card-payments/requests', id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/organizer-card-payments/requests/${id}`);
+      return response.json();
+    },
+    enabled: !!id,
+    refetchInterval: 5000,
+  });
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutClientSecret, setCheckoutClientSecret] = useState<string | null>(null);
+
+  const cardCheckoutMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/organizer-card-payments/checkout-session', {
+        paymentRequestId: id,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setCheckoutClientSecret(data.clientSecret);
+      setCheckoutOpen(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not start card payment',
+        description: error?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+      refetchCardPaymentInfo();
+    },
+  });
+
+  const refundCardPaymentMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      const response = await apiRequest('POST', `/api/organizer-card-payments/${paymentId}/refund`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Full refund requested', description: 'The card transaction will update when Stripe confirms it.' });
+      refetchCardPaymentInfo();
+      queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not refund card payment',
+        description: error?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
   });
 
   const updateRecipientMutation = useMutation({
@@ -117,6 +172,16 @@ export default function PaymentRequestDetail() {
   const hasOrganizerView = isCreator || request.viewerIsScrimmageOrganizer === true;
   const canManagePayments = isCreator || request.viewerCanManagePayments === true;
   const myRecipient = recipients.find((r: any) => r.userId === (user as any)?.id);
+  const cardPayments: any[] = Array.isArray(cardPaymentInfo?.payments) ? cardPaymentInfo.payments : [];
+  const myCardPayment = cardPayments.find((payment: any) => payment.payerUserId === (user as any)?.id);
+  const cardPaymentInProgress = !!myCardPayment && ['pending', 'processing', 'refund_pending'].includes(myCardPayment.status);
+  const canStartCardPayment = cardPaymentInfo?.enabled === true
+    && cardPaymentInfo.cardEnabled === true
+    && cardPaymentInfo.webhookReady === true
+    && !!myRecipient
+    && !myRecipient.isPaid
+    && !cardPaymentInProgress
+    && myCardPayment?.status !== 'disputed';
   const totalRecipients = recipients.length;
   const paidCount = recipients.filter((r: any) => r.isPaid).length;
   const theme = STATUS_THEME[status];
@@ -124,6 +189,16 @@ export default function PaymentRequestDetail() {
   const creatorName = `${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim() || 'the organizer';
   const venmoUrl = resolveVenmoLink(request.venmoLinkOverride, creator.venmoUsername);
   const cashappUrl = resolveCashAppLink(request.cashappLinkOverride, creator.cashappUsername);
+  const cardPaymentStatusLabel = (statusValue: string) => ({
+    pending: 'Payment not started',
+    processing: 'Processing',
+    paid: 'Paid',
+    failed: 'Failed',
+    cancelled: 'Cancelled',
+    refund_pending: 'Refund pending',
+    refunded: 'Refunded',
+    disputed: 'Disputed',
+  }[statusValue] || statusValue);
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="payment-request-detail-page">
@@ -266,6 +341,120 @@ export default function PaymentRequestDetail() {
           />
         )}
 
+        {!hasOrganizerView && cardPaymentInfo?.enabled && cardPaymentInfo.cardEnabled && myRecipient && (
+          <div className="mb-6 rounded-2xl border border-[hsl(var(--hairline))] bg-card p-5 shadow-[var(--elev-rest)]" data-testid="card-pay-by-card">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold">Pay by card</h2>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Invoice amount {`$${(cardPaymentInfo.baseAmountCents / 100).toFixed(2)}`} + service fee {`$${(cardPaymentInfo.serviceFeeCents / 100).toFixed(2)}`} = total {`$${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)}`}.
+            </p>
+            {!cardPaymentInfo.webhookReady ? (
+              <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
+                Card payments are temporarily unavailable until the payment webhook is ready.
+              </p>
+            ) : cardPaymentInProgress ? (
+              <p className="mt-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Your card payment is processing. The invoice updates after Stripe verifies it.
+              </p>
+            ) : myRecipient.isPaid ? (
+              <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">
+                This invoice is marked paid. Card transaction details and the receipt appear below.
+              </p>
+            ) : (
+              <Button
+                className="mt-4 w-full"
+                onClick={() => cardCheckoutMutation.mutate()}
+                disabled={!canStartCardPayment || cardCheckoutMutation.isPending}
+                data-testid="button-pay-by-card"
+              >
+                {cardCheckoutMutation.isPending
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <CreditCard className="mr-2 h-4 w-4" />}
+                {cardCheckoutMutation.isPending ? 'Opening secure checkout…' : `Pay $${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)} by card`}
+              </Button>
+            )}
+            {myCardPayment?.receiptUrl && (
+              <a
+                href={myCardPayment.receiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                View Stripe receipt <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+          </div>
+        )}
+
+        {cardPaymentInfo?.enabled && cardPayments.length > 0 && (
+          <section className="mb-6 rounded-2xl border border-[hsl(var(--hairline))] bg-card p-5 shadow-[var(--elev-rest)]" data-testid="card-payment-history">
+            <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Card transactions
+            </h2>
+            <div className="space-y-3">
+              {cardPayments.map((payment: any) => {
+                const recipient = recipients.find((candidate: any) => candidate.id === payment.recipientId);
+                const name = recipient?.user
+                  ? `${recipient.user.firstName ?? ''} ${recipient.user.lastName ?? ''}`.trim()
+                  : recipient?.placeholderPlayer
+                    ? `${recipient.placeholderPlayer.firstName ?? ''} ${recipient.placeholderPlayer.lastName ?? ''}`.trim()
+                    : 'Invoice recipient';
+                return (
+                  <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[hsl(var(--hairline))] p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{name} · {cardPaymentStatusLabel(payment.status)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Charged ${(payment.totalAmountCents / 100).toFixed(2)} · Organizer receives ${(payment.baseAmountCents / 100).toFixed(2)}
+                        {payment.serviceFeeCents > 0 && ` · Fee $${(payment.serviceFeeCents / 100).toFixed(2)}`}
+                      </p>
+                      {payment.disputeStatus && (
+                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                          Dispute status: {payment.disputeStatus}
+                        </p>
+                      )}
+                      {payment.receiptUrl && (
+                        <a href={payment.receiptUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                          View receipt <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                    {canManagePayments && payment.status === 'paid' && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" disabled={refundCardPaymentMutation.isPending}>
+                            Refund full payment
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Refund this card payment?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Stripe will refund the full amount charged and reverse the organizer transfer. The service fee is retained by RosterHockey. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Keep payment</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => refundCardPaymentMutation.mutate(payment.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Refund full amount
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Recipients List */}
         <div className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
           <div className="flex items-center justify-between mb-4">
@@ -284,6 +473,11 @@ export default function PaymentRequestDetail() {
               const isMe = recipient.userId === (user as any)?.id;
               const canUpdate = canManagePayments || isMe;
               const recipientTheme = recipient.isPaid ? STATUS_THEME.settled : theme;
+              const recipientCardPayment = cardPayments.find((payment: any) => payment.recipientId === recipient.id);
+              const manualPaymentBlocked = !!recipientCardPayment && (
+                ['pending', 'processing', 'refund_pending', 'paid'].includes(recipientCardPayment.status) ||
+                (recipientCardPayment.status === 'disputed' && !['lost', 'won'].includes(recipientCardPayment.disputeStatus))
+              );
 
               return (
                 <div
@@ -361,7 +555,9 @@ export default function PaymentRequestDetail() {
                             Paid
                           </span>
                           {recipient.paymentMethod && (
-                            <span className="text-xs text-muted-foreground">{recipient.paymentMethod}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {recipient.paymentMethod === 'stripe' ? 'Card' : recipient.paymentMethod}
+                            </span>
                           )}
                         </div>
                         {canManagePayments && (
@@ -393,6 +589,7 @@ export default function PaymentRequestDetail() {
                       </div>
                     ) : canManagePayments ? (
                       <Select
+                        disabled={manualPaymentBlocked}
                         onValueChange={(method) => {
                           updateRecipientMutation.mutate({
                             recipientId: recipient.id,
@@ -402,7 +599,7 @@ export default function PaymentRequestDetail() {
                         }}
                       >
                         <SelectTrigger className="w-[130px] h-8 text-xs" data-testid={`select-payment-method-${recipient.id}`}>
-                          <SelectValue placeholder="Mark Paid" />
+                          <SelectValue placeholder={manualPaymentBlocked ? 'Card processing' : 'Mark Paid'} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="venmo">Venmo</SelectItem>
@@ -430,6 +627,23 @@ export default function PaymentRequestDetail() {
           </div>
         </div>
       </div>
+      <StripeCheckoutModal
+        clientSecret={checkoutClientSecret}
+        open={checkoutOpen}
+        onOpenChange={setCheckoutOpen}
+        title="Pay this invoice by card"
+        successHeadline="Payment submitted"
+        successMessage="Stripe is confirming the transaction. This invoice updates automatically after verification."
+        onPaymentComplete={async () => {
+          await Promise.all([
+            refetchCardPaymentInfo(),
+            queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] }),
+            queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] }),
+            queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] }),
+            queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] }),
+          ]);
+        }}
+      />
     </div>
   );
 }
