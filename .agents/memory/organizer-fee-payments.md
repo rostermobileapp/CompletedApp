@@ -25,7 +25,7 @@ Destination-charge payment events and connected-account lifecycle events require
 
 **Why:** Destination charges belong to the platform Stripe account, whereas `account.updated` belongs to the connected-account event scope. A connected-accounts-only webhook will not settle platform destination-charge invoices.
 
-**How to apply:** Configure separate platform-payment and connected-account snapshot destinations; verify mode, signature, and event scope independently. Never reuse the subscription webhook for organizer payments.
+**How to apply:** Configure separate platform-payment and connected-account snapshot destinations; verify mode, signature, and event scope independently. An enabled destination with the correct event name does not prove delivery from connected accounts: inspect account-scoped Stripe events and the receiving app's processed-event records. Never reuse the subscription webhook for organizer payments.
 
 Stripe can replay a cached HTTP 400 saying Connect is not registered even after Connect has been enabled.
 

@@ -1,4 +1,5 @@
 node_modules
+/generated-artifacts/
 package-lock.json
 dist
 .DS_Store

@@ -20048,6 +20048,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
 
       res.json({ ...updatedScrimmage, inviteDeliveryFailed });
     } catch (error) {
+      if (error instanceof OrganizerCardPaymentError) {
+        return res.status(error.statusCode).json({ message: error.message, code: error.code });
+      }
       console.error('Error updating scrimmage:', error);
       res.status(500).json({ message: 'Failed to update scrimmage' });
     }
@@ -26192,6 +26195,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
           message: "Invalid payment request data",
           errors: error.errors,
         });
+      }
+      if (error instanceof OrganizerCardPaymentError) {
+        return res.status(error.statusCode).json({ message: error.message, code: error.code });
       }
       console.error("Error updating payment request:", error);
       res.status(500).json({ message: "Failed to update payment request" });

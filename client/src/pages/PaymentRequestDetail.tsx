@@ -175,6 +175,9 @@ export default function PaymentRequestDetail() {
   const cardPayments: any[] = Array.isArray(cardPaymentInfo?.payments) ? cardPaymentInfo.payments : [];
   const myCardPayment = cardPayments.find((payment: any) => payment.payerUserId === (user as any)?.id);
   const cardPaymentInProgress = !!myCardPayment && ['pending', 'processing', 'refund_pending'].includes(myCardPayment.status);
+  const canResumeCardPayment = !!myCardPayment
+    && ['pending', 'processing'].includes(myCardPayment.status)
+    && !myRecipient?.isPaid;
   const canStartCardPayment = cardPaymentInfo?.enabled === true
     && cardPaymentInfo.cardEnabled === true
     && cardPaymentInfo.webhookReady === true
@@ -376,6 +379,17 @@ export default function PaymentRequestDetail() {
                 {cardCheckoutMutation.isPending ? 'Opening secure checkout…' : `Pay $${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)} by card`}
               </Button>
             )}
+            {cardPaymentInfo.webhookReady && canResumeCardPayment && (
+              <Button
+                className="mt-3 w-full"
+                variant="outline"
+                onClick={() => cardCheckoutMutation.mutate()}
+                disabled={cardCheckoutMutation.isPending}
+                data-testid="button-resume-card-payment"
+              >
+                {cardCheckoutMutation.isPending ? 'Opening secure checkout…' : 'Continue existing card checkout'}
+              </Button>
+            )}
             {myCardPayment?.receiptUrl && (
               <a
                 href={myCardPayment.receiptUrl}
@@ -408,7 +422,7 @@ export default function PaymentRequestDetail() {
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{name} · {cardPaymentStatusLabel(payment.status)}</p>
                       <p className="text-xs text-muted-foreground">
-                        Charged ${(payment.totalAmountCents / 100).toFixed(2)} · Organizer receives ${(payment.baseAmountCents / 100).toFixed(2)}
+                        Total ${(payment.totalAmountCents / 100).toFixed(2)} · Base amount ${(payment.baseAmountCents / 100).toFixed(2)}
                         {payment.serviceFeeCents > 0 && ` · Fee $${(payment.serviceFeeCents / 100).toFixed(2)}`}
                       </p>
                       {payment.disputeStatus && (

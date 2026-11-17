@@ -10327,6 +10327,26 @@ export class DatabaseStorage implements IStorage {
         // newly-created request cannot retain the previous scrimmage price.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmageId}`}))`);
       }
+      if (costIsBeingUpdated && isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        await tx.execute(sql`
+          SELECT id FROM public.payment_requests WHERE related_scrimmage_id=${scrimmageId}
+          ORDER BY id FOR UPDATE
+        `);
+        const protectedPrice = await tx.execute(sql`
+          SELECT p.id FROM public.organizer_card_payments p
+          JOIN public.payment_requests pr ON pr.id=p.payment_request_id
+          WHERE pr.related_scrimmage_id=${scrimmageId}
+            AND pr.amount_per_person IS DISTINCT FROM ${String(updates.costPerPlayer ?? 0)}::numeric
+            AND p.status IN ('pending','processing','paid','refund_pending','disputed')
+          LIMIT 1
+        `);
+        if (protectedPrice.rows.length) {
+          throw new OrganizerCardPaymentError(
+            "The price cannot change while a linked invoice has an active or settled card transaction.",
+            409, "card_payment_price_locked",
+          );
+        }
+      }
 
       const [updatedScrimmage] = await tx
         .update(scrimmages)
@@ -13931,6 +13951,25 @@ export class DatabaseStorage implements IStorage {
     recipients?: { recipientUserIds: string[]; placeholderPlayerIds: string[] },
   ): Promise<PaymentRequest> {
     return await db.transaction(async (tx) => {
+      if (isOrganizerCardPaymentsActiveInCurrentRuntime()) {
+        await tx.execute(sql`SELECT id FROM public.payment_requests WHERE id=${id} FOR UPDATE`);
+        if (updates.amountPerPerson !== undefined) {
+          const protectedPrice = await tx.execute(sql`
+            SELECT p.id FROM public.organizer_card_payments p
+            JOIN public.payment_requests pr ON pr.id=p.payment_request_id
+            WHERE pr.id=${id}
+              AND pr.amount_per_person IS DISTINCT FROM ${updates.amountPerPerson}::numeric
+              AND p.status IN ('pending','processing','paid','refund_pending','disputed')
+            LIMIT 1
+          `);
+          if (protectedPrice.rows.length) {
+            throw new OrganizerCardPaymentError(
+              "The amount cannot change while this invoice has an active or settled card transaction.",
+              409, "card_payment_price_locked",
+            );
+          }
+        }
+      }
       const updatePayload: Record<string, any> = { updatedAt: new Date() };
       if (updates.title !== undefined) updatePayload.title = updates.title;
       if (updates.description !== undefined) updatePayload.description = updates.description;

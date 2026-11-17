@@ -43,9 +43,9 @@ async function main() {
       if (!id) throw new Error("Synthetic Auth identity missing");
       identities.push(id);
       await sql`
-        INSERT INTO users (id,email,first_name,last_name,role,display_id)
-        VALUES (${id},${fixture.email},${fixture.first},${fixture.last},${fixture.role},${fixture.display})
-        ON CONFLICT (id) DO NOTHING
+        INSERT INTO users (id,email,first_name,last_name,role,display_id,onboarding_completed)
+        VALUES (${id},${fixture.email},${fixture.first},${fixture.last},${fixture.role},${fixture.display},true)
+        ON CONFLICT (id) DO UPDATE SET onboarding_completed=true
       `;
     }
     await sql.begin(async tx => {
