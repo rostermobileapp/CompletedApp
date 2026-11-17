@@ -338,7 +338,9 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
 
   const createPaymentRequestMutation = useMutation({
     mutationFn: async (data: CreatePaymentRequestForm) => {
-      const response = await apiRequest('POST', '/api/payment-requests', data);
+      const { cardEnabled, ...normalFields } = data;
+      const payload = cardSetup?.enabled && cardSetup?.eligible ? { ...normalFields, cardEnabled } : normalFields;
+      const response = await apiRequest('POST', '/api/payment-requests', payload);
       return response.json();
     },
     onSuccess: (paymentRequest) => {
@@ -361,7 +363,9 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
 
   const updatePaymentRequestMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest('PATCH', `/api/payment-requests/${editingRequestId}`, data);
+      const payload = { ...data };
+      if (!cardSetup?.enabled || !cardSetup?.eligible) delete payload.cardEnabled;
+      const response = await apiRequest('PATCH', `/api/payment-requests/${editingRequestId}`, payload);
       return response.json();
     },
     onSuccess: (paymentRequest) => {
@@ -413,6 +417,9 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
         venmoLinkOverride: data.venmoLinkOverride ?? null,
         cashappLinkOverride: data.cashappLinkOverride ?? null,
       };
+      if (cardSetup?.enabled && cardSetup?.eligible) {
+        payload.cardEnabled = data.cardEnabled === true;
+      }
       if (recipientsChanged) {
         if (!activeLeagueId) {
           toast({
@@ -550,7 +557,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
                       </p>
                       {!cardSetup.webhookReady ? (
                         <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                          Stripe test webhook setup is still required before card collection can be enabled.
+                          Stripe payment webhook setup is still required before card collection can be enabled.
                         </p>
                       ) : !cardSetup.ready && (
                         <Button

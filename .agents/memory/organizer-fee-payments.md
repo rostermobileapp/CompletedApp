@@ -33,6 +33,18 @@ Organizer-fee development uses the owner's separate nonproduction Supabase proje
 
 **How to apply:** Verify the development database and Supabase API identify the same nonproduction project before writes. Keep payment collection disabled in the live-data preview.
 
+The owner authorized a production pilot with **real charges**, restricted to U00001 and U00002 on both the organizer and payer sides. This does not authorize creating real charges as automated tests or changing subscription tiers.
+
+**Why:** After reviewing the native-return limitations, the owner explicitly requested production availability for exactly these two accounts and selected real charges rather than Stripe TEST.
+
+**How to apply:** Enforce the restriction against server-loaded account IDs, not client claims or hidden buttons alone. Preserve normal payment methods for everyone else. Production readiness must cover its own schema, live keys and dedicated webhooks; preview and automated payment tests must remain isolated.
+
+U00001 has a founder-only exception to the paid-organizer eligibility rule for collecting organizer payments.
+
+**Why:** The owner explicitly revised the initial eligibility decision: U00001 must also be able to receive payments and participate in this feature in the future.
+
+**How to apply:** Authorize U00001 for collection using its server-loaded display ID without changing its fee-exempt status, role, or subscription. Everyone else retains the existing personal paid/non-fee-exempt organizer rule. Stripe receiving-account verification and the separate production pilot allowlist still apply.
+
 Sandbox scrimmage payment tests must leave outbound-delivery restrictions enabled. Their synthetic invitation fixtures may represent already-delivered invitations; payment testing must not claim to verify invitation delivery.
 
 **Why:** Scrimmage RSVP is intentionally inaccessible until invitation delivery is recorded, even for approved league members. Development blocks the real push/email delivery needed to reach that state, so an otherwise valid payment fixture fails before checkout.

@@ -13,14 +13,17 @@ import {
 } from "./organizerScrimmageRefunds";
 import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
+import { canUseOrganizerCardPilot } from "./organizerCardPilot";
 import {
   assertOrganizerCardWebhooksReady,
+  assertOrganizerCardPilotUser,
+  isOrganizerCardPilotUser,
   calculateOrganizerServiceFeeCents,
   getOrganizerCardConnectWebhookSecret,
   getOrganizerCardPaymentsWebhookSecret,
   getOrganizerCardStripe,
   getVerifiedConnectedAccountStatus,
-  hasPersonalProEntitlement,
+  hasOrganizerCardCollectionEntitlement,
   isOrganizerCardPaymentsActiveInCurrentRuntime,
   OrganizerCardPaymentError,
   parseBaseAmountCents,
@@ -99,21 +102,26 @@ async function preparePaymentAttempt(paymentRequestId: string, payerUserId: stri
     const requestResult = await client.query<{
       payment_request_id: string;
       creator_id: string;
+      organizer_display_id: string | null;
       amount_per_person: string;
       card_enabled: boolean;
       recipient_id: string;
       recipient_user_id: string;
       is_paid: boolean;
     }>(`
-      SELECT pr.id AS payment_request_id, pr.creator_id, pr.amount_per_person::text,
+      SELECT pr.id AS payment_request_id, pr.creator_id, organizer.display_id AS organizer_display_id, pr.amount_per_person::text,
              pr.card_enabled, rr.id AS recipient_id, rr.user_id AS recipient_user_id, rr.is_paid
       FROM public.payment_requests pr
       JOIN public.payment_request_recipients rr ON rr.payment_request_id = pr.id
+      JOIN public.users organizer ON organizer.id = pr.creator_id AND organizer.deleted_at IS NULL
       WHERE pr.id = $1 AND rr.user_id = $2
       FOR UPDATE OF pr, rr
     `, [paymentRequestId, payerUserId]);
     const request = requestResult.rows[0];
     if (!request) throw new OrganizerCardPaymentError("This invoice is not assigned to your account.", 404, "recipient_not_found");
+    if (!canUseOrganizerCardPilot(isVerifiedProductionRuntime(), request.organizer_display_id)) {
+      throw new OrganizerCardPaymentError("The organizer is not in the card payment pilot.", 403, "card_pilot_restricted");
+    }
     if (!request.card_enabled) throw new OrganizerCardPaymentError("The organizer has not enabled card payments for this invoice.", 409, "card_payment_not_enabled");
     if (request.is_paid) throw new OrganizerCardPaymentError("This invoice is already marked paid.", 409, "already_paid");
 
@@ -595,7 +603,14 @@ export function registerOrganizerCardPaymentRoutes(
   app.get("/api/organizer-card-payments/connect/status", isAuthenticated, async (req: any, res) => {
     const userId = userIdFromRequest(req);
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-    const eligible = await hasPersonalProEntitlement(userId).catch(() => false);
+    try {
+      if (!await isOrganizerCardPilotUser(userId)) {
+        return res.json({ enabled: false, webhookReady: false, eligible: false, connected: false, ready: false });
+      }
+    } catch (error) {
+      return sendPaymentError(res, error);
+    }
+    const eligible = await hasOrganizerCardCollectionEntitlement(userId).catch(() => false);
     let stripe: Stripe;
     try {
       stripe = getOrganizerCardStripe();
@@ -634,7 +649,8 @@ export function registerOrganizerCardPaymentRoutes(
     const userId = userIdFromRequest(req);
     if (!userId) return res.status(401).json({ message: "Authentication required" });
     try {
-      if (!await hasPersonalProEntitlement(userId)) {
+      await assertOrganizerCardPilotUser(userId);
+      if (!await hasOrganizerCardCollectionEntitlement(userId)) {
         throw new OrganizerCardPaymentError("Connecting a receiving account requires your own active Player Pro subscription or higher.", 403, "subscription_required");
       }
       const stripe = getOrganizerCardStripe();
@@ -723,10 +739,11 @@ export function registerOrganizerCardPaymentRoutes(
     const paymentRequestId = typeof req.body?.paymentRequestId === "string" ? req.body.paymentRequestId : "";
     if (!paymentRequestId) return res.status(400).json({ message: "Payment request is required" });
     try {
+      await assertOrganizerCardPilotUser(payerUserId);
       assertOrganizerCardWebhooksReady();
       const stripe = getOrganizerCardStripe();
       const prepared = await preparePaymentAttempt(paymentRequestId, payerUserId);
-      if (!await hasPersonalProEntitlement(prepared.organizer_user_id)) {
+      if (!await hasOrganizerCardCollectionEntitlement(prepared.organizer_user_id)) {
         throw new OrganizerCardPaymentError("The organizer is not eligible to collect card payments.", 409, "organizer_entitlement_inactive");
       }
       const accountStatus = await getVerifiedConnectedAccountStatus(prepared.organizer_user_id, stripe);
@@ -831,6 +848,9 @@ export function registerOrganizerCardPaymentRoutes(
       return res.json({ enabled: false, webhookReady: false, cardEnabled: false, payments: [] });
     }
     try {
+      if (!await isOrganizerCardPilotUser(viewerId)) {
+        return res.json({ enabled: false, webhookReady: false, cardEnabled: false, payments: [] });
+      }
       const requestId = String(req.params.requestId);
       const access = await pool.query<{ allowed: boolean; card_enabled: boolean; amount_per_person: string; title: string; refund_releases_spot: boolean }>(`
         SELECT pr.card_enabled, pr.amount_per_person::text, pr.title,
@@ -905,6 +925,9 @@ export function registerOrganizerCardPaymentRoutes(
       return res.json({ enabled: false, cardPaymentEnabled: false });
     }
     try {
+      if (!await isOrganizerCardPilotUser(viewerId)) {
+        return res.json({ enabled: false, cardPaymentEnabled: false });
+      }
       const result = await pool.query<{ creator_id: string; card_payment_enabled: boolean; is_co_host: boolean }>(`
         SELECT s.creator_id, s.card_payment_enabled,
                EXISTS (SELECT 1 FROM public.scrimmage_co_hosts ch
@@ -926,6 +949,7 @@ export function registerOrganizerCardPaymentRoutes(
     const organizerUserId = userIdFromRequest(req);
     if (!organizerUserId) return res.status(401).json({ message: "Authentication required" });
     try {
+      await assertOrganizerCardPilotUser(organizerUserId);
       assertOrganizerCardWebhooksReady();
       const stripe = getOrganizerCardStripe();
       const result = await pool.query<PaymentRow>(

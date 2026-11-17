@@ -211,7 +211,7 @@ export default function PaymentRequests() {
                 <h2 className="font-semibold">Card payment setup</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {!cardSetup.webhookReady
-                    ? 'Connect is separate from billing. Card collection stays disabled until the Stripe test webhook is configured.'
+                    ? 'Connect is separate from billing. Card collection stays disabled until the Stripe payment webhooks are configured.'
                     : cardSetup.ready
                     ? 'Your Stripe receiving account is ready. You can enable card payments on new invoices and scrimmages.'
                     : cardSetup.connected

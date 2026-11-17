@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import { OrganizerCardPaymentError } from "./organizerCardPaymentMath";
+import { canCollectOrganizerCardPayments, canUseOrganizerCardPilot } from "./organizerCardPilot";
 
 export {
   calculateOrganizerServiceFeeCents,
@@ -13,6 +14,25 @@ export function isOrganizerCardPaymentsActiveInCurrentRuntime(): boolean {
   return isVerifiedProductionRuntime()
     ? process.env.ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED === "1"
     : process.env.NONPRODUCTION_ISOLATED === "1";
+}
+
+export async function isOrganizerCardPilotUser(userId: string): Promise<boolean> {
+  if (!isVerifiedProductionRuntime()) return true;
+  const result = await pool.query<{ display_id: string | null }>(
+    "SELECT display_id FROM public.users WHERE id=$1 AND deleted_at IS NULL LIMIT 1",
+    [userId],
+  );
+  return canUseOrganizerCardPilot(true, result.rows[0]?.display_id);
+}
+
+export async function assertOrganizerCardPilotUser(userId: string): Promise<void> {
+  if (!await isOrganizerCardPilotUser(userId)) {
+    throw new OrganizerCardPaymentError(
+      "Card payments are not available for this account.",
+      403,
+      "card_pilot_restricted",
+    );
+  }
 }
 
 export function getOrganizerCardStripe(): Stripe {
@@ -86,21 +106,23 @@ export function assertOrganizerCardWebhooksReady(): void {
   getOrganizerCardConnectWebhookSecret();
 }
 
-export async function hasPersonalProEntitlement(userId: string): Promise<boolean> {
-  const result = await pool.query<{ role: string; fee_exempt: boolean }>(
-    "SELECT role, fee_exempt FROM public.users WHERE id = $1 AND deleted_at IS NULL LIMIT 1",
+export async function hasOrganizerCardCollectionEntitlement(userId: string): Promise<boolean> {
+  const result = await pool.query<{ display_id: string | null; role: string; fee_exempt: boolean }>(
+    "SELECT display_id, role, fee_exempt FROM public.users WHERE id = $1 AND deleted_at IS NULL LIMIT 1",
     [userId],
   );
   const user = result.rows[0];
-  if (!user || user.fee_exempt) return false;
-  const role = user.role;
-  // The synced global role is the personal subscription entitlement. League
-  // seats, commissioner permissions, and fee-exempt status do not qualify.
-  return role === "player_pro" || role === "secondary_commissioner" || role === "commissioner";
+  if (!user) return false;
+  // The founder has a narrowly scoped collection exception. For everyone else,
+  // league seats and fee exemption still do not qualify as paid membership.
+  return canCollectOrganizerCardPayments({
+    displayId: user.display_id, role: user.role, feeExempt: user.fee_exempt,
+  });
 }
 
 export async function assertOrganizerCardCollectionReady(userId: string): Promise<void> {
-  if (!await hasPersonalProEntitlement(userId)) {
+  await assertOrganizerCardPilotUser(userId);
+  if (!await hasOrganizerCardCollectionEntitlement(userId)) {
     throw new OrganizerCardPaymentError(
       "Creating card payment requests requires your own active Player Pro subscription or higher.",
       403,

@@ -622,7 +622,9 @@ export default function CreateScrimmage() {
         dateTime: `${data.date}T${data.time || '00:00'}`, // Date-only anchor when the time is TBD
         timeTbd: !!data.timeTbd || !data.time,
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
-        cardPaymentEnabled: data.cardPaymentEnabled === true,
+        ...(cardPaymentSetup?.enabled && cardPaymentSetup?.eligible
+          ? { cardPaymentEnabled: data.cardPaymentEnabled === true }
+          : {}),
         // Per-scrimmage payment link overrides (validated + normalized server-side)
         venmoLinkOverride: data.venmoLinkOverride ?? null,
         cashappLinkOverride: data.cashappLinkOverride ?? null,
@@ -1767,7 +1769,7 @@ export default function CreateScrimmage() {
                     </p>
                     {!cardPaymentSetup.webhookReady ? (
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                        Stripe test webhook setup is still required before card collection can be enabled.
+                        Stripe payment webhook setup is still required before card collection can be enabled.
                       </p>
                     ) : !cardPaymentSetup.ready && (
                       <Button

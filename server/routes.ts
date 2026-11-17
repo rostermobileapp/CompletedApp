@@ -26,6 +26,7 @@ import { setupAuth, isAuthenticated, supabase, getAuthenticatedDatabaseUser } fr
 import { registerOrganizerCardPaymentRoutes } from "./organizerCardPaymentRoutes";
 import {
   assertOrganizerCardCollectionReady,
+  isOrganizerCardPilotUser,
   isOrganizerCardPaymentsActiveInCurrentRuntime,
   OrganizerCardPaymentError,
 } from "./organizerCardPaymentService";
@@ -19709,13 +19710,16 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
         return res.status(400).json({ message: "Invalid update data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
       }
 
+      if (updateData.cardPaymentEnabled !== undefined && !await isOrganizerCardPilotUser(userId)) {
+        return res.status(403).json({ message: 'Card payment settings are unavailable for this account.' });
+      }
       if (updateData.cardPaymentEnabled === true) {
         const effectiveCost = Number(updateData.costPerPlayer ?? existingScrimmage.costPerPlayer ?? 0);
         if (effectiveCost <= 0) {
           return res.status(400).json({ message: 'Card payments require a positive cost per player' });
         }
         try {
-          await assertOrganizerCardCollectionReady(userId);
+          await assertOrganizerCardCollectionReady(existingScrimmage.creatorId);
         } catch (error: any) {
           return res.status(error.statusCode || 500).json({ message: error.message || 'Card collection is unavailable.' });
         }
@@ -26122,6 +26126,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const validated = updatePaymentRequestSchema.parse(req.body);
+      if (validated.cardEnabled !== undefined && !await isOrganizerCardPilotUser(userId)) {
+        return res.status(403).json({ message: "Card payment settings are unavailable for this account." });
+      }
       if (validated.cardEnabled === true) {
         try {
           await assertOrganizerCardCollectionReady(userId);
