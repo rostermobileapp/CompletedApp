@@ -9,6 +9,12 @@ The owner requires the Platform model: organizers collect payments directly, rat
 
 **How to apply:** Direct charges alone do not remove platform responsibility for an Express account's negative balance. Use an account configuration where Stripe handles connected-account negative-balance responsibility, and disclose the organizer onboarding requirements. Confirm processing-fee allocation before changing any player total, organizer proceeds, or platform fee. Preserve old transactions and their original accounting; never silently convert existing Express accounts.
 
+The owner chose players to cover additional processing costs when moving to direct organizer collection.
+
+**Why:** When explicitly asked who should cover Stripe processing fees, the owner selected “Players cover additional costs,” rather than reducing organizer proceeds or using RosterHockey's service fee.
+
+**How to apply:** Disclose additional costs before authorization, but do not treat this as permission for an unrestricted card surcharge or a guarantee that all Stripe costs can legally be passed on. Apply card-type, jurisdiction, cost and refund restrictions; block unsupported cases rather than silently charging the organizer or platform. The existing card-only service-fee policy also needs review before direct-charge activation.
+
 Organizer-initiated refunds return the invoice base amount only. For legacy destination charges, reverse that same amount from the organizer. The player does not receive the service fee back; RosterHockey retains it before Stripe processing costs.
 
 **Why:** The owner explicitly clarified: “the player should only get $20 back. The organizer gets reversed $20 and RosterHockey Keeps the difference.” For a $20 invoice plus $1.50 fee, refund $20, reverse $20, retain $1.50; the organizer nets zero.
