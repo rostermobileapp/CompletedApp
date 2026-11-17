@@ -27,6 +27,12 @@ Destination-charge payment events and connected-account lifecycle events require
 
 **How to apply:** Configure separate platform-payment and connected-account snapshot destinations; verify mode, signature, and event scope independently. An enabled destination with the correct event name does not prove delivery from connected accounts: inspect account-scoped Stripe events and the receiving app's processed-event records. Never reuse the subscription webhook for organizer payments.
 
+Webhook delivery probes must identify a newly generated event, not merely find an existing event of the right type.
+
+**Why:** Editing an Express account's business-profile description did not consistently emit `account.updated`; old events remained in its history and made the diagnostic output misleading. A changed test metadata value generated a fresh event that the app processed successfully.
+
+**How to apply:** In isolated tests, change a synthetic account's metadata value, match the resulting event's request ID to the Stripe update response, and verify that exact event ID was processed by the app. Do not infer success or a routing failure from an unrelated historical event.
+
 Stripe can replay a cached HTTP 400 saying Connect is not registered even after Connect has been enabled.
 
 **Why:** A sandbox activation succeeded, but retries with the same account-creation idempotency key continued returning the earlier error with `idempotent-replayed: true`. A fresh key after the definitive rejection allowed onboarding.

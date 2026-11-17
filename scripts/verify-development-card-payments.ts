@@ -139,17 +139,29 @@ async function main() {
     console.log("[Card verification] Real auth, manual methods, card spoofing, ownership and active-attempt safeguards passed.");
 
     stage = "connected-account webhook delivery";
-    const [before] = await sql`SELECT count(*)::int AS count FROM stripe_connect_webhook_events WHERE event_type='account.updated'`;
     const [account] = await sql`SELECT stripe_account_id FROM stripe_connected_accounts WHERE user_id=${session.user.id}`;
     const stripe = new Stripe(env.TESTING_STRIPE_SECRET_KEY!);
-    await stripe.accounts.update(account.stripe_account_id, {
-      business_profile: { product_description: `Synthetic organizer payment verification ${randomUUID()}` },
+    // Metadata changes reliably emit account.updated; not every editable
+    // business-profile field does. Correlate the exact Stripe request so old
+    // account events or unrelated deliveries cannot make this check pass.
+    const updatedAccount = await stripe.accounts.update(account.stripe_account_id, {
+      metadata: { rosterVerificationRun: randomUUID() },
     });
+    const updateRequestId = updatedAccount.lastResponse.requestId;
     let delivered = false;
-    for (let attempt = 0; attempt < 12; attempt++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      const [after] = await sql`SELECT count(*)::int AS count FROM stripe_connect_webhook_events WHERE event_type='account.updated' AND processed_at IS NOT NULL`;
-      if (after.count > before.count) { delivered = true; break; }
+      const events = await stripe.events.list(
+        { type: "account.updated", limit: 5 },
+        { stripeAccount: account.stripe_account_id },
+      );
+      const event = events.data.find(candidate => candidate.request?.id === updateRequestId);
+      if (!event) continue;
+      const [received] = await sql`
+        SELECT count(*)::int AS count FROM stripe_connect_webhook_events
+        WHERE event_id=${event.id} AND event_type='account.updated' AND processed_at IS NOT NULL
+      `;
+      if (received.count === 1) { delivered = true; break; }
     }
     console.log(delivered
       ? "[Card verification] Genuine Stripe connected-account event delivered and processed."
