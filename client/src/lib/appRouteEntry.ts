@@ -21,6 +21,7 @@ export const PROTECTED_APP_ROUTES = [
   '/tournaments/:tournamentId/custom-builder', '/tournament-teams/:tournamentId',
   '/tournaments/:tournamentId', '/media/tournament/:id', '/media/league/:id',
   '/media/team/:id', '/privacy', '/admin/stripe', '/admin/metrics',
+  '/admin/organizer-card-payments',
 ] as const;
 
 const matchers = PROTECTED_APP_ROUTES.map(template => ({

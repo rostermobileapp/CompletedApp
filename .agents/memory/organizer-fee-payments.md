@@ -80,3 +80,9 @@ Winning a dispute does not guarantee that Stripe returns the dispute fee. Proces
 **Why:** The actual sandbox balance entries retained a $15 fee even for won disputes. Reporting only service fees less card processing incorrectly implied a profit while the platform had lost money.
 
 **How to apply:** Reconcile platform net to independent Stripe balance entries, including dispute fees and principal withdrawals/reinstatements. Track gross transfers, net organizer proceeds and retained application fees separately. Preserve unknown accounting as unreconciled, and refresh dispute accounting on funds-withdrawn/reinstated events without letting an older, shorter balance-entry list overwrite a more complete one. Do not infer financial costs from the dispute outcome alone.
+
+Checkout-return verification must cover a still-mounted screen, not just a cold page reload.
+
+**Why:** Browser fixtures using both native user-agent variants reproduced paid card history alongside an invoice still cached as unpaid after foreground events. An organizer setup fixture similarly retained an outdated incomplete status. Cold reloads hid both refresh gaps.
+
+**How to apply:** Verify authoritative invoice flags and organizer readiness after warm resume as well as delayed webhook settlement. A return URL or embedded completion callback must never grant paid status. Keep browser-fixture results separate from actual installed-wrapper, bank-app switching, and OS link-association checks.
