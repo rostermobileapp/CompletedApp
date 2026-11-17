@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { usePaymentReturnRefresh } from '@/hooks/usePaymentReturnRefresh';
+import { getCardPaymentStateKey } from '@/lib/paymentReturnRefresh';
 import { PaymentSummaryCard } from '@/components/PaymentSummaryCard';
 import {
   STATUS_THEME,
@@ -28,9 +30,11 @@ export default function PaymentRequestDetail() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { data: paymentRequest, isLoading } = useQuery({
+  const { data: paymentRequest, isLoading, isFetching: invoiceFetching } = useQuery({
     queryKey: [`/api/payment-requests/${id}`],
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: cardPaymentInfo, refetch: refetchCardPaymentInfo } = useQuery<any>({
@@ -42,6 +46,36 @@ export default function PaymentRequestDetail() {
     enabled: !!id,
     refetchInterval: 5000,
   });
+
+  const refreshInvoiceQueries = useCallback(() => Promise.all([
+    queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] }),
+    queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] }),
+    queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] }),
+    queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] }),
+  ]), [id, queryClient]);
+
+  usePaymentReturnRefresh(() => Promise.all([
+    refetchCardPaymentInfo(),
+    refreshInvoiceQueries(),
+  ]), `${(user as any)?.id ?? ''}:${id ?? ''}`);
+
+  const cardStateKey = cardPaymentInfo
+    ? getCardPaymentStateKey(Array.isArray(cardPaymentInfo.payments) ? cardPaymentInfo.payments : [])
+    : null;
+  const syncedCardState = useRef<{ scope: string; key: string } | null>(null);
+  useEffect(() => {
+    if (!id || !paymentRequest || invoiceFetching || cardStateKey === null) return;
+    const scope = `${(user as any)?.id ?? ''}:${id}`;
+    const previous = syncedCardState.current;
+    if (previous?.scope === scope && previous.key === cardStateKey) return;
+    syncedCardState.current = { scope, key: cardStateKey };
+    // Wait for any existing invoice fetch to finish before invalidating. Otherwise
+    // an initial fetch begun before webhook settlement could absorb the refresh.
+    if (cardStateKey !== '[]' || previous?.scope === scope) {
+      void refreshInvoiceQueries();
+    }
+  }, [id, user?.id, paymentRequest, invoiceFetching, cardStateKey, refreshInvoiceQueries]);
+
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutClientSecret, setCheckoutClientSecret] = useState<string | null>(null);
 
@@ -184,7 +218,7 @@ export default function PaymentRequestDetail() {
     && !!myRecipient
     && !myRecipient.isPaid
     && !cardPaymentInProgress
-    && myCardPayment?.status !== 'disputed';
+    && !['paid', 'disputed'].includes(myCardPayment?.status);
   const totalRecipients = recipients.length;
   const paidCount = recipients.filter((r: any) => r.isPaid).length;
   const theme = STATUS_THEME[status];
@@ -666,10 +700,7 @@ export default function PaymentRequestDetail() {
         onPaymentComplete={async () => {
           await Promise.all([
             refetchCardPaymentInfo(),
-            queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] }),
-            queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] }),
-            queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] }),
-            queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] }),
+            refreshInvoiceQueries(),
           ]);
         }}
       />

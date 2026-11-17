@@ -12,6 +12,7 @@ import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { PaymentSummaryCard } from '@/components/PaymentSummaryCard';
 import { useToast } from '@/hooks/use-toast';
+import { usePaymentReturnRefresh } from '@/hooks/usePaymentReturnRefresh';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
@@ -23,7 +24,7 @@ export default function PaymentRequests() {
 
   const isFreeTier = !permissionsLoading && !canAccessPremiumFeatures();
 
-  const { data: cardSetup } = useQuery<any>({
+  const { data: cardSetup, refetch: refetchCardSetup } = useQuery<any>({
     queryKey: ['/api/organizer-card-payments/connect/status'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/organizer-card-payments/connect/status');
@@ -32,6 +33,8 @@ export default function PaymentRequests() {
     staleTime: 0,
     refetchOnMount: 'always',
   });
+
+  usePaymentReturnRefresh(() => refetchCardSetup(), 'organizer-card-setup');
 
   const connectCardAccount = useMutation({
     mutationFn: async () => {
