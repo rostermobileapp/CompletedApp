@@ -3,7 +3,13 @@ name: Scrimmage and league-fee card payments
 description: Organizer-to-player fee collection is transaction-only and must not alter subscription tier.
 ---
 
-Organizer-initiated refunds return the invoice base amount only and reverse that same amount from the organizer. The player does not receive the service fee back; RosterHockey retains it before Stripe processing costs.
+The owner requires the Platform model: organizers collect payments directly, rather than RosterHockey creating marketplace/destination charges for them.
+
+**Why:** After being told that the destination-charge platform balance bears processing fees, refunds and chargebacks, the owner rejected that responsibility and explicitly requested a change to Platform.
+
+**How to apply:** Direct charges alone do not remove platform responsibility for an Express account's negative balance. Use an account configuration where Stripe handles connected-account negative-balance responsibility, and disclose the organizer onboarding requirements. Confirm processing-fee allocation before changing any player total, organizer proceeds, or platform fee. Preserve old transactions and their original accounting; never silently convert existing Express accounts.
+
+Organizer-initiated refunds return the invoice base amount only. For legacy destination charges, reverse that same amount from the organizer. The player does not receive the service fee back; RosterHockey retains it before Stripe processing costs.
 
 **Why:** The owner explicitly clarified: “the player should only get $20 back. The organizer gets reversed $20 and RosterHockey Keeps the difference.” For a $20 invoice plus $1.50 fee, refund $20, reverse $20, retain $1.50; the organizer nets zero.
 
