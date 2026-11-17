@@ -20,7 +20,7 @@ import {
 } from '@/lib/paymentStatus';
 import { resolveVenmoLink, resolveCashAppLink } from '@/lib/paymentLinks';
 import { PaymentMethodPicker, type PaymentMethod } from '@/components/PaymentMethodPicker';
-import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
+import { OrganizerDirectCheckout } from '@/components/OrganizerDirectCheckout';
 import { SiVenmo, SiCashapp } from 'react-icons/si';
 
 export default function PaymentRequestDetail() {
@@ -76,37 +76,23 @@ export default function PaymentRequestDetail() {
     }
   }, [id, user?.id, paymentRequest, invoiceFetching, cardStateKey, refreshInvoiceQueries]);
 
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [checkoutClientSecret, setCheckoutClientSecret] = useState<string | null>(null);
-
-  const cardCheckoutMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/organizer-card-payments/checkout-session', {
-        paymentRequestId: id,
-      });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setCheckoutClientSecret(data.clientSecret);
-      setCheckoutOpen(true);
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Could not start card payment',
-        description: error?.message || 'Please try again.',
-        variant: 'destructive',
-      });
-      refetchCardPaymentInfo();
-    },
-  });
+  const [directCheckoutOpen, setDirectCheckoutOpen] = useState(false);
+  const cardPaymentsForRefund = useRef<any[]>([]);
 
   const refundCardPaymentMutation = useMutation({
     mutationFn: async (paymentId: string) => {
       const response = await apiRequest('POST', `/api/organizer-card-payments/${paymentId}/refund`, {});
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: 'Invoice refund requested', description: 'The invoice amount will be returned. The service fee is non-refundable.' });
+    onSuccess: (data: any, paymentId: string) => {
+      const payment = cardPaymentsForRefund.current.find((item: any) => item.id === paymentId);
+      const isDirect = data?.paymentFlow === 'direct' || payment?.paymentFlow === 'direct';
+      toast({
+        title: 'Invoice refund requested',
+        description: isDirect
+          ? 'The full card payment, including the processing surcharge, will be returned. The organizer may still incur non-refundable Stripe processing costs.'
+          : 'The invoice amount will be returned. The service fee is non-refundable.',
+      });
       refetchCardPaymentInfo();
       queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
@@ -207,6 +193,8 @@ export default function PaymentRequestDetail() {
   const canManagePayments = isCreator || request.viewerCanManagePayments === true;
   const myRecipient = recipients.find((r: any) => r.userId === (user as any)?.id);
   const cardPayments: any[] = Array.isArray(cardPaymentInfo?.payments) ? cardPaymentInfo.payments : [];
+  cardPaymentsForRefund.current = cardPayments;
+  const isDirectCardFlow = cardPaymentInfo?.paymentFlow === 'direct';
   const myCardPayment = cardPayments.find((payment: any) => payment.payerUserId === (user as any)?.id);
   const cardPaymentInProgress = !!myCardPayment && ['pending', 'processing', 'refund_pending'].includes(myCardPayment.status);
   const canResumeCardPayment = !!myCardPayment
@@ -218,7 +206,8 @@ export default function PaymentRequestDetail() {
     && !!myRecipient
     && !myRecipient.isPaid
     && !cardPaymentInProgress
-    && !['paid', 'disputed'].includes(myCardPayment?.status);
+    && myCardPayment?.status !== 'paid'
+    && !(myCardPayment?.status === 'disputed' && !['lost', 'won'].includes(myCardPayment?.disputeStatus));
   const totalRecipients = recipients.length;
   const paidCount = recipients.filter((r: any) => r.isPaid).length;
   const theme = STATUS_THEME[status];
@@ -385,8 +374,13 @@ export default function PaymentRequestDetail() {
               <h2 className="text-base font-semibold">Pay by card</h2>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Invoice amount {`$${(cardPaymentInfo.baseAmountCents / 100).toFixed(2)}`} + service fee {`$${(cardPaymentInfo.serviceFeeCents / 100).toFixed(2)}`} = total {`$${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)}`}.
-              {' '}Refunds return the invoice amount only; the service fee is non-refundable.
+              {isDirectCardFlow ? (
+                <>Invoice amount {`$${(cardPaymentInfo.baseAmountCents / 100).toFixed(2)}`}. The final card total, including any processing surcharge, is shown before you confirm.
+                  {' '}If refunded, the full direct payment is returned; the organizer may still incur Stripe processing costs that are not returned.</>
+              ) : (
+                <>Invoice amount {`$${(cardPaymentInfo.baseAmountCents / 100).toFixed(2)}`} + service fee {`$${(cardPaymentInfo.serviceFeeCents / 100).toFixed(2)}`} = total {`$${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)}`}.
+                  {' '}Refunds return the invoice amount only; the service fee is non-refundable.</>
+              )}
               {cardPaymentInfo.refundReleasesSpot && ' A refund also withdraws your upcoming Pay-to-Play request.'}
             </p>
             {!cardPaymentInfo.webhookReady ? (
@@ -402,28 +396,30 @@ export default function PaymentRequestDetail() {
               <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">
                 This invoice is marked paid. Card transaction details and the receipt appear below.
               </p>
-            ) : (
+            ) : isDirectCardFlow ? (
               <Button
                 className="mt-4 w-full"
-                onClick={() => cardCheckoutMutation.mutate()}
-                disabled={!canStartCardPayment || cardCheckoutMutation.isPending}
+                onClick={() => setDirectCheckoutOpen(true)}
+                disabled={!canStartCardPayment}
                 data-testid="button-pay-by-card"
               >
-                {cardCheckoutMutation.isPending
-                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : <CreditCard className="mr-2 h-4 w-4" />}
-                {cardCheckoutMutation.isPending ? 'Opening secure checkout…' : `Pay $${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)} by card`}
+                <CreditCard className="mr-2 h-4 w-4" />
+                Review card payment
               </Button>
+            ) : (
+              <p className="mt-4 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                This is a historical card payment record. New card payments are not available through this legacy checkout.
+              </p>
             )}
-            {cardPaymentInfo.webhookReady && canResumeCardPayment && (
+            {isDirectCardFlow && cardPaymentInfo.webhookReady && canResumeCardPayment && (
               <Button
                 className="mt-3 w-full"
                 variant="outline"
-                onClick={() => cardCheckoutMutation.mutate()}
-                disabled={cardCheckoutMutation.isPending}
+                onClick={() => setDirectCheckoutOpen(true)}
+                disabled={!canResumeCardPayment}
                 data-testid="button-resume-card-payment"
               >
-                {cardCheckoutMutation.isPending ? 'Opening secure checkout…' : 'Continue existing card checkout'}
+                Continue existing card payment
               </Button>
             )}
             {myCardPayment?.receiptUrl && (
@@ -459,7 +455,9 @@ export default function PaymentRequestDetail() {
                       <p className="text-sm font-medium">{name} · {cardPaymentStatusLabel(payment.status)}</p>
                       <p className="text-xs text-muted-foreground">
                         Total ${(payment.totalAmountCents / 100).toFixed(2)} · Base amount ${(payment.baseAmountCents / 100).toFixed(2)}
-                        {payment.serviceFeeCents > 0 && ` · Fee $${(payment.serviceFeeCents / 100).toFixed(2)}`}
+                        {payment.paymentFlow === 'direct'
+                          ? ` · Processing surcharge $${((payment.processingSurchargeCents ?? 0) / 100).toFixed(2)}`
+                          : payment.serviceFeeCents > 0 && ` · Service fee $${(payment.serviceFeeCents / 100).toFixed(2)}`}
                       </p>
                       {payment.refundedAmountCents > 0 && (
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -477,21 +475,26 @@ export default function PaymentRequestDetail() {
                         </a>
                       )}
                     </div>
-                    {canManagePayments && payment.status === 'paid' && (
+                    {canManagePayments && (payment.status === 'paid' ||
+                      (payment.paymentFlow === 'direct' && payment.status === 'refund_pending' && payment.refundStatus === 'partial')) && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="outline" size="sm" disabled={refundCardPaymentMutation.isPending}>
-                            Refund invoice amount
+                            {payment.paymentFlow === 'direct' ? 'Refund full payment' : 'Refund invoice amount'}
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Refund this card payment?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Stripe will refund ${(payment.baseAmountCents / 100).toFixed(2)} to the payer
-                              and reverse ${(payment.baseAmountCents / 100).toFixed(2)} from the organizer’s
-                              Stripe balance. RosterHockey retains the ${(payment.serviceFeeCents / 100).toFixed(2)} service fee,
-                              which is non-refundable to the payer.
+                              {payment.paymentFlow === 'direct' ? (
+                                <>Stripe will return the remaining ${((payment.totalAmountCents - (payment.refundedAmountCents ?? 0)) / 100).toFixed(2)} so the full payment of ${(payment.totalAmountCents / 100).toFixed(2)}, including the ${((payment.processingSurchargeCents ?? 0) / 100).toFixed(2)} processing surcharge, is refunded. The organizer may still bear non-returned Stripe processing costs.</>
+                              ) : (
+                                <>Stripe will refund ${(payment.baseAmountCents / 100).toFixed(2)} to the payer
+                                  and reverse ${(payment.baseAmountCents / 100).toFixed(2)} from the organizer’s
+                                  Stripe balance. RosterHockey retains the ${(payment.serviceFeeCents / 100).toFixed(2)} service fee,
+                                  which is non-refundable to the payer.</>
+                              )}
                               {cardPaymentInfo?.refundReleasesSpot && (
                                 <> For an upcoming Pay-to-Play scrimmage, this also releases the player’s
                                   roster spot and promotes the next eligible backup.</>
@@ -505,7 +508,7 @@ export default function PaymentRequestDetail() {
                               onClick={() => refundCardPaymentMutation.mutate(payment.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                              Refund invoice amount
+                              {payment.paymentFlow === 'direct' ? 'Refund full payment' : 'Refund invoice amount'}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -690,18 +693,14 @@ export default function PaymentRequestDetail() {
           </div>
         </div>
       </div>
-      <StripeCheckoutModal
-        clientSecret={checkoutClientSecret}
-        open={checkoutOpen}
-        onOpenChange={setCheckoutOpen}
-        title="Pay this invoice by card"
-        successHeadline="Payment submitted"
-        successMessage="Stripe is confirming the transaction. This invoice updates automatically after verification."
-        onPaymentComplete={async () => {
-          await Promise.all([
-            refetchCardPaymentInfo(),
-            refreshInvoiceQueries(),
-          ]);
+      <OrganizerDirectCheckout
+        key={`${(user as any)?.id ?? ''}:${id ?? ''}`}
+        open={directCheckoutOpen}
+        onOpenChange={setDirectCheckoutOpen}
+        paymentRequestId={String(id ?? '')}
+        scopeKey={String((user as any)?.id ?? '')}
+        onRefresh={async () => {
+          await Promise.all([refetchCardPaymentInfo(), refreshInvoiceQueries()]);
         }}
       />
     </div>

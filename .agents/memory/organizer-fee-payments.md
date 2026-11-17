@@ -13,9 +13,9 @@ The owner chose players to cover additional processing costs when moving to dire
 
 **Why:** When explicitly asked who should cover Stripe processing fees, the owner selected “Players cover additional costs,” rather than reducing organizer proceeds or using RosterHockey's service fee.
 
-**How to apply:** Disclose additional costs before authorization, but do not treat this as permission for an unrestricted card surcharge or a guarantee that all Stripe costs can legally be passed on. Apply card-type, jurisdiction, cost and refund restrictions; block unsupported cases rather than silently charging the organizer or platform. The existing card-only service-fee policy also needs review before direct-charge activation.
+**How to apply:** Disclose additional costs before authorization, but do not treat this as permission for an unrestricted card surcharge or a guarantee that all Stripe costs can legally be passed on. Apply card-type, jurisdiction, cost and refund restrictions. The owner subsequently chose **organizers absorb uncovered costs**, including when no surcharge is permitted or verified. Never silently transfer that shortfall to RosterHockey. The old 5% + $0.50 service fee is not automatically approved for the new direct model; a processing-cost surcharge is not RosterHockey revenue.
 
-Organizer-initiated refunds return the invoice base amount only. For legacy destination charges, reverse that same amount from the organizer. The player does not receive the service fee back; RosterHockey retains it before Stripe processing costs.
+For historical destination-charge transactions only, organizer-initiated refunds return the invoice base amount and reverse that same amount from the organizer. The old service fee stays with RosterHockey. This is not the refund rule for new direct payments, whose processing surcharge must also be returned.
 
 **Why:** The owner explicitly clarified: “the player should only get $20 back. The organizer gets reversed $20 and RosterHockey Keeps the difference.” For a $20 invoice plus $1.50 fee, refund $20, reverse $20, retain $1.50; the organizer nets zero.
 

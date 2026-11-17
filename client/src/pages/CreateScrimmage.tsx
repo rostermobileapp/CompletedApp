@@ -1765,7 +1765,7 @@ export default function CreateScrimmage() {
                       Accept card payments
                     </Label>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Players pay the scrimmage cost plus a 5% + $0.50 service fee. You receive the full per-player cost.
+                      Payments go directly to your Stripe account. Players review any permitted processing surcharge before paying; you cover Stripe costs that cannot be passed on. Full refunds include any surcharge.
                     </p>
                     {!cardPaymentSetup.webhookReady ? (
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">

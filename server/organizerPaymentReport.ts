@@ -39,6 +39,7 @@ export async function loadOrganizerPaymentReport(
         p.organizer_user_id, organizer.display_id AS organizer_display_id,
         p.payer_user_id, payer.display_id AS payer_display_id,
         p.status, p.currency, p.base_amount_cents, p.service_fee_cents, p.total_amount_cents,
+        p.payment_flow,p.processing_surcharge_cents,
         p.stripe_processing_fee_cents, p.transfer_amount_cents, p.transfer_reversed_cents,
         p.refunded_amount_cents, p.application_fee_refunded_cents,
         p.refund_status, p.refunded_at, p.dispute_status, p.created_at,
@@ -60,9 +61,13 @@ export async function loadOrganizerPaymentReport(
         CASE WHEN captured THEN total_amount_cents ELSE 0 END AS captured_amount_cents,
         CASE WHEN captured THEN service_fee_cents - application_fee_refunded_cents ELSE 0 END AS retained_service_fee_cents,
         CASE WHEN captured THEN transfer_amount_cents - COALESCE(transfer_reversed_cents,0) ELSE 0 END AS net_transfer_cents,
-        CASE WHEN captured THEN transfer_amount_cents - service_fee_cents
+        CASE WHEN captured AND payment_flow='direct' AND has_dispute AND dispute_balance_net_cents IS NULL THEN NULL
+          WHEN captured AND payment_flow='direct' THEN total_amount_cents-refunded_amount_cents
+          -stripe_processing_fee_cents+COALESCE(dispute_balance_net_cents,0)
+          WHEN captured THEN transfer_amount_cents - service_fee_cents
           + application_fee_refunded_cents - COALESCE(transfer_reversed_cents,0) ELSE 0 END AS organizer_proceeds_cents,
-        CASE WHEN captured AND has_dispute AND dispute_balance_net_cents IS NULL THEN NULL
+        CASE WHEN payment_flow='direct' THEN 0
+          WHEN captured AND has_dispute AND dispute_balance_net_cents IS NULL THEN NULL
           WHEN captured THEN service_fee_cents - application_fee_refunded_cents
           - stripe_processing_fee_cents + COALESCE(dispute_balance_net_cents,0) ELSE 0 END AS platform_net_cents,
         NOT captured OR (
@@ -84,7 +89,7 @@ export async function loadOrganizerPaymentReport(
           ELSE COALESCE(SUM(transfer_amount_cents) FILTER (WHERE captured),0)::text END AS organizer_gross_transfers_cents,
         CASE WHEN COUNT(*) FILTER (WHERE captured AND transfer_amount_cents IS NULL)>0 THEN NULL
           ELSE COALESCE(SUM(net_transfer_cents),0)::text END AS organizer_transfers_cents,
-        CASE WHEN COUNT(*) FILTER (WHERE captured AND transfer_amount_cents IS NULL)>0 THEN NULL
+        CASE WHEN COUNT(*) FILTER (WHERE captured AND organizer_proceeds_cents IS NULL)>0 THEN NULL
           ELSE COALESCE(SUM(organizer_proceeds_cents),0)::text END AS organizer_proceeds_cents,
         COALESCE(SUM(refunded_amount_cents),0)::text AS refunds_cents,
         COALESCE(SUM(transfer_reversed_cents),0)::text AS transfer_reversals_cents,
@@ -96,7 +101,7 @@ export async function loadOrganizerPaymentReport(
           ELSE COALESCE(SUM(dispute_fee_cents),0)::text END AS dispute_fees_cents,
         CASE WHEN COUNT(*) FILTER (WHERE has_dispute AND (dispute_balance_net_cents IS NULL OR dispute_fee_cents IS NULL))>0 THEN NULL
           ELSE COALESCE(SUM(GREATEST(0,-dispute_balance_net_cents-dispute_fee_cents)),0)::text END AS dispute_withheld_cents,
-        CASE WHEN COUNT(*) FILTER (WHERE NOT accounting_complete)>0 THEN NULL
+        CASE WHEN COUNT(*) FILTER (WHERE payment_flow<>'direct' AND NOT accounting_complete)>0 THEN NULL
           ELSE COALESCE(SUM(platform_net_cents),0)::text END AS platform_net_cents
       FROM amounts
     )
@@ -112,7 +117,7 @@ export function organizerReportCsv(payments: Record<string, any>[]) {
   const headers = [
     "id", "payment_request_id", "title", "event_type", "organizer_user_id", "organizer_display_id",
     "payer_user_id", "payer_display_id", "status", "currency", "base_amount_cents", "service_fee_cents",
-    "total_amount_cents", "captured_amount_cents", "retained_service_fee_cents",
+    "total_amount_cents", "payment_flow", "processing_surcharge_cents", "captured_amount_cents", "retained_service_fee_cents",
     "stripe_processing_fee_cents", "transfer_amount_cents", "transfer_reversed_cents",
     "net_transfer_cents", "organizer_proceeds_cents", "refunded_amount_cents",
     "application_fee_refunded_cents", "refund_status", "refunded_at", "dispute_status",

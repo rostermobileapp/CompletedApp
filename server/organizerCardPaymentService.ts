@@ -3,6 +3,7 @@ import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import { OrganizerCardPaymentError } from "./organizerCardPaymentMath";
 import { canCollectOrganizerCardPayments, canUseOrganizerCardPilot } from "./organizerCardPilot";
+import { readDirectAccount } from "./organizerDirectAccounts";
 
 export {
   calculateOrganizerServiceFeeCents,
@@ -14,6 +15,12 @@ export function isOrganizerCardPaymentsActiveInCurrentRuntime(): boolean {
   return isVerifiedProductionRuntime()
     ? process.env.ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED === "1"
     : process.env.NONPRODUCTION_ISOLATED === "1";
+}
+
+export function assertDirectCollectionEnabled(): void {
+  if (isVerifiedProductionRuntime() && process.env.ORGANIZER_DIRECT_PAYMENTS_LIVE_ENABLED !== "1") {
+    throw new OrganizerCardPaymentError("Direct card collection is not enabled yet.", 503, "direct_payments_disabled");
+  }
 }
 
 export async function isOrganizerCardPilotUser(userId: string): Promise<boolean> {
@@ -122,6 +129,7 @@ export async function hasOrganizerCardCollectionEntitlement(userId: string): Pro
 
 export async function assertOrganizerCardCollectionReady(userId: string): Promise<void> {
   await assertOrganizerCardPilotUser(userId);
+  assertDirectCollectionEnabled();
   if (!await hasOrganizerCardCollectionEntitlement(userId)) {
     throw new OrganizerCardPaymentError(
       "Creating card payment requests requires your own active Player Pro subscription or higher.",
@@ -156,53 +164,6 @@ export async function getVerifiedConnectedAccountStatus(
   userId: string,
   stripe: Stripe,
 ): Promise<ConnectedAccountStatus> {
-  const result = await pool.query<{
-    stripe_account_id: string | null;
-  }>(
-    "SELECT stripe_account_id FROM public.stripe_connected_accounts WHERE user_id = $1 LIMIT 1",
-    [userId],
-  );
-  const accountId = result.rows[0]?.stripe_account_id;
-  if (!accountId) {
-    return {
-      connected: false,
-      accountId: null,
-      ready: false,
-      detailsSubmitted: false,
-      chargesEnabled: false,
-      transfersEnabled: false,
-      payoutsEnabled: false,
-      currentlyDue: [],
-    };
-  }
-
-  const account = await stripe.accounts.retrieve(accountId);
-  const detailsSubmitted = account.details_submitted === true;
-  const chargesEnabled = account.charges_enabled === true;
-  const transfersEnabled = account.capabilities?.transfers === "active";
-  const payoutsEnabled = account.payouts_enabled === true;
-  const currentlyDue = account.requirements?.currently_due ?? [];
-  await pool.query(
-    `UPDATE public.stripe_connected_accounts
-     SET details_submitted = $2,
-         charges_enabled = $3,
-         transfers_enabled = $4,
-         payouts_enabled = $5,
-         requirements_currently_due = $6,
-         updated_at = now()
-     WHERE user_id = $1`,
-    [userId, detailsSubmitted, chargesEnabled, transfersEnabled, payoutsEnabled, currentlyDue],
-  );
-
-  return {
-    connected: true,
-    accountId,
-    ready: detailsSubmitted && transfersEnabled && payoutsEnabled,
-    detailsSubmitted,
-    chargesEnabled,
-    transfersEnabled,
-    payoutsEnabled,
-    currentlyDue,
-  };
+  return readDirectAccount(userId, stripe);
 }
 

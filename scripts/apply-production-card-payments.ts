@@ -3,13 +3,17 @@
  * database, NOT Replit-managed PostgreSQL. Never run from a build/start hook.
  *
  * NODE_ENV=production npx tsx scripts/apply-production-card-payments.ts --apply-live-pilot-schema
+ * Direct-only upgrade after separate owner approval:
+ * NODE_ENV=production npx tsx scripts/apply-production-card-payments.ts --apply-direct-pilot-schema
  */
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 
 let client: pg.Client | undefined;
 try {
-  if (process.env.NODE_ENV !== 'production' || !process.argv.includes('--apply-live-pilot-schema')) {
+  const legacySchema = process.argv.includes('--apply-live-pilot-schema');
+  const directSchema = process.argv.includes('--apply-direct-pilot-schema');
+  if (process.env.NODE_ENV !== 'production' || legacySchema === directSchema) {
     throw new Error('EXPLICIT_PRODUCTION_MIGRATION_CONFIRMATION_REQUIRED');
   }
   const connection = process.env.DATABASE_URL;
@@ -28,11 +32,11 @@ try {
         decodeURIComponent(db.username).endsWith(`.${productionProject}`))) {
     throw new Error('PRODUCTION_TARGET_MISMATCH');
   }
-  const migrations = await Promise.all([
+  const migrations = await Promise.all((directSchema ? ['0056_organizer_direct_payments.sql'] : [
     '0053_organizer_card_payments.sql',
     '0054_organizer_refund_amount.sql',
     '0055_organizer_report_ledger.sql',
-  ].map(name => readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8')));
+  ]).map(name => readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8')));
   client = new pg.Client({
     connectionString: connection, connectionTimeoutMillis: 10_000,
     ssl: { rejectUnauthorized: true, ca: await readFile(new URL('../server/certs/supabase-ca.pem', import.meta.url), 'utf8') },
@@ -48,7 +52,8 @@ try {
   );
   if (accounts.rows.length !== 2) throw new Error('PILOT_ACCOUNTS_NOT_FOUND');
   const existing = await client.query("SELECT to_regclass('public.organizer_card_payments') IS NOT NULL AS present");
-  if (existing.rows[0].present) {
+  if (directSchema && !existing.rows[0].present) throw new Error('LEGACY_SCHEMA_PREREQUISITE_MISSING');
+  if (!directSchema && existing.rows[0].present) {
     const records = await client.query('SELECT COUNT(*)::int AS count FROM public.organizer_card_payments');
     if (records.rows[0].count !== 0) {
       throw new Error('EXISTING_PRODUCTION_CARD_PAYMENTS_REQUIRE_SEPARATE_MIGRATION_REVIEW');
@@ -74,9 +79,19 @@ try {
       AS ready
   `);
   if (!verified.rows[0].ready) throw new Error('SCHEMA_VERIFICATION_FAILED');
+  if (directSchema) {
+    const direct = await client.query(`SELECT
+      to_regclass('public.organizer_direct_accounts') IS NOT NULL
+      AND to_regclass('public.organizer_stripe_account_registry') IS NOT NULL
+      AND NOT has_column_privilege('authenticated','public.organizer_card_payments','confirmation_token_id','SELECT')
+      AND NOT has_column_privilege('authenticated','public.organizer_card_payments','quote_id','SELECT')
+      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+        AND table_name='organizer_card_payments' AND column_name='fee_policy_fingerprint') AS ready`);
+    if (!direct.rows[0].ready) throw new Error('DIRECT_SCHEMA_VERIFICATION_FAILED');
+  }
   await client.query('COMMIT');
   console.info(JSON.stringify({
-    productionTargetMatched: true, cardSchemaReady: true,
+    productionTargetMatched: true, cardSchemaReady: true, directSchemaReady: directSchema,
     copiedTestData: false, createdCharges: 0, enabledLiveCollection: false,
   }));
 } catch (error) {

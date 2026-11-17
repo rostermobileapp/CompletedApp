@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { Express, RequestHandler } from "express";
 import Stripe from "stripe";
-import { isConnectPlatformNotRegistered } from "./organizerConnectErrors";
+import { onboardDirectAccount } from "./organizerDirectAccounts";
+import { registerOrganizerDirectRoutes, requestDirectInvoiceRefund } from "./organizerDirectPayments";
+import { applyDirectOrganizerEvent } from "./organizerDirectWebhooks";
 import { readFinalizedOrganizerCharge } from "./organizerChargeAccounting";
 import { isOrganizerInvoiceRefunded, organizerInvoiceRefundParams, organizerRefundAccountingUpdate } from "./organizerRefundAccounting";
 import { matchesOrganizerDispute, organizerDisputeTransition, lostDisputeRecipientReset } from "./organizerDisputeState";
@@ -16,6 +18,7 @@ import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import { canUseOrganizerCardPilot } from "./organizerCardPilot";
 import {
   assertOrganizerCardWebhooksReady,
+  assertDirectCollectionEnabled,
   assertOrganizerCardPilotUser,
   isOrganizerCardPilotUser,
   calculateOrganizerServiceFeeCents,
@@ -30,6 +33,8 @@ import {
 } from "./organizerCardPaymentService";
 
 type PaymentRow = {
+  payment_flow?: "destination" | "direct";
+  processing_surcharge_cents?: number;
   id: string;
   payment_request_id: string;
   recipient_id: string;
@@ -87,6 +92,11 @@ function sendPaymentError(res: any, error: unknown) {
   }
   const stripeStatus = (error as any)?.statusCode;
   if (typeof stripeStatus === "number" && stripeStatus >= 400 && stripeStatus < 500) {
+    const field = (value: unknown) => typeof value === "string" && /^[a-zA-Z0-9_.[\]-]{1,120}$/.test(value) ? value : undefined;
+    console.warn("[OrganizerCardPayments] Stripe request rejected.", {
+      type: field((error as any)?.type), code: field((error as any)?.code),
+      parameter: field((error as any)?.param), requestId: field((error as any)?.requestId),
+    });
     return res.status(400).json({ message: "Stripe could not complete this payment action." });
   }
   console.error("[OrganizerCardPayments] Request failed.", {
@@ -345,6 +355,12 @@ async function applyStripeEvent(
     }
   }
   if (!payment) paymentId = null;
+  if (payment?.payment_flow === "direct") {
+    // A platform-signed event is not proof about a connected-account charge.
+    payment = undefined;
+    paymentId = null;
+    effect = "none";
+  }
   if (verifiedDispute && payment) {
     if (!payment.stripe_payment_intent_id) {
       // The dispute may precede success delivery. Retry rather than permanently
@@ -600,6 +616,7 @@ export function registerOrganizerCardPaymentRoutes(
   requireFounder: RequestHandler,
   onInvoiceRefundCommitted: (refund: CommittedInvoiceRefund) => Promise<void>,
 ) {
+  registerOrganizerDirectRoutes(app, isAuthenticated, requestAppOrigin, sendPaymentError);
   app.get("/api/organizer-card-payments/connect/status", isAuthenticated, async (req: any, res) => {
     const userId = userIdFromRequest(req);
     if (!userId) return res.status(401).json({ message: "Authentication required" });
@@ -613,6 +630,7 @@ export function registerOrganizerCardPaymentRoutes(
     const eligible = await hasOrganizerCardCollectionEntitlement(userId).catch(() => false);
     let stripe: Stripe;
     try {
+      assertDirectCollectionEnabled();
       stripe = getOrganizerCardStripe();
     } catch {
       return res.json({
@@ -653,80 +671,8 @@ export function registerOrganizerCardPaymentRoutes(
       if (!await hasOrganizerCardCollectionEntitlement(userId)) {
         throw new OrganizerCardPaymentError("Connecting a receiving account requires your own active Player Pro subscription or higher.", 403, "subscription_required");
       }
-      const stripe = getOrganizerCardStripe();
-      const origin = requestAppOrigin(req);
-      const returnUrl = new URL("/payment-requests?connect=return", origin).toString();
-      const refreshUrl = new URL("/payment-requests?connect=refresh", origin).toString();
-
-      await pool.query(
-        `INSERT INTO public.stripe_connected_accounts (user_id, creation_idempotency_key)
-         VALUES ($1,$2) ON CONFLICT (user_id) DO NOTHING`,
-        [userId, `organizer-connect:${randomUUID()}`],
-      );
-      const result = await pool.query<{
-        stripe_account_id: string | null;
-        creation_idempotency_key: string;
-      }>(
-        "SELECT stripe_account_id, creation_idempotency_key FROM public.stripe_connected_accounts WHERE user_id=$1",
-        [userId],
-      );
-      const mapping = result.rows[0];
-      if (!mapping) throw new Error("Connected-account mapping could not be initialized");
-
-      let accountId = mapping.stripe_account_id;
-      if (!accountId) {
-        let account: Stripe.Account;
-        try {
-          account = await stripe.accounts.create({
-            type: "express",
-            country: "US",
-            business_type: "individual",
-            capabilities: { transfers: { requested: true } },
-            metadata: { rosterHockeyUserId: userId },
-            settings: { payouts: { schedule: { interval: "weekly", weekly_anchor: "monday" } } },
-          }, { idempotencyKey: mapping.creation_idempotency_key });
-        } catch (error) {
-          if (!isConnectPlatformNotRegistered(error)) throw error;
-          // No account was created for this key. Compare-and-swap means a
-          // concurrent retry cannot overwrite a newer key or a saved account.
-          await pool.query(
-            `UPDATE public.stripe_connected_accounts
-             SET creation_idempotency_key=$3, updated_at=now()
-             WHERE user_id=$1 AND creation_idempotency_key=$2 AND stripe_account_id IS NULL`,
-            [userId, mapping.creation_idempotency_key, `organizer-connect:${randomUUID()}`],
-          );
-          throw new OrganizerCardPaymentError(
-            "Stripe Connect platform setup is required. Complete setup in the same Stripe account or sandbox, then retry.",
-            409,
-            "connect_platform_setup_required",
-          );
-        }
-        accountId = account.id;
-        await pool.query(
-          `UPDATE public.stripe_connected_accounts SET stripe_account_id=$2, updated_at=now()
-           WHERE user_id=$1 AND stripe_account_id IS NULL`,
-          [userId, accountId],
-        );
-        const saved = await pool.query<{ stripe_account_id: string }>(
-          "SELECT stripe_account_id FROM public.stripe_connected_accounts WHERE user_id=$1",
-          [userId],
-        );
-        if (saved.rows[0]?.stripe_account_id !== accountId) {
-          throw new OrganizerCardPaymentError("The receiving account mapping changed; retry safely.", 409, "account_mapping_conflict");
-        }
-      } else {
-        // Reuse the one mapped account on every retry; never create a second account.
-        await stripe.accounts.update(accountId, {
-          settings: { payouts: { schedule: { interval: "weekly", weekly_anchor: "monday" } } },
-        });
-      }
-
-      const accountLink = await stripe.accountLinks.create({
-        account: accountId,
-        type: "account_onboarding",
-        refresh_url: refreshUrl,
-        return_url: returnUrl,
-      });
+      assertDirectCollectionEnabled();
+      const accountLink = await onboardDirectAccount(userId, getOrganizerCardStripe(), requestAppOrigin(req));
       res.json({ url: accountLink.url });
     } catch (error) {
       sendPaymentError(res, error);
@@ -740,102 +686,8 @@ export function registerOrganizerCardPaymentRoutes(
     if (!paymentRequestId) return res.status(400).json({ message: "Payment request is required" });
     try {
       await assertOrganizerCardPilotUser(payerUserId);
-      assertOrganizerCardWebhooksReady();
-      const stripe = getOrganizerCardStripe();
-      const prepared = await preparePaymentAttempt(paymentRequestId, payerUserId);
-      if (!await hasOrganizerCardCollectionEntitlement(prepared.organizer_user_id)) {
-        throw new OrganizerCardPaymentError("The organizer is not eligible to collect card payments.", 409, "organizer_entitlement_inactive");
-      }
-      const accountStatus = await getVerifiedConnectedAccountStatus(prepared.organizer_user_id, stripe);
-      if (!accountStatus.ready || accountStatus.accountId !== prepared.stripe_account_id) {
-        throw new OrganizerCardPaymentError("The organizer’s receiving account is not ready for card payments.", 409, "organizer_account_not_ready");
-      }
-
-      let payment = prepared;
-      if (payment.stripe_checkout_session_id) {
-        const existingSession = await stripe.checkout.sessions.retrieve(payment.stripe_checkout_session_id);
-        if (existingSession.status === "open" && existingSession.client_secret) {
-          return res.json({
-            clientSecret: existingSession.client_secret,
-            paymentId: payment.id,
-            baseAmountCents: payment.base_amount_cents,
-            serviceFeeCents: payment.service_fee_cents,
-            totalAmountCents: payment.total_amount_cents,
-            currency: "usd",
-          });
-        }
-        if (existingSession.status === "complete") {
-          throw new OrganizerCardPaymentError("This payment is processing. Refresh the invoice shortly.", 409, "payment_processing");
-        }
-        await pool.query(
-          `UPDATE public.organizer_card_payments SET status='cancelled', updated_at=now()
-           WHERE id=$1 AND status IN ('pending','processing')`,
-          [payment.id],
-        );
-        payment = await preparePaymentAttempt(paymentRequestId, payerUserId);
-      }
-
-      const origin = requestAppOrigin(req);
-      const returnUrl = new URL(
-        `/payment-requests/${encodeURIComponent(paymentRequestId)}?checkout_session_id={CHECKOUT_SESSION_ID}`,
-        origin,
-      ).toString();
-      const metadata = {
-        organizerCardPaymentId: payment.id,
-        paymentRequestId: payment.payment_request_id,
-        recipientId: payment.recipient_id,
-        payerUserId: payment.payer_user_id,
-        organizerUserId: payment.organizer_user_id,
-      };
-      const session = await stripe.checkout.sessions.create({
-        ui_mode: "embedded",
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: "usd",
-              unit_amount: payment.base_amount_cents,
-              product_data: { name: "Amount to organizer" },
-            },
-          },
-          {
-            quantity: 1,
-            price_data: {
-              currency: "usd",
-              unit_amount: payment.service_fee_cents,
-              product_data: { name: "RosterHockey service fee (non-refundable)" },
-            },
-          },
-        ],
-        payment_intent_data: {
-          application_fee_amount: payment.service_fee_cents,
-          transfer_data: { destination: payment.stripe_account_id },
-          metadata,
-        },
-        client_reference_id: payment.id,
-        metadata,
-        redirect_on_completion: "if_required",
-        return_url: returnUrl,
-      }, { idempotencyKey: payment.idempotency_key });
-      if (!session.client_secret) {
-        throw new OrganizerCardPaymentError("Stripe did not return an embedded checkout secret.", 502, "checkout_secret_missing");
-      }
-      await pool.query(
-        `UPDATE public.organizer_card_payments SET status='processing',
-           stripe_checkout_session_id=$2, updated_at=now()
-         WHERE id=$1 AND status IN ('pending','processing')`,
-        [payment.id, session.id],
-      );
-      res.json({
-        clientSecret: session.client_secret,
-        paymentId: payment.id,
-        baseAmountCents: payment.base_amount_cents,
-        serviceFeeCents: payment.service_fee_cents,
-        totalAmountCents: payment.total_amount_cents,
-        currency: "usd",
-      });
+      // Retired clients must update rather than create a platform-owned charge.
+      return res.status(409).json({ message: "Reload the app to use direct organizer checkout.", code: "direct_checkout_required" });
     } catch (error) {
       sendPaymentError(res, error);
     }
@@ -876,6 +728,7 @@ export function registerOrganizerCardPaymentRoutes(
         SELECT id, recipient_id AS "recipientId", payer_user_id AS "payerUserId",
                organizer_user_id AS "organizerUserId", base_amount_cents AS "baseAmountCents",
                service_fee_cents AS "serviceFeeCents", total_amount_cents AS "totalAmountCents",
+               payment_flow AS "paymentFlow", processing_surcharge_cents AS "processingSurchargeCents",
                currency, status, receipt_url AS "receiptUrl", refund_status AS "refundStatus",
                refunded_amount_cents AS "refundedAmountCents",
                refunded_at AS "refundedAt", dispute_status AS "disputeStatus",
@@ -890,10 +743,12 @@ export function registerOrganizerCardPaymentRoutes(
       `, [requestId, viewerId]);
       res.json({
         enabled: true,
+        paymentFlow: "direct",
         refundReleasesSpot: access.rows[0].refund_releases_spot,
         webhookReady: (() => {
           try {
             assertOrganizerCardWebhooksReady();
+            assertDirectCollectionEnabled();
             return true;
           } catch {
             return false;
@@ -903,7 +758,7 @@ export function registerOrganizerCardPaymentRoutes(
         amountPerPerson: access.rows[0].amount_per_person,
         ...(access.rows[0].card_enabled ? (() => {
           const baseAmountCents = parseBaseAmountCents(access.rows[0].amount_per_person);
-          const serviceFeeCents = calculateOrganizerServiceFeeCents(baseAmountCents);
+          const serviceFeeCents = 0;
           return {
             baseAmountCents,
             serviceFeeCents,
@@ -967,6 +822,9 @@ export function registerOrganizerCardPaymentRoutes(
       );
       const payment = result.rows[0];
       if (!payment) throw new OrganizerCardPaymentError("Card payment not found.", 404, "payment_not_found");
+      if (payment.payment_flow === "direct") {
+        return res.json(await requestDirectInvoiceRefund(stripe, payment));
+      }
       if (payment.status === "refund_pending") {
         return res.json({ status: "refund_pending" });
       }
@@ -1019,6 +877,16 @@ export function registerOrganizerCardPaymentRoutes(
       }
       if (scope === "platform" && event.account) {
         return res.status(400).send("Connected account events are not accepted on the payment endpoint");
+      }
+      if (scope === "connect") {
+        if (!event.account) return res.status(400).send("Missing connected-account scope");
+        if (event.type === "account.updated" && (event.data.object as Stripe.Account).id !== event.account) {
+          return res.status(400).send("Account scope mismatch");
+        }
+        if (event.type !== "account.updated") {
+          await applyDirectOrganizerEvent(stripe, event, onInvoiceRefundCommitted);
+          return res.json({ received: true });
+        }
       }
       await applyStripeEvent(stripe, event, scope, onInvoiceRefundCommitted);
       res.json({ received: true });

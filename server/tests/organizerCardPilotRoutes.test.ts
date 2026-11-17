@@ -19,6 +19,11 @@ test('production handlers deny non-pilot accounts before Stripe or financial wri
           return { rows: ids[params[0]] ? [{ display_id: ids[params[0]] }] : [] };
         }
         if (text.includes('SELECT stripe_account_id')) return { rows: [] };
+        if (text.includes('SELECT pr.id,pr.creator_id')) return { rows: [{
+          id: 'invoice', creator_id: 'blocked', display_id: 'U00003', role: 'commissioner',
+          fee_exempt: false, amount_per_person: '20.00', card_enabled: true,
+          recipient_id: 'recipient', is_paid: false,
+        }] };
         throw new Error('Unexpected database query');
       },
       async connect() {
@@ -67,6 +72,7 @@ test('production handlers deny non-pilot accounts before Stripe or financial wri
     require: (name: string) => name === 'pilot-test-state' ? { state } : require(name),
     process: { env: {
       ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED: '1',
+      ORGANIZER_DIRECT_PAYMENTS_LIVE_ENABLED: '1',
       STRIPE_SECRET_KEY: 'sk_live_synthetic_not_a_real_key',
       STRIPE_CARD_PAYMENTS_WEBHOOK_SECRET: 'whsec_fixture',
       STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_fixture',
@@ -105,6 +111,9 @@ test('production handlers deny non-pilot accounts before Stripe or financial wri
       '/api/organizer-card-payments/connect/onboarding',
       '/api/organizer-card-payments/checkout-session',
       '/api/organizer-card-payments/:paymentId/refund',
+      '/api/organizer-card-payments/direct/context',
+      '/api/organizer-card-payments/direct/quote',
+      '/api/organizer-card-payments/direct/confirm',
     ]) assert.equal((await request('post', path, user)).statusCode, 403);
   }
   assert.equal(state.stripeCalls, 0);
@@ -116,7 +125,10 @@ test('production handlers deny non-pilot accounts before Stripe or financial wri
     assert.equal(result.body.eligible, true, 'The founder can collect while remaining fee-exempt');
   }
   // Even an allowed payer cannot start a transaction for a non-pilot organizer.
-  const blockedOrganizer = await request('post', '/api/organizer-card-payments/checkout-session', 'first');
+  const retiredCheckout = await request('post', '/api/organizer-card-payments/checkout-session', 'first');
+  assert.equal(retiredCheckout.statusCode, 409);
+  assert.equal(retiredCheckout.body.code, 'direct_checkout_required');
+  const blockedOrganizer = await request('post', '/api/organizer-card-payments/direct/context', 'first');
   assert.equal(blockedOrganizer.statusCode, 403);
   assert.equal(blockedOrganizer.body.code, 'card_pilot_restricted');
   assert.equal(state.writes, 0);

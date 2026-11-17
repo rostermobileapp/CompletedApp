@@ -1814,6 +1814,23 @@ export const paymentRequestRecipients = pgTable("payment_request_recipients", {
 ]);
 
 // Organizer-to-player card collection is kept separate from subscription data.
+export const organizerStripeAccountRegistry = pgTable("organizer_stripe_account_registry", {
+  stripeAccountId: varchar("stripe_account_id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  accountKind: varchar("account_kind").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  check("organizer_stripe_account_registry_account_kind_check", sql`${table.accountKind} IN ('legacy','direct')`),
+]);
+
+export const organizerDirectAccounts = pgTable("organizer_direct_accounts", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "restrict" }),
+  stripeAccountId: varchar("stripe_account_id").unique().references(() => organizerStripeAccountRegistry.stripeAccountId, { onDelete: "restrict" }),
+  creationIdempotencyKey: varchar("creation_idempotency_key").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const stripeConnectedAccounts = pgTable("stripe_connected_accounts", {
   userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   stripeAccountId: varchar("stripe_account_id").unique(),
@@ -1836,9 +1853,17 @@ export const organizerCardPayments = pgTable("organizer_card_payments", {
   recipientId: varchar("recipient_id").references(() => paymentRequestRecipients.id, { onDelete: "restrict" }).notNull(),
   payerUserId: varchar("payer_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
   organizerUserId: varchar("organizer_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
-  stripeAccountId: varchar("stripe_account_id").references(() => stripeConnectedAccounts.stripeAccountId, { onDelete: "restrict" }).notNull(),
+  stripeAccountId: varchar("stripe_account_id").references(() => organizerStripeAccountRegistry.stripeAccountId, { onDelete: "restrict" }).notNull(),
   baseAmountCents: integer("base_amount_cents").notNull(),
   serviceFeeCents: integer("service_fee_cents").notNull(),
+  paymentFlow: varchar("payment_flow").notNull().default("destination"),
+  processingSurchargeCents: integer("processing_surcharge_cents").notNull().default(0),
+  quoteId: varchar("quote_id"),
+  quoteExpiresAt: timestamp("quote_expires_at", { withTimezone: true }),
+  confirmationTokenId: varchar("confirmation_token_id"),
+  confirmationStartedAt: timestamp("confirmation_started_at", { withTimezone: true }),
+  feePolicyFingerprint: varchar("fee_policy_fingerprint"),
+  feeExplanation: text("fee_explanation"),
   totalAmountCents: integer("total_amount_cents").notNull(),
   currency: varchar("currency", { length: 3 }).default("usd").notNull(),
   status: varchar("status").default("pending").notNull(),
@@ -1854,15 +1879,23 @@ export const organizerCardPayments = pgTable("organizer_card_payments", {
   refundId: varchar("refund_id").unique(),
   refundStatus: varchar("refund_status"),
   refundedAmountCents: integer("refunded_amount_cents").default(0).notNull(),
+  applicationFeeRefundedCents: integer("application_fee_refunded_cents").default(0).notNull(),
   refundedAt: timestamp("refunded_at"),
   transferReversalId: varchar("transfer_reversal_id").unique(),
   transferReversedCents: integer("transfer_reversed_cents"),
   disputeId: varchar("dispute_id").unique(),
   disputeStatus: varchar("dispute_status"),
+  disputedAmountCents: integer("disputed_amount_cents"),
+  disputeFeeCents: integer("dispute_fee_cents"),
+  disputeBalanceNetCents: integer("dispute_balance_net_cents"),
+  disputeBalanceTransactionCount: integer("dispute_balance_transaction_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
-  check("organizer_card_payments_amounts_positive", sql`${table.baseAmountCents} > 0 AND ${table.serviceFeeCents} >= 0 AND ${table.totalAmountCents} = ${table.baseAmountCents} + ${table.serviceFeeCents}`),
+  check("organizer_card_payments_amounts_positive", sql`${table.baseAmountCents} > 0 AND ${table.serviceFeeCents} >= 0 AND ${table.processingSurchargeCents} >= 0`),
+  check("organizer_card_total_with_surcharge", sql`${table.totalAmountCents}::bigint = ${table.baseAmountCents}::bigint + ${table.serviceFeeCents}::bigint + ${table.processingSurchargeCents}::bigint`),
+  check("organizer_direct_no_unreviewed_service_fee", sql`${table.paymentFlow} <> 'direct' OR ${table.serviceFeeCents} = 0`),
+  check("organizer_card_payments_payment_flow_check", sql`${table.paymentFlow} IN ('destination','direct')`),
   check("organizer_card_payments_usd_only", sql`${table.currency} = 'usd'`),
   check("organizer_card_payments_status_valid", sql`${table.status} IN ('pending', 'processing', 'paid', 'failed', 'cancelled', 'refund_pending', 'refunded', 'disputed')`),
   index("idx_organizer_card_payments_request").on(table.paymentRequestId, table.createdAt),
