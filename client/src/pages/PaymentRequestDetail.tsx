@@ -353,6 +353,7 @@ export default function PaymentRequestDetail() {
             <p className="mt-2 text-sm text-muted-foreground">
               Invoice amount {`$${(cardPaymentInfo.baseAmountCents / 100).toFixed(2)}`} + service fee {`$${(cardPaymentInfo.serviceFeeCents / 100).toFixed(2)}`} = total {`$${(cardPaymentInfo.totalAmountCents / 100).toFixed(2)}`}.
               {' '}Refunds return the invoice amount only; the service fee is non-refundable.
+              {cardPaymentInfo.refundReleasesSpot && ' A refund also withdraws your upcoming Pay-to-Play request.'}
             </p>
             {!cardPaymentInfo.webhookReady ? (
               <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
@@ -457,6 +458,10 @@ export default function PaymentRequestDetail() {
                               and reverse ${(payment.baseAmountCents / 100).toFixed(2)} from the organizer’s
                               Stripe balance. RosterHockey retains the ${(payment.serviceFeeCents / 100).toFixed(2)} service fee,
                               which is non-refundable to the payer.
+                              {cardPaymentInfo?.refundReleasesSpot && (
+                                <> For an upcoming Pay-to-Play scrimmage, this also releases the player’s
+                                  roster spot and promotes the next eligible backup.</>
+                              )}
                               This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>

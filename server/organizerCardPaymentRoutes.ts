@@ -4,6 +4,10 @@ import Stripe from "stripe";
 import { isConnectPlatformNotRegistered } from "./organizerConnectErrors";
 import { readFinalizedOrganizerCharge } from "./organizerChargeAccounting";
 import { isOrganizerInvoiceRefunded, organizerInvoiceRefundParams, organizerRefundAccountingUpdate } from "./organizerRefundAccounting";
+import {
+  lockInvoiceRefundScrimmage, releaseRefundedScrimmageRequest,
+  type CommittedInvoiceRefund,
+} from "./organizerScrimmageRefunds";
 import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import {
@@ -241,6 +245,7 @@ async function applyStripeEvent(
   stripe: Stripe,
   event: Stripe.Event,
   scope: "platform" | "connect",
+  onInvoiceRefundCommitted: (refund: CommittedInvoiceRefund) => Promise<void>,
 ): Promise<void> {
   const object: any = event.data.object;
   let paymentId: string | null = object?.metadata?.organizerCardPaymentId ?? null;
@@ -343,9 +348,19 @@ async function applyStripeEvent(
       ? transfer.amount_reversed ?? 0 : 0;
   }
 
+  let committedRefund: CommittedInvoiceRefund | null = null;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const refundScrimmage = effect === "refund" && payment
+      ? await lockInvoiceRefundScrimmage(client, payment.payment_request_id, payment.organizer_user_id)
+      : null;
+    if (payment) {
+      // Serialize distinct deliveries before inserting their payment FK, so
+      // concurrent webhook inserts cannot deadlock against the payment row lock.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",
+        [`organizer-card-event:${payment.id}`]);
+    }
     const inserted = await client.query(
       `INSERT INTO public.stripe_connect_webhook_events (event_id, event_type, payment_id)
        VALUES ($1,$2,$3) ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
@@ -435,7 +450,7 @@ async function applyStripeEvent(
           const reversal: any = refundInfo?.transfer_reversal;
           await client.query(
             `UPDATE public.organizer_card_payments
-             SET status=CASE WHEN $2 THEN 'refunded' ELSE 'refund_pending' END,
+             SET status=CASE WHEN status='refunded' OR $2 THEN 'refunded' ELSE 'refund_pending' END,
                  refund_id=COALESCE($3, refund_id),
                  refund_status=COALESCE($4, 'succeeded'),
                  refunded_at=CASE WHEN $2 THEN now() ELSE refunded_at END,
@@ -454,13 +469,24 @@ async function applyStripeEvent(
                verifiedRefundedCents,
             ],
           );
-          if (fullRefund) {
+          // Only the first completed refund may mutate the recipient/roster.
+          // Later deliveries must not undo a subsequent RSVP or repayment.
+          if (fullRefund && row.status !== "refunded") {
             await client.query(
               `UPDATE public.payment_request_recipients
-               SET is_paid=false, payment_method=NULL, paid_at=NULL, updated_at=now()
+               SET is_paid=false, payment_method=NULL, paid_at=NULL,
+                   is_confirmed=false, confirmed_at=NULL, updated_at=now()
                WHERE id=$1 AND payment_request_id=$2`,
               [row.recipient_id, row.payment_request_id],
             );
+            const released = await releaseRefundedScrimmageRequest(client, refundScrimmage, row.payer_user_id);
+            committedRefund = {
+              paymentRequestId: row.payment_request_id,
+              organizerUserId: row.organizer_user_id,
+              payerUserId: row.payer_user_id,
+              scrimmageId: refundScrimmage?.id ?? null,
+              ...released,
+            };
           }
         } else if (effect === "dispute_created") {
           await client.query(
@@ -502,12 +528,16 @@ async function applyStripeEvent(
   } finally {
     client.release();
   }
+  // Reuse normal backup promotion only after releasing the transaction's
+  // scrimmage lock. The normal promotion path also checks capacity atomically.
+  if (committedRefund) await onInvoiceRefundCommitted(committedRefund);
 }
 
 export function registerOrganizerCardPaymentRoutes(
   app: Express,
   isAuthenticated: RequestHandler,
   requireFounder: RequestHandler,
+  onInvoiceRefundCommitted: (refund: CommittedInvoiceRefund) => Promise<void>,
 ) {
   app.get("/api/organizer-card-payments/connect/status", isAuthenticated, async (req: any, res) => {
     const userId = userIdFromRequest(req);
@@ -749,8 +779,12 @@ export function registerOrganizerCardPaymentRoutes(
     }
     try {
       const requestId = String(req.params.requestId);
-      const access = await pool.query<{ allowed: boolean; card_enabled: boolean; amount_per_person: string; title: string }>(`
-        SELECT pr.card_enabled, pr.amount_per_person::text, pr.title, (
+      const access = await pool.query<{ allowed: boolean; card_enabled: boolean; amount_per_person: string; title: string; refund_releases_spot: boolean }>(`
+        SELECT pr.card_enabled, pr.amount_per_person::text, pr.title,
+        EXISTS (
+          SELECT 1 FROM public.scrimmages s
+          WHERE s.id=pr.related_scrimmage_id AND s.join_mode='first_pay'
+        ) AS refund_releases_spot, (
           pr.creator_id=$2
           OR EXISTS (
             SELECT 1 FROM public.payment_request_recipients rr
@@ -783,6 +817,7 @@ export function registerOrganizerCardPaymentRoutes(
       `, [requestId, viewerId]);
       res.json({
         enabled: true,
+        refundReleasesSpot: access.rows[0].refund_releases_spot,
         webhookReady: (() => {
           try {
             assertOrganizerCardWebhooksReady();
@@ -908,7 +943,7 @@ export function registerOrganizerCardPaymentRoutes(
       if (scope === "platform" && event.account) {
         return res.status(400).send("Connected account events are not accepted on the payment endpoint");
       }
-      await applyStripeEvent(stripe, event, scope);
+      await applyStripeEvent(stripe, event, scope, onInvoiceRefundCommitted);
       res.json({ received: true });
     } catch (error: any) {
       if (error instanceof Stripe.errors.StripeSignatureVerificationError) {

@@ -71,17 +71,18 @@ async function main() {
     assert.equal(account.body.ready, true);
     let invoiceId: string;
     let scrimmageId: string | null = null;
+    let backupUserId: string | null = null;
     const scrimmageEvidence: Record<string, unknown>[] = [];
     async function scrimmageSnapshot(phase: string) {
       const [state] = await sql`
-        SELECT sr.status AS admission_status, sr.backup_position,
+        SELECT COALESCE(sr.status::text,'not_on_roster') AS admission_status, sr.backup_position,
                rr.is_paid, rr.is_confirmed, rr.payment_method,
                rr.paid_at IS NOT NULL AS has_paid_timestamp,
                rr.confirmed_at IS NOT NULL AS has_confirmed_timestamp
-        FROM scrimmage_requests sr
-        JOIN payment_requests pr ON pr.related_scrimmage_id=sr.scrimmage_id
-        JOIN payment_request_recipients rr ON rr.payment_request_id=pr.id AND rr.user_id=sr.player_id
-        WHERE sr.scrimmage_id=${scrimmageId} AND sr.player_id=${payer.user.id}
+        FROM payment_requests pr
+        JOIN payment_request_recipients rr ON rr.payment_request_id=pr.id
+        LEFT JOIN scrimmage_requests sr ON sr.scrimmage_id=pr.related_scrimmage_id AND sr.player_id=rr.user_id
+        WHERE pr.related_scrimmage_id=${scrimmageId} AND rr.user_id=${payer.user.id}
       `;
       assert.ok(state);
       const view = await api(organizer.access_token, `/api/payment-requests/${invoiceId}`);
@@ -100,6 +101,7 @@ async function main() {
       const saved = JSON.parse(await readFile(statePath, "utf8"));
       invoiceId = saved.invoiceId;
       scrimmageId = saved.scrimmageId ?? null;
+      backupUserId = saved.backupUserId ?? null;
       const [fixture] = await sql`
         SELECT id FROM payment_requests
         WHERE id=${invoiceId} AND creator_id=${organizer.user.id}
@@ -113,6 +115,7 @@ async function main() {
     } else if (scrimmageTest) {
       stage = "card-enabled first-to-pay scrimmage creation";
       const secondPlayer = await login("captain@roster-dev.invalid");
+      backupUserId = secondPlayer.user.id;
       const created = await api(organizer.access_token, "/api/scrimmages", "POST", {
         leagueId: "dev-league", title: `Synthetic card scrimmage ${randomUUID()}`,
         dateTime: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19),
@@ -143,7 +146,7 @@ async function main() {
       assert.ok(request);
       assert.equal(request.card_enabled, true);
       invoiceId = request.id;
-      await writeFile(statePath, JSON.stringify({ invoiceId, scrimmageId }, null, 2));
+      await writeFile(statePath, JSON.stringify({ invoiceId, scrimmageId, backupUserId }, null, 2));
       const initial = await scrimmageSnapshot("joined_before_payment");
       assert.equal(initial.is_paid, false);
       assert.equal(initial.is_confirmed, false);
@@ -291,6 +294,32 @@ async function main() {
         assert.equal(admitted.is_confirmed, true);
         console.log("[Scrimmage test] Admission still requires organizer confirmation; confirmation approved the paid player.");
       }
+      stage = "normal paid backup queue setup";
+      assert.ok(backupUserId);
+      // Use the existing manual-payment APIs for the other synthetic players;
+      // only the primary player needs another genuine Stripe TEST transaction.
+      assert.equal((await api(organizer.access_token,
+        `/api/scrimmages/${scrimmageId}/requests`, "POST", {})).status, 201);
+      for (const userId of [organizer.user.id, backupUserId]) {
+        const [recipient] = await sql`
+          SELECT id FROM payment_request_recipients
+          WHERE payment_request_id=${invoiceId} AND user_id=${userId}
+        `;
+        assert.ok(recipient);
+        assert.equal((await api(organizer.access_token,
+          `/api/payment-request-recipients/${recipient.id}`, "PATCH",
+          { isPaid: true, paymentMethod: "cash" })).status, 200);
+        assert.equal((await api(organizer.access_token,
+          `/api/payment-request-recipients/${recipient.id}/confirm`, "PATCH",
+          { isConfirmed: true })).status, 200);
+      }
+      const [backup] = await sql`
+        SELECT status,backup_position FROM scrimmage_requests
+        WHERE scrimmage_id=${scrimmageId} AND player_id=${backupUserId}
+      `;
+      assert.equal(backup.status, "backup");
+      assert.equal(backup.backup_position, 1);
+      console.log("[Scrimmage test] Normal payment confirmation filled the roster and queued the next paid backup.");
     }
 
     stage = "database RLS isolation";
@@ -321,6 +350,28 @@ async function main() {
     assert.equal((await rest(payer.access_token, "stripe_connect_webhook_events", "select=event_id&limit=1")).status, 403);
     console.log("[Checkout test] Real Supabase RLS allowed payer/organizer reads and rejected outsiders, anonymous reads and direct writes.");
 
+    if (scrimmageTest) {
+      stage = "organizer refund consequence disclosure";
+      const organizerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      await organizerContext.addInitScript(({ origin, storageKey, session }) => {
+        if (location.origin === origin) localStorage.setItem(storageKey, JSON.stringify(session));
+      }, { origin, storageKey, session: organizer });
+      const organizerPage = await organizerContext.newPage();
+      await organizerPage.goto(`${origin}/payment-requests/${invoiceId}`, { waitUntil: "domcontentloaded" });
+      const refundButton = organizerPage.getByRole("button", { name: "Refund invoice amount", exact: true });
+      await refundButton.waitFor({ timeout: 45_000 });
+      await refundButton.click();
+      const dialog = organizerPage.getByRole("alertdialog");
+      const disclosure = await dialog.innerText();
+      assert.match(disclosure, /refund \$20\.00/);
+      assert.match(disclosure, /roster spot and promotes the next eligible backup/);
+      await organizerPage.screenshot({
+        path: `${outputDir}/scrimmage-refund-confirmation-mobile.jpg`, fullPage: true,
+      });
+      await organizerContext.close();
+      console.log("[Scrimmage test] Phone refund confirmation disclosed the $20 refund, spot release and backup promotion.");
+    }
+
     stage = "invoice-only refund and transfer reversal";
     assert.equal((await api(payer.access_token, `/api/organizer-card-payments/${payment.id}/refund`, "POST", {})).status, 404);
     const refund = await api(organizer.access_token, `/api/organizer-card-payments/${payment.id}/refund`, "POST", {});
@@ -340,9 +391,21 @@ async function main() {
       const returned = await scrimmageSnapshot("invoice_refunded");
       assert.equal(returned.is_paid, false);
       assert.equal(returned.payment_method, null);
-      console.log("[Scrimmage test] Post-refund state:", JSON.stringify({
-        admissionStatus: returned.admission_status, paymentConfirmed: returned.is_confirmed,
-      }));
+      assert.equal(returned.is_confirmed, false);
+      assert.equal(returned.has_confirmed_timestamp, false);
+      assert.equal(returned.admission_status, "not_on_roster");
+      let backup: any;
+      for (let attempt = 0; attempt < 30; attempt++) {
+        [backup] = await sql`
+          SELECT status,backup_position FROM scrimmage_requests
+          WHERE scrimmage_id=${scrimmageId} AND player_id=${backupUserId}
+        `;
+        if (backup.status === "approved") break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      assert.equal(backup.status, "approved");
+      assert.equal(backup.backup_position, null);
+      console.log("[Scrimmage test] Confirmed refund cleared payment confirmation, removed the player and promoted backup #1.");
     }
     assert.equal(refunded.transfer_reversed_cents, 2000);
     assert.equal(refunded.refunded_amount_cents, 2000);
@@ -377,12 +440,48 @@ async function main() {
     // genuine provider redeliveries. The alias represents a distinct late event.
     await replay(success);
     await replay({ ...success, id: `evt_synthetic_late_${randomUUID()}` });
+    if (scrimmageTest) {
+      // A new RSVP after the refund must survive even distinct, concurrent late
+      // refund events for the old card transaction.
+      const rejoin = await api(payer.access_token,
+        `/api/scrimmages/${scrimmageId}/requests`, "POST", {});
+      assert.equal(rejoin.status, 201);
+      assert.equal(rejoin.body.status, "pending");
+      assert.equal((await api(organizer.access_token,
+        `/api/payment-request-recipients/${payment.recipient_id}`, "PATCH",
+        { isPaid: true, paymentMethod: "cash" })).status, 200);
+      assert.equal((await api(organizer.access_token,
+        `/api/payment-request-recipients/${payment.recipient_id}/confirm`, "PATCH",
+        { isConfirmed: true })).status, 200);
+      const rosterBeforeReplay = await sql`
+        SELECT player_id,status,backup_position,approved_at
+        FROM scrimmage_requests WHERE scrimmage_id=${scrimmageId} ORDER BY player_id
+      `;
+      const refundEvents = await stripe.events.list({ type: "charge.refunded", limit: 20 });
+      const refundEvent = refundEvents.data.find(event =>
+        (event.data.object as Stripe.Charge).payment_intent === settled.stripe_payment_intent_id);
+      assert.ok(refundEvent);
+      await replay(refundEvent);
+      await Promise.all([1, 2].map(() => replay({
+        ...refundEvent, id: `evt_synthetic_refund_replay_${randomUUID()}`,
+      })));
+      assert.deepEqual(await sql`
+        SELECT player_id,status,backup_position,approved_at
+        FROM scrimmage_requests WHERE scrimmage_id=${scrimmageId} ORDER BY player_id
+      `, rosterBeforeReplay);
+      const repaid = await scrimmageSnapshot("fresh_repayment_survived_late_refund_replays");
+      assert.equal(repaid.is_paid, true);
+      assert.equal(repaid.is_confirmed, true);
+      assert.equal(repaid.payment_method, "cash");
+      assert.equal(repaid.admission_status, "backup");
+      console.log("[Scrimmage test] Concurrent refund replays preserved the fresh RSVP/manual repayment and did not promote another backup.");
+    }
     const [afterReplay] = await sql`
       SELECT p.status,r.is_paid FROM organizer_card_payments p
       JOIN payment_request_recipients r ON r.id=p.recipient_id WHERE p.id=${payment.id}
     `;
     assert.equal(afterReplay.status, "refunded");
-    assert.equal(afterReplay.is_paid, false);
+    assert.equal(afterReplay.is_paid, scrimmageTest);
     const roles = await sql`SELECT id,role FROM users WHERE id IN (${organizer.user.id},${payer.user.id}) ORDER BY id`;
     assert.deepEqual(roles, beforeRoles, "Fee payments and refunds must never change subscription roles");
     console.log("[Checkout test] $20 invoice refund and $20 reversal verified; $1.50 fee retained; organizer net zero; subscription roles unchanged.");

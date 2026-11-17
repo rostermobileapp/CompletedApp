@@ -9,6 +9,12 @@ Organizer-initiated refunds return the invoice base amount only and reverse that
 
 **How to apply:** Disclose the non-refundable fee before payment and in refund confirmation. Treat refunding the full invoice base as a completed invoice refund, even though Stripe calls it a partial charge refund. Reporting must use actual refunded money, not the original charge total.
 
+A confirmed Pay-to-Play invoice refund clears payment confirmation, releases the refunded player's upcoming roster spot, and uses normal ranked-backup promotion. Other join modes and historical attendance must remain intact.
+
+**Why:** The owner explicitly approved “Release spot” after sandbox testing showed that refunded players still occupied approved roster spots.
+
+**How to apply:** Release only on the first verified completed invoice refund, under the scrimmage payment locks. A late event for an old refunded transaction must never remove a later RSVP or undo repayment. Run normal backup promotion after committing the release and refresh the organizer, refunded player and promoted backup.
+
 Organizer card collection for scrimmage charges and league fees is a separate transaction flow. A verified full Stripe payment must automatically mark the linked recipient paid in the existing invoice tracking so the organizer sees the settled status; pending, failed, or cancelled attempts must not. A successful, failed, or refunded fee payment, or Connect onboarding, must never promote or downgrade a RosterHockey account or update subscription access. Player Pro or higher is only an organizer eligibility gate; a payer's card purchase is not a subscription event.
 
 **Why:** The owner clarified that this feature supports scrimmage setup and league-fee collection, that successful Stripe payments must synchronize to the existing invoice paid indicator, and that these transactions do not change anyone's account subscription tier.

@@ -25871,6 +25871,13 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const confirmation = await db.transaction(async (tx) => {
+        // Match refund/finalization lock order before touching the recipient.
+        const scrimmageId = recipient.paymentRequest.relatedScrimmageId;
+        if (scrimmageId) {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmageId}`}))`);
+          await tx.select({ id: scrimmages.id }).from(scrimmages)
+            .where(eq(scrimmages.id, scrimmageId)).limit(1).for('update');
+        }
         // Player undo and organizer confirmation both lock this row, so an
         // unpaid transition cannot race between the paid check and admission.
         const [lockedRecipient] = await tx
@@ -31293,7 +31300,36 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     next();
   };
 
-  registerOrganizerCardPaymentRoutes(app, isAuthenticated, requireFounder);
+  registerOrganizerCardPaymentRoutes(app, isAuthenticated, requireFounder, async (refund) => {
+    broadcastPaymentUpdate({
+      id: refund.paymentRequestId,
+      creatorId: refund.organizerUserId,
+      relatedScrimmageId: refund.scrimmageId,
+    }, [refund.payerUserId]);
+    if (!refund.scrimmageId) return;
+    const promotedPlayerId = refund.releasedApprovedSpot
+      ? await promoteNextBackup(refund.scrimmageId)
+      : undefined;
+    await broadcastScrimmageUpdate(refund.scrimmageId, [
+      refund.payerUserId, ...(promotedPlayerId ? [promotedPlayerId] : []),
+    ]);
+    if (refund.removedRequest) {
+      try {
+        await storage.createNotification({
+          userId: refund.payerUserId,
+          type: 'general',
+          title: 'Scrimmage spot released after refund',
+          message: 'Your invoice amount was refunded and your Pay-to-Play roster spot was released. The service fee is non-refundable.',
+          actionUrl: `/scrimmage/${refund.scrimmageId}`,
+          actionText: 'View Scrimmage',
+          scrimmageId: refund.scrimmageId,
+        });
+        broadcastNotificationUpdate(refund.payerUserId);
+      } catch (error) {
+        console.error('[OrganizerCardPayments] Refund notification failed.');
+      }
+    }
+  });
 
   app.get('/api/admin/users/search', isAuthenticated, requireFounder, async (req: any, res) => {
     try {
