@@ -27,6 +27,12 @@ Organizer-fee development uses the owner's separate nonproduction Supabase proje
 
 **How to apply:** Verify the development database and Supabase API identify the same nonproduction project before writes. Keep payment collection disabled in the live-data preview.
 
+Sandbox scrimmage payment tests must leave outbound-delivery restrictions enabled. Their synthetic invitation fixtures may represent already-delivered invitations; payment testing must not claim to verify invitation delivery.
+
+**Why:** Scrimmage RSVP is intentionally inaccessible until invitation delivery is recorded, even for approved league members. Development blocks the real push/email delivery needed to reach that state, so an otherwise valid payment fixture fails before checkout.
+
+**How to apply:** Scope any invitation-state setup to a newly created, explicitly synthetic scrimmage owned by a synthetic organizer. Then use normal authenticated RSVP, checkout, confirmation and refund APIs. Never loosen live-delivery guards or authentication to make a sandbox payment check pass.
+
 Destination-charge payment events and connected-account lifecycle events require distinct webhook scopes and signing secrets.
 
 **Why:** Destination charges belong to the platform Stripe account, whereas `account.updated` belongs to the connected-account event scope. A connected-accounts-only webhook will not settle platform destination-charge invoices.

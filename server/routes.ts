@@ -20554,7 +20554,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
           }
 
           const existingRecipient = await tx
-            .select({ id: paymentRequestRecipients.id })
+            .select({ id: paymentRequestRecipients.id, paymentRequestId: paymentRequestRecipients.paymentRequestId })
             .from(paymentRequestRecipients)
             .innerJoin(paymentRequests, eq(paymentRequestRecipients.paymentRequestId, paymentRequests.id))
             .where(and(
@@ -20562,11 +20562,34 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
               eq(paymentRequestRecipients.userId, userId),
             ))
             .limit(1);
+          const cardRuntimeActive = isOrganizerCardPaymentsActiveInCurrentRuntime();
+          const cardPaymentEnabled = cardRuntimeActive
+            ? Boolean((await tx.execute(sql`
+                SELECT card_payment_enabled FROM public.scrimmages WHERE id=${scrimmageId}
+              `) as any).rows?.[0]?.card_payment_enabled)
+            : false;
           if (existingRecipient.length > 0) {
+            if (cardRuntimeActive) {
+              await tx.execute(sql`
+                UPDATE public.payment_requests
+                SET card_enabled=${cardPaymentEnabled}, updated_at=now()
+                WHERE id=${existingRecipient[0].paymentRequestId}
+              `);
+            }
             return { kind: 'created' as const, request, paymentRequest: null };
           }
 
-          const [paymentRequest] = await tx
+          // Later Pay-to-Play joins append to the same organizer-facing invoice,
+          // under the scrimmage payment lock, just like other join modes.
+          let [paymentRequest] = await tx
+            .select()
+            .from(paymentRequests)
+            .where(eq(paymentRequests.relatedScrimmageId, scrimmageId))
+            .orderBy(paymentRequests.createdAt)
+            .limit(1)
+            .for('update');
+          if (!paymentRequest) {
+            [paymentRequest] = await tx
             .insert(paymentRequests)
             .values({
               creatorId: currentScrimmage.creatorId,
@@ -20581,6 +20604,14 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
               relatedConversationId: null,
             })
             .returning();
+          }
+          if (cardRuntimeActive) {
+            await tx.execute(sql`
+              UPDATE public.payment_requests
+              SET card_enabled=${cardPaymentEnabled}, updated_at=now()
+              WHERE id=${paymentRequest.id}
+            `);
+          }
           await tx.insert(paymentRequestRecipients).values({
             paymentRequestId: paymentRequest.id,
             userId,

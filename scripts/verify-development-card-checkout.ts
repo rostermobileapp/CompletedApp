@@ -13,7 +13,8 @@ import { isolateDevelopmentEnvironment } from "../server/nonproductionEnvironmen
 const env = isolateDevelopmentEnvironment(process.env);
 const origin = `https://${env.REPLIT_DEV_DOMAIN}`;
 const outputDir = "generated-artifacts/card-payment-checks";
-const statePath = `${outputDir}/checkout-fixture.json`;
+const scrimmageTest = process.argv.includes("--scrimmage");
+const statePath = `${outputDir}/${scrimmageTest ? "scrimmage" : "checkout"}-fixture.json`;
 let stage = "synthetic login";
 
 async function login(email: string) {
@@ -69,14 +70,95 @@ async function main() {
     assert.equal(account.status, 200);
     assert.equal(account.body.ready, true);
     let invoiceId: string;
+    let scrimmageId: string | null = null;
+    const scrimmageEvidence: Record<string, unknown>[] = [];
+    async function scrimmageSnapshot(phase: string) {
+      const [state] = await sql`
+        SELECT sr.status AS admission_status, sr.backup_position,
+               rr.is_paid, rr.is_confirmed, rr.payment_method,
+               rr.paid_at IS NOT NULL AS has_paid_timestamp,
+               rr.confirmed_at IS NOT NULL AS has_confirmed_timestamp
+        FROM scrimmage_requests sr
+        JOIN payment_requests pr ON pr.related_scrimmage_id=sr.scrimmage_id
+        JOIN payment_request_recipients rr ON rr.payment_request_id=pr.id AND rr.user_id=sr.player_id
+        WHERE sr.scrimmage_id=${scrimmageId} AND sr.player_id=${payer.user.id}
+      `;
+      assert.ok(state);
+      const view = await api(organizer.access_token, `/api/payment-requests/${invoiceId}`);
+      assert.equal(view.status, 200);
+      const visibleRecipient = view.body.recipients.find((recipient: any) => recipient.userId === payer.user.id);
+      assert.ok(visibleRecipient);
+      assert.equal(visibleRecipient.isPaid, state.is_paid);
+      assert.equal(visibleRecipient.isConfirmed, state.is_confirmed);
+      scrimmageEvidence.push({ phase, ...state });
+      await writeFile(`${outputDir}/scrimmage-results.json`, JSON.stringify({
+        invoiceId, scrimmageId, states: scrimmageEvidence,
+      }, null, 2));
+      return state;
+    }
     if (process.argv.includes("--resume")) {
-      invoiceId = JSON.parse(await readFile(statePath, "utf8")).invoiceId;
+      const saved = JSON.parse(await readFile(statePath, "utf8"));
+      invoiceId = saved.invoiceId;
+      scrimmageId = saved.scrimmageId ?? null;
       const [fixture] = await sql`
         SELECT id FROM payment_requests
         WHERE id=${invoiceId} AND creator_id=${organizer.user.id}
-          AND title='Synthetic genuine card checkout'
+          AND (title='Synthetic genuine card checkout' OR
+            related_scrimmage_id IN (
+              SELECT id FROM scrimmages WHERE id=${scrimmageId}
+              AND creator_id=${organizer.user.id} AND title LIKE 'Synthetic card scrimmage %'
+            ))
       `;
       assert.ok(fixture, "Only the synthetic checkout fixture can be resumed");
+    } else if (scrimmageTest) {
+      stage = "card-enabled first-to-pay scrimmage creation";
+      const secondPlayer = await login("captain@roster-dev.invalid");
+      const created = await api(organizer.access_token, "/api/scrimmages", "POST", {
+        leagueId: "dev-league", title: `Synthetic card scrimmage ${randomUUID()}`,
+        dateTime: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19),
+        location: "Synthetic development rink", maxPlayers: 2,
+        costPerPlayer: "20.00", joinMode: "first_pay", cardPaymentEnabled: true,
+        inviteUserIds: [payer.user.id, secondPlayer.user.id],
+      });
+      assert.equal(created.status, 201);
+      scrimmageId = created.body.id;
+      // Outbound email/push stays disabled in development. Seed only the
+      // delivered-invitation state of this validated synthetic fixture so the
+      // real authenticated RSVP can run. This does not test invite delivery.
+      const invitationFixture = await sql`
+        UPDATE scrimmages SET invite_sent_at=now()
+        WHERE id=${scrimmageId} AND creator_id=${organizer.user.id}
+          AND title LIKE 'Synthetic card scrimmage %'
+        RETURNING id
+      `;
+      assert.equal(invitationFixture.length, 1);
+      stage = "player joins and receives the scrimmage invoice";
+      const joined = await api(payer.access_token, `/api/scrimmages/${scrimmageId}/requests`, "POST", {});
+      assert.equal(joined.status, 201);
+      assert.equal(joined.body.status, "pending");
+      const [request] = await sql`
+        SELECT id,card_enabled FROM payment_requests
+        WHERE related_scrimmage_id=${scrimmageId} AND creator_id=${organizer.user.id}
+      `;
+      assert.ok(request);
+      assert.equal(request.card_enabled, true);
+      invoiceId = request.id;
+      await writeFile(statePath, JSON.stringify({ invoiceId, scrimmageId }, null, 2));
+      const initial = await scrimmageSnapshot("joined_before_payment");
+      assert.equal(initial.is_paid, false);
+      assert.equal(initial.is_confirmed, false);
+      assert.equal(initial.admission_status, "pending");
+      const secondJoin = await api(secondPlayer.access_token,
+        `/api/scrimmages/${scrimmageId}/requests`, "POST", {});
+      assert.equal(secondJoin.status, 201);
+      const [{ invoice_count, recipient_count }] = await sql`
+        SELECT COUNT(DISTINCT pr.id)::int AS invoice_count, COUNT(rr.id)::int AS recipient_count
+        FROM payment_requests pr JOIN payment_request_recipients rr ON rr.payment_request_id=pr.id
+        WHERE pr.related_scrimmage_id=${scrimmageId}
+      `;
+      assert.equal(invoice_count, 1);
+      assert.equal(recipient_count, 2);
+      console.log("[Scrimmage test] Real scrimmage creation and RSVP produced one card-enabled unpaid invoice.");
     } else {
       stage = "card-enabled invoice creation";
       const created = await api(organizer.access_token, "/api/payment-requests", "POST", {
@@ -189,6 +271,28 @@ async function main() {
     assert.equal(actualTransfer.amount - actualFee.amount, 2000);
     console.log("[Checkout test] Genuine Stripe TEST payment settled the invoice; base $20, fee $1.50; receipt recorded.");
 
+    if (scrimmageTest) {
+      stage = "scrimmage organizer paid list and admission";
+      const paid = await scrimmageSnapshot("stripe_payment_succeeded");
+      assert.equal(paid.is_paid, true);
+      assert.equal(paid.payment_method, "stripe");
+      console.log("[Scrimmage test] Stripe settlement appeared as paid in the organizer's real invoice response.");
+      if (paid.admission_status === "pending") {
+        assert.equal(paid.is_confirmed, false);
+        assert.equal((await api(payer.access_token,
+          `/api/payment-request-recipients/${payment.recipient_id}/confirm`, "PATCH",
+          { isConfirmed: true })).status, 403);
+        const confirmation = await api(organizer.access_token,
+          `/api/payment-request-recipients/${payment.recipient_id}/confirm`, "PATCH",
+          { isConfirmed: true });
+        assert.equal(confirmation.status, 200);
+        const admitted = await scrimmageSnapshot("organizer_confirms_payment");
+        assert.equal(admitted.admission_status, "approved");
+        assert.equal(admitted.is_confirmed, true);
+        console.log("[Scrimmage test] Admission still requires organizer confirmation; confirmation approved the paid player.");
+      }
+    }
+
     stage = "database RLS isolation";
     const outsider = await login("captain@roster-dev.invalid");
     const rest = async (token: string | null, table: string, query: string, method = "GET", body?: unknown) => {
@@ -232,6 +336,14 @@ async function main() {
     }
     assert.equal(refunded.status, "refunded");
     assert.equal(refunded.is_paid, false);
+    if (scrimmageTest) {
+      const returned = await scrimmageSnapshot("invoice_refunded");
+      assert.equal(returned.is_paid, false);
+      assert.equal(returned.payment_method, null);
+      console.log("[Scrimmage test] Post-refund state:", JSON.stringify({
+        admissionStatus: returned.admission_status, paymentConfirmed: returned.is_confirmed,
+      }));
+    }
     assert.equal(refunded.transfer_reversed_cents, 2000);
     assert.equal(refunded.refunded_amount_cents, 2000);
     assert.ok(refunded.refund_id);
