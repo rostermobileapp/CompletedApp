@@ -14,3 +14,15 @@ There is no existing desktop Stripe Connect flow or pre-existing organizer accou
 **Why:** The owner explicitly clarified that they do not have a Connect flow yet; the earlier brief's claim that desktop organizers were already connected was incorrect.
 
 **How to apply:** Build first-time onboarding rather than waiting for an external flow. Reuse any accounts created by this new flow on retries; do not interpret the old brief as evidence of existing connected accounts.
+
+Organizer-fee development uses the owner's separate nonproduction Supabase project and Stripe TEST mode. The live-data Replit preview is not a payment-test environment. Production migrations, configuration changes, live charges, and publishing require separate approval.
+
+**Why:** The owner selected a free Supabase organization and separate development project specifically to isolate this payment work from live users and billing.
+
+**How to apply:** Verify the development database and Supabase API identify the same nonproduction project before writes. Keep payment collection disabled in the live-data preview.
+
+Destination-charge payment events and connected-account lifecycle events require distinct webhook scopes and signing secrets.
+
+**Why:** Destination charges belong to the platform Stripe account, whereas `account.updated` belongs to the connected-account event scope. A connected-accounts-only webhook will not settle platform destination-charge invoices.
+
+**How to apply:** Configure separate platform-payment and connected-account snapshot destinations; verify mode, signature, and event scope independently. Never reuse the subscription webhook for organizer payments.

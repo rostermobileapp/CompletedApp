@@ -187,6 +187,58 @@ test("fetch and native HTTPS guards reject provider calls before any network ope
   });
 });
 
+test("organizer test payments allow only the configured test credential and payment resources", () => {
+  const key = "sk_test_synthetic";
+  const dev = environment.DEV_SUPABASE_URL;
+  const headers = { Authorization: `Bearer ${key}` };
+  const paymentUrl = new URL("https://api.stripe.com/v1/checkout/sessions");
+  assert.doesNotThrow(() => assertDevelopmentRequest(paymentUrl, dev, "POST", headers, key));
+  for (const authorization of ["Bearer sk_live_synthetic", "Bearer sk_test_other", ""]) {
+    assert.throws(() => assertDevelopmentRequest(paymentUrl, dev, "POST", { Authorization: authorization }, key), /disabled/);
+  }
+  for (const url of [
+    "https://api.stripe.com/v1/subscriptions",
+    "https://api.stripe.com/v1/customers",
+    "https://api.stripe.com.evil.invalid/v1/refunds",
+    "http://api.stripe.com/v1/refunds",
+  ]) {
+    assert.throws(() => assertDevelopmentRequest(new URL(url), dev, "POST", headers, key), /disabled/);
+  }
+  assert.throws(() => assertDevelopmentRequest(paymentUrl, dev, "POST", headers), /disabled/);
+});
+
+test("test card endpoints are allowed only in isolated development with both test keys", () => {
+  const keys = ["NONPRODUCTION_ISOLATED", "TESTING_STRIPE_SECRET_KEY", "TESTING_VITE_STRIPE_PUBLIC_KEY", "SUPABASE_URL"];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  try {
+    process.env.NONPRODUCTION_ISOLATED = "1";
+    process.env.SUPABASE_URL = environment.DEV_SUPABASE_URL;
+    process.env.TESTING_STRIPE_SECRET_KEY = "sk_test_synthetic";
+    process.env.TESTING_VITE_STRIPE_PUBLIC_KEY = "pk_test_synthetic";
+    for (const path of [
+      "/api/organizer-card-payments/connect/onboarding",
+      "/api/organizer-card-payments/checkout-session",
+      "/api/stripe-card-payments-webhook",
+      "/api/stripe-connect-webhook",
+    ]) {
+      let allowed = false;
+      const res = { setHeader() {}, status() { return this; }, json() {} };
+      nonproductionHttpGuard({ method: "POST", path } as any, res as any, () => { allowed = true; });
+      assert.equal(allowed, true, path);
+      delete process.env.TESTING_STRIPE_SECRET_KEY;
+      allowed = false;
+      nonproductionHttpGuard({ method: "POST", path } as any, res as any, () => { allowed = true; });
+      assert.equal(allowed, false, path);
+      process.env.TESTING_STRIPE_SECRET_KEY = "sk_test_synthetic";
+    }
+  } finally {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
+});
+
 test("development delivery HTTP endpoints reject requests explicitly, while production middleware is unchanged", () => {
   const previous = process.env.NONPRODUCTION_ISOLATED;
   const previousUrl = process.env.SUPABASE_URL;

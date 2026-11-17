@@ -2,7 +2,23 @@ import http from "node:http";
 import https from "node:https";
 import { syncBuiltinESMExports } from "node:module";
 
-export function assertDevelopmentRequest(url: URL, devOrigin: string, method = "GET"): void {
+export function assertDevelopmentRequest(
+  url: URL,
+  devOrigin: string,
+  method = "GET",
+  headers?: HeadersInit,
+  stripeTestSecret?: string,
+): void {
+  // Only the explicitly provided test credential may leave development for
+  // these organizer-payment resources. Live keys and other Stripe APIs remain blocked.
+  const authorization = headers ? new Headers(headers).get("authorization") : null;
+  if (stripeTestSecret?.startsWith("sk_test_") &&
+      authorization === `Bearer ${stripeTestSecret}` &&
+      url.origin === "https://api.stripe.com" &&
+      !url.username && !url.password &&
+      /^\/v1\/(?:accounts|account_links|checkout\/sessions|payment_intents|charges|balance_transactions|refunds)(?:\/[a-zA-Z0-9_]+)*$/.test(url.pathname)) {
+    return;
+  }
   const path = decodeURIComponent(url.pathname).replace(/\/+$/, "");
   const authMutation = path.startsWith("/auth/v1/") &&
     !["GET", "HEAD"].includes(method.toUpperCase()) &&
@@ -14,12 +30,13 @@ export function assertDevelopmentRequest(url: URL, devOrigin: string, method = "
   }
 }
 
-export function installDevelopmentNetworkGuard(devOrigin: string): void {
+export function installDevelopmentNetworkGuard(devOrigin: string, stripeTestSecret?: string): void {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (input, init) => {
     assertDevelopmentRequest(new URL(
       typeof input === "string" || input instanceof URL ? input : input.url,
-    ), devOrigin, init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET"));
+    ), devOrigin, init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET"),
+    init?.headers ?? (input instanceof Request ? input.headers : undefined), stripeTestSecret);
     // A redirect must never forward credentials or requests to an unchecked host.
     return originalFetch(input, { ...init, redirect: "error" });
   };
@@ -32,8 +49,8 @@ export function installDevelopmentNetworkGuard(devOrigin: string): void {
           ? new URL(input) : new URL(
             `${input.protocol ?? protocol}//${input.hostname ?? input.host}${input.port ? `:${input.port}` : ""}${input.path ?? "/"}`,
           );
-        assertDevelopmentRequest(url, devOrigin, typeof input === "object" && !(input instanceof URL)
-          ? input.method ?? "GET" : args[1]?.method ?? "GET");
+        const options = typeof input === "object" && !(input instanceof URL) ? input : args[1] ?? {};
+        assertDevelopmentRequest(url, devOrigin, options.method ?? "GET", options.headers, stripeTestSecret);
         return (original as Function).apply(module, args);
       };
     }

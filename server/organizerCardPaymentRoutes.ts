@@ -179,6 +179,7 @@ async function validateStripePaymentIntent(
   if (
     intent.status !== "succeeded" ||
     intent.amount !== payment.total_amount_cents ||
+    intent.amount_received !== payment.total_amount_cents ||
     intent.currency !== "usd" ||
     intent.application_fee_amount !== payment.service_fee_cents ||
     destination !== payment.stripe_account_id ||
@@ -226,9 +227,13 @@ async function applyStripeEvent(
   } else if (event.type === "checkout.session.expired") {
     sessionId = object.id;
     effect = "cancelled";
-  } else if (event.type === "checkout.session.async_payment_failed" || event.type === "payment_intent.payment_failed") {
-    paymentIntentId = object.id?.startsWith("pi_") ? object.id : null;
+  } else if (event.type === "checkout.session.async_payment_failed") {
     effect = "failed";
+  } else if (event.type === "payment_intent.payment_failed") {
+    // Card declines are retryable in the same open Checkout Session. Do not
+    // release the attempt and allow a second charge while that session is live.
+    paymentIntentId = object.id;
+    effect = "processing";
   } else if (event.type === "payment_intent.canceled") {
     paymentIntentId = object.id;
     effect = "cancelled";
@@ -470,7 +475,7 @@ export function registerOrganizerCardPaymentRoutes(
     try {
       let webhookReady = true;
       try {
-        getOrganizerCardWebhookSecret();
+        assertOrganizerCardWebhooksReady();
       } catch {
         webhookReady = false;
       }
@@ -559,7 +564,7 @@ export function registerOrganizerCardPaymentRoutes(
     const paymentRequestId = typeof req.body?.paymentRequestId === "string" ? req.body.paymentRequestId : "";
     if (!paymentRequestId) return res.status(400).json({ message: "Payment request is required" });
     try {
-      getOrganizerCardWebhookSecret();
+      assertOrganizerCardWebhooksReady();
       const stripe = getOrganizerCardStripe();
       const prepared = await preparePaymentAttempt(paymentRequestId, payerUserId);
       if (!await hasPersonalProEntitlement(prepared.organizer_user_id)) {
@@ -703,7 +708,7 @@ export function registerOrganizerCardPaymentRoutes(
         enabled: true,
         webhookReady: (() => {
           try {
-            getOrganizerCardWebhookSecret();
+            assertOrganizerCardWebhooksReady();
             return true;
           } catch {
             return false;
@@ -756,7 +761,7 @@ export function registerOrganizerCardPaymentRoutes(
     const organizerUserId = userIdFromRequest(req);
     if (!organizerUserId) return res.status(401).json({ message: "Authentication required" });
     try {
-      getOrganizerCardWebhookSecret();
+      assertOrganizerCardWebhooksReady();
       const stripe = getOrganizerCardStripe();
       const result = await pool.query<PaymentRow>(
         `SELECT p.* FROM public.organizer_card_payments p
@@ -820,18 +825,26 @@ export function registerOrganizerCardPaymentRoutes(
     }
   });
 
-  app.post("/api/stripe-connect-webhook", async (req: any, res) => {
+  const handleWebhook = (scope: "platform" | "connect"): RequestHandler => async (req: any, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) return res.status(400).send("Missing stripe-signature header");
     try {
       const stripe = getOrganizerCardStripe();
-      const webhookSecret = getOrganizerCardWebhookSecret();
+      const webhookSecret = scope === "platform"
+        ? getOrganizerCardPaymentsWebhookSecret()
+        : getOrganizerCardConnectWebhookSecret();
       const event = stripe.webhooks.constructEvent(
         req.body as Buffer,
         Array.isArray(signature) ? signature[0] : signature,
         webhookSecret,
       );
-      await applyStripeEvent(stripe, event);
+      if (event.livemode !== isVerifiedProductionRuntime()) {
+        return res.status(400).send("Webhook mode does not match this environment");
+      }
+      if (scope === "platform" && event.account) {
+        return res.status(400).send("Connected account events are not accepted on the payment endpoint");
+      }
+      await applyStripeEvent(stripe, event, scope);
       res.json({ received: true });
     } catch (error: any) {
       if (error instanceof Stripe.errors.StripeSignatureVerificationError) {
@@ -839,7 +852,9 @@ export function registerOrganizerCardPaymentRoutes(
       }
       sendPaymentError(res, error);
     }
-  });
+  };
+  app.post("/api/stripe-card-payments-webhook", handleWebhook("platform"));
+  app.post("/api/stripe-connect-webhook", handleWebhook("connect"));
 
   app.get("/api/admin/organizer-card-payments/report", isAuthenticated, requireFounder, async (req: any, res) => {
     if (!isOrganizerCardPaymentsActiveInCurrentRuntime()) {

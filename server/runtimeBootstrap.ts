@@ -36,7 +36,7 @@ if (process.env.PREVIEW_USE_LIVE_SECRETS === "1") {
       if (!(key in isolated)) delete process.env[key];
     }
     Object.assign(process.env, isolated);
-    installDevelopmentNetworkGuard(isolated.SUPABASE_URL!);
+    installDevelopmentNetworkGuard(isolated.SUPABASE_URL!, isolated.TESTING_STRIPE_SECRET_KEY);
   } catch {
     // Never expose URL parse errors, which can contain connection passwords.
     throw new Error("Development is stopped: isolated configuration is missing or unsafe.");
