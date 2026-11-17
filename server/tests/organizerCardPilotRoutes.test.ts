@@ -4,10 +4,10 @@ import { build } from 'esbuild';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
-test('production handlers deny non-pilot accounts before Stripe or financial writes', async () => {
+test('production pilot separates onboarding from collection without bypassing runtime safety', async () => {
   const ids: Record<string, string> = { first: 'U00001', second: 'U00002', blocked: 'U00003' };
   const state = {
-    stripeCalls: 0, writes: 0,
+    stripeCalls: 0, writes: 0, onboardingCalls: 0,
     pool: {
       async query(text: string, params: string[] = []) {
         if (text.includes('SELECT display_id, role, fee_exempt')) {
@@ -52,12 +52,22 @@ test('production handlers deny non-pilot accounts before Stripe or financial wri
         build.onResolve({ filter: /^pilot-test-state$/ }, args => ({
           path: args.path, external: true,
         }));
-        build.onResolve({ filter: /(^|\/)(db|runtimePolicy)$|^stripe$/ }, args => ({
+        build.onResolve({ filter: /(^|\/)(db|runtimePolicy|organizerDirectAccounts)$|^stripe$/ }, args => ({
           path: args.path, namespace: 'pilot-fixture',
         }));
         build.onLoad({ filter: /.*/, namespace: 'pilot-fixture' }, args => ({
           contents: args.path === 'stripe'
             ? `import {state} from 'pilot-test-state'; export default class Stripe { constructor(){state.stripeCalls++;} }`
+            : args.path.endsWith('organizerDirectAccounts')
+              ? `import {state} from 'pilot-test-state';
+                 export const readDirectAccount = async () => ({
+                   connected:false, accountId:null, ready:false, detailsSubmitted:false,
+                   chargesEnabled:false, transfersEnabled:false, payoutsEnabled:false, currentlyDue:[]
+                 });
+                 export const onboardDirectAccount = async () => {
+                   state.onboardingCalls++;
+                   return {url:'https://connect.stripe.com/setup/synthetic-'+state.onboardingCalls};
+                 };`
             : args.path.endsWith('runtimePolicy')
               ? 'export const isVerifiedProductionRuntime = () => true;'
               : `import {state} from 'pilot-test-state'; export const pool=state.pool;`,
@@ -67,16 +77,18 @@ test('production handlers deny non-pilot accounts before Stripe or financial wri
   });
   const module = { exports: {} as any };
   const require = createRequire(import.meta.url);
+  const env: Record<string, string> = {
+    ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED: '1',
+    ORGANIZER_DIRECT_PAYMENTS_LIVE_ENABLED: '1',
+    STRIPE_SECRET_KEY: 'sk_live_synthetic_not_a_real_key',
+    STRIPE_CARD_PAYMENTS_WEBHOOK_SECRET: 'whsec_fixture',
+    STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_fixture',
+    FRONTEND_URL: 'https://example.test',
+  };
   new vm.Script(bundle.outputFiles[0].text).runInNewContext({
-    module, exports: module.exports, console, Buffer,
+    module, exports: module.exports, console, Buffer, URL,
     require: (name: string) => name === 'pilot-test-state' ? { state } : require(name),
-    process: { env: {
-      ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED: '1',
-      ORGANIZER_DIRECT_PAYMENTS_LIVE_ENABLED: '1',
-      STRIPE_SECRET_KEY: 'sk_live_synthetic_not_a_real_key',
-      STRIPE_CARD_PAYMENTS_WEBHOOK_SECRET: 'whsec_fixture',
-      STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_fixture',
-    } },
+    process: { env },
   });
   const handlers = new Map<string, Function>();
   const app = Object.fromEntries(['get', 'post'].map(method => [
@@ -133,4 +145,51 @@ test('production handlers deny non-pilot accounts before Stripe or financial wri
   assert.equal(blockedOrganizer.body.code, 'card_pilot_restricted');
   assert.equal(state.writes, 0);
   assert.equal((await request('get', '/api/organizer-card-payments/connect/status', null)).statusCode, 401);
+
+  // Preparing onboarding must not turn on collection, even for the founder.
+  delete env.ORGANIZER_DIRECT_PAYMENTS_LIVE_ENABLED;
+  for (const value of [undefined, '0', 'true']) {
+    if (value === undefined) delete env.ORGANIZER_DIRECT_ONBOARDING_LIVE_ENABLED;
+    else env.ORGANIZER_DIRECT_ONBOARDING_LIVE_ENABLED = value;
+    const status = await request('get', '/api/organizer-card-payments/connect/status', 'first');
+    assert.equal(status.body.enabled, false);
+    assert.equal(status.body.onboardingEnabled, false);
+    const setup = await request('post', '/api/organizer-card-payments/connect/onboarding', 'first');
+    assert.equal(setup.statusCode, 503);
+    assert.equal(setup.body.code, 'direct_onboarding_disabled');
+  }
+  assert.equal(state.onboardingCalls, 0);
+  env.ORGANIZER_DIRECT_ONBOARDING_LIVE_ENABLED = '1';
+  for (const user of ['first', 'second']) {
+    const status = await request('get', '/api/organizer-card-payments/connect/status', user);
+    assert.equal(status.body.enabled, false);
+    assert.equal(status.body.onboardingEnabled, true);
+    assert.equal(status.body.eligible, true);
+    const setup = await request('post', '/api/organizer-card-payments/connect/onboarding', user);
+    assert.equal(setup.statusCode, 200);
+    assert.match(setup.body.url, /^https:\/\/connect\.stripe\.com\/setup\/synthetic-/);
+    for (const path of ['context', 'quote', 'confirm']) {
+      const payment = await request('post', `/api/organizer-card-payments/direct/${path}`, user);
+      assert.equal(payment.statusCode, 503);
+      assert.equal(payment.body.code, 'direct_payments_disabled');
+    }
+  }
+  const blockedSetup = await request('post', '/api/organizer-card-payments/connect/onboarding', 'blocked');
+  assert.equal(blockedSetup.statusCode, 403);
+  assert.equal(state.onboardingCalls, 2);
+  assert.equal(state.writes, 0, 'No invoice or payment ledger writes during onboarding-only requests');
+
+  delete env.STRIPE_CONNECT_WEBHOOK_SECRET;
+  const missingWebhook = await request('get', '/api/organizer-card-payments/connect/status', 'first');
+  assert.equal(missingWebhook.body.onboardingEnabled, true, 'Receiving-account setup can precede webhook readiness');
+  assert.equal(missingWebhook.body.webhookReady, false);
+  assert.equal(missingWebhook.body.enabled, false);
+
+  // The original runtime and key safety gates remain mandatory.
+  delete env.ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED;
+  assert.equal((await request('post', '/api/organizer-card-payments/connect/onboarding', 'first')).body.code, 'payments_disabled');
+  env.ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED = '1';
+  env.STRIPE_SECRET_KEY = 'sk_test_fixture';
+  assert.equal((await request('post', '/api/organizer-card-payments/connect/onboarding', 'first')).body.code, 'stripe_not_ready');
+  assert.equal(state.onboardingCalls, 2);
 });

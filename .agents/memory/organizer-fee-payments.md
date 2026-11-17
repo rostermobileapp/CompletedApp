@@ -3,6 +3,12 @@ name: Scrimmage and league-fee card payments
 description: Organizer-to-player fee collection is transaction-only and must not alter subscription tier.
 ---
 
+Receiving-account onboarding must be independently available before live payment collection is enabled, with separate production approval.
+
+**Why:** Tying Stripe setup visibility to the collection switch prevented the pilot organizers from completing the prerequisites while charges were intentionally disabled.
+
+**How to apply:** Keep onboarding permission distinct from collection permission in both server responses and UI. Preparing a fix is not permission to publish, enable live onboarding, create live accounts, or charge cards. Preserve the pilot allowlist and existing runtime/key checks.
+
 The owner requires the Platform model: organizers collect payments directly, rather than RosterHockey creating marketplace/destination charges for them.
 
 **Why:** After being told that the destination-charge platform balance bears processing fees, refunds and chargebacks, the owner rejected that responsibility and explicitly requested a change to Platform.

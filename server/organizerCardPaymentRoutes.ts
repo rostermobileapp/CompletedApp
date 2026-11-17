@@ -19,6 +19,8 @@ import { canUseOrganizerCardPilot } from "./organizerCardPilot";
 import {
   assertOrganizerCardWebhooksReady,
   assertDirectCollectionEnabled,
+  assertDirectOnboardingEnabled,
+  isDirectCollectionEnabled,
   assertOrganizerCardPilotUser,
   isOrganizerCardPilotUser,
   calculateOrganizerServiceFeeCents,
@@ -622,7 +624,7 @@ export function registerOrganizerCardPaymentRoutes(
     if (!userId) return res.status(401).json({ message: "Authentication required" });
     try {
       if (!await isOrganizerCardPilotUser(userId)) {
-        return res.json({ enabled: false, webhookReady: false, eligible: false, connected: false, ready: false });
+        return res.json({ enabled: false, onboardingEnabled: false, webhookReady: false, eligible: false, connected: false, ready: false });
       }
     } catch (error) {
       return sendPaymentError(res, error);
@@ -630,11 +632,12 @@ export function registerOrganizerCardPaymentRoutes(
     const eligible = await hasOrganizerCardCollectionEntitlement(userId).catch(() => false);
     let stripe: Stripe;
     try {
-      assertDirectCollectionEnabled();
+      assertDirectOnboardingEnabled();
       stripe = getOrganizerCardStripe();
     } catch {
       return res.json({
         enabled: false,
+        onboardingEnabled: false,
         webhookReady: false,
         eligible,
         connected: false,
@@ -657,7 +660,7 @@ export function registerOrganizerCardPaymentRoutes(
         ? await getVerifiedConnectedAccountStatus(userId, stripe)
         : { connected: false, accountId: null, ready: false, detailsSubmitted: false, chargesEnabled: false, transfersEnabled: false, payoutsEnabled: false, currentlyDue: [] };
       const { accountId: _accountId, ...publicStatus } = status;
-      res.json({ enabled: true, webhookReady, eligible, ...publicStatus });
+      res.json({ enabled: isDirectCollectionEnabled(), onboardingEnabled: true, webhookReady, eligible, ...publicStatus });
     } catch (error) {
       sendPaymentError(res, error);
     }
@@ -671,7 +674,7 @@ export function registerOrganizerCardPaymentRoutes(
       if (!await hasOrganizerCardCollectionEntitlement(userId)) {
         throw new OrganizerCardPaymentError("Connecting a receiving account requires your own active Player Pro subscription or higher.", 403, "subscription_required");
       }
-      assertDirectCollectionEnabled();
+      assertDirectOnboardingEnabled();
       const accountLink = await onboardDirectAccount(userId, getOrganizerCardStripe(), requestAppOrigin(req));
       res.json({ url: accountLink.url });
     } catch (error) {

@@ -39,7 +39,11 @@ export default function PaymentRequests() {
   const connectCardAccount = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/organizer-card-payments/connect/onboarding', {});
-      return response.json();
+      const data = await response.json();
+      if (typeof data?.url !== 'string' || !data.url) {
+        throw new Error('Stripe did not return a setup link. Please try again.');
+      }
+      return data;
     },
     onSuccess: (data) => {
       if (typeof data?.url === 'string') window.location.assign(data.url);
@@ -201,7 +205,7 @@ export default function PaymentRequests() {
           )}
         </div>
 
-        {cardSetup?.enabled && cardSetup?.eligible && (
+        {(cardSetup?.onboardingEnabled || cardSetup?.enabled) && cardSetup?.eligible && (
           <section className="mb-6 rounded-xl border border-[hsl(var(--hairline))] bg-card p-4 shadow-[var(--elev-rest)]" data-testid="card-organizer-card-setup">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
@@ -210,7 +214,11 @@ export default function PaymentRequests() {
               <div className="min-w-0 flex-1">
                 <h2 className="font-semibold">Card payment setup</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {!cardSetup.webhookReady
+                  {!cardSetup.enabled
+                    ? cardSetup.ready
+                      ? 'Your Stripe receiving account is ready. Card collection is not enabled yet.'
+                      : 'Complete Stripe account setup now. Card collection will remain disabled until separately enabled.'
+                    : !cardSetup.webhookReady
                     ? 'Connect is separate from billing. Card collection stays disabled until the Stripe payment webhooks are configured.'
                     : cardSetup.ready
                     ? 'Your Stripe receiving account is ready. You can enable card payments on new invoices and scrimmages.'

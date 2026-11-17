@@ -23,6 +23,18 @@ export function assertDirectCollectionEnabled(): void {
   }
 }
 
+export function isDirectCollectionEnabled(): boolean {
+  return !isVerifiedProductionRuntime() || process.env.ORGANIZER_DIRECT_PAYMENTS_LIVE_ENABLED === "1";
+}
+
+export function assertDirectOnboardingEnabled(): void {
+  if (isVerifiedProductionRuntime() &&
+      process.env.ORGANIZER_DIRECT_ONBOARDING_LIVE_ENABLED !== "1" &&
+      !isDirectCollectionEnabled()) {
+    throw new OrganizerCardPaymentError("Stripe account setup is not enabled yet.", 503, "direct_onboarding_disabled");
+  }
+}
+
 export async function isOrganizerCardPilotUser(userId: string): Promise<boolean> {
   if (!isVerifiedProductionRuntime()) return true;
   const result = await pool.query<{ display_id: string | null }>(
