@@ -18,3 +18,16 @@ credentials. Validate the destination before sending a key, never log credential
 values or remote error bodies, and require confirmed synchronous completion
 before acknowledging recalculation jobs. Test authentication with a non-mutating
 request; publishing and replaying live jobs require their own approval.
+
+An authenticated method-guard response proves authentication only, not that the
+deployed function supports the caller's request targets. Verify the deployed
+function contract separately before declaring a dispatch fix ready.
+
+**Why:** Railway and Supabase publish independently. An authenticated older
+function accepted team requests but rejected the newer completed-game source
+targets with HTTP 400, leaving predictions stale even after the server fix.
+
+**How to apply:** Compare the deployed function's accepted targets with every
+server dispatch path. Do not say a Railway-only publish is sufficient without
+checking that contract. Include a non-mutating validation check for the request
+shape, not just a GET authentication probe.
