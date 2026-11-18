@@ -9,11 +9,11 @@ Receiving-account onboarding must be independently available before live payment
 
 **How to apply:** Keep onboarding permission distinct from collection permission in both server responses and UI. Preparing a fix is not permission to publish, enable live onboarding, create live accounts, or charge cards. Preserve the collection pilot allowlist and existing runtime/key checks.
 
-Every personally paid user must be able to see and access Stripe receiving-account onboarding, not only the two collection-pilot users. Retain the founder exception.
+Every user with account-level Player Pro access or higher must be able to see and access Stripe receiving-account onboarding, not only paying subscribers or the two collection-pilot users. Retain the founder exception.
 
-**Why:** The owner explicitly corrected the proposed two-account onboarding restriction: “I want it set up as if EVERY paid user can see it and access it.”
+**Why:** The owner clarified that “Any account that has the player pro access should be able to use stripe,” including manually granting Player Pro in Supabase.
 
-**How to apply:** Gate onboarding by personal paid entitlement, not the collection pilot allowlist. This expands setup access only; it does not authorize publishing, enabling charges, or broadening the payment pilot.
+**How to apply:** Gate organizer eligibility by account-level Pro-or-higher role, regardless of subscription purchase or fee exemption; never require a billing record for manually granted access. This does not authorize publishing, enabling charges, or broadening the collection pilot.
 
 The owner requires the Platform model: organizers collect payments directly, rather than RosterHockey creating marketplace/destination charges for them.
 
@@ -67,7 +67,7 @@ U00001 has a founder-only exception to the paid-organizer eligibility rule for c
 
 **Why:** The owner explicitly revised the initial eligibility decision: U00001 must also be able to receive payments and participate in this feature in the future.
 
-**How to apply:** Authorize U00001 for collection using its server-loaded display ID without changing its fee-exempt status, role, or subscription. Everyone else retains the existing personal paid/non-fee-exempt organizer rule. Stripe receiving-account verification and the separate production pilot allowlist still apply.
+**How to apply:** Authorize U00001 for collection using its server-loaded display ID without changing its fee-exempt status, role, or subscription. Everyone else needs account-level Player Pro access or higher, including manual grants. Stripe receiving-account verification and the separate collection pilot allowlist still apply.
 
 Sandbox scrimmage payment tests must leave outbound-delivery restrictions enabled. Their synthetic invitation fixtures may represent already-delivered invitations; payment testing must not claim to verify invitation delivery.
 

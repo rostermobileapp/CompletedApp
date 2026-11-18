@@ -668,7 +668,7 @@ export function registerOrganizerCardPaymentRoutes(
     if (!userId) return res.status(401).json({ message: "Authentication required" });
     try {
       if (!await hasOrganizerCardCollectionEntitlement(userId)) {
-        throw new OrganizerCardPaymentError("Connecting a receiving account requires your own active Player Pro subscription or higher.", 403, "subscription_required");
+        throw new OrganizerCardPaymentError("Connecting a receiving account requires Player Pro access or higher.", 403, "subscription_required");
       }
       assertDirectOnboardingEnabled();
       const accountLink = await onboardDirectAccount(userId, getOrganizerCardStripe(), requestAppOrigin(req));

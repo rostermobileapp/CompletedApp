@@ -3,15 +3,18 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { canCollectOrganizerCardPayments, canUseOrganizerCardPilot, ORGANIZER_CARD_PILOT_DISPLAY_IDS } from '../organizerCardPilot';
 
-test('only the founder receives a collection exception without a paid entitlement', () => {
+test('all account-level Pro roles qualify, including manual and fee-exempt grants', () => {
   for (const role of ['free_tier', 'player_pro', 'commissioner']) {
     assert.equal(canCollectOrganizerCardPayments({ displayId: 'U00001', role, feeExempt: true }), true);
   }
   for (const displayId of ['U00002', 'U00003', null]) {
     assert.equal(canCollectOrganizerCardPayments({ displayId, role: 'free_tier', feeExempt: false }), false);
-    assert.equal(canCollectOrganizerCardPayments({ displayId, role: 'commissioner', feeExempt: true }), false);
-    assert.equal(canCollectOrganizerCardPayments({ displayId, role: 'player_pro', feeExempt: false }), true);
-    assert.equal(canCollectOrganizerCardPayments({ displayId, role: 'commissioner', feeExempt: false }), true);
+    assert.equal(canCollectOrganizerCardPayments({ displayId, role: 'free_tier', feeExempt: true }), false);
+    for (const role of ['player_pro', 'secondary_commissioner', 'commissioner']) {
+      for (const feeExempt of [false, true]) {
+        assert.equal(canCollectOrganizerCardPayments({ displayId, role, feeExempt }), true);
+      }
+    }
   }
 });
 

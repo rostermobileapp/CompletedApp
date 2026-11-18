@@ -132,8 +132,8 @@ export async function hasOrganizerCardCollectionEntitlement(userId: string): Pro
   );
   const user = result.rows[0];
   if (!user) return false;
-  // The founder has a narrowly scoped collection exception. For everyone else,
-  // league seats and fee exemption still do not qualify as paid membership.
+  // Account-level Pro access qualifies regardless of billing source or fee
+  // exemption, including roles granted manually in Supabase.
   return canCollectOrganizerCardPayments({
     displayId: user.display_id, role: user.role, feeExempt: user.fee_exempt,
   });
@@ -144,7 +144,7 @@ export async function assertOrganizerCardCollectionReady(userId: string): Promis
   assertDirectCollectionEnabled();
   if (!await hasOrganizerCardCollectionEntitlement(userId)) {
     throw new OrganizerCardPaymentError(
-      "Creating card payment requests requires your own active Player Pro subscription or higher.",
+      "Creating card payment requests requires Player Pro access or higher.",
       403,
       "subscription_required",
     );

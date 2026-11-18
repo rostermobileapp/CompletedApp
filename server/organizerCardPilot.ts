@@ -8,13 +8,12 @@ export function canUseOrganizerCardPilot(
   return !production || ORGANIZER_CARD_PILOT_DISPLAY_IDS.some(id => id === displayId);
 }
 
-/** This exception authorizes fee collection only, never subscription benefits. */
+/** Eligibility follows account-level Pro access, including manually granted roles. */
 export function canCollectOrganizerCardPayments(account: {
   displayId: string | null;
   role: string;
   feeExempt: boolean;
 }): boolean {
   if (account.displayId === 'U00001') return true;
-  return !account.feeExempt &&
-    ['player_pro', 'secondary_commissioner', 'commissioner'].includes(account.role);
+  return ['player_pro', 'secondary_commissioner', 'commissioner'].includes(account.role);
 }
