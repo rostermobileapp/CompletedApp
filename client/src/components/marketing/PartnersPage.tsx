@@ -7,8 +7,8 @@ import "./PartnersPage.css";
 
 const orgTypes = ["Hockey Association / Club", "Arena / Ice Facility", "Recreation League", "Youth Sports Organization", "Sports Media / Podcast", "Other"];
 
-export function PartnersPage() {
-  useSeo({ title: "Community Partner Program | RosterHockey", description: "Partner with RosterHockey to support your hockey community through our referral program. Apply online and help teams stay connected." });
+export function PartnersPage({ applicationOnly = false }: { applicationOnly?: boolean } = {}) {
+  useSeo({ title: applicationOnly ? "Partner Application | RosterHockey" : "Community Partner Program | RosterHockey", description: "Partner with RosterHockey to support your hockey community through our referral program. Apply online and help teams stay connected.", canonical: applicationOnly ? `${APP_SITE_ORIGIN}/referral-program/apply` : undefined });
   const [referrals, setReferrals] = useState(300);
   const [fileName, setFileName] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -51,7 +51,7 @@ export function PartnersPage() {
     if (form.hockeyAffiliation.trim()) data.append("hockeyAffiliation", form.hockeyAffiliation.trim());
     if (file) data.append("proofDocument", file);
     try {
-      const response = await fetch(`${APP_SITE_ORIGIN}/api/referral/apply`, { method: "POST", body: data });
+      const response = await fetch(applicationOnly ? "/api/referral/apply" : `${APP_SITE_ORIGIN}/api/referral/apply`, { method: "POST", body: data });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Unable to submit your application. Please try again.");
       setSubmitted(true);
@@ -64,6 +64,7 @@ export function PartnersPage() {
 
   return (
     <main className="rp-page partner-page">
+      {!applicationOnly && <>
       <RosterPageNav active="partners" />
       <section className="partner-hero">
         <div className="partner-container">
@@ -123,6 +124,7 @@ export function PartnersPage() {
         </div>
       </section>
 
+      </>}
       <section className="partner-apply" id="apply">
         <div className="partner-container partner-apply-layout">
           <div><span className="rp-kicker">Make the next season count</span><h2 className="rp-title rp-title-sm">Apply to become<br />a partner.</h2><p>Takes about three minutes. We review every application personally.</p><div className="partner-apply-note"><CheckCircle2 size={17} /> Confirm your email to submit your application for review.</div></div>
@@ -140,7 +142,7 @@ export function PartnersPage() {
           </form>}
         </div>
       </section>
-      <RosterPageFooter />
+      {!applicationOnly && <RosterPageFooter />}
       {notice && <div className="partner-toast" role="status">{notice}<button aria-label="Dismiss message" onClick={() => setNotice("")}><X size={16} /></button></div>}
     </main>
   );

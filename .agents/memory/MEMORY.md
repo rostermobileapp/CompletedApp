@@ -102,3 +102,4 @@
 - [All-skater odds projections](all-skater-odds-projections.md) — odds must list every team skater, including zero-point/out players; never truncate the generated or saved list to three.
 - [Organizer fee payments](organizer-fee-payments.md) — scrimmage and league-fee card transactions are separate from subscriptions and never change a user's tier.
 - [Signup attribution policy](signup-attribution-policy.md) — first valid referral, explicit confirmation, campaign/credit separation, and manual install fallback; preserve HPIB tracking.
+- [Independent website project](independent-website-export.md) — new project, not another artifact; copy/import verification precedes cleanup, publishing, and domain approval.

@@ -236,6 +236,10 @@ export function Router() {
     return <ForgotPassword />;
   }
 
+  if (location === '/referral-program/apply') {
+    return <ReferralProgram applicationOnly />;
+  }
+
   if (location === '/hpib') {
     return <HPIBDownload />;
   }
@@ -309,7 +313,7 @@ export function Router() {
           <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
           <Route path="/referral-program/portal" component={ReferralPortal} />
           <Route path="/referral-program/verify" component={ReferralApplicationVerification} />
-          <Route path="/referral-program" component={ReferralProgram} />
+          <Route path="/referral-program">{() => <ReferralProgram />}</Route>
           <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
           <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
           <Route path="/admin/referrals" component={ReferralAdmin} />
@@ -423,7 +427,7 @@ export function Router() {
               <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
               <Route path="/referral-program/portal" component={ReferralPortal} />
               <Route path="/referral-program/verify" component={ReferralApplicationVerification} />
-              <Route path="/referral-program" component={ReferralProgram} />
+              <Route path="/referral-program">{() => <ReferralProgram />}</Route>
               <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
               <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
               <Route path="/admin/referrals" component={ReferralAdmin} />

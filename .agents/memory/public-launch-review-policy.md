@@ -3,7 +3,7 @@ name: Public launch and review policy
 description: Product launch scope and evidence requirements for public marketing claims.
 ---
 
-Hockey is live on the App Store and Google Play. Soccer and baseball have not launched; their pages should remain reachable but excluded from the sitemap and marked noindex in both HTML and response headers.
+Hockey is live on the App Store and Google Play. Soccer and baseball have not launched; preserve their existing unlaunched handling rather than introducing new public sport pages. Keep their URLs unindexed and excluded from the sitemap.
 
 **Why:** The owner explicitly confirmed the live hockey launch and unlaunched status of the other sports.
 

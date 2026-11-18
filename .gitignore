@@ -1,6 +1,7 @@
 node_modules
 /generated-artifacts/
 package-lock.json
+!scripts/website-export/templates/package-lock.json
 dist
 .DS_Store
 server/public
