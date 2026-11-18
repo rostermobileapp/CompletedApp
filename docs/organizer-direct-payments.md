@@ -39,3 +39,17 @@ The server requires a verified US credit card and matching permitted billing/mer
 - `scripts/verify-direct-checkout-ui.ts` uses signed-in iOS/Android browser fixtures for separate total approval, surcharge/no-surcharge displays, interrupted confirmation recovery and webhook-driven invoice refresh.
 
 Actual Standard-account card settlement, positive-surcharge Stripe feature access and installed-device bank-app switching are **not established by these fixture checks**. Complete real Stripe TEST onboarding/settlement and physical-device testing before claiming those paths are verified.
+
+## Unlinking Stripe inside the app
+
+On Payments, open the **Manage Stripe** dropdown (or **Set up Stripe** for a partially configured connection), select **Unlink Stripe**, and confirm. This revokes RosterHockey's access through Stripe OAuth deauthorization; it never closes or deletes the organizer's Standard account, its balance, transaction history, or RosterHockey payment records. Past payments and future refunds/disputes for the detached account must be managed directly in Stripe. A downgraded user can still unlink their existing connection.
+
+Known processing payments, refunds in progress, and unresolved disputes block unlinking. Unconfirmed quotes are cancelled, and existing organizer-owned invoice/scrimmage card flags are disabled without changing paid status or roster membership. An account-row lock coordinates checkout/refund reservation and unlinking. A persisted unlink-in-progress marker blocks new checkout/onboarding before the external Stripe request; uncertain failures remain paused and offer **Retry unlink**. Reconnection uses a fresh account-creation key, preserves the historical account registry, and does not silently re-enable old invoices.
+
+Release prerequisites, requiring separate production approval:
+
+1. Apply only `0057_organizer_stripe_unlink.sql` with `NODE_ENV=production npx tsx scripts/apply-production-card-payments.ts --apply-unlink-schema`. This adds one nullable state column; it does not unlink any account or enable collection. For an already initialized isolated development project, use `NODE_ENV=development npx tsx scripts/apply-development-direct-payments.ts --unlink-only`.
+2. Configure `STRIPE_CONNECT_CLIENT_ID` on the live Railway service with the platform's **live Connect client ID**, starting with `ca_`, from Stripe's Connect OAuth settings. This is an application identifier, not a secret API key. Use the separate `TESTING_STRIPE_CONNECT_CLIENT_ID` for isolated Stripe TEST operations. Never substitute an API key or guess the ID. Missing configuration fails explicitly, without local unlinking or falsely claiming revocation.
+3. Publish the code separately. The existing production runtime/key guards remain in place; unlinking does not require collection activation or a current Pro subscription.
+
+`scripts/verify-stripe-unlink.ts` validates the actual SQL, migration, account-lock race, durable pause, reconnection, and retained history on a disposable local PostgreSQL server with deterministic Stripe fixtures. `scripts/verify-stripe-unlink-ui.ts` uses the actual card/dialog source to test the compact menu, cancel/confirm behavior, and return to setup at 320px, 402px, and desktop widths. These checks make no Stripe requests or production writes and do not establish real Stripe revocation.

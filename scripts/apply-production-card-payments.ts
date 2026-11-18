@@ -13,7 +13,8 @@ let client: pg.Client | undefined;
 try {
   const legacySchema = process.argv.includes('--apply-live-pilot-schema');
   const directSchema = process.argv.includes('--apply-direct-pilot-schema');
-  if (process.env.NODE_ENV !== 'production' || legacySchema === directSchema) {
+  const unlinkSchema = process.argv.includes('--apply-unlink-schema');
+  if (process.env.NODE_ENV !== 'production' || [legacySchema, directSchema, unlinkSchema].filter(Boolean).length !== 1) {
     throw new Error('EXPLICIT_PRODUCTION_MIGRATION_CONFIRMATION_REQUIRED');
   }
   const connection = process.env.DATABASE_URL;
@@ -32,7 +33,7 @@ try {
         decodeURIComponent(db.username).endsWith(`.${productionProject}`))) {
     throw new Error('PRODUCTION_TARGET_MISMATCH');
   }
-  const migrations = await Promise.all((directSchema ? ['0056_organizer_direct_payments.sql'] : [
+  const migrations = await Promise.all((unlinkSchema ? ['0057_organizer_stripe_unlink.sql'] : directSchema ? ['0056_organizer_direct_payments.sql'] : [
     '0053_organizer_card_payments.sql',
     '0054_organizer_refund_amount.sql',
     '0055_organizer_report_ledger.sql',
@@ -52,8 +53,8 @@ try {
   );
   if (accounts.rows.length !== 2) throw new Error('PILOT_ACCOUNTS_NOT_FOUND');
   const existing = await client.query("SELECT to_regclass('public.organizer_card_payments') IS NOT NULL AS present");
-  if (directSchema && !existing.rows[0].present) throw new Error('LEGACY_SCHEMA_PREREQUISITE_MISSING');
-  if (!directSchema && existing.rows[0].present) {
+  if ((directSchema || unlinkSchema) && !existing.rows[0].present) throw new Error('LEGACY_SCHEMA_PREREQUISITE_MISSING');
+  if (legacySchema && existing.rows[0].present) {
     const records = await client.query('SELECT COUNT(*)::int AS count FROM public.organizer_card_payments');
     if (records.rows[0].count !== 0) {
       throw new Error('EXISTING_PRODUCTION_CARD_PAYMENTS_REQUIRE_SEPARATE_MIGRATION_REVIEW');
@@ -89,9 +90,16 @@ try {
         AND table_name='organizer_card_payments' AND column_name='fee_policy_fingerprint') AS ready`);
     if (!direct.rows[0].ready) throw new Error('DIRECT_SCHEMA_VERIFICATION_FAILED');
   }
+  if (unlinkSchema) {
+    const unlink = await client.query(`SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+      AND table_name='organizer_direct_accounts' AND column_name='disconnect_requested_at'
+    ) AS ready`);
+    if (!unlink.rows[0].ready) throw new Error('UNLINK_SCHEMA_VERIFICATION_FAILED');
+  }
   await client.query('COMMIT');
   console.info(JSON.stringify({
-    productionTargetMatched: true, cardSchemaReady: true, directSchemaReady: directSchema,
+    productionTargetMatched: true, cardSchemaReady: true, directSchemaReady: directSchema, unlinkSchemaReady: unlinkSchema,
     copiedTestData: false, createdCharges: 0, enabledLiveCollection: false,
   }));
 } catch (error) {

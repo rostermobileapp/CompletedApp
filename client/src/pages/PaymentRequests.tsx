@@ -13,7 +13,7 @@ import { usePermissions } from '@/context/SubscriptionContext';
 import { PaymentSummaryCard } from '@/components/PaymentSummaryCard';
 import { useToast } from '@/hooks/use-toast';
 import { usePaymentReturnRefresh } from '@/hooks/usePaymentReturnRefresh';
-import { OrganizerStripeSetupCard } from '@/components/OrganizerStripeSetupCard';
+import { OrganizerStripeSetupCard, OrganizerStripeUnlinkDialog } from '@/components/OrganizerStripeSetupCard';
 import { openOrganizerStripeUrl } from '@/lib/organizerStripeNavigation';
 
 export default function PaymentRequests() {
@@ -25,6 +25,7 @@ export default function PaymentRequests() {
   const { toast } = useToast();
 
   const isFreeTier = !permissionsLoading && !canAccessPremiumFeatures();
+  const [unlinkConnectionId, setUnlinkConnectionId] = useState<string | null>(null);
 
   const { data: cardSetup, refetch: refetchCardSetup } = useQuery<any>({
     queryKey: ['/api/organizer-card-payments/connect/status'],
@@ -55,6 +56,32 @@ export default function PaymentRequests() {
         variant: 'destructive',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/organizer-card-payments/connect/status'] });
+    },
+  });
+
+  const unlinkCardAccount = useMutation({
+    mutationFn: async () => {
+      if (!unlinkConnectionId) throw new Error('Refresh your Stripe connection before unlinking.');
+      const response = await apiRequest('POST', '/api/organizer-card-payments/connect/unlink', {
+        confirmed: true, connectionId: unlinkConnectionId,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(['/api/organizer-card-payments/connect/status'], (previous: any) => ({
+        ...previous, connected: false, ready: false, enabled: false, connectionId: null, unlinkPending: false,
+      }));
+      setUnlinkConnectionId(null);
+      toast({ title: 'Stripe unlinked' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Could not unlink Stripe', description: error?.message || 'Please try again.', variant: 'destructive' });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        predicate: query => String(query.queryKey[0]).startsWith('/api/organizer-card-payments') ||
+          String(query.queryKey[0]).startsWith('/api/payment-requests'),
+      });
     },
   });
 
@@ -206,10 +233,13 @@ export default function PaymentRequests() {
         </div>
 
         <OrganizerStripeSetupCard
-          eligible={hasRole('player_pro') || user?.displayId === 'U00001' || cardSetup?.eligible === true}
+          eligible={hasRole('player_pro') || user?.displayId === 'U00001' || cardSetup?.eligible === true || cardSetup?.connected === true}
           ready={cardSetup?.ready === true}
           collectionEnabled={cardSetup?.enabled === true && cardSetup?.webhookReady === true}
-          pending={connectCardAccount.isPending}
+          pending={connectCardAccount.isPending || unlinkCardAccount.isPending}
+          connected={cardSetup?.connected === true}
+          unlinkPending={cardSetup?.unlinkPending === true}
+          onUnlink={typeof cardSetup?.connectionId === 'string' ? () => setUnlinkConnectionId(cardSetup.connectionId) : undefined}
           onSetup={() => connectCardAccount.mutate()}
           onManage={() => {
             try {
@@ -222,6 +252,12 @@ export default function PaymentRequests() {
               });
             }
           }}
+        />
+        <OrganizerStripeUnlinkDialog
+          open={unlinkConnectionId !== null}
+          pending={unlinkCardAccount.isPending}
+          onOpenChange={open => { if (!open) setUnlinkConnectionId(null); }}
+          onConfirm={() => unlinkCardAccount.mutate()}
         />
 
         {/* Tabs */}

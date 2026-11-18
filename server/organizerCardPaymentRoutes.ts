@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Express, RequestHandler } from "express";
 import Stripe from "stripe";
 import { onboardDirectAccount } from "./organizerDirectAccounts";
+import { unlinkOrganizerStripe } from "./organizerStripeUnlink";
 import { registerOrganizerDirectRoutes, requestDirectInvoiceRefund } from "./organizerDirectPayments";
 import { applyDirectOrganizerEvent } from "./organizerDirectWebhooks";
 import { readFinalizedOrganizerCharge } from "./organizerChargeAccounting";
@@ -623,9 +624,6 @@ export function registerOrganizerCardPaymentRoutes(
     const userId = userIdFromRequest(req);
     if (!userId) return res.status(401).json({ message: "Authentication required" });
     const eligible = await hasOrganizerCardCollectionEntitlement(userId).catch(() => false);
-    if (!eligible) {
-      return res.json({ enabled: false, onboardingEnabled: false, webhookReady: false, eligible: false, connected: false, ready: false });
-    }
     let stripe: Stripe;
     try {
       stripe = getOrganizerCardStripe();
@@ -651,17 +649,31 @@ export function registerOrganizerCardPaymentRoutes(
       } catch {
         webhookReady = false;
       }
-      const status = eligible
-        ? await getVerifiedConnectedAccountStatus(userId, stripe)
-        : { connected: false, accountId: null, ready: false, detailsSubmitted: false, chargesEnabled: false, transfersEnabled: false, payoutsEnabled: false, currentlyDue: [] };
+      const status = await getVerifiedConnectedAccountStatus(userId, stripe);
       const { accountId: _accountId, ...publicStatus } = status;
-      const collectionEnabled = isDirectCollectionEnabled() && await isOrganizerCardPilotUser(userId);
+      const collectionEnabled = eligible && !("unlinkPending" in status && status.unlinkPending) &&
+        isDirectCollectionEnabled() && await isOrganizerCardPilotUser(userId);
       let onboardingEnabled = true;
       try { assertDirectOnboardingEnabled(); } catch { onboardingEnabled = false; }
-      res.json({ enabled: collectionEnabled, onboardingEnabled, webhookReady, eligible, ...publicStatus });
+      res.json({ enabled: collectionEnabled, onboardingEnabled: onboardingEnabled && eligible,
+        webhookReady, eligible, connectionId: _accountId, ...publicStatus });
     } catch (error) {
       sendPaymentError(res, error);
     }
+  });
+
+  app.post("/api/organizer-card-payments/connect/unlink", isAuthenticated, async (req: any, res) => {
+    const userId = userIdFromRequest(req);
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+    try {
+      if (req.body?.confirmed !== true || typeof req.body?.connectionId !== "string" ||
+          !/^acct_[A-Za-z0-9]+$/.test(req.body.connectionId)) {
+        throw new OrganizerCardPaymentError("Confirm the Stripe account you want to unlink.", 400, "stripe_unlink_confirmation_required");
+      }
+      // Existing owners can disconnect even after losing Pro access. Never use
+      // a body-supplied user ID, or require the collection/onboarding switches.
+      res.json(await unlinkOrganizerStripe(userId, req.body.connectionId, getOrganizerCardStripe()));
+    } catch (error) { sendPaymentError(res, error); }
   });
 
   app.post("/api/organizer-card-payments/connect/onboarding", isAuthenticated, async (req: any, res) => {

@@ -11,6 +11,7 @@ test('production pilot separates onboarding from collection without bypassing ru
   };
   const state = {
     stripeCalls: 0, writes: 0, onboardingCalls: 0, accountReady: false,
+    unlinkCalls: [] as { userId: string; accountId: string }[],
     pool: {
       async query(text: string, params: string[] = []) {
         if (text.includes('SELECT display_id, role, fee_exempt')) {
@@ -57,7 +58,7 @@ test('production pilot separates onboarding from collection without bypassing ru
         build.onResolve({ filter: /^pilot-test-state$/ }, args => ({
           path: args.path, external: true,
         }));
-        build.onResolve({ filter: /(^|\/)(db|runtimePolicy|organizerDirectAccounts)$|^stripe$/ }, args => ({
+        build.onResolve({ filter: /(^|\/)(db|runtimePolicy|organizerDirectAccounts|organizerStripeUnlink)$|^stripe$/ }, args => ({
           path: args.path, namespace: 'pilot-fixture',
         }));
         build.onLoad({ filter: /.*/, namespace: 'pilot-fixture' }, args => ({
@@ -72,6 +73,12 @@ test('production pilot separates onboarding from collection without bypassing ru
                  export const onboardDirectAccount = async () => {
                    state.onboardingCalls++;
                    return {url:'https://connect.stripe.com/setup/synthetic-'+state.onboardingCalls};
+                 };`
+            : args.path.endsWith('organizerStripeUnlink')
+              ? `import {state} from 'pilot-test-state';
+                 export const lockActiveDirectAccount=async()=>{};
+                 export const unlinkOrganizerStripe=async(userId,accountId)=>{
+                   state.unlinkCalls.push({userId,accountId}); return {connected:false};
                  };`
             : args.path.endsWith('runtimePolicy')
               ? 'export const isVerifiedProductionRuntime = () => true;'
@@ -100,7 +107,7 @@ test('production pilot separates onboarding from collection without bypassing ru
     method, (path: string, ...callbacks: Function[]) => handlers.set(`${method} ${path}`, callbacks.at(-1)!),
   ]));
   module.exports.registerOrganizerCardPaymentRoutes(app, () => {}, () => {}, async () => {});
-  async function request(method: string, path: string, sub: string | null) {
+  async function request(method: string, path: string, sub: string | null, body?: any) {
     const response = {
       statusCode: 200, body: null as any,
       status(code: number) { this.statusCode = code; return this; },
@@ -108,7 +115,7 @@ test('production pilot separates onboarding from collection without bypassing ru
     };
     const req = {
       user: { claims: { sub, displayId: 'U00001', role: 'commissioner' } },
-      body: { paymentRequestId: 'invoice', displayId: 'U00001', organizerUserId: 'first' },
+      body: body ?? { paymentRequestId: 'invoice', displayId: 'U00001', organizerUserId: 'first' },
       params: { requestId: 'invoice', scrimmageId: 'scrimmage', paymentId: 'payment' },
     };
     await handlers.get(`${method} ${path}`)!(req, response);
@@ -199,6 +206,17 @@ test('production pilot separates onboarding from collection without bypassing ru
     assert.equal(setup.body.code, 'subscription_required');
   }
   assert.equal((await request('post', '/api/organizer-card-payments/connect/onboarding', null)).statusCode, 401);
+  const unlinkPath = '/api/organizer-card-payments/connect/unlink';
+  assert.equal((await request('post', unlinkPath, null, { confirmed: true, connectionId: 'acct_fixture' })).statusCode, 401);
+  for (const body of [{}, { confirmed: false, connectionId: 'acct_fixture' }, { confirmed: true, connectionId: 'other' }]) {
+    assert.equal((await request('post', unlinkPath, 'first', body)).statusCode, 400);
+  }
+  // Downgrades must not trap a former Pro account in its Stripe connection.
+  assert.equal((await request('post', unlinkPath, 'free', {
+    confirmed: true, connectionId: 'acct_fixture', userId: 'second',
+  })).statusCode, 200);
+  assert.equal(state.unlinkCalls.length, 1);
+  assert.equal(state.unlinkCalls[0].userId, 'free', 'The server uses the signed-in owner, never a body-supplied user');
   assert.equal(state.onboardingCalls, 7);
   assert.equal(state.writes, 0, 'No invoice or payment ledger writes during onboarding-only requests');
 

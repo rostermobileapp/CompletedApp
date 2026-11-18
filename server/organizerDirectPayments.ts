@@ -10,6 +10,7 @@ import {
 } from "./organizerCardPaymentService";
 import { OrganizerCardPaymentError, parseBaseAmountCents } from "./organizerCardPaymentMath";
 import { readDirectAccount } from "./organizerDirectAccounts";
+import { lockActiveDirectAccount } from "./organizerStripeUnlink";
 import { directStripeOptions, directSurchargePolicy, quoteDirectProcessing, directFeePolicyFingerprint } from "./organizerDirectPricing";
 
 type Database = { query: (...args: any[]) => Promise<any> };
@@ -48,6 +49,26 @@ export async function requestDirectInvoiceRefund(stripe: Stripe, payment: any) {
     throw new OrganizerCardPaymentError("Only settled direct payments can be refunded.", 409, "payment_not_refundable");
   }
   if (payment.status === "refunded") return { status: "refunded", paymentId: payment.id };
+  const refundClient = await pool.connect();
+  try {
+    await refundClient.query("BEGIN");
+    await lockActiveDirectAccount(refundClient, payment.organizer_user_id, payment.stripe_account_id);
+    const current = (await refundClient.query(
+      "SELECT status FROM public.organizer_card_payments WHERE id=$1 FOR UPDATE", [payment.id],
+    )).rows[0];
+    if (!current || !["paid", "refund_pending", "refunded"].includes(current.status)) {
+      throw new OrganizerCardPaymentError("This payment can no longer be refunded.", 409, "payment_not_refundable");
+    }
+    if (current.status === "refunded") {
+      await refundClient.query("COMMIT");
+      return { status: "refunded", paymentId: payment.id };
+    }
+    await refundClient.query(
+      "UPDATE public.organizer_card_payments SET status='refund_pending',updated_at=now() WHERE id=$1", [payment.id],
+    );
+    await refundClient.query("COMMIT");
+  } catch (error) { await refundClient.query("ROLLBACK"); throw error; }
+  finally { refundClient.release(); }
   const options = directStripeOptions(payment.stripe_account_id, payment.processing_surcharge_cents);
   const charge = await stripe.charges.retrieve(payment.stripe_charge_id, {}, options);
   if (charge.payment_intent !== payment.stripe_payment_intent_id ||
@@ -149,6 +170,7 @@ export function registerOrganizerDirectRoutes(
     let payment: any;
     try {
       await client.query("BEGIN");
+      await lockActiveDirectAccount(client, initial.creator_id, accountId);
       const invoice = await invoiceForPayer(client, requestId, payer, true);
       if (invoice.creator_id !== initial.creator_id || parseBaseAmountCents(invoice.amount_per_person) !== pricing.baseAmountCents) {
         throw new OrganizerCardPaymentError("This invoice changed. Review it again before paying.", 409, "invoice_changed");
@@ -196,6 +218,7 @@ export function registerOrganizerDirectRoutes(
         [String(req.body?.paymentId ?? ""), payer],
       )).rows[0];
       if (!candidate) throw new OrganizerCardPaymentError("Payment quote not found.", 404, "quote_not_found");
+      await lockActiveDirectAccount(client, candidate.organizer_user_id, candidate.stripe_account_id);
       const invoice = await invoiceForPayer(client, candidate.payment_request_id, payer, true);
       payment = (await client.query("SELECT * FROM public.organizer_card_payments WHERE id=$1 FOR UPDATE", [candidate.id])).rows[0];
       if (payment.quote_id !== req.body?.quoteId || !payment.confirmation_token_id ||

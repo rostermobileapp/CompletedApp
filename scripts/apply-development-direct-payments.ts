@@ -12,8 +12,12 @@ try {
   const forbidden = JSON.parse(process.env.NONPRODUCTION_FORBIDDEN_DATABASES ?? "[]");
   if (!endpoint.startsWith(`supabase:${project}/`) || !Array.isArray(forbidden) ||
       !forbidden.length || forbidden.includes(endpoint)) throw new Error("Development target is not isolated.");
-  const migration = await readFile(new URL("../migrations/0056_organizer_direct_payments.sql", import.meta.url), "utf8");
-  await pool.query(migration);
+  const migrations = process.argv.includes("--unlink-only")
+    ? ["0057_organizer_stripe_unlink.sql"]
+    : ["0056_organizer_direct_payments.sql", "0057_organizer_stripe_unlink.sql"];
+  for (const name of migrations) {
+    await pool.query(await readFile(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
+  }
   console.info("Direct organizer schema applied to isolated development only.");
 } catch (error: any) {
   console.error("Direct development migration stopped.", { code: error?.code ?? "TARGET_GUARD_FAILED" });

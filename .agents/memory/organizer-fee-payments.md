@@ -27,6 +27,12 @@ Stripe-hosted onboarding must open in the system browser from the Natively app, 
 
 **How to apply:** Explicitly request the native system-browser handoff for onboarding and Stripe settings. Never prefetch or log single-use setup URLs, or silently fall back to in-app navigation if the bridge fails. Refresh verified account status when the app resumes; physical-device verification remains separate from bridge fixtures.
 
+Unlinking must revoke RosterHockey's Stripe access, not delete the organizer's Stripe account or merely hide a local mapping.
+
+**Why:** The owner requested an in-app unlink action after finding no way to disconnect. Standard accounts and balances belong to organizers; historical payment ownership must survive reconnection.
+
+**How to apply:** Require confirmation, retain the compact Payments row, block known unsettled activity, and preserve invoice/transaction history. Pause new collection durably before revocation; do not claim success after uncertain Stripe responses. Keep unlink available after Pro access is removed. Disclose that detached-account payment management moves to Stripe, and treat migration/configuration/publishing as separate approvals.
+
 The owner requires the Platform model: organizers collect payments directly, rather than RosterHockey creating marketplace/destination charges for them.
 
 **Why:** After being told that the destination-charge platform balance bears processing fees, refunds and chargebacks, the owner rejected that responsibility and explicitly requested a change to Platform.
