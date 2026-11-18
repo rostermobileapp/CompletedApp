@@ -91,3 +91,31 @@ mtime_ms = 1795019732950
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/c31b41b1-49e6-4bf6-b0ae-792ac5fe254d/9054b299-a56b-4a3f-b0fd-c9f3362e82e3"
 storage_version_token = "1795025738102888"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "IuDEVZL78_wruafGADfjz"
+uri = "file://generated-artifacts/website-review/APP-Cleanup-Scope-Review.html"
+type = "html"
+title = "APP cleanup scope for review"
+description = "Reviewed scope and exact file dispositions: conditional source removal, form dependencies, protected HPIB and deferred public files. Nothing removed or published."
+logical_id = "9e5dcc9e-c18b-45eb-b21d-b376db8b0796"
+content_hash = "sha256:43770fda6f19846e3346e88702055fca07be03a22f2fa3d65e6d1f03700497ab"
+size = 22752
+mtime_ms = 1795027360632
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/9e5dcc9e-c18b-45eb-b21d-b376db8b0796/cfe93bfc-df21-480f-9bca-30677cf44fe5"
+storage_version_token = "1795027379296485"
+content_type = "text/html"
+
+[[outputs]]
+id = "r3wsYLFY26CinEwQpJ1CP"
+uri = "file://generated-artifacts/website-review/reviewed-app-cleanup.csv"
+type = "table"
+title = "Reviewed APP cleanup file list"
+description = "The 64-entry list with revised retain/remove conditions. This is not a deletion script."
+logical_id = "59b3c9a2-a4ba-4624-8e45-06720be81bc5"
+content_hash = "sha256:f3cda89dd252f1c76986f919ed29242f56800d7fbd818dbd100d11be6c104ce0"
+size = 14431
+mtime_ms = 1795027360630
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/59b3c9a2-a4ba-4624-8e45-06720be81bc5/66611f95-2aa6-4200-91b0-a49af02b4679"
+storage_version_token = "1795027379818802"
+content_type = "text/csv"
