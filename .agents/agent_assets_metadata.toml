@@ -63,3 +63,17 @@ mtime_ms = 1795016482542
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/bfdd24f0-9342-470b-947f-6f1fc0751d46/c4f3628d-5739-4882-bee7-fd2139d42889"
 storage_version_token = "1795016483184921"
 content_type = "text/html"
+
+[[outputs]]
+id = "XlqyE0n4qO4AzKWtNjE-c"
+uri = "file://generated-artifacts/website-review/RosterHockey-Website-Handoff.html"
+type = "html"
+title = "Website export review and import instructions"
+description = "Verified desktop/mobile screenshots, isolation results, import steps, and the proposed APP cleanup list. Nothing deleted or published."
+logical_id = "0d1ac62e-2c92-4515-b158-f3f6d8871992"
+content_hash = "sha256:569856b719a3e2a806ff40a03bf20b32d65cf6307993b666dd94de2bc17425fc"
+size = 369854
+mtime_ms = 1795019866643
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/0d1ac62e-2c92-4515-b158-f3f6d8871992/6727bb79-7e8f-4541-b9b7-6b56aa18cb7e"
+storage_version_token = "1795019892865761"
+content_type = "text/html"
