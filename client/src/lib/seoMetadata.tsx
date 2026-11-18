@@ -1,36 +1,15 @@
 import { createContext, type MutableRefObject, type ReactNode } from 'react';
+import { MARKETING_REDIRECT_PATHS, appRobots } from '@shared/appWebPolicy';
 
 export const APP_SITE_ORIGIN = 'https://www.roster-app.com';
 export const MARKETING_SITE_ORIGIN = 'https://www.rosterhockey.com';
 // Retained for app-facing callers that need the app's canonical origin.
 export const CANONICAL_SITE_ORIGIN = APP_SITE_ORIGIN;
 
-const marketingPagePaths = new Set([
-  '/',
-  '/features',
-  '/line-combos-predictions',
-  '/rosterhockey-vs-benchapp',
-  '/rosterhockey-vs-teamsnap',
-  '/rosterhockey-vs-rosterlytic',
-  '/pricing',
-  '/about',
-  '/hockey',
-  '/for-adult-leagues',
-  '/for-youth-teams',
-  '/for-varsity',
-  '/referral-program',
-  '/faq',
-  '/support',
-  '/privacy-policy',
-  '/privacy',
-  '/terms-of-service',
-  '/sitemap.xml',
-  '/robots.txt',
-  '/llms.txt',
-]);
+const marketingPagePaths = new Set<string>(MARKETING_REDIRECT_PATHS);
 
 function currentHostname() {
-  return typeof window === 'undefined' ? 'www.rosterhockey.com' : window.location.hostname.toLowerCase();
+  return typeof window === 'undefined' ? 'www.roster-app.com' : window.location.hostname.toLowerCase();
 }
 
 function normalizedPath(path: string) {
@@ -41,14 +20,9 @@ export function isMarketingPagePath(path: string) {
   return marketingPagePaths.has(normalizedPath(path));
 }
 
-export function canonicalOriginForPath(path: string, hostname = currentHostname()) {
-  const pathname = normalizedPath(path);
-  if (!marketingPagePaths.has(pathname)) return APP_SITE_ORIGIN;
-
-  // The root is also the authenticated app's launch page. Keep its canonical
-  // origin on the app host when that is where the visitor is using the app.
-  if (pathname === '/' && /(^|\.)roster-app\.com$/.test(hostname)) return APP_SITE_ORIGIN;
-  return MARKETING_SITE_ORIGIN;
+export function canonicalOriginForPath(_path: string, _hostname = currentHostname()) {
+  // This source now belongs exclusively to APP. WEBSITE owns an independent copy.
+  return APP_SITE_ORIGIN;
 }
 
 export type SeoMetadata = {
@@ -97,4 +71,13 @@ export function applyCanonicalUrl(path: string, appRoot = false) {
     document.head.appendChild(ogUrl);
   }
   ogUrl.content = href;
+  let robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+  if (!robots) {
+    robots = document.createElement('meta');
+    robots.name = 'robots';
+    document.head.appendChild(robots);
+  }
+  const preview = /(?:\.replit\.(?:dev|app)|\.vercel\.app)$/.test(currentHostname())
+    || ['localhost', '127.0.0.1'].includes(currentHostname());
+  robots.content = appRobots(path, preview);
 }

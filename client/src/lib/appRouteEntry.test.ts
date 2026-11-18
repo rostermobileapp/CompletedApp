@@ -61,9 +61,16 @@ test('login destinations never accept query-supplied redirects or external paths
   assert.equal(loginDestination('//evil.test', '', ''), '/');
   assert.equal(loginDestination('/login', '?returnTo=https://evil.test', ''), '/?returnTo=https://evil.test');
   assert.equal(shouldShowAppLogin('/unknown', true, ''), false);
-  assert.equal(shouldShowAppLogin('/', false, ''), false);
+  assert.equal(shouldShowAppLogin('/', false, ''), true);
   assert.equal(shouldShowAppLogin('/', false, '?trivia=1'), true);
   assert.equal(shouldShowAppLogin('/app', false, ''), true);
+});
+
+test('APP legal aliases stay public rather than being shadowed by the login guard', () => {
+  for (const path of ['/privacy', '/privacy-policy', '/terms', '/terms-of-service']) {
+    assert.equal(isProtectedAppPath(path), false, path);
+    assert.equal(shouldShowAppLogin(path, false, ''), false, path);
+  }
 });
 
 test('protected entry list covers router destinations not available to signed-out users', () => {

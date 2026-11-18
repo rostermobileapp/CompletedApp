@@ -10,10 +10,9 @@ import {
 
 test('marketing routes are exact, including referral portal boundary', () => {
   for (const path of [
-    '/', '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/rosterhockey-vs-rosterlytic', '/pricing', '/about', '/hockey',
+    '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/rosterhockey-vs-rosterlytic', '/pricing', '/about', '/hockey',
     '/for-adult-leagues', '/for-youth-teams', '/for-varsity', '/referral-program',
-    '/faq', '/support', '/privacy-policy', '/privacy', '/terms-of-service',
-    '/sitemap.xml', '/robots.txt', '/llms.txt',
+    '/faq', '/support', '/contact',
   ]) {
     assert.equal(isMarketingPagePath(path), true, path);
   }
@@ -27,13 +26,13 @@ test('marketing routes are exact, including referral portal boundary', () => {
   assert.equal(isMarketingPagePath('/manifest.json'), false);
 });
 
-test('canonical URLs split marketing paths from app paths and normalize trailing slashes', () => {
-  assert.equal(canonicalUrl('/features/'), `${MARKETING_SITE_ORIGIN}/features`);
-  assert.equal(canonicalUrl('/line-combos-predictions'), `${MARKETING_SITE_ORIGIN}/line-combos-predictions`);
-  assert.equal(canonicalUrl('/rosterhockey-vs-benchapp'), `${MARKETING_SITE_ORIGIN}/rosterhockey-vs-benchapp`);
-  assert.equal(canonicalUrl('/rosterhockey-vs-teamsnap'), `${MARKETING_SITE_ORIGIN}/rosterhockey-vs-teamsnap`);
-  assert.equal(canonicalUrl('/rosterhockey-vs-rosterlytic'), `${MARKETING_SITE_ORIGIN}/rosterhockey-vs-rosterlytic`);
-  assert.equal(canonicalUrl('/privacy'), `${MARKETING_SITE_ORIGIN}/privacy`);
+test('this project owns APP canonicals only, with no query or trailing slash', () => {
+  assert.equal(canonicalUrl('/features/'), `${APP_SITE_ORIGIN}/features`);
+  assert.equal(canonicalUrl('/line-combos-predictions'), `${APP_SITE_ORIGIN}/line-combos-predictions`);
+  assert.equal(canonicalUrl('/rosterhockey-vs-benchapp'), `${APP_SITE_ORIGIN}/rosterhockey-vs-benchapp`);
+  assert.equal(canonicalUrl('/rosterhockey-vs-teamsnap'), `${APP_SITE_ORIGIN}/rosterhockey-vs-teamsnap`);
+  assert.equal(canonicalUrl('/rosterhockey-vs-rosterlytic'), `${APP_SITE_ORIGIN}/rosterhockey-vs-rosterlytic`);
+  assert.equal(canonicalUrl('/privacy'), `${APP_SITE_ORIGIN}/privacy`);
   assert.equal(canonicalUrl('/referral-program/portal/login'), `${APP_SITE_ORIGIN}/referral-program/portal/login`);
   assert.equal(canonicalUrl('/manifest.json'), `${APP_SITE_ORIGIN}/manifest.json`);
   assert.equal(canonicalUrl('/login?next=%2Fcalendar'), `${APP_SITE_ORIGIN}/login`);
@@ -42,6 +41,6 @@ test('canonical URLs split marketing paths from app paths and normalize trailing
 test('root canonical stays on the app domain for app-host visitors', () => {
   assert.equal(canonicalOriginForPath('/', 'www.roster-app.com'), APP_SITE_ORIGIN);
   assert.equal(canonicalOriginForPath('/', 'roster-app.com'), APP_SITE_ORIGIN);
-  assert.equal(canonicalOriginForPath('/', 'www.rosterhockey.com'), MARKETING_SITE_ORIGIN);
+  assert.equal(canonicalOriginForPath('/', 'www.rosterhockey.com'), APP_SITE_ORIGIN);
   assert.equal(canonicalUrl('/', { appRoot: true }), `${APP_SITE_ORIGIN}/`);
 });

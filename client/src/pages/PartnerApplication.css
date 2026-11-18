@@ -1,0 +1,36 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap");
+/* Existing application styling, independent of the removed marketing navigation. */
+.partner-page { min-height:100vh;overflow:hidden;background:#071323;color:#edf5fc;font-family:"DM Sans",sans-serif; }
+.partner-page * { box-sizing:border-box; }
+.partner-page a:focus-visible,.partner-page button:focus-visible,.partner-page input:focus-visible,.partner-page select:focus-visible,.partner-page textarea:focus-visible { outline:3px solid #a8d8ff;outline-offset:4px; }
+.partner-page .rp-kicker { display:block;color:#83baff;text-transform:uppercase;letter-spacing:.18em;font-size:10px;font-weight:700; }
+.partner-page .rp-title { margin:18px 0 20px;color:#f1f7fd;font:900 clamp(62px,8.2vw,112px)/.88 "Barlow Condensed",sans-serif;letter-spacing:.012em;text-transform:uppercase; }
+.partner-page .rp-title-sm { font-size:clamp(48px,6vw,78px); }
+.partner-container { width:min(1140px,calc(100% - 48px));margin:0 auto; }
+.partner-apply { padding:108px 0;background:radial-gradient(ellipse at 16% 30%,rgba(45,120,192,.19),transparent 38%),#0c2035;border-top:1px solid rgba(151,195,236,.1); }
+.partner-apply-layout { display:grid;grid-template-columns:.78fr 1.22fr;gap:7vw;align-items:start; }
+.partner-apply-layout>div:first-child>p { color:#a9bdd1;font-size:13px;line-height:1.8; }
+.partner-apply-note { display:flex;align-items:flex-start;gap:8px;margin-top:23px;color:#8db9e6;font-size:10px;line-height:1.6; }
+.partner-apply-note svg { flex-shrink:0; }
+.partner-form { display:grid;gap:15px;padding:26px;border:1px solid rgba(151,195,236,.18);border-radius:16px;background:linear-gradient(145deg,#142f4a,#0c2035);box-shadow:0 25px 56px rgba(0,0,0,.26); }
+.partner-form>label,.partner-form-row label { display:grid;gap:7px;color:#c8d9e8;font-size:10px;font-weight:700; }
+.partner-form label>span { display:inline;color:#91a9c0;font-weight:400; }
+.partner-form input:not([type=file]),.partner-form select,.partner-form textarea { width:100%;min-height:43px;padding:10px 12px;border:1px solid #345575;border-radius:8px;background:#0a1e32;color:#eff7ff;font:12px "DM Sans",sans-serif; }
+.partner-form input::placeholder,.partner-form textarea::placeholder { color:#6e89a2; }
+.partner-form select option { background:#0a1e32; }
+.partner-form textarea { resize:vertical; }
+.partner-form-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+.partner-upload { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:45px;flex-wrap:wrap;padding:11px;border:1px dashed #3d6384;border-radius:9px;color:#a7bfd6;font-size:9px; }
+.partner-upload>label { display:flex;align-items:center;gap:8px;cursor:pointer; }
+.partner-upload>label svg { color:#82bbfb; }
+.partner-upload>input { position:absolute;width:1px;height:1px;opacity:0; }
+.partner-upload>button { display:flex;align-items:center;gap:4px;border:0;background:none;color:#8dbaff;font-size:9px;cursor:pointer; }
+.partner-submit { min-height:46px;display:flex;align-items:center;justify-content:center;gap:9px;border:0;border-radius:9px;background:#3d8df5;color:#fff;font:700 12px "DM Sans",sans-serif;cursor:pointer; }
+.partner-submit:hover { background:#61a5ff; }
+.partner-error { margin:0;color:#ffb1b9;font-size:10px; }
+.partner-terms { margin:0;color:#7f98b0;font-size:9px;line-height:1.5; }
+.partner-toast { position:fixed;z-index:70;left:50%;bottom:20px;transform:translateX(-50%);width:min(560px,calc(100% - 32px));display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;border:1px solid #4f8bb8;border-radius:12px;background:rgba(8,25,42,.97);box-shadow:0 18px 40px rgba(0,0,0,.33);color:#d9ecfb;font-size:11px;line-height:1.55; }
+.partner-toast button { display:grid;place-items:center;flex:0 0 34px;height:34px;border:0;border-radius:50%;background:#173a5b;color:#c6e2fb;cursor:pointer; }
+@media(max-width:850px) { .partner-apply-layout { grid-template-columns:1fr;gap:35px; }.partner-apply-layout>div:first-child { max-width:600px; } }
+@media(max-width:620px) { .partner-container { width:calc(100% - 40px); }.partner-apply { padding:76px 0; }.partner-form { padding:19px; }.partner-form-row { grid-template-columns:1fr; } }
+@media(prefers-reduced-motion:reduce) { .partner-page * { scroll-behavior:auto!important;transition:none!important; } }

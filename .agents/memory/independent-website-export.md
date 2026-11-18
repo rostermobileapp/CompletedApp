@@ -40,3 +40,13 @@ handoff could overwrite independent fixes.
 
 **How to apply:** Make future website changes in the website project. The original
 ZIP is a historical handoff snapshot, not an up-to-date distribution.
+
+Release the additive APP prerequisites first, then cut over and verify WEBSITE,
+and only afterward release APP-only cleanup. Each release needs separate approval.
+
+**Why:** The live website must not lose its current serving deployment before the
+independent website is live, and its application/attribution destinations must work
+before cutover.
+
+**How to apply:** Before publishing either project, check the release order and
+retain the pre-cleanup additive APP checkpoint as a release/rollback option.

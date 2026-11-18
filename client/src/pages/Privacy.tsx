@@ -2,7 +2,7 @@ import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft } from 'lucide-react';
 import { useSeo } from '@/hooks/useSeo';
-import { MARKETING_SITE_ORIGIN } from '@/lib/seoMetadata';
+import { APP_SITE_ORIGIN } from '@/lib/seoMetadata';
 
 export default function Privacy({ publicPage = false }: { publicPage?: boolean }) {
   const [, navigate] = useLocation();
@@ -17,7 +17,7 @@ export default function Privacy({ publicPage = false }: { publicPage?: boolean }
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
           {publicPage ? (
-            <a href={`${MARKETING_SITE_ORIGIN}/`} className="text-muted-foreground" aria-label="Back to RosterHockey home" data-testid="button-back">
+            <a href={`${APP_SITE_ORIGIN}/`} className="text-muted-foreground" aria-label="Back to RosterHockey home" data-testid="button-back">
               <ArrowLeft className="w-6 h-6" />
             </a>
           ) : (

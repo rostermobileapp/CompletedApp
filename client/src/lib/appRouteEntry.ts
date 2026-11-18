@@ -20,7 +20,7 @@ export const PROTECTED_APP_ROUTES = [
   '/leagues/:leagueId/tournaments', '/tournaments/:tournamentId/edit',
   '/tournaments/:tournamentId/custom-builder', '/tournament-teams/:tournamentId',
   '/tournaments/:tournamentId', '/media/tournament/:id', '/media/league/:id',
-  '/media/team/:id', '/privacy', '/admin/stripe', '/admin/metrics',
+  '/media/team/:id', '/admin/stripe', '/admin/metrics',
   '/admin/organizer-card-payments',
 ] as const;
 
@@ -33,10 +33,8 @@ export function isProtectedAppPath(path: string): boolean {
   return matchers.some(({ pattern }) => pattern.test(path));
 }
 
-export function shouldShowAppLogin(path: string, native: boolean, search: string): boolean {
-  const params = new URLSearchParams(search);
-  return path === '/app' || isProtectedAppPath(path) ||
-    (path === '/' && (native || params.get('trivia') === '1' || params.get('notification') === '1'));
+export function shouldShowAppLogin(path: string, _native: boolean, _search: string): boolean {
+  return path === '/' || path === '/app' || isProtectedAppPath(path);
 }
 
 export function loginDestination(path: string, search: string, hash: string): string {

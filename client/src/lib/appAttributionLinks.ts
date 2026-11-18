@@ -18,6 +18,9 @@ export function installAppAttributionLinks(doc: Document, currentUrl: () => stri
   }
   const decorated = new WeakMap<HTMLAnchorElement, { original: string; href: string }>();
   const decorate = (anchor: HTMLAnchorElement) => {
+    // Attribute observations also include <link rel="canonical">. Never turn
+    // document metadata into an outbound CTA or append campaign parameters.
+    if (anchor.tagName !== "A") return;
     const current = anchor.getAttribute("href");
     const previous = decorated.get(anchor);
     const original = previous && current === previous.href ? previous.original : current;

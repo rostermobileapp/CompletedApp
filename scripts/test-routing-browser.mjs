@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import WebSocket from 'ws';
 import { once } from 'node:events';
 
-const target = await (await fetch('http://127.0.0.1:9222/json/new?about:blank', { method: 'PUT' })).json();
+const cdpOrigin = process.env.ROUTING_CDP_ORIGIN || 'http://127.0.0.1:9222';
+const target = await (await fetch(`${cdpOrigin}/json/new?about:blank`, { method: 'PUT' })).json();
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await once(ws, 'open');
 let id = 0;
@@ -41,11 +42,13 @@ async function wait(expression) {
   throw new Error(`Timed out: ${expression}\n${await evaluate('document.body.innerText')}\n${errors.join('\n')}`);
 }
 let initId;
-async function open(path, { signedIn = true, loading = false, saved = null, native = true } = {}) {
+async function open(path, { signedIn = true, loading = false, saved = null, native = true, desktop = false, onboarded = true } = {}) {
   if (initId) await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: initId });
   const init = await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.__routeFixtureInitial=${JSON.stringify({ user: signedIn ? { id: 'fixture-user', role: 'free_tier' } : null, isLoading: loading })};
     window.__fixtureNative=${native};
+    window.__fixtureDesktop=${desktop};
+    window.__fixtureOnboarded=${onboarded};
     if(location.origin==='http://127.0.0.1:3001') {
       localStorage.clear();
       ${saved ? `localStorage.setItem('roster.mobile.lastScreen',${JSON.stringify(typeof saved === 'string' ? saved : JSON.stringify(saved))});` : ''}
@@ -73,6 +76,22 @@ try {
   await send('Page.enable');
   await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await check('signed-out web root uses the existing Login without a marketing flash', async () => {
+    await open('/', { signedIn: false, native: false });
+    await wait(`!!document.querySelector('[data-testid="button-login-initial"]')`);
+    await expectPath('/');
+    assert.ok(!await evaluate(`document.body.innerText.includes('Illustrative preview')`));
+  });
+  await check('signed-in desktop root keeps the existing Dashboard', async () => {
+    await open('/', { native: false, desktop: true });
+    await wait(`document.querySelector('[data-testid="fixture-page"]')?.textContent==='Dashboard'`);
+    await expectPath('/');
+  });
+  await check('new accounts keep the existing onboarding gate', async () => {
+    await open('/', { native: false, desktop: true, onboarded: false });
+    await wait(`document.querySelector('[data-testid="fixture-page"]')?.textContent==='Onboarding'`);
+    await expectPath('/');
+  });
   await check('native /app with no saved screen -> Home, no 404 flash', async () => {
     await open('/app'); await expectPath('/', 'home');
   });
@@ -180,5 +199,5 @@ try {
   console.log(`${passed} browser scenarios passed; no uncaught browser exceptions.`);
 } finally {
   ws.close();
-  await fetch(`http://127.0.0.1:9222/json/close/${target.id}`);
+  await fetch(`${cdpOrigin}/json/close/${target.id}`);
 }

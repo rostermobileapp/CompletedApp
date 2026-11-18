@@ -1,120 +1,34 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { APP_ORIGIN, MARKETING_REDIRECT_PATHS, WEBSITE_ORIGIN } from "../../shared/appWebPolicy";
+const config = JSON.parse(readFileSync(new URL("../../vercel.json", import.meta.url), "utf8"));
 
-const config = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'));
-
-function pathMatcher(source: string) {
-  const match = source.match(/^\/:path\((.*)\)$/);
-  assert.ok(match, `Expected a named regex path source: ${source}`);
-  return new RegExp(`^/(?:${match[1]})$`);
-}
-
-const appHostMarketingRedirect = config.redirects.find((route: any) =>
-  route.destination === 'https://www.rosterhockey.com/:path',
-);
-const retiredSportRedirects = config.redirects.filter((route: any) =>
-  route.destination === 'https://www.rosterhockey.com/hockey' &&
-  route.statusCode === 301,
-);
-const marketingHostAppRedirect = config.redirects.find((route: any) =>
-  route.destination === 'https://www.roster-app.com/:path*' &&
-  route.has?.some((condition: any) => condition.type === 'host' && condition.value === 'www.rosterhockey.com'),
-);
-
-test('the app host permanently redirects exact marketing paths and keeps their paths', () => {
-  assert.ok(appHostMarketingRedirect);
-  assert.ok(appHostMarketingRedirect.has?.some((condition: any) =>
-    condition.type === 'host' && condition.value?.re === '^(?:www\\.)?roster-app\\.com$',
-  ));
-  const matches = pathMatcher(appHostMarketingRedirect.source);
-  for (const path of [
-    '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/rosterhockey-vs-rosterlytic', '/pricing', '/about', '/hockey',
-    '/for-adult-leagues', '/for-youth-teams', '/for-varsity',
-    '/referral-program', '/faq', '/support', '/sitemap.xml', '/llms.txt',
-  ]) {
-    assert.equal(matches.test(path), true, path);
-  }
-  for (const path of [
-    '/', '/login', '/get-started', '/api/auth/user',
-    '/referral-program/portal/login', '/referral-program/verify',
-    '/.well-known/apple-app-site-association', '/robots.txt', '/manifest.json',
-    '/privacy', '/privacy-policy', '/terms-of-service',
-  ]) {
-    assert.equal(matches.test(path), false, path);
-  }
-  assert.equal(matches.test('/rosterhockey-vs-benchapp/extra'), false);
-  assert.equal(matches.test('/rosterhockey-vs-teamsnap/extra'), false);
-  assert.equal(appHostMarketingRedirect.statusCode, 301);
-  assert.equal('preserveQueryParams' in appHostMarketingRedirect, false);
+test("hosting config and actual server share the exact marketing redirect allowlist", () => {
+  const rule = config.redirects.find((r: any) => r.destination === `${WEBSITE_ORIGIN}/:path`);
+  assert.equal(rule.statusCode, 301);
+  const pattern = new RegExp(`^/(?:${rule.source.slice("/:path(".length, -1)})$`);
+  for (const path of MARKETING_REDIRECT_PATHS) assert.ok(pattern.test(path), path);
+  for (const path of ["/", "/login", "/signup", "/get-started", "/privacy", "/privacy-policy", "/terms",
+    "/terms-of-service", "/hpib", "/referral-program/apply", "/referral-program/verify",
+    "/referral-program/portal", "/referral-program/portal/login", "/admin/referrals",
+    "/api/referral/apply", "/.well-known/apple-app-site-association", "/sitemap.xml", "/robots.txt",
+    "/llms.txt", "/game/fixture", "/features/subpage", "/made-up"]) assert.equal(pattern.test(path), false, path);
+  assert.ok(config.redirects.every((r: any) => !r.destination.startsWith(APP_ORIGIN)), "No old website-to-APP catch-all");
+  assert.ok(!config.rewrites.some((r: any) => r.source === "/:path*" || r.source === "/(.*)"));
 });
-
-test('retired sport paths on both hosts go directly to hockey permanently', () => {
-  assert.equal(retiredSportRedirects.length, 2);
-  const oldApp = retiredSportRedirects.find((route: any) =>
-    route.has?.some((condition: any) => condition.type === 'host' &&
-      condition.value?.re === '^(?:www\\.)?roster-app\\.com$'),
-  );
-  const marketingHost = retiredSportRedirects.find((route: any) =>
-    route.has?.some((condition: any) => condition.type === 'host' &&
-      condition.value === 'www.rosterhockey.com'),
-  );
-  assert.ok(oldApp);
-  assert.ok(marketingHost);
-  for (const route of [oldApp, marketingHost]) {
-    assert.equal(route.source, '/(baseball|soccer)(/.*)?');
-    const matches = new RegExp(`^${route.source}$`);
-    for (const path of ['/baseball', '/soccer', '/baseball/archive', '/soccer/archive']) {
-      assert.equal(matches.test(path), true, path);
-    }
-    assert.equal(route.statusCode, 301);
-    assert.equal(route.destination, 'https://www.rosterhockey.com/hockey');
-    assert.equal('preserveQueryParams' in route, false);
+test("APP-only public documents keep their own initial metadata; API and association transport stay intact", () => {
+  for (const path of ["/login", "/privacy", "/privacy-policy", "/terms", "/terms-of-service",
+    "/referral-program/apply", "/referral-program/verify", "/referral-program/portal",
+    "/referral-program/portal/login", "/hpib"]) {
+    assert.equal(config.rewrites.find((r: any) => r.source === path)?.destination, `${path}/index.html`);
   }
-  assert.ok(config.redirects.indexOf(oldApp) < config.redirects.indexOf(appHostMarketingRedirect));
-  assert.ok(config.redirects.indexOf(marketingHost) < config.redirects.indexOf(marketingHostAppRedirect));
-});
-
-test('the marketing host sends app paths to the app but keeps marketing and static files', () => {
-  assert.ok(marketingHostAppRedirect);
-  const matches = pathMatcher(marketingHostAppRedirect.source);
-  for (const path of [
-    '/login', '/get-started', '/app', '/api/auth/user',
-    '/referral-program/portal/login', '/referral-program/verify',
-    '/team/123', '/game/123', '/.well-known/apple-app-site-association',
-    '/unknown-route',
-  ]) {
-    assert.equal(matches.test(path), true, path);
-  }
-  for (const path of [
-    '/', '/features', '/line-combos-predictions', '/rosterhockey-vs-benchapp', '/rosterhockey-vs-teamsnap', '/rosterhockey-vs-rosterlytic', '/pricing', '/referral-program', '/privacy',
-    '/privacy-policy', '/terms-of-service', '/sitemap.xml', '/robots.txt',
-    '/llms.txt', '/manifest.json', '/assets/app.js',
-    '/marketing/roster-home/logo-dark.png', '/badges/beer-me/tier-3.webp',
-    '/images/line-combos/og-line-combos.png',
-    '/favicon.png', '/roster-logo.png',
-  ]) {
-    assert.equal(matches.test(path), false, path);
-  }
-  assert.equal(marketingHostAppRedirect.statusCode, 302);
-  assert.equal('preserveQueryParams' in marketingHostAppRedirect, false);
-  assert.equal(marketingHostAppRedirect.source.includes('baseball'), false);
-  assert.equal(marketingHostAppRedirect.source.includes('soccer'), false);
-});
-
-test('the app root is not redirected and only the apex marketing host is canonicalized', () => {
-  assert.equal(config.redirects.some((route: any) =>
-    route.has?.some((condition: any) =>
-      condition.type === 'host' &&
-      (condition.value === 'roster-app.com' || condition.value === 'www.roster-app.com'),
-    ) && route.source === '/',
-  ), false);
-  const apexMarketingRedirect = config.redirects.find((route: any) =>
-    route.source === '/:path*' &&
-    route.has?.some((condition: any) => condition.type === 'host' && condition.value === 'rosterhockey.com'),
-  );
-  assert.ok(apexMarketingRedirect);
-  assert.equal(apexMarketingRedirect.destination, 'https://www.rosterhockey.com/:path*');
-  assert.equal(apexMarketingRedirect.statusCode, 302);
-  assert.equal('preserveQueryParams' in apexMarketingRedirect, false);
+  assert.equal(config.rewrites.find((r: any) => r.source === "/api/:path*").destination,
+    "https://completedapp-production.up.railway.app/api/:path*");
+  assert.equal(config.rewrites.find((r: any) => r.source === "/.well-known/:file*").destination, "/.well-known/:file*");
+  assert.equal(config.headers.find((r: any) => r.source === "/.well-known/apple-app-site-association").headers[0].value, "application/json");
+  const login = config.headers.find((r: any) => r.source === "/login");
+  assert.equal(login.headers[0].value, "index, follow");
+  assert.ok(config.headers.some((r: any) => r.has?.some((h: any) => String(h.value).includes("vercel")) &&
+    r.headers.some((h: any) => h.key === "X-Robots-Tag" && h.value.includes("noindex"))));
 });

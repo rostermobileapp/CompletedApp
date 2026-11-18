@@ -5,8 +5,9 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
-import { serveCrawlabilityFiles } from "./crawlabilityFiles";
 import { isLiveProjectPreview } from "./runtimePolicy";
+import { appDocumentHeaders, isAppDocument, isAppPreview, serveAppWebRouting } from "./appWebRouting";
+import { appDocumentHtml } from "../shared/appWebPolicy";
 
 const viteLogger = createLogger();
 
@@ -46,13 +47,12 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
-  // Never serve a previously built production client (and its native bridge
-  // configuration) from the isolated development server.
-  if (!previewSafetyEnabled) {
-    serveCrawlabilityFiles(app, path.resolve(import.meta.dirname, "..", "dist", "public"));
-  }
+  // APP policy is independent from old website build artifacts.
+  serveAppWebRouting(app, path.resolve(import.meta.dirname, "..", "client/public"));
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
+  // Do not mount at "*": Express strips that mount from req.path, making
+  // every document look like "/" and hiding real unknown-route 404s.
+  app.use(async (req, res, next) => {
     const url = req.originalUrl;
 
     try {
@@ -75,7 +75,10 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      // Keep development-only visual routes; production has no preview bypass.
+      const known = isAppDocument(req.path) || /^\/(?:onboarding-preview|gerry-home-preview|trophy-case-preview)$/.test(req.path);
+      res.status(known ? 200 : 404).set(appDocumentHeaders(req))
+        .end(appDocumentHtml(page, req.path, true));
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -91,36 +94,16 @@ export function serveStatic(app: Express, distPath = path.resolve(import.meta.di
     );
   }
 
-  serveCrawlabilityFiles(app, distPath);
+  serveAppWebRouting(app, distPath);
+  const template = fs.readFileSync(path.join(distPath, "index.html"), "utf8");
   app.get("*", (req, res, next) => {
-    // Serve generated /faq/index.html at /faq without redirecting to /faq/.
-    // The browser router uses clean paths, just like the Vercel frontend.
-    const pagePath = path.resolve(distPath, `.${req.path}`, "index.html");
-    if (!pagePath.startsWith(`${path.resolve(distPath)}${path.sep}`)
-      || !fs.existsSync(pagePath) || !fs.statSync(pagePath).isFile()) return next();
-    if (req.path !== "/" && req.path.endsWith("/")) {
-      const query = req.originalUrl.slice(req.originalUrl.indexOf("?") < 0
-        ? req.originalUrl.length : req.originalUrl.indexOf("?"));
-      return res.redirect(301, `/${req.path.split("/").filter(Boolean).join("/")}${query}`);
-    }
-    return res.sendFile(pagePath);
+    if (!isAppDocument(req.path)) return next();
+    return res.status(200).set(appDocumentHeaders(req))
+      .send(appDocumentHtml(template, req.path, isAppPreview(req)));
   });
   app.use(express.static(distPath, { redirect: false }));
 
-  const clientRoutes = [
-    /^\/$/,
-    /^\/(?:app|login|get-started|reset-password|forgot-password|hpib|demo)$/,
-    /^\/(?:features|line-combos-predictions|rosterhockey-vs-benchapp|rosterhockey-vs-teamsnap|rosterhockey-vs-rosterlytic|pricing|about|hockey|for-youth-teams|for-adult-leagues|for-varsity|referral-program|faq|support|privacy|privacy-policy|terms-of-service)$/,
-    /^\/(?:league-tournament-search|league-search|team-search|tournament-search|tournaments|tournaments\/create|facilities|facility-memberships|create-league|create-team|create-scrimmage|scrimmage-management|invite-groups|league-management|league-list|calendar|announcements|substitute-confirmations|stats|stats-management|scorekeeper|create-payment-request|calendar-events\/create|roster|subscription|trophy-case|trophy-case\/earned-patches|admin\/badges|admin\/referrals|admin\/stripe|admin\/metrics)$/,
-    /^\/invite-groups\/(?:new|[^/]+)$/,
-    /^\/(?:messages|user|facilities|edit-scrimmage|draft|league|game|scrimmage|team-event|team|player-stats|payment-requests|tournament-teams|leagues|media|tournaments)\/[^/]+(?:\/(?:edit|custom-builder|score-verification|tournaments|create))?$/,
-    /^\/(?:leagues\/[^/]+\/tournaments\/(?:create)?|media\/(?:tournament|league|team)\/[^/]+|referral-program\/(?:portal(?:\/(?:auth|set-password|forgot-password|login))?|verify)|admin\/referrals(?:\/(?:login|partner\/[^/]+))?)$/,
-  ];
-
   app.use((req, res) => {
-    if (clientRoutes.some(route => route.test(req.path))) {
-      return res.sendFile(path.resolve(distPath, "index.html"));
-    }
     const canonical = `https://www.roster-app.com${req.path.replaceAll('"', '%22').replaceAll('<', '%3C')}`;
     res.status(404).set("X-Robots-Tag", "noindex, nofollow").type("html").send(
       `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Page not found | RosterHockey</title><meta property="og:site_name" content="RosterHockey"><link rel="canonical" href="${canonical}"></head><body><main><h1>Page not found</h1><p>The page you requested does not exist.</p><a href="/">Return to RosterHockey</a></main></body></html>`,

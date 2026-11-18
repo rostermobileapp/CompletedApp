@@ -6,61 +6,16 @@
   "redirects": [
     {
       "source": "/(baseball|soccer)(/.*)?",
-      "has": [
-        {
-          "type": "host",
-          "value": {
-            "re": "^(?:www\\.)?roster-app\\.com$"
-          }
-        }
-      ],
       "destination": "https://www.rosterhockey.com/hockey",
       "statusCode": 301
     },
     {
-      "source": "/(baseball|soccer)(/.*)?",
-      "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
-      "destination": "https://www.rosterhockey.com/hockey",
-      "statusCode": 301
-    },
-    {
-      "source": "/:path(features|line-combos-predictions|rosterhockey-vs-benchapp|rosterhockey-vs-teamsnap|rosterhockey-vs-rosterlytic|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|sitemap\\.xml|llms\\.txt)",
-      "has": [
-        {
-          "type": "host",
-          "value": {
-            "re": "^(?:www\\.)?roster-app\\.com$"
-          }
-        }
-      ],
+      "source": "/:path(features|line-combos-predictions|rosterhockey-vs-benchapp|rosterhockey-vs-teamsnap|rosterhockey-vs-rosterlytic|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|contact)",
       "destination": "https://www.rosterhockey.com/:path",
       "statusCode": 301
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "rosterhockey.com" }],
-      "destination": "https://www.rosterhockey.com/",
-      "statusCode": 302
-    },
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "rosterhockey.com" }],
-      "destination": "https://www.rosterhockey.com/:path*",
-      "statusCode": 302
-    },
-    {
-      "source": "/:path((?!$|(?:features|line-combos-predictions|rosterhockey-vs-benchapp|rosterhockey-vs-teamsnap|rosterhockey-vs-rosterlytic|pricing|about|hockey|for-adult-leagues|for-youth-teams|for-varsity|referral-program|faq|support|privacy-policy|privacy|terms-of-service|sitemap\\.xml|robots\\.txt|llms\\.txt|manifest\\.json)(?:/?$)|(?:assets|marketing|badges|images)(?:/|$)|(?:favicon\\.png|icon-192\\.png|icon-512\\.png|roster-logo(?:-transparent)?\\.png)$).*)",
-      "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
-      "destination": "https://www.roster-app.com/:path*",
-      "statusCode": 302
     }
   ],
   "rewrites": [
-    {
-      "source": "/robots.txt",
-      "has": [{ "type": "host", "value": "www.rosterhockey.com" }],
-      "destination": "/marketing/robots.txt"
-    },
     {
       "source": "/api/:path*",
       "destination": "https://completedapp-production.up.railway.app/api/:path*"
@@ -69,12 +24,17 @@
       "source": "/.well-known/:file*",
       "destination": "/.well-known/:file*"
     },
-    { "source": "/app", "destination": "/index.html" },
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/get-started", "destination": "/index.html" },
-    { "source": "/reset-password", "destination": "/index.html" },
-    { "source": "/forgot-password", "destination": "/index.html" },
-    { "source": "/hpib", "destination": "/index.html" },
+    { "source": "/app", "destination": "/app/index.html" },
+    { "source": "/login", "destination": "/login/index.html" },
+    { "source": "/get-started", "destination": "/get-started/index.html" },
+    { "source": "/reset-password", "destination": "/reset-password/index.html" },
+    { "source": "/forgot-password", "destination": "/forgot-password/index.html" },
+    { "source": "/hpib", "destination": "/hpib/index.html" },
+    { "source": "/privacy", "destination": "/privacy/index.html" },
+    { "source": "/privacy-policy", "destination": "/privacy-policy/index.html" },
+    { "source": "/terms", "destination": "/terms/index.html" },
+    { "source": "/terms-of-service", "destination": "/terms-of-service/index.html" },
+    { "source": "/referral-program/apply", "destination": "/referral-program/apply/index.html" },
     { "source": "/demo", "destination": "/index.html" },
     { "source": "/trophy-case-preview", "destination": "/index.html" },
     { "source": "/gerry-home-preview", "destination": "/index.html" },
@@ -82,11 +42,17 @@
     { "source": "/league-search", "destination": "/index.html" },
     { "source": "/team-search", "destination": "/index.html" },
     { "source": "/messages/:conversationId", "destination": "/index.html" },
+    { "source": "/messages", "destination": "/index.html" },
+    { "source": "/teams", "destination": "/index.html" },
+    { "source": "/profile", "destination": "/index.html" },
+    { "source": "/payment-requests", "destination": "/index.html" },
     { "source": "/user/:userId", "destination": "/index.html" },
     { "source": "/trophy-case", "destination": "/index.html" },
     { "source": "/trophy-case/earned-patches", "destination": "/index.html" },
     { "source": "/admin/badges", "destination": "/index.html" },
     { "source": "/subscription", "destination": "/index.html" },
+    { "source": "/subscriptions", "destination": "/index.html" },
+    { "source": "/settings/billing", "destination": "/index.html" },
     { "source": "/roster", "destination": "/index.html" },
     { "source": "/create-league", "destination": "/index.html" },
     { "source": "/create-team", "destination": "/index.html" },
@@ -97,6 +63,7 @@
     { "source": "/invite-groups/new", "destination": "/index.html" },
     { "source": "/invite-groups/:id", "destination": "/index.html" },
     { "source": "/league-management", "destination": "/index.html" },
+    { "source": "/league-management/:leagueId", "destination": "/index.html" },
     { "source": "/draft/:draftId", "destination": "/index.html" },
     { "source": "/league/:leagueId/score-verification", "destination": "/index.html" },
     { "source": "/league-list", "destination": "/index.html" },
@@ -128,21 +95,30 @@
     { "source": "/media/tournament/:id", "destination": "/index.html" },
     { "source": "/media/league/:id", "destination": "/index.html" },
     { "source": "/media/team/:id", "destination": "/index.html" },
-    { "source": "/referral-program/portal/auth", "destination": "/index.html" },
-    { "source": "/referral-program/portal/set-password", "destination": "/index.html" },
-    { "source": "/referral-program/portal/forgot-password", "destination": "/index.html" },
-    { "source": "/referral-program/portal/login", "destination": "/index.html" },
-    { "source": "/referral-program/portal", "destination": "/index.html" },
-    { "source": "/referral-program/verify", "destination": "/index.html" },
-    { "source": "/admin/referrals/login", "destination": "/index.html" },
+    { "source": "/referral-program/portal/auth", "destination": "/referral-program/portal/auth/index.html" },
+    { "source": "/referral-program/portal/set-password", "destination": "/referral-program/portal/set-password/index.html" },
+    { "source": "/referral-program/portal/forgot-password", "destination": "/referral-program/portal/forgot-password/index.html" },
+    { "source": "/referral-program/portal/login", "destination": "/referral-program/portal/login/index.html" },
+    { "source": "/referral-program/portal", "destination": "/referral-program/portal/index.html" },
+    { "source": "/referral-program/verify", "destination": "/referral-program/verify/index.html" },
+    { "source": "/admin/referrals/login", "destination": "/admin/referrals/login/index.html" },
     { "source": "/admin/referrals/partner/:id", "destination": "/index.html" },
     { "source": "/admin/referrals", "destination": "/index.html" },
     { "source": "/facilities", "destination": "/index.html" },
     { "source": "/facilities/:id", "destination": "/index.html" },
     { "source": "/admin/stripe", "destination": "/index.html" },
-    { "source": "/admin/metrics", "destination": "/index.html" }
+    { "source": "/admin/metrics", "destination": "/index.html" },
+    { "source": "/admin/organizer-card-payments", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/:path((?!login/?$|api(?:/|$)|\\.well-known(?:/|$)|assets(?:/|$)|.*\\.[^/]+$).*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/login",
+      "headers": [{ "key": "X-Robots-Tag", "value": "index, follow" }]
+    },
     {
       "source": "/robots.txt",
       "headers": [

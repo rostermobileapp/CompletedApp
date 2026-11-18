@@ -30,15 +30,9 @@ import { TriviaHost } from "@/components/TriviaHost";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
-import Landing from "@/components/marketing/ScrollStory";
-import LineCombosPage from "@/components/marketing/line-combos/LineCombosPage";
-import RosterHockeyVsTeamSnapPage from "@/components/marketing/RosterHockeyVsTeamSnapPage";
-import RosterHockeyVsBenchAppPage from "@/components/marketing/RosterHockeyVsBenchAppPage";
-import RosterHockeyVsRosterlyticPage from "@/components/marketing/RosterHockeyVsRosterlyticPage";
-import { PricingPage as Pricing } from "@/components/marketing/PricingPage";
-import { AboutPage as About } from "@/components/marketing/AboutPage";
-import SportLanding from "@/pages/SportLanding";
-import SegmentLanding from "@/pages/SegmentLanding";
+import { WebsiteRedirect } from "@/components/WebsiteRedirect";
+import { marketingDestination } from "@shared/appWebPolicy";
+import PartnerApplication from "@/pages/PartnerApplication";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
@@ -75,7 +69,6 @@ import CreateCalendarEvent from "@/pages/CreateCalendarEvent";
 import Privacy from "@/pages/Privacy";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
-import Support from "@/pages/Support";
 import StripeAdmin from "@/pages/StripeAdmin";
 import Tournaments from "@/pages/Tournaments";
 import TournamentsLanding from "@/pages/TournamentsLanding";
@@ -93,8 +86,6 @@ import PlayerStatsTrends from "@/pages/PlayerStatsTrends";
 import TeamEventDetails from "@/pages/TeamEventDetails";
 import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
-import { FeaturesPage as FeaturesLanding } from "@/components/marketing/FeaturesPage";
-import { PartnersPage as ReferralProgram } from "@/components/marketing/PartnersPage";
 import ReferralApplicationVerification from "@/pages/ReferralApplicationVerification";
 import ReferralPortalLogin from "@/pages/ReferralPortalLogin";
 import ReferralPortalAuth from "@/pages/ReferralPortalAuth";
@@ -237,7 +228,7 @@ export function Router() {
   }
 
   if (location === '/referral-program/apply') {
-    return <ReferralProgram applicationOnly />;
+    return <PartnerApplication />;
   }
 
   if (location === '/hpib') {
@@ -252,17 +243,9 @@ export function Router() {
     return <LoadingScreen />;
   }
 
-  // Public marketing pages use their own navigation, including for signed-in users.
-  const marketingPage = location === '/features' ? <FeaturesLanding />
-    : location === '/line-combos-predictions' ? <LineCombosPage />
-    : location === '/rosterhockey-vs-benchapp' ? <RosterHockeyVsBenchAppPage />
-    : location === '/rosterhockey-vs-teamsnap' ? <RosterHockeyVsTeamSnapPage />
-    : location === '/rosterhockey-vs-rosterlytic' ? <RosterHockeyVsRosterlyticPage />
-    : location === '/pricing' ? <Pricing />
-    : location === '/about' ? <About />
-    : location === '/faq' ? <Support />
-    : location === '/referral-program' ? <ReferralProgram /> : null;
-  if (marketingPage) return <><ScrollToTop />{marketingPage}</>;
+  if (marketingDestination(location)) {
+    return <WebsiteRedirect path={location} search={window.location.search} />;
+  }
 
   // Development-only entry point for visually reviewing each profile onboarding step.
   // This intentionally works without a session because the preview is visual-only.
@@ -286,25 +269,14 @@ export function Router() {
       <>
         <ScrollToTop />
         <Switch>
-          <Route path="/" component={Landing} />
-          <Route path="/features" component={FeaturesLanding} />
-          <Route path="/line-combos-predictions" component={LineCombosPage} />
-          <Route path="/rosterhockey-vs-benchapp" component={RosterHockeyVsBenchAppPage} />
-          <Route path="/rosterhockey-vs-teamsnap" component={RosterHockeyVsTeamSnapPage} />
-          <Route path="/rosterhockey-vs-rosterlytic" component={RosterHockeyVsRosterlyticPage} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/about" component={About} />
-          <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>
-          <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
-          <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
-          <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
+          <Route path="/" component={Login} />
           <Route path="/app" component={Login} />
           <Route path="/login" component={Login} />
           <Route path="/get-started" component={OnboardingQuestionnaire} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
           <Route path="/privacy">{() => <Privacy publicPage />}</Route>
           <Route path="/terms-of-service" component={TermsOfService} />
-          <Route path="/support" component={Support} />
+          <Route path="/terms" component={TermsOfService} />
           <Route path="/facilities" component={FacilityBrowse} />
           <Route path="/facilities/:id" component={FacilityDetail} />
           <Route path="/referral-program/portal/auth" component={ReferralPortalAuth} />
@@ -313,7 +285,6 @@ export function Router() {
           <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
           <Route path="/referral-program/portal" component={ReferralPortal} />
           <Route path="/referral-program/verify" component={ReferralApplicationVerification} />
-          <Route path="/referral-program">{() => <ReferralProgram />}</Route>
           <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
           <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
           <Route path="/admin/referrals" component={ReferralAdmin} />
@@ -427,15 +398,13 @@ export function Router() {
               <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
               <Route path="/referral-program/portal" component={ReferralPortal} />
               <Route path="/referral-program/verify" component={ReferralApplicationVerification} />
-              <Route path="/referral-program">{() => <ReferralProgram />}</Route>
               <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
               <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
               <Route path="/admin/referrals" component={ReferralAdmin} />
               <Route path="/privacy">{() => <Privacy />}</Route>
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />
-              <Route path="/support" component={Support} />
-              <Route path="/about" component={About} />
+              <Route path="/terms" component={TermsOfService} />
               <Route path="/admin/stripe" component={StripeAdmin} />
               <Route path="/admin/metrics" component={AdminMetrics} />
               <Route path="/admin/organizer-card-payments" component={AdminOrganizerCardPayments} />

@@ -11,7 +11,7 @@ interface SeoOptions {
   canonical?: string;
 }
 
-const DEFAULT_TITLE = 'RosterHockey | Beer League Hockey Team & League Management App';
+const DEFAULT_TITLE = 'RosterHockey App';
 export function useSeo({ title, description, ogTitle, ogDescription, ogImage, canonical }: SeoOptions) {
   const [location] = useLocation();
   const collector = useContext(SeoMetadataContext);

@@ -1,6 +1,8 @@
 # APP-only cleanup review
 
-This is a proposed scope, not authorization to implement or delete files.
+This records the reviewed scope. Implementation was subsequently approved by
+assignment of the existing separation task. Results and the release hold are in
+`docs/app-only-cleanup-result.md`; the findings below describe the review baseline.
 The independent WEBSITE was imported and verified as reported by its Agent.
 Its website-only dependency fixes are authoritative; the original handoff ZIP
 must not overwrite that project.

@@ -7,8 +7,18 @@
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 
 const root = process.cwd();
+// Reuse the real desktop shell's primary-page selection instead of pretending
+// its children own "/". The surrounding shell UI/providers remain stubbed.
+const desktopSource = ts.createSourceFile('DesktopAppShell.tsx',
+  readFileSync(resolve(root, 'client/src/components/DesktopAppShell.tsx'), 'utf8'),
+  ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const desktopSelector = desktopSource.statements.find(node =>
+  ts.isFunctionDeclaration(node) && node.name?.text === 'getMainScreenForPath');
+if (!desktopSelector) throw new Error('Desktop shell primary-page selector changed; update the routing fixture');
 const stateSource = `
 import React, {useSyncExternalStore} from 'react';
 import {QueryClient} from '@tanstack/react-query';
@@ -18,7 +28,7 @@ export const queryClient = new QueryClient({defaultOptions:{queries:{
   retry:false, queryFn: async ({queryKey}) => {
     if (queryKey[0] === '/api/user') {
       await new Promise(r=>setTimeout(r, window.fixture.accountDelay));
-      return {id:state.user?.id, onboardingCompleted:true, role:'free_tier'};
+      return {id:state.user?.id, onboardingCompleted:window.__fixtureOnboarded!==false, role:'free_tier'};
     }
     return [];
   }
@@ -33,9 +43,10 @@ export function useAuth() {
   const s=useSyncExternalStore(fn=>{listeners.add(fn);return ()=>listeners.delete(fn)},()=>state);
   return {...s,isAuthenticated:!!s.user};
 }
-export function useIsDesktopWeb(){return false}
+export function useIsDesktopWeb(){return window.__fixtureDesktop===true}
 export function isInsideNativeWrapper(){return window.__fixtureNative !== false}
 export function useDemo(){return {isActive:false}}
+export async function apiRequest(){throw new Error('Unexpected provider request in routing fixture')}
 export const DemoContextProvider=({children})=>children;
 export function useToast(){return {toast:()=>{}}}
 export const supabase={auth:{
@@ -49,11 +60,20 @@ export const supabase={auth:{
 `;
 const passSource = `
 import React from 'react';
+import {useLocation} from 'wouter';
 const Pass=({children})=>children || null;
+const page=(name)=>()=> <h1 data-testid="fixture-page">{name}</h1>;
+const Dashboard=page('Dashboard'), Teams=page('Teams'), Messages=page('Messages'),
+  PaymentRequests=page('PaymentRequests'), Profile=page('Profile');
+${desktopSelector.getText(desktopSource)}
+export function DesktopAppShell({children}) {
+  const [path]=useLocation();
+  return getMainScreenForPath(path) ?? children;
+}
 export default Pass;
 export const PermissionProvider=Pass, DemoContextProvider=Pass, ThemeProvider=Pass,
   TooltipProvider=Pass, SlideUpOverlayProvider=Pass, WebSocketProvider=Pass,
-  ErrorBoundary=Pass, PageTransition=Pass, DesktopAppShell=Pass;
+  ErrorBoundary=Pass, PageTransition=Pass, WebsiteRedirect=Pass;
 export const PricingPage=Pass, AboutPage=Pass, FeaturesPage=Pass, PartnersPage=Pass;
 export const Toaster=()=>null, HPIBBanner=()=>null, ActiveDraftsBanner=()=>null,
   SlideOutMenu=()=>null, ScrollToTop=()=>null, NativelyNotificationsInitializer=()=>null,
@@ -85,7 +105,7 @@ const result = await build({
     name: 'isolated-routing-fixture',
     setup(builder) {
       builder.onResolve({ filter: /^fixture-state$/ }, () => ({ path: 'state', namespace: 'fixture' }));
-      builder.onResolve({ filter: /(?:useAuth|useIsDesktopWeb|useToast|lib\/supabase|context\/DemoContext|lib\/queryClient)$/ }, args => {
+      builder.onResolve({ filter: /(?:useAuth|useIsDesktopWeb|useToast|supabase|context\/DemoContext|queryClient)$/ }, args => {
         if (args.importer.includes('/client/') || args.importer === 'state') return { path: 'state', namespace: 'fixture' };
       });
       builder.onResolve({ filter: /^@\/pages\// }, args => {
@@ -130,4 +150,4 @@ createServer((req, res) => {
     <style>body{font:16px system-ui;background:#111;color:white;margin:0}button,input{font:inherit;padding:12px;margin:4px}nav{position:fixed;bottom:0;background:#222;width:100%}[aria-hidden=true]{display:none!important}.fixed{position:fixed}.inset-0{inset:0}.absolute{position:absolute}</style>
     </head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>`);
   }
-}).listen(3001, '0.0.0.0', () => console.log('Isolated routing fixture listening on 3001'));
+}).listen(3001, '127.0.0.1', () => console.log('Isolated routing fixture listening on 3001'));

@@ -43,6 +43,7 @@ integrations = ["javascript_websocket:1.0.0", "javascript_object_storage:1.0.0",
 [[ports]]
 localPort = 3001
 externalPort = 4200
+exposeLocalhost = true
 
 [[ports]]
 localPort = 3002

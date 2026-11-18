@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { transformSync } from "esbuild";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { marketingDestination, WEBSITE_ORIGIN } from "@shared/appWebPolicy";
 
 const source = readFileSync("client/src/components/FunFeaturesShowcase.tsx", "utf8");
 const require = createRequire(import.meta.url);
@@ -75,24 +76,22 @@ test("every showcase image uses an existing local asset and has alt text", () =>
   }
 });
 
-test("only hockey and adult-league pages receive fun promotion", () => {
-  const sport = readFileSync("client/src/pages/SportLanding.tsx", "utf8");
-  const segment = readFileSync("client/src/pages/SegmentLanding.tsx", "utf8");
-  assert.match(sport, /sport === 'hockey' && \([\s\S]*?<FunFeaturesNudge/);
-  assert.match(segment, /segment === 'for-adult-leagues' && \([\s\S]*?<FunFeaturesNudge/);
+// Public-page placement belongs to the independent WEBSITE now. Keep all
+// component behavior/accessibility/asset tests above; test the APP boundary here.
+test("hockey and adult-league promotions delegate to the independent website", () => {
+  for (const route of ["/hockey", "/for-adult-leagues"]) {
+    assert.equal(marketingDestination(route, "?ref=FIXTURE"), `${WEBSITE_ORIGIN}${route}?ref=FIXTURE`);
+  }
   assert.ok(source.includes('href="/features#fun-features"'));
 });
 
-test("hero promotes all three features and both public pricing lists explain access", () => {
-  const home = readFileSync("client/src/pages/Landing.tsx", "utf8");
-  const pricing = readFileSync("client/src/pages/Pricing.tsx", "utf8");
-  assert.match(home, /href="#fun-features"/);
-  assert.ok(home.includes("Earn patches. Track post-game beers. Play daily trivia."));
-  for (const page of [home, pricing]) {
-    for (const benefit of ["Daily Hockey Trivia", "Beer Counter (Adult Players)",
-      "Earn Patch Progress", "Trophy Case & Patch Artwork (21+)"]) assert.ok(page.includes(benefit));
+test("APP no longer imports promotional pages or the retained historical showcase", () => {
+  const app = readFileSync("client/src/App.tsx", "utf8");
+  for (const module of ["FunFeaturesShowcase", "marketing/", "pages/Landing", "pages/Pricing", "SportLanding", "SegmentLanding"]) {
+    assert.ok(!app.includes(module), module);
   }
-  assert.ok(pricing.includes("verified age of 21 or older"));
+  assert.equal(marketingDestination("/pricing"), `${WEBSITE_ORIGIN}/pricing`);
+  assert.equal(marketingDestination("/features"), `${WEBSITE_ORIGIN}/features`);
 });
 
 test("new styles include responsive, focus-visible, and reduced-motion treatment", () => {

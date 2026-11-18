@@ -45,10 +45,13 @@ test("crawler files have explicit content types and never fall through to the SP
   }
 });
 
-test("production static serving keeps clean prerendered URLs and SPA/404 boundaries", async () => {
+test("production serves APP metadata and redirects even stale website artifacts before static handling", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "roster-static-pages-"));
   await mkdir(path.join(root, "faq"));
-  await writeFile(path.join(root, "index.html"), "<h1>Homepage</h1>");
+  await mkdir(path.join(root, ".well-known"));
+  await writeFile(path.join(root, ".well-known/apple-app-site-association"), '{"applinks":{"details":[]}}');
+  await writeFile(path.join(root, ".well-known/assetlinks.json"), '[{"fixture":true}]');
+  await writeFile(path.join(root, "index.html"), '<!doctype html><head><title>Old title</title><link rel="canonical" href="https://www.roster-app.com/"></head><body><div id="root"></div></body>');
   await writeFile(path.join(root, "faq", "index.html"), "<h1>FAQ</h1><p>Initial HTML answer</p>");
   const app = express();
   serveStatic(app, root);
@@ -57,23 +60,32 @@ test("production static serving keeps clean prerendered URLs and SPA/404 boundar
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   try {
     const faq = await fetch(`${origin}/faq`, { redirect: "manual" });
-    assert.equal(faq.status, 200);
-    assert.match(await faq.text(), /Initial HTML answer/);
-    assert.equal(faq.headers.get("x-robots-tag"), null);
+    assert.equal(faq.status, 301);
+    assert.equal(faq.headers.get("location"), "https://www.rosterhockey.com/faq");
     for (const sport of ["soccer", "baseball"]) {
-      const response = await fetch(`${origin}/${sport}`);
-      assert.equal(response.status, 404);
-      assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
-      assert.match(await response.text(), /Page not found/);
+      const response = await fetch(`${origin}/${sport}`, { redirect: "manual" });
+      assert.equal(response.status, 301);
+      assert.equal(response.headers.get("location"), "https://www.rosterhockey.com/hockey");
     }
     const slash = await fetch(`${origin}/faq/?source=crawl`, { redirect: "manual" });
     assert.equal(slash.status, 301);
-    assert.equal(slash.headers.get("location"), "/faq?source=crawl");
-    assert.match(await (await fetch(`${origin}/login`)).text(), /Homepage/);
+    assert.equal(slash.headers.get("location"), "https://www.rosterhockey.com/faq?source=crawl");
+    assert.match(await (await fetch(`${origin}/login`)).text(), /Log In \| RosterHockey/);
     const missing = await fetch(`${origin}/not-a-page`);
     assert.equal(missing.status, 404);
     assert.match(await missing.text(), /Page not found/);
-    assert.equal((await fetch(`${origin}/robots.txt`)).status, 404);
+    const robots = await fetch(`${origin}/robots.txt`);
+    assert.equal(robots.status, 200);
+    assert.match(await robots.text(), /www\.roster-app\.com\/sitemap.xml/);
+    for (const [file, expected] of [
+      ["apple-app-site-association", '{"applinks":{"details":[]}}'],
+      ["assetlinks.json", '[{"fixture":true}]'],
+    ]) {
+      const response = await fetch(`${origin}/.well-known/${file}`);
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get("content-type") || "", /application\/json/);
+      assert.equal(await response.text(), expected);
+    }
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
