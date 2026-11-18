@@ -50,3 +50,15 @@ before cutover.
 
 **How to apply:** Before publishing either project, check the release order and
 retain the pre-cleanup additive APP checkpoint as a release/rollback option.
+
+A React route alone does not make an additive release candidate ready. Verify
+the public APP URL through both frontend-host rewrites and the Node production
+document list, not only through the development server.
+
+**Why:** The application UI existed in the pre-cleanup source while both
+production hosting layers omitted its URL and returned 404. Releasing that
+source unchanged would not satisfy the WEBSITE's outbound Apply link.
+
+**How to apply:** Treat a pre-cleanup checkpoint as a source base until its
+production routing is tested. Preserve website serving while preparing any
+minimal additive routing patch; do not substitute the full cleanup release.

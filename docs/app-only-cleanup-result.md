@@ -93,9 +93,13 @@ Vite WebSocket/CSP console warning was observed; it did not prevent rendering.
 ## Release order and rollback boundary
 
 1. Preserve additive APP checkpoint **`edbbcde4`** (the last pre-cleanup reviewed
-   state) as the separately approvable prerequisite release/rollback option.
-   It retains website serving and the APP-owned application/attribution entry.
-2. With separate approval, release that additive APP frontend/backend first.
+   state) as the base for a separately approvable prerequisite release candidate.
+   It retains website serving and the APP-owned application/attribution UI.
+   **Readiness-check correction:** do not publish this checkpoint unchanged.
+   Its Vercel rewrites and Node production document list omit
+   `/referral-program/apply`, even though its React route exists. Prepare and
+   test a minimal additive routing patch while retaining website serving.
+2. With separate approval, release the corrected additive APP frontend/backend first.
    Confirm the actual APP host and required entry destinations. Do not deploy
    this APP-only cleanup first.
 3. With separate approval in the WEBSITE project, publish/cut over WEBSITE.
@@ -109,3 +113,24 @@ Vite WebSocket/CSP console warning was observed; it did not prevent rendering.
    APP auth/transactional frontend origins, API transport, and native settings.
    Railway is the actual APP runtime; Vercel configuration alone is not release
    verification. No hosting or provider changes were performed here.
+
+## Subsequent read-only live readiness check
+
+- The public APP frontend and current WEBSITE respond through Vercel and serve
+  the same combined client bundle. Railway serves the APP backend/runtime.
+- Railway reported the backend online on a release preceding the additive
+  prerequisites, with no staged changes to that service.
+- The public APP and Railway both returned 404 for `/referral-program/apply`.
+- The live APP root/login still contain website initial metadata; `/terms` is
+  still 404. These cleanup changes are not live.
+- The live WEBSITE still redirects `/contact` and `/blog` into APP; independent
+  WEBSITE cutover has not been demonstrated.
+- The current workspace branch is also the branch connected to Railway. Do not
+  push the cleanup as a shortcut to the additive prerequisite release.
+- The independent WEBSITE project's own current preview and publishing settings
+  were not accessible from this workspace. Its live candidate needs a separate
+  check before cutover approval.
+
+These checks performed public GETs and read-only deployment/source inspection.
+No applications were submitted, and no deployments, settings, secrets, or
+production data were changed.

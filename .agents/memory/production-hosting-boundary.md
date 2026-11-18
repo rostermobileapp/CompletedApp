@@ -5,6 +5,16 @@ description: Distinguishes the live Railway app from Replit workspace and previe
 
 The Roster live app's production errors and daily trivia sender are visible in Railway's production environment even when Replit reports no active deployment for this workspace. The Replit development preview is not the live app.
 
+The public APP frontend is served through Vercel; Railway serves its API/backend
+runtime. Check both hosts when verifying a release.
+
+**Why:** Live readiness checks showed Vercel frontend responses and a separately
+versioned Railway backend. Updating one does not prove the other is current.
+
+**How to apply:** Confirm frontend route/metadata behavior publicly and inspect
+the actual Railway release separately. Do not interpret absent Replit deployment
+metadata as absence of the external production services.
+
 **Why:** During the October 2026 trivia tap investigation, Replit deployment metadata showed no active deployment while Railway showed matching live app and push-delivery logs.
 
 **How to apply:** Check Railway for production incidents and verify the deployed version there. Do not infer that local workspace changes are live, and do not redeploy without user authorization.
