@@ -35,8 +35,6 @@ test('isolated development fixtures do not gain access to live mode through thei
 test('server gates card reads, writes, and the actual invoice organizer', () => {
   const routes = readFileSync(new URL('../organizerCardPaymentRoutes.ts', import.meta.url), 'utf8');
   for (const path of [
-    '/api/organizer-card-payments/connect/status',
-    '/api/organizer-card-payments/connect/onboarding',
     '/api/organizer-card-payments/checkout-session',
     '/api/organizer-card-payments/requests/:requestId',
     '/api/organizer-card-payments/scrimmages/:scrimmageId/settings',
@@ -52,4 +50,13 @@ test('server gates card reads, writes, and the actual invoice organizer', () => 
   const guard = preparation.indexOf('canUseOrganizerCardPilot(');
   assert.ok(guard >= 0);
   assert.ok(guard < preparation.indexOf('INSERT INTO public.organizer_card_payments'));
+});
+
+test('onboarding uses paid entitlement rather than the collection pilot allowlist', () => {
+  const routes = readFileSync(new URL('../organizerCardPaymentRoutes.ts', import.meta.url), 'utf8');
+  const start = routes.indexOf('app.post("/api/organizer-card-payments/connect/onboarding"');
+  const handler = routes.slice(start, routes.indexOf('\n  app.', start + 1));
+  assert.match(handler, /hasOrganizerCardCollectionEntitlement\(userId\)/);
+  assert.match(handler, /assertDirectOnboardingEnabled\(\)/);
+  assert.doesNotMatch(handler, /assertOrganizerCardPilotUser\(/);
 });

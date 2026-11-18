@@ -622,14 +622,10 @@ export function registerOrganizerCardPaymentRoutes(
   app.get("/api/organizer-card-payments/connect/status", isAuthenticated, async (req: any, res) => {
     const userId = userIdFromRequest(req);
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-    try {
-      if (!await isOrganizerCardPilotUser(userId)) {
-        return res.json({ enabled: false, onboardingEnabled: false, webhookReady: false, eligible: false, connected: false, ready: false });
-      }
-    } catch (error) {
-      return sendPaymentError(res, error);
-    }
     const eligible = await hasOrganizerCardCollectionEntitlement(userId).catch(() => false);
+    if (!eligible) {
+      return res.json({ enabled: false, onboardingEnabled: false, webhookReady: false, eligible: false, connected: false, ready: false });
+    }
     let stripe: Stripe;
     try {
       assertDirectOnboardingEnabled();
@@ -660,7 +656,8 @@ export function registerOrganizerCardPaymentRoutes(
         ? await getVerifiedConnectedAccountStatus(userId, stripe)
         : { connected: false, accountId: null, ready: false, detailsSubmitted: false, chargesEnabled: false, transfersEnabled: false, payoutsEnabled: false, currentlyDue: [] };
       const { accountId: _accountId, ...publicStatus } = status;
-      res.json({ enabled: isDirectCollectionEnabled(), onboardingEnabled: true, webhookReady, eligible, ...publicStatus });
+      const collectionEnabled = isDirectCollectionEnabled() && await isOrganizerCardPilotUser(userId);
+      res.json({ enabled: collectionEnabled, onboardingEnabled: true, webhookReady, eligible, ...publicStatus });
     } catch (error) {
       sendPaymentError(res, error);
     }
@@ -670,7 +667,6 @@ export function registerOrganizerCardPaymentRoutes(
     const userId = userIdFromRequest(req);
     if (!userId) return res.status(401).json({ message: "Authentication required" });
     try {
-      await assertOrganizerCardPilotUser(userId);
       if (!await hasOrganizerCardCollectionEntitlement(userId)) {
         throw new OrganizerCardPaymentError("Connecting a receiving account requires your own active Player Pro subscription or higher.", 403, "subscription_required");
       }

@@ -7,7 +7,13 @@ Receiving-account onboarding must be independently available before live payment
 
 **Why:** Tying Stripe setup visibility to the collection switch prevented the pilot organizers from completing the prerequisites while charges were intentionally disabled.
 
-**How to apply:** Keep onboarding permission distinct from collection permission in both server responses and UI. Preparing a fix is not permission to publish, enable live onboarding, create live accounts, or charge cards. Preserve the pilot allowlist and existing runtime/key checks.
+**How to apply:** Keep onboarding permission distinct from collection permission in both server responses and UI. Preparing a fix is not permission to publish, enable live onboarding, create live accounts, or charge cards. Preserve the collection pilot allowlist and existing runtime/key checks.
+
+Every personally paid user must be able to see and access Stripe receiving-account onboarding, not only the two collection-pilot users. Retain the founder exception.
+
+**Why:** The owner explicitly corrected the proposed two-account onboarding restriction: “I want it set up as if EVERY paid user can see it and access it.”
+
+**How to apply:** Gate onboarding by personal paid entitlement, not the collection pilot allowlist. This expands setup access only; it does not authorize publishing, enabling charges, or broadening the payment pilot.
 
 The owner requires the Platform model: organizers collect payments directly, rather than RosterHockey creating marketplace/destination charges for them.
 

@@ -5,14 +5,19 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
 test('production pilot separates onboarding from collection without bypassing runtime safety', async () => {
-  const ids: Record<string, string> = { first: 'U00001', second: 'U00002', blocked: 'U00003' };
+  const ids: Record<string, string> = {
+    first: 'U00001', second: 'U00002', blocked: 'U00003', pro: 'U00004',
+    secondary: 'U00005', free: 'U00006', exempt: 'U00007',
+  };
   const state = {
     stripeCalls: 0, writes: 0, onboardingCalls: 0,
     pool: {
       async query(text: string, params: string[] = []) {
         if (text.includes('SELECT display_id, role, fee_exempt')) {
           return { rows: ids[params[0]] ? [{
-            display_id: ids[params[0]], role: 'commissioner', fee_exempt: params[0] === 'first',
+            display_id: ids[params[0]],
+            role: ({ pro: 'player_pro', secondary: 'secondary_commissioner', free: 'free_tier' } as Record<string, string>)[params[0]] ?? 'commissioner',
+            fee_exempt: ['first', 'exempt'].includes(params[0]),
           }] : [] };
         }
         if (text.includes('SELECT display_id')) {
@@ -111,7 +116,6 @@ test('production pilot separates onboarding from collection without bypassing ru
   }
   for (const user of ['blocked', 'missing']) {
     for (const path of [
-      '/api/organizer-card-payments/connect/status',
       '/api/organizer-card-payments/requests/:requestId',
       '/api/organizer-card-payments/scrimmages/:scrimmageId/settings',
     ]) {
@@ -120,7 +124,6 @@ test('production pilot separates onboarding from collection without bypassing ru
       assert.equal(result.body.enabled, false);
     }
     for (const path of [
-      '/api/organizer-card-payments/connect/onboarding',
       '/api/organizer-card-payments/checkout-session',
       '/api/organizer-card-payments/:paymentId/refund',
       '/api/organizer-card-payments/direct/context',
@@ -135,6 +138,12 @@ test('production pilot separates onboarding from collection without bypassing ru
     assert.equal(result.statusCode, 200);
     assert.equal(result.body.enabled, true);
     assert.equal(result.body.eligible, true, 'The founder can collect while remaining fee-exempt');
+  }
+  for (const user of ['blocked', 'pro', 'secondary']) {
+    const result = await request('get', '/api/organizer-card-payments/connect/status', user);
+    assert.equal(result.body.onboardingEnabled, true);
+    assert.equal(result.body.eligible, true);
+    assert.equal(result.body.enabled, false, 'Broad onboarding does not expand the collection pilot');
   }
   // Even an allowed payer cannot start a transaction for a non-pilot organizer.
   const retiredCheckout = await request('post', '/api/organizer-card-payments/checkout-session', 'first');
@@ -160,7 +169,7 @@ test('production pilot separates onboarding from collection without bypassing ru
   }
   assert.equal(state.onboardingCalls, 0);
   env.ORGANIZER_DIRECT_ONBOARDING_LIVE_ENABLED = '1';
-  for (const user of ['first', 'second']) {
+  for (const user of ['first', 'second', 'blocked', 'pro', 'secondary']) {
     const status = await request('get', '/api/organizer-card-payments/connect/status', user);
     assert.equal(status.body.enabled, false);
     assert.equal(status.body.onboardingEnabled, true);
@@ -170,13 +179,21 @@ test('production pilot separates onboarding from collection without bypassing ru
     assert.match(setup.body.url, /^https:\/\/connect\.stripe\.com\/setup\/synthetic-/);
     for (const path of ['context', 'quote', 'confirm']) {
       const payment = await request('post', `/api/organizer-card-payments/direct/${path}`, user);
-      assert.equal(payment.statusCode, 503);
-      assert.equal(payment.body.code, 'direct_payments_disabled');
+      const pilot = ['first', 'second'].includes(user);
+      assert.equal(payment.statusCode, pilot ? 503 : 403);
+      assert.equal(payment.body.code, pilot ? 'direct_payments_disabled' : 'card_pilot_restricted');
     }
   }
-  const blockedSetup = await request('post', '/api/organizer-card-payments/connect/onboarding', 'blocked');
-  assert.equal(blockedSetup.statusCode, 403);
-  assert.equal(state.onboardingCalls, 2);
+  for (const user of ['free', 'exempt', 'missing']) {
+    const status = await request('get', '/api/organizer-card-payments/connect/status', user);
+    assert.equal(status.body.onboardingEnabled, false);
+    assert.equal(status.body.eligible, false);
+    const setup = await request('post', '/api/organizer-card-payments/connect/onboarding', user);
+    assert.equal(setup.statusCode, 403);
+    assert.equal(setup.body.code, 'subscription_required');
+  }
+  assert.equal((await request('post', '/api/organizer-card-payments/connect/onboarding', null)).statusCode, 401);
+  assert.equal(state.onboardingCalls, 5);
   assert.equal(state.writes, 0, 'No invoice or payment ledger writes during onboarding-only requests');
 
   delete env.STRIPE_CONNECT_WEBHOOK_SECRET;
@@ -191,5 +208,5 @@ test('production pilot separates onboarding from collection without bypassing ru
   env.ORGANIZER_CARD_PAYMENTS_LIVE_ENABLED = '1';
   env.STRIPE_SECRET_KEY = 'sk_test_fixture';
   assert.equal((await request('post', '/api/organizer-card-payments/connect/onboarding', 'first')).body.code, 'stripe_not_ready');
-  assert.equal(state.onboardingCalls, 2);
+  assert.equal(state.onboardingCalls, 5);
 });
