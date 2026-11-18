@@ -78,7 +78,10 @@ test("the prediction popup matches Home's thin green/red track and white marker"
         chanceOfPoint: 0.25,
         form: null,
       })),
-      topScorersAway: [],
+      topScorersAway: Array.from({ length: 11 }, (_, index) => ({
+        id: `away-skater-${index + 1}`, name: `Away Skater ${index + 1}`,
+        projectedPoints: 0, chanceOfPoint: 0, form: null,
+      })),
       expectedGoalsHome: 8.3, expectedGoalsAway: 3.5,
     },
   }));
@@ -103,6 +106,9 @@ test("the prediction popup matches Home's thin green/red track and white marker"
   assert.match(home, /rounded-xl border border-primary\/30 bg-primary\/20 p-3/);
   assert.doesNotMatch(home, /dark:bg-\[/);
   const away = renderSheet("away");
+  assert.equal((away.match(/<li\b/g) ?? []).length, 11);
+  assert.match(away, /Away Skater 11/);
+  assert.match(away, /0 pts · 0%/);
   assert.match(away, /bg-\[#ef4444\]" style="width:95%"/);
   assert.match(away, /bg-\[#22c55e\]" style="width:5%"/);
   assert.match(away, /Odds <span class="text-base font-extrabold text-primary tabular-nums">\+1900<\/span>/);

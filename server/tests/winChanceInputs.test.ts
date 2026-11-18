@@ -2,6 +2,7 @@ import { before, after, beforeEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import pg from "pg";
+import ts from "typescript";
 import { fixtureAdmin } from "./helpers/predictionFixtureDb.js";
 import { loadScope, loadTeamData, recalculateSourceGames, recalculateTeam } from "../../supabase/functions/recalculate-win-chance/calculator.js";
 import { aggregateResults, buildTeamInput, headToHead, type GameRow } from "../../supabase/functions/recalculate-win-chance/modelInputs.js";
@@ -40,9 +41,23 @@ describe("prediction input rules", () => {
     assert.equal(isFutureGame("2026-11-13T00:00:00Z", now,"America/New_York"),false);
     assert.equal(localTimestamp(Date.parse("2026-07-01T01:00:00Z"),"America/New_York"),"2026-06-30T21:00:00");
   });
-  test("does not modify the supplied model", async () => {
-    assert.equal(await readFile("supabase/functions/recalculate-win-chance/winProbability.ts","utf8"),
-      await readFile("attached_assets/0_winProbability_1794508276740.ts","utf8"));
+  test("preserves the supplied model outside the approved all-skater projection output", async () => {
+    const withoutSkaterOutput = (source: string) => {
+      const file = ts.createSourceFile("model.ts", source, ts.ScriptTarget.Latest, true);
+      const projection = file.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "projectScorers");
+      assert.ok(projection, "the projection function must remain separately identifiable");
+      // Ignore documentation-only trigger-policy changes, but compare every
+      // other declaration in the numerical model against the supplied source.
+      return ts.createPrinter({ removeComments: true }).printList(
+        ts.ListFormat.MultiLine,
+        ts.factory.createNodeArray(file.statements.filter(node => node !== projection)),
+        file,
+      );
+    };
+    assert.equal(
+      withoutSkaterOutput(await readFile("supabase/functions/recalculate-win-chance/winProbability.ts","utf8")),
+      withoutSkaterOutput(await readFile("attached_assets/0_winProbability_1794508276740.ts","utf8")),
+    );
   });
 });
 
@@ -182,6 +197,30 @@ describe("prediction loader and guarded persistence", { skip: !url }, () => {
     assert.ok(Math.abs(Number(first.home_win_probability)+Number(first.away_win_probability)+Number(first.tie_probability)-1)<0.00002);
     await recalculateTeam(admin,"mavs",now);
     assert.deepEqual((await pool.query("SELECT * FROM game_predictions")).rows[0],first);
+  });
+  test("persists the full registered and placeholder skater roster for both teams", async () => {
+    for (const team of ["mavs", "neon"]) {
+      for (let index = 1; index <= 8; index++) {
+        const id = `${team}-extra-${index}`;
+        await pool.query("INSERT INTO users VALUES($1,$2,'Skater')", [id, id]);
+        await pool.query("INSERT INTO team_memberships(user_id,team_id,status,position) VALUES($1,$2,'approved','C')", [id, team]);
+        await pool.query(`INSERT INTO league_memberships(user_id,league_id,assigned_team_id,status,is_goalie,is_skater)
+          VALUES($1,'league',$2,'approved',false,true)`, [id, team]);
+      }
+      await pool.query("INSERT INTO placeholder_players VALUES($1,$2,'Placeholder','Skater',false,true)", [`${team}-placeholder`, team]);
+    }
+    assert.deepEqual(await recalculateTeam(admin, "mavs", now), { updated: 1 });
+    const stored = (await pool.query("SELECT top_scorers_home,top_scorers_away FROM game_predictions WHERE game_id='upcoming'")).rows[0];
+    for (const [team, projections] of [["mavs", stored.top_scorers_home], ["neon", stored.top_scorers_away]] as const) {
+      assert.equal(projections.length, 11);
+      assert.equal(new Set(projections.map((player: any) => player.id)).size, 11);
+      assert.ok(projections.some((player: any) => player.id === `${team}-extra-8`));
+      assert.ok(projections.some((player: any) => player.id === `placeholder:${team}-placeholder`));
+      assert.ok(!projections.some((player: any) => player.id === `${team}-goalie`));
+    }
+    const outSkater = stored.top_scorers_home.find((player: any) => player.id === "mavs-star");
+    assert.equal(outSkater.projectedPoints, 0);
+    assert.equal(outSkater.chanceOfPoint, 0);
   });
   test("recalculates shared teams once for a completed-game batch", async () => {
     await recalculateSourceGames(admin, ["mavs-0", "neon-0", "missing"], now);

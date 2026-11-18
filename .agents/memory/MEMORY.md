@@ -99,4 +99,5 @@
 - [Prediction standings authority](prediction-standings-authority.md) — team-summary counters can stay zero; prediction inputs must match result-derived season standings, including OT losses.
 - [Supabase Edge Function deployment](supabase-edge-function-deployment.md) — use remote bundling when local Docker bundling fails through Replit’s package proxy.
 - [View Odds premium scope](win-chance-premium-scope.md) — detailed prediction popup is Player Pro/Commissioner; keep the basic win-chance display separate.
+- [All-skater odds projections](all-skater-odds-projections.md) — odds must list every team skater, including zero-point/out players; never truncate the generated or saved list to three.
 - [Organizer fee payments](organizer-fee-payments.md) — scrimmage and league-fee card transactions are separate from subscriptions and never change a user's tier.

@@ -83,7 +83,7 @@ describe("win-chance model", () => {
     }));
     const result = predictGame(
       { ...home, skaters, goalies: [{ id: "goalie", gamesPlayed: 8, goalsAgainst: 20, recentGoalsAgainst: [], rsvp: "in" }] },
-      away,
+      { ...away, skaters: skaters.map(player => ({ ...player, id: `away-${player.id}` })) },
       [],
       { leagueAvgGoals: 3.2 },
     );
@@ -94,6 +94,47 @@ describe("win-chance model", () => {
     );
     assert.equal(result.topScorersA.some((player) => player.id === "goalie"), false);
     assert.equal(result.topScorersA.find((player) => player.id === "skater-10")?.projectedPoints, 0);
+    assert.equal(result.topScorersA.find((player) => player.id === "skater-10")?.chanceOfPoint, 0);
+    assert.equal(result.topScorersB.length, skaters.length);
+    assert.deepEqual(
+      new Set(result.topScorersB.map((player) => player.id)),
+      new Set(skaters.map((player) => `away-${player.id}`)),
+    );
+    assert.ok(result.topScorersA.every((player, index, players) =>
+      index === 0 || players[index - 1].projectedPoints >= player.projectedPoints));
+  });
+
+  test("keeps every skater when the entire roster is out or has zero production", () => {
+    for (const rsvp of ["out", "none"] as const) {
+      const skaters = Array.from({ length: 12 }, (_, index) => ({
+        id: `zero-${index}`, name: `Zero ${index}`, gamesPlayed: 8,
+        goals: 0, assists: 0, recentGames: [], rsvp,
+      }));
+      const result = predictGame({ ...home, skaters }, away, [], { leagueAvgGoals: 3.2 });
+      assert.equal(result.topScorersA.length, 12);
+      assert.ok(result.topScorersA.every(player => player.projectedPoints === 0 && player.chanceOfPoint === 0));
+    }
+    assert.deepEqual(predictGame({ ...home, skaters: [] }, away).topScorersA, []);
+  });
+
+  test("expanding the skater output does not change win probabilities or goal projections", () => {
+    const skaters = Array.from({ length: 12 }, (_, index) => ({
+      id: `skater-${index}`, name: `Skater ${index}`, gamesPlayed: 8,
+      goals: index + 1, assists: index, recentGames: [],
+      rsvp: (index === 11 ? "out" : "none") as "out" | "none",
+    }));
+    const team = { ...home, skaters, goalies: [] };
+    const result = predictGame(team, {
+      ...team, name: "Away", goalsFor: 24, goalsAgainst: 29, wins: 3, losses: 4, streak: -1,
+    }, [], { leagueAvgGoals: 3.2 });
+    // Recorded from the unchanged calculation before removing the output limit.
+    assert.equal(result.winProbA, 0.7709666328138073);
+    assert.equal(result.winProbB, 0.22903336718619272);
+    assert.equal(result.expectedGoalsA, 4.639107316480311);
+    assert.equal(result.expectedGoalsB, 3.222391390816282);
+    assert.deepEqual(result.projectedScore, { a: 4, b: 3 });
+    assert.equal(result.topScorersA.length, 12);
+    assert.equal(result.topScorersB.length, 12);
   });
 
   test("reports ties only when the league allows them", () => {

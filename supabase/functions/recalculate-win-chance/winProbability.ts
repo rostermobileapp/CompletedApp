@@ -332,14 +332,14 @@ function headToHeadScore(h2h: HeadToHeadGame[]): number {
   return (rSum / wSum) * confidence;
 }
 
-function projectScorers(l: LineupResult, teamXG: number, top = 3): PlayerProjection[] {
+function projectScorers(l: LineupResult, teamXG: number): PlayerProjection[] {
   const weightSum = l.players.reduce((s, p) => s + p.att * p.pointRate, 0);
-  if (weightSum <= 0) return [];
   const teamPoints = teamXG * l.teamPointsPerGoal;
+  // The odds popup lists the full skater roster, not a top-scorer shortlist.
+  // Keep unavailable and zero-production skaters visible with zero projections.
   return l.players
-    .filter((p) => p.att > 0)
     .map((p) => {
-      const projectedPoints = (teamPoints * p.att * p.pointRate) / weightSum;
+      const projectedPoints = weightSum > 0 ? (teamPoints * p.att * p.pointRate) / weightSum : 0;
       return {
         id: p.id,
         name: p.name,
@@ -348,8 +348,7 @@ function projectScorers(l: LineupResult, teamXG: number, top = 3): PlayerProject
         form: p.form,
       };
     })
-    .sort((a, b) => b.projectedPoints - a.projectedPoints)
-    .slice(0, top);
+    .sort((a, b) => b.projectedPoints - a.projectedPoints);
 }
 
 // ---------- Main ----------
