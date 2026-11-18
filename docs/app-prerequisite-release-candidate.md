@@ -59,6 +59,45 @@ actual public-host verification must follow a separately approved release.
 An existing development-tool WebSocket reconnect warning was observed without
 preventing the form from rendering.
 
+## Read-only release review
+
+The local candidate still resolves to the commit recorded above, and the active
+workspace remains on `10_1_2026`.
+
+Railway's production `CompletedApp` service reports:
+
+- Source: `rostermobileapp/CompletedApp`, branch `10_1_2026`.
+- Current successful deployment: `e32b5aab-c99f-4764-9a77-591c405411a6`.
+- Current live source: `b83bbe680bc7590a3119c60daec0ede7b5afe30f`.
+- The current deployment is reported as rollback-capable and redeployable.
+- No staged service configuration changes were present.
+
+This is a point-in-time rollback record, not an executed rollback or a guarantee
+that the target will remain available. Recheck immediately before an approved
+release. Do not push the active workspace branch: it contains the cleanup that
+must remain held.
+
+**The live-to-candidate comparison is larger than the routing-only patch.**
+Relative to the live backend source, the candidate changes 49 files, with 5,803
+insertions and 140 deletions, including previously prepared signup/referral
+attribution and website-export tooling/tests/documentation. The two production
+routing lines are the change relative to the reviewed pre-cleanup base, not
+the entire change relative to production. The earlier attribution verification
+and remaining real-account/device limitations are recorded in
+`docs/signup-attribution-checkpoint.md`.
+
+**Release review is blocked on Vercel account access.** A Vercel integration is
+available but is not connected here. The actual frontend project, production
+branch/deployment behavior, current deployment identifier, domain assignments,
+and frontend rollback target have not been verified through account access.
+Repository `vercel.json` alone cannot establish those production settings.
+No Replit-hosted deployment was reported; do not publish this workspace as a
+substitute for reviewing the existing external hosting pipeline.
+
+Nothing was pushed, published, rolled back, or changed in production during
+this review. Connecting Vercel is for completing this inspection and is not
+permission to publish or modify its settings.
+
 ## Inspect or reproduce locally
 
 From the workspace root:
