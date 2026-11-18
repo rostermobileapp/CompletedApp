@@ -86,10 +86,17 @@ the entire change relative to production. The earlier attribution verification
 and remaining real-account/device limitations are recorded in
 `docs/signup-attribution-checkpoint.md`.
 
-**Release review is blocked on Vercel account access.** A Vercel integration is
-available but is not connected here. The actual frontend project, production
-branch/deployment behavior, current deployment identifier, domain assignments,
-and frontend rollback target have not been verified through account access.
+**Release review is blocked on identifying/accessing the Vercel project.** The
+owner connected Vercel, but the default-scope project list returned zero projects
+and listing teams returned HTTP 403. A deployment lookup by the public APP alias
+returned 404; this does not establish that the live deployment is missing.
+The connection does not offer an automatic reconnect flow. Obtain the actual
+Vercel project dashboard URL to identify its team/project scope and retry a
+direct read. If access is still denied, the connection needs permission for
+that project before review can continue.
+The actual frontend project, production branch/deployment behavior, current
+deployment identifier, domain assignments, and frontend rollback target have
+not been verified through account access.
 Repository `vercel.json` alone cannot establish those production settings.
 No Replit-hosted deployment was reported; do not publish this workspace as a
 substitute for reviewing the existing external hosting pipeline.
