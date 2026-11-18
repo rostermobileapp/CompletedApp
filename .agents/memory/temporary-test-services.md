@@ -32,3 +32,15 @@ When starting a disposable PostgreSQL cluster in this workspace, set `unix_socke
 **Why:** PostgreSQL may otherwise exit before listening because its default `/run/postgresql` directory is absent.
 
 **How to apply:** Keep the TCP host, port, database, and role explicit for test clients, and set the socket directory separately for the local server process.
+
+Frontend-only fixtures on another localhost port must explicitly configure that
+origin in the existing nonproduction request guard; do not disable the guard.
+
+**Why:** The form rendered correctly on a temporary port, but its fetch was
+rejected before the browser's intercepted request handler could see it. The
+guard's normal localhost allowance is specific to the app preview port.
+
+**How to apply:** Inject only the fixture's isolated origin through the test
+Vite configuration. Keep billing/push protection enabled, block external browser
+requests, and intercept every mutation. Use a separate Vite cache and omit
+workspace-only preview plugins to avoid disturbing the managed app server.

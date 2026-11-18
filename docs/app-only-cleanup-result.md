@@ -99,6 +99,8 @@ Vite WebSocket/CSP console warning was observed; it did not prevent rendering.
    Its Vercel rewrites and Node production document list omit
    `/referral-program/apply`, even though its React route exists. Prepare and
    test a minimal additive routing patch while retaining website serving.
+   A corrected local candidate is now documented in
+   `docs/app-prerequisite-release-candidate.md`; it has not been pushed or published.
 2. With separate approval, release the corrected additive APP frontend/backend first.
    Confirm the actual APP host and required entry destinations. Do not deploy
    this APP-only cleanup first.

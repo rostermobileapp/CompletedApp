@@ -72,7 +72,7 @@
 - [Trivia presentation intent](trivia-presentation.md) — minimalist play, green/red results, Trophy Case consistency, and instant push opening.
 - [All-patches button visibility](all-patches-button-visibility.md) — keep View All Patches visible only to U00001, independent of trivia's public launch.
 - [Anthropic model compatibility](anthropic-model-compatibility.md) — model availability checks do not validate Messages options; test the full generation/verification flow.
-- [Temporary test services](temporary-test-services.md) — use tracked background processes and explicit local DB connection parameters; workspace PG defaults can leak into fixtures.
+- [Temporary test services](temporary-test-services.md) — isolate background services, DB connection parameters, frontend request origins, and Vite caches.
 - [Verification runtime compatibility](verification-runtime-compatibility.md) — testing delegation may be unavailable; isolate dynamic import graphs in bundled checks without weakening auth.
 - [Production secret boundary](production-secret-boundary.md) — Replit workspace secret presence does not establish Railway billing readiness; validate configuration in its actual environment.
 - [Production hosting boundary](production-hosting-boundary.md) — Railway serves the live app even when Replit reports no active deployment; verify the actual host before publishing.

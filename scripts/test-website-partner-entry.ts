@@ -11,6 +11,9 @@ const errors: string[] = [];
 try {
   await context.route("**/*", async route => {
     const request = route.request();
+    // External fonts/SDKs are irrelevant to form behavior and may keep an
+    // isolated candidate loading. Also prevents any provider/account requests.
+    if (new URL(request.url()).origin !== new URL(origin).origin) return route.abort();
     if (request.method() !== "POST") return route.continue();
     const url = new URL(request.url());
     if (url.pathname !== "/api/referral/apply") return route.abort();
@@ -24,7 +27,7 @@ try {
   });
   const page = await context.newPage();
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto(`${origin}/referral-program/apply`, { waitUntil: "networkidle" });
+  await page.goto(`${origin}/referral-program/apply`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: /Apply to become.*partner/ }).waitFor();
   assert.equal(await page.locator(".partner-hero").count(), 0, "APP entry is the application, not the marketing page");
   await page.getByLabel("Organization name").fill("Website Export Fixture");
