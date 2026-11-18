@@ -1,7 +1,9 @@
 # Win-chance prediction setup
 
-The prediction worker runs as a Supabase Edge Function. The database queues
-requests with `pg_net`; requests do not run in the application process.
+Predictions are calculated in a Supabase Edge Function. After migration 0050,
+the database queues completed-game and other eligible input changes; the
+application worker dispatches them synchronously to the function and acknowledges
+them only after success. Older administrative SQL dispatches use `pg_net`.
 
 ## Configure each Supabase project
 
@@ -12,7 +14,7 @@ requests with `pg_net`; requests do not run in the application process.
    `migrations/0048_win_chance_safe_save.sql`, and
    `migrations/0049_win_chance_dispatch_scope.sql`.
 3. Deploy `recalculate-win-chance` from `supabase/functions`, including
-   `calculator.ts`, `modelInputs.ts`, `gameTime.ts`, and the unchanged model.
+   `handler.ts`, `calculator.ts`, `modelInputs.ts`, `gameTime.ts`, and the unchanged model.
 
 The migration enables `pg_net`, adds the prediction table and RLS policy, and
 registers the restricted triggers. The default API secret is read only from
@@ -67,6 +69,36 @@ Vault configuration retain the job for retry. Credentials and remote error
 bodies must never be logged. Publishing the server fix and replaying previously
 failed live jobs are separate operational steps; tests must not dispatch against
 live games.
+
+## Publish and verify both runtimes
+
+Railway and Supabase publish independently. A successful Railway publish does
+**not** update the Edge Function. Its request contract must accept all four
+targets: `team_id`, `game_id`, `source_game_id`, and `source_game_ids`.
+
+1. With approval, publish `supabase/functions/recalculate-win-chance` to the
+   matching Supabase project. Keep `verify_jwt = false` in function config:
+   authentication is still enforced by `withSupabase({ auth: "secret" })`, not
+   disabled. Use the CLI remote bundler (`--use-api`) if local bundling fails.
+2. Publish the corresponding application changes to Railway.
+3. Run the read-only contract check:
+
+   ```sh
+   npx tsx scripts/verify-win-chance-deployment.ts --production-read-only
+   ```
+
+   It checks that the database, Vault URL, and Supabase project match, then calls
+   the authenticated `GET ?contract=1` route. Only after the expected contract
+   is confirmed does it validate all four POST shapes using `validate_only: true`.
+   No calculators run and no predictions or queue jobs are changed. An old
+   deployment fails before any POST is sent.
+4. Obtain separate approval before replaying failed live jobs. Publishing alone
+   does not override a queue job's deferred retry time. Automatically due jobs
+   can still run normally after either deployment.
+
+Completed-game badge candidates must exist in `users` with no `deleted_at`.
+Orphaned historical goal/assist/attendance/penalty records are preserved, but
+must not produce foreign-key errors while awarding badges.
 
 ## Isolated input integration checks
 

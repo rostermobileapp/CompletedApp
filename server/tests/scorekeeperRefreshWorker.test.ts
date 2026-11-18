@@ -61,7 +61,12 @@ function fixture(options: { failResponses?: number; badgeFailure?: boolean; alre
           line_combo_done: !!options.alreadyDone, win_odds_done: false,
         }] };
       }
-      if (text.includes("FROM game_attendance")) return { rows: [] };
+      if (text.includes("WITH participants")) {
+        assert.match(text, /JOIN users u ON u\.id = p\.user_id/);
+        assert.match(text, /u\.deleted_at IS NULL/);
+        assert.deepEqual([...params[1]], ["player-1", "player-2"]);
+        return { rows: [{ user_id: "player-1" }, { user_id: "player-2" }] };
+      }
       if (text.includes("vault.decrypted_secrets")) return { rows: [{
         project_url: "https://fixture.supabase.co", secret_key: "sb_secret_fixture",
       }] };

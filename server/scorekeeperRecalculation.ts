@@ -60,18 +60,23 @@ async function gameBadgeEvaluations(gameId: string) {
   const teamIds = Array.from(new Set([game.homeTeamId, game.awayTeamId].filter(Boolean))) as string[];
   const rosterMembers = await Promise.all(teamIds.map((teamId) => storage.getTeamMembers(teamId)));
   const rosterUserIds = rosterMembers.flatMap((members) => members.map((member) => member.userId));
+  // Historical scoring rows can outlive an account. Keep that history, but do
+  // not write badge awards/progress for a missing or retired user.
   const participantRows = await pool.query<{ user_id: string }>(`
-    SELECT user_id FROM game_attendance WHERE game_id = $1 AND user_id IS NOT NULL
-    UNION SELECT goalie_user_id FROM game_goalies WHERE game_id = $1 AND goalie_user_id IS NOT NULL
-    UNION SELECT scorer_id FROM game_goals WHERE game_id = $1 AND scorer_id IS NOT NULL
-    UNION SELECT primary_assist_id FROM game_goals WHERE game_id = $1 AND primary_assist_id IS NOT NULL
-    UNION SELECT secondary_assist_id FROM game_goals WHERE game_id = $1 AND secondary_assist_id IS NOT NULL
-    UNION SELECT player_id FROM game_penalties WHERE game_id = $1 AND player_id IS NOT NULL
-  `, [gameId]);
-  const userIds = Array.from(new Set([
-    ...rosterUserIds,
-    ...participantRows.rows.map(({ user_id }) => String(user_id)),
-  ]));
+    WITH participants AS (
+      SELECT unnest($2::text[]) AS user_id
+      UNION SELECT user_id FROM game_attendance WHERE game_id = $1 AND user_id IS NOT NULL
+      UNION SELECT goalie_user_id FROM game_goalies WHERE game_id = $1 AND goalie_user_id IS NOT NULL
+      UNION SELECT scorer_id FROM game_goals WHERE game_id = $1 AND scorer_id IS NOT NULL
+      UNION SELECT primary_assist_id FROM game_goals WHERE game_id = $1 AND primary_assist_id IS NOT NULL
+      UNION SELECT secondary_assist_id FROM game_goals WHERE game_id = $1 AND secondary_assist_id IS NOT NULL
+      UNION SELECT player_id FROM game_penalties WHERE game_id = $1 AND player_id IS NOT NULL
+    )
+    SELECT DISTINCT u.id AS user_id
+    FROM participants p JOIN users u ON u.id = p.user_id
+    WHERE u.deleted_at IS NULL
+  `, [gameId, Array.from(new Set(rosterUserIds))]);
+  const userIds = participantRows.rows.map(({ user_id }) => String(user_id));
   const year = Number(String(game.scheduledAt).slice(0, 4));
   return {
     game,
