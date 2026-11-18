@@ -628,7 +628,6 @@ export function registerOrganizerCardPaymentRoutes(
     }
     let stripe: Stripe;
     try {
-      assertDirectOnboardingEnabled();
       stripe = getOrganizerCardStripe();
     } catch {
       return res.json({
@@ -657,7 +656,9 @@ export function registerOrganizerCardPaymentRoutes(
         : { connected: false, accountId: null, ready: false, detailsSubmitted: false, chargesEnabled: false, transfersEnabled: false, payoutsEnabled: false, currentlyDue: [] };
       const { accountId: _accountId, ...publicStatus } = status;
       const collectionEnabled = isDirectCollectionEnabled() && await isOrganizerCardPilotUser(userId);
-      res.json({ enabled: collectionEnabled, onboardingEnabled: true, webhookReady, eligible, ...publicStatus });
+      let onboardingEnabled = true;
+      try { assertDirectOnboardingEnabled(); } catch { onboardingEnabled = false; }
+      res.json({ enabled: collectionEnabled, onboardingEnabled, webhookReady, eligible, ...publicStatus });
     } catch (error) {
       sendPaymentError(res, error);
     }

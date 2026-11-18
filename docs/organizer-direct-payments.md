@@ -10,6 +10,8 @@ Full direct-payment refunds include the surcharge. Stripe may retain processing 
 
 Standard-account organizers manage their payout settings with Stripe. The application does not promise or force the old Express weekly payout schedule.
 
+The Payments screen always shows eligible account-level Pro/Commissioner users a **Set up Stripe** button, including when collection is disabled or onboarding has only been partially completed. Once Stripe verifies the account as ready, the button becomes **Manage Stripe info** and opens the full Stripe dashboard settings. Feature activation controls API actions, not setup-button visibility.
+
 ## Surcharge configuration
 
 Default: leave `ORGANIZER_DIRECT_SURCHARGE_POLICIES` unset. Organizers then cover all processing costs.

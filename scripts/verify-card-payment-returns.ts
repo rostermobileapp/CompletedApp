@@ -174,10 +174,11 @@ try {
     const before = reads;
     ready = true;
     await foreground(page);
-    await page.getByText('Your Stripe receiving account is ready.', { exact: false }).waitFor();
+    await page.getByTestId('button-manage-stripe').waitFor();
     await page.waitForTimeout(300);
     assert.equal(reads - before, 1, 'One refresh for three foreground signals');
     assert.equal(await page.getByTestId('button-connect-stripe').count(), 0);
+    assert.equal(await page.getByTestId('button-manage-stripe').count(), 1);
     await page.screenshot({ path: `${output}/organizer-ready.jpg` });
     results.push({ organizerWarmResume: 'passed', foregroundSignalsCoalesced: true });
     await context.close();

@@ -10,7 +10,7 @@ test('production pilot separates onboarding from collection without bypassing ru
     secondary: 'U00005', free: 'U00006', exempt: 'U00007', grantedPro: 'U00008',
   };
   const state = {
-    stripeCalls: 0, writes: 0, onboardingCalls: 0,
+    stripeCalls: 0, writes: 0, onboardingCalls: 0, accountReady: false,
     pool: {
       async query(text: string, params: string[] = []) {
         if (text.includes('SELECT display_id, role, fee_exempt')) {
@@ -66,7 +66,7 @@ test('production pilot separates onboarding from collection without bypassing ru
             : args.path.endsWith('organizerDirectAccounts')
               ? `import {state} from 'pilot-test-state';
                  export const readDirectAccount = async () => ({
-                   connected:false, accountId:null, ready:false, detailsSubmitted:false,
+                   connected:state.accountReady, accountId:null, ready:state.accountReady, detailsSubmitted:state.accountReady,
                    chargesEnabled:false, transfersEnabled:false, payoutsEnabled:false, currentlyDue:[]
                  });
                  export const onboardDirectAccount = async () => {
@@ -168,6 +168,12 @@ test('production pilot separates onboarding from collection without bypassing ru
     assert.equal(setup.body.code, 'direct_onboarding_disabled');
   }
   assert.equal(state.onboardingCalls, 0);
+  state.accountReady = true;
+  const completedWithCollectionOff = await request('get', '/api/organizer-card-payments/connect/status', 'pro');
+  assert.equal(completedWithCollectionOff.body.ready, true, 'Completed setup remains authoritative while onboarding and collection are disabled');
+  assert.equal(completedWithCollectionOff.body.enabled, false);
+  assert.equal(completedWithCollectionOff.body.onboardingEnabled, false);
+  state.accountReady = false;
   env.ORGANIZER_DIRECT_ONBOARDING_LIVE_ENABLED = '1';
   for (const user of ['first', 'second', 'blocked', 'pro', 'secondary', 'exempt', 'grantedPro']) {
     const status = await request('get', '/api/organizer-card-payments/connect/status', user);

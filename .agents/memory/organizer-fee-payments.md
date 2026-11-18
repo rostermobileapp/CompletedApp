@@ -15,6 +15,12 @@ Every user with account-level Player Pro access or higher must be able to see an
 
 **How to apply:** Gate organizer eligibility by account-level Pro-or-higher role, regardless of subscription purchase or fee exemption; never require a billing record for manually granted access. This does not authorize publishing, enabling charges, or broadening the collection pilot.
 
+Payments must always show “Set up Stripe” to eligible Pro/Commissioner accounts until Stripe setup is complete, then retain a button for managing Stripe information.
+
+**Why:** The owner explicitly requires persistent setup visibility, not a button hidden by collection switches or removed once onboarding completes.
+
+**How to apply:** Base card visibility on account access, not collection activation. Keep the setup wording for incomplete onboarding and change to management only after verified completion. Standard accounts manage details in Stripe's full dashboard.
+
 The owner requires the Platform model: organizers collect payments directly, rather than RosterHockey creating marketplace/destination charges for them.
 
 **Why:** After being told that the destination-charge platform balance bears processing fees, refunds and chargebacks, the owner rejected that responsibility and explicitly requested a change to Platform.

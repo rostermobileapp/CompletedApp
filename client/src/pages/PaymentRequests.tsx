@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import CreatePaymentRequestPage from '@/pages/CreatePaymentRequest';
-import { ArrowLeft, CheckCircle2, CreditCard, DollarSign, ExternalLink, Loader2, Lock, Plus, Users } from 'lucide-react';
+import { ArrowLeft, DollarSign, Lock, Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { apiRequest } from '@/lib/queryClient';
@@ -13,12 +13,13 @@ import { usePermissions } from '@/context/SubscriptionContext';
 import { PaymentSummaryCard } from '@/components/PaymentSummaryCard';
 import { useToast } from '@/hooks/use-toast';
 import { usePaymentReturnRefresh } from '@/hooks/usePaymentReturnRefresh';
+import { OrganizerStripeSetupCard } from '@/components/OrganizerStripeSetupCard';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const { openOverlay } = useSlideUpOverlay();
   const { selectedType, selectedTeamId, selectedLeagueId } = useDashboardSelection();
-  const { canAccessPremiumFeatures, isLoading: permissionsLoading } = usePermissions();
+  const { canAccessPremiumFeatures, hasRole, user, isLoading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -205,44 +206,14 @@ export default function PaymentRequests() {
           )}
         </div>
 
-        {(cardSetup?.onboardingEnabled || cardSetup?.enabled) && cardSetup?.eligible && (
-          <section className="mb-6 rounded-xl border border-[hsl(var(--hairline))] bg-card p-4 shadow-[var(--elev-rest)]" data-testid="card-organizer-card-setup">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
-                {cardSetup.ready && cardSetup.webhookReady ? <CheckCircle2 className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="font-semibold">Card payment setup</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {!cardSetup.enabled
-                    ? cardSetup.ready
-                      ? 'Your Stripe receiving account is ready. Card collection is not enabled yet.'
-                      : 'Complete Stripe account setup now. Card collection will remain disabled until separately enabled.'
-                    : !cardSetup.webhookReady
-                    ? 'Connect is separate from billing. Card collection stays disabled until the Stripe payment webhooks are configured.'
-                    : cardSetup.ready
-                    ? 'Your Stripe receiving account is ready. You can enable card payments on new invoices and scrimmages.'
-                    : cardSetup.connected
-                      ? 'Finish Stripe verification before enabling card collection.'
-                      : 'Connect a Stripe account to collect one-time card payments for your invoices.'}
-                </p>
-              </div>
-              {!cardSetup.ready && (
-                <Button
-                  size="sm"
-                  onClick={() => connectCardAccount.mutate()}
-                  disabled={connectCardAccount.isPending}
-                  data-testid="button-connect-stripe"
-                >
-                  {connectCardAccount.isPending
-                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    : <ExternalLink className="mr-2 h-4 w-4" />}
-                  {cardSetup.connected ? 'Continue setup' : 'Connect Stripe'}
-                </Button>
-              )}
-            </div>
-          </section>
-        )}
+        <OrganizerStripeSetupCard
+          eligible={hasRole('player_pro') || user?.displayId === 'U00001' || cardSetup?.eligible === true}
+          ready={cardSetup?.ready === true}
+          collectionEnabled={cardSetup?.enabled === true && cardSetup?.webhookReady === true}
+          pending={connectCardAccount.isPending}
+          onSetup={() => connectCardAccount.mutate()}
+          onManage={() => window.location.assign('https://dashboard.stripe.com/settings')}
+        />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'created' | 'received')}>
