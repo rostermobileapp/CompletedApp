@@ -90,10 +90,12 @@ and remaining real-account/device limitations are recorded in
 owner connected Vercel, but the default-scope project list returned zero projects
 and listing teams returned HTTP 403. A deployment lookup by the public APP alias
 returned 404; this does not establish that the live deployment is missing.
-The connection does not offer an automatic reconnect flow. Obtain the actual
-Vercel project dashboard URL to identify its team/project scope and retry a
-direct read. If access is still denied, the connection needs permission for
-that project before review can continue.
+The connection does not offer an automatic reconnect flow. The owner supplied
+`https://vercel.com/tobin-kerns-projects/roster_public_version`. A direct project
+read scoped to `tobin-kerns-projects` returned 404, and the scoped project list
+still returned zero projects. This does not distinguish an inaccessible project
+from a renamed/moved project. Review needs either a connection authorized for
+that project or owner-provided Git/production-deployment/domain settings.
 The actual frontend project, production branch/deployment behavior, current
 deployment identifier, domain assignments, and frontend rollback target have
 not been verified through account access.
