@@ -267,7 +267,7 @@ export function registerReferralRoutes(app: Express) {
         ))
         .limit(1);
       if (!partner) return res.status(404).json({ message: "Code not recognized" });
-      res.json({ valid: true, orgName: partner.orgName });
+      res.json({ valid: true, id: partner.id, orgName: partner.orgName });
     } catch (err) {
       console.error("[Referral] validate-code error:", err);
       res.status(500).json({ message: "Internal error" });

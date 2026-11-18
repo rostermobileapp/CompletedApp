@@ -26,3 +26,14 @@ For animated UI, source equality and timer-driven final-state text are not suffi
 **Why:** A marketing graduation preserved the original bracket source exactly, while a headless check reached the champion state without observing completion of all SVG connectors.
 
 **How to apply:** Check the actual animated paths or visual progression independently. If browser checks fail or the browser crashes, report the limitation instead of treating source parity or skipped checks as a passing playback test.
+
+A component fixture must verify that real application styles loaded before its
+screenshots count as visual evidence.
+
+**Why:** Functional signup checks passed while a failed stylesheet-generation step
+left the fixture unstyled. Rendering the real component does not establish CSS
+parity.
+
+**How to apply:** Reuse the application's compiled CSS and assert a known computed
+style before capturing review screenshots. Keep functional fixture evidence
+distinct from live authenticated-app verification.

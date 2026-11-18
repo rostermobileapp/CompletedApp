@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { ArrowLeft, BarChart2, Bell, Calendar, Check, DollarSign, MessageSquare, Star, Trophy, Users, Zap } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { loadSignupAttribution, signupAttribution } from '@/lib/signupAttributionBrowser';
 
 const TOTAL_STEPS = 9;
 
@@ -137,7 +139,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 
 export default function OnboardingQuestionnaire() {
   const [, navigate] = useLocation();
-  const { data: userData } = useQuery<{ id?: string }>({ queryKey: ['/api/user'] });
+  const { data: userData, refetch: retryUser } = useQuery<{ id?: string; referralPartnerId?: string; referralCode?: string }>({ queryKey: ['/api/user'] });
   const isAuthenticated = !!userData?.id;
   const previewParam = new URLSearchParams(window.location.search).get('preview');
   const previewScreen = import.meta.env.DEV && QUESTIONNAIRE_SCREENS.some(({ value }) => value === previewParam)
@@ -159,6 +161,27 @@ export default function OnboardingQuestionnaire() {
     retry: false,
   });
   const [processingDone, setProcessingDone] = useState(false);
+  const [attributionError, setAttributionError] = useState('');
+  const [savingReferral, setSavingReferral] = useState(false);
+  const manualPartnerSelected = useRef(false);
+  const [capturedPartner, setCapturedPartner] = useState<{ id: string; orgName: string } | null>(null);
+  const { data: incomingAttribution, error: incomingAttributionError, refetch: retryAttribution, isPending: attributionPending } = useQuery({
+    queryKey: ['signup-attribution', userData?.id ?? 'anonymous'],
+    queryFn: loadSignupAttribution,
+    staleTime: Infinity,
+    retry: 1,
+    enabled: !isPreviewMode,
+  });
+  useEffect(() => {
+    const partner = incomingAttribution?.partner;
+    const existing = userData?.referralPartnerId;
+    if (partner) setCapturedPartner(partner);
+    if (existing) {
+      setState(prev => ({ ...prev, referralPartnerId: existing }));
+    } else if (partner && !manualPartnerSelected.current) {
+      setState(prev => ({ ...prev, referralPartnerId: partner.id, referralCode: partner.code }));
+    }
+  }, [incomingAttribution, userData?.referralPartnerId]);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStep = SCREEN_ORDER.indexOf(screen) + 1;
@@ -567,12 +590,20 @@ export default function OnboardingQuestionnaire() {
               <p className="text-xs text-gray-400 mb-2">Select your hockey association or partner organization.</p>
               <select
                 value={state.referralPartnerId}
+                disabled={!!userData?.referralPartnerId}
                 onChange={e => {
+                  manualPartnerSelected.current = true;
                   const val = e.target.value;
                   setState(prev => ({ ...prev, referralPartnerId: val, referralOtherText: val !== 'other' ? '' : prev.referralOtherText }));
                 }}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:border-[#3c82f4] transition-colors appearance-none"
               >
+                {(userData?.referralPartnerId || capturedPartner?.id) &&
+                  !approvedPartners.some(p => p.id === (userData?.referralPartnerId || capturedPartner?.id)) && (
+                    <option value={userData?.referralPartnerId || capturedPartner?.id}>
+                      {capturedPartner?.orgName || 'Your saved referral partner'}
+                    </option>
+                  )}
                 {approvedPartners.map(p => (
                   <option key={p.id} value={p.id}>{p.orgName}</option>
                 ))}
@@ -592,64 +623,71 @@ export default function OnboardingQuestionnaire() {
               )}
             </div>
 
+            {userData?.referralPartnerId && (
+              <p className="mb-3 text-sm text-gray-600">Your original referral partner is already saved and will not be changed.</p>
+            )}
+            {capturedPartner && !userData?.referralPartnerId && (
+              <p className="mb-3 text-sm text-gray-600">Partner from your link: {capturedPartner.orgName}. Confirm your selection below.</p>
+            )}
+            {(attributionError || incomingAttributionError) && (
+              <div role="alert" className="mb-3 text-sm text-red-700">
+                <p>{attributionError || 'Your referral could not be verified. Retry before continuing.'}</p>
+                {incomingAttributionError && <button type="button" onClick={() => void retryAttribution()} className="underline">Retry referral verification</button>}
+              </div>
+            )}
+            {incomingAttribution?.userId && !isAuthenticated && (
+              <div role="alert" className="mb-3 text-sm text-red-700">
+                <p>Your account has not finished loading. Retry before saving your partner.</p>
+                <button type="button" className="underline" onClick={() => void retryUser()}>Retry account loading</button>
+              </div>
+            )}
             <button
+              disabled={savingReferral || (!isPreviewMode && (attributionPending || !!incomingAttributionError || (!!incomingAttribution?.userId && !isAuthenticated)))}
               onClick={async () => {
-                const saves: Promise<void>[] = [];
-
-                // Persist referral selection to user profile (authenticated users only)
+                if (savingReferral) return;
+                setSavingReferral(true);
+                setAttributionError('');
                 const hasRealPartner = state.referralPartnerId && state.referralPartnerId !== 'other';
                 const hasOther = state.referralPartnerId === 'other';
-                if (isAuthenticated && (hasRealPartner || hasOther)) {
-                  saves.push(
-                    fetch('/api/user/onboarding', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({
-                        referralPartnerId: hasRealPartner ? state.referralPartnerId : undefined,
-                        referralSourceOther: hasOther ? (state.referralOtherText || 'other') : undefined,
-                      }),
-                    }).then(async (res) => {
-                      if (res.ok) {
-                        const data = await res.json().catch(() => ({}));
-                        const attrs: Record<string, string> = {};
-                        if (data.referralPartnerId) attrs['referral_partner_id'] = data.referralPartnerId;
-                        if (data.referralCode) attrs['referral_code'] = data.referralCode;
-                        if (Object.keys(attrs).length > 0) {
-                          // Push to RevenueCat subscriber attributes via native bridge (no-op in browser)
-                          setSubscriberAttributes(attrs);
-                          // Also persist to localStorage so the next purchase call picks it up
-                          try {
-                            if (attrs['referral_partner_id']) localStorage.setItem('pendingReferralPartnerId', attrs['referral_partner_id']);
-                            if (attrs['referral_code']) localStorage.setItem('pendingReferralCode', attrs['referral_code']);
-                          } catch {}
-                        }
-                      }
-                    }).catch(() => {})
-                  );
-                } else if (isAuthenticated && !state.referralPartnerId) {
-                  // Explicit "None" selection — clear any prior referral
-                  saves.push(
-                    fetch('/api/user/onboarding', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({ clearReferral: true }),
-                    }).then(() => {
+                try {
+                  if (isAuthenticated) {
+                    const res = await apiRequest('PATCH', '/api/user/onboarding', {
+                      referralPartnerId: hasRealPartner ? state.referralPartnerId : undefined,
+                      referralSourceOther: hasOther ? (state.referralOtherText || 'other') : undefined,
+                      clearReferral: !state.referralPartnerId || undefined,
+                    });
+                    const data = await res.json();
+                    const attrs: Record<string, string> = {};
+                    if (data.referralPartnerId) attrs['referral_partner_id'] = data.referralPartnerId;
+                    if (data.referralCode) attrs['referral_code'] = data.referralCode;
+                    if (Object.keys(attrs).length > 0) {
+                      // Only confirmed server records reach the native purchase bridge.
+                      setSubscriberAttributes(attrs);
+                      try {
+                        if (attrs['referral_partner_id']) localStorage.setItem('pendingReferralPartnerId', attrs['referral_partner_id']);
+                        if (attrs['referral_code']) localStorage.setItem('pendingReferralCode', attrs['referral_code']);
+                      } catch {}
+                    }
+                    if (!data.referralPartnerId) {
                       try {
                         localStorage.removeItem('pendingReferralPartnerId');
                         localStorage.removeItem('pendingReferralCode');
                       } catch {}
-                    }).catch(() => {})
-                  );
+                    }
+                    signupAttribution().clear();
+                    await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+                  }
+                  goTo('processing');
+                } catch (error: any) {
+                  setAttributionError(error?.message || 'Your partner could not be saved. Please try again.');
+                  if (error?.status === 409) await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+                } finally {
+                  setSavingReferral(false);
                 }
-
-                await Promise.all(saves);
-                goTo('processing');
               }}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
-              Build my roster →
+              {savingReferral ? 'Saving your selection…' : 'Build my roster →'}
             </button>
           </div>
         )}

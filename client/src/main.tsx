@@ -4,6 +4,11 @@ import App from "./App";
 import "./index.css";
 import { forgetMobileScreen } from "./lib/mobileScreenResume";
 import { isOpaqueCrossOriginScriptError } from "./lib/globalErrorHandling";
+import { beginSignupAttribution } from "./lib/signupAttributionBrowser";
+import { installAppAttributionLinks } from "./lib/appAttributionLinks";
+
+beginSignupAttribution();
+installAppAttributionLinks(document, () => window.location.href);
 
 function showFatalOverlay(label: string, detail: string) {
   try {

@@ -11,6 +11,7 @@ import rosterModalLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
 import { EmailVerificationModal } from '@/components/EmailVerificationModal';
 import { loginDestination } from '@/lib/appRouteEntry';
 import { isTransientAuthError, retryTransientSignIn } from '@/lib/authSessionController';
+import { signupAttributionMetadata, bindSignupAttributionUser } from '@/lib/signupAttributionBrowser';
 
 const rosterLogo = '/roster-logo-transparent.png';
 
@@ -39,12 +40,14 @@ export default function Login() {
 
     try {
       if (isSignUp) {
+        const attribution = await signupAttributionMetadata();
         console.log('[Signup] Attempting signup for:', email);
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: undefined,
+            data: attribution,
           }
         });
         
@@ -61,6 +64,16 @@ export default function Login() {
         if (data.user && data.user.identities && data.user.identities.length === 0) {
           setEmailTaken(true);
           return;
+        }
+
+        if (data.user) {
+          try {
+            bindSignupAttributionUser(data.user.id);
+          } catch {
+            // Signup metadata already holds the context. Do not claim that a
+            // successfully created account failed because local storage did.
+            toast({ variant: 'destructive', title: 'Account created', description: 'Local referral storage is unavailable. Your signup context is saved to your account.' });
+          }
         }
 
         if (data.user && !data.session) {

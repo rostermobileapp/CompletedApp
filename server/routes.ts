@@ -20,6 +20,7 @@ import { hasAccountMergeOperatorContext, hasRealAccountMergeActor, assertAccount
 import { verifyMergeSignIns } from "./accountMergeIdentity";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
 import { normalizeEmail } from "./emailNormalization";
+import { saveOnboardingReferral, ReferralSaveError } from "./onboardingReferral";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
 import { setupAuth, isAuthenticated, supabase, getAuthenticatedDatabaseUser } from "./supabaseAuth";
@@ -2491,87 +2492,11 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
       if (role !== undefined) updateData.role = role;
 
-      // Referral lock enforcement — once referral_partner_id is set it cannot be changed.
-      // Block ALL referral-mutating payloads (partner change, other, or clear) when partner is locked,
-      // because the "other" and "clearReferral" state-machine branches also null out referralPartnerId.
-      if (referralPartnerId || clearReferral || referralSourceOther !== undefined) {
-        const [existingUser] = await db
-          .select({ referralPartnerId: users.referralPartnerId })
-          .from(users)
-          .where(eq(users.id, userId))
-          .limit(1);
-
-        if (existingUser?.referralPartnerId) {
-          return res.status(409).json({
-            message: 'Referral partner already set and cannot be changed',
-            code: 'REFERRAL_LOCKED',
-          });
-        }
-      }
-
-      // Referral tracking — explicit state machine for partner / other / none transitions
-      if (clearReferral) {
-        // Explicit "None" selected — wipe all referral fields and remove any link rows
-        updateData.referralPartnerId = null;
-        updateData.referralSourceOther = null;
-        updateData.referralCode = null;
-        await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
-      } else if (referralPartnerId) {
-        // Real partner selected — look up partner code, replace link row, clear "other" text
-        const [partnerRow] = await db
-          .select({ id: referralPartners.id, referralCode: referralPartners.referralCode })
-          .from(referralPartners)
-          .where(and(eq(referralPartners.id, referralPartnerId), eq(referralPartners.status, 'approved')))
-          .limit(1);
-
-        if (partnerRow) {
-          updateData.referralPartnerId = referralPartnerId;
-          updateData.referralCode = partnerRow.referralCode || null;
-          updateData.referralSourceOther = null; // clear any stale "other" text
-          // Delete prior link(s) for this user (handles partner switches), then insert fresh
-          await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
-          await db.insert(referralUserLinks).values({
-            userId,
-            referralPartnerId,
-            isPaid: false,
-          });
-          // If the user is already a paid subscriber, immediately claim them for this partner
-          const [userRecord] = await db
-            .select({ role: users.role })
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1);
-          const isPaidRole = userRecord?.role === 'commissioner' || userRecord?.role === 'player_pro';
-          if (isPaidRole) {
-            const paidTier = userRecord.role === 'commissioner' ? 'commissioner' : 'player_pro';
-            await db.insert(referralConversions).values({
-              partnerId: referralPartnerId,
-              referralCode: partnerRow.referralCode || '',
-              userId,
-              conversionType: 'claim',
-              tier: paidTier,
-              platform: 'web',
-              grossPriceCents: 0,
-              status: 'active',
-            });
-            await db
-              .update(referralUserLinks)
-              .set({ isPaid: true, paidTier, paidAt: new Date() })
-              .where(and(
-                eq(referralUserLinks.userId, userId),
-                eq(referralUserLinks.referralPartnerId, referralPartnerId),
-              ));
-          }
-        }
-      } else if (referralSourceOther !== undefined) {
-        // "Other" selected — save free-text attribution, remove links and partner fields
-        updateData.referralSourceOther = referralSourceOther;
-        updateData.referralPartnerId = null;
-        updateData.referralCode = null;
-        await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
-      } else if (referralCode !== undefined) {
-        updateData.referralCode = referralCode;
-      }
+      // Campaign/user metadata is intentionally absent from the credit path.
+      // URL-prefilled and manual selections use the same atomic validated write.
+      await saveOnboardingReferral(pool, userId, {
+        referralPartnerId, referralSourceOther, referralCode, clearReferral,
+      });
 
       // Check whether this PATCH is the moment onboarding completes for the
       // first time, so we can fire the founder new-signup alert after the user
@@ -2608,6 +2533,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
 
       res.json(user);
     } catch (error) {
+      if (error instanceof ReferralSaveError) {
+        return res.status(error.status).json({ message: error.message, code: error.code });
+      }
       console.error("Error updating onboarding:", error);
       res.status(500).json({ message: "Failed to update onboarding" });
     }
