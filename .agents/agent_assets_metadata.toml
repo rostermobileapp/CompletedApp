@@ -21,3 +21,31 @@ mtime_ms = 1794941335429
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/183f0467-e336-4727-9e1e-193ca59fb589/2f60f317-7343-429d-927d-a51bae252cf4"
 storage_version_token = "1794941586554444"
 content_type = "text/csv"
+
+[[outputs]]
+id = "fns6Vs5AQbI5lp_NC1PDR"
+uri = "file://generated-artifacts/domain-split-audit/rosterhockey-separation-audit.html"
+type = "html"
+title = "Website and App Separation Audit"
+description = "Written plan with searchable inventories of all 1,649 assessed files, routes, components, assets, environment keys, and live domain findings. Audit only; no implementation."
+logical_id = "c6d00af3-31c4-4874-a532-fc0f9ae6eb2a"
+content_hash = "sha256:c6627ac93368adba283c019aa951beff9c3ffe9dde9bd8725a71f30b8ae19602"
+size = 817673
+mtime_ms = 1795013461398
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/c6d00af3-31c4-4874-a532-fc0f9ae6eb2a/14d0aa16-564b-476a-a955-93e8365d59c1"
+storage_version_token = "1795013471224534"
+content_type = "text/html"
+
+[[outputs]]
+id = "UCOW-d_WlteuJL7HGrg2o"
+uri = "file://generated-artifacts/rosterhockey-separation-audit.zip"
+type = "unspecified"
+title = "Complete Audit and CSV Inventories"
+description = "Download the written plan, self-contained report, ten CSV inventories, and read-only auth URL findings. This is not the website export."
+logical_id = "1c7c7b8d-f328-4ded-9daa-146affd332fb"
+content_hash = "sha256:2bfe895821c01da33c9e35ebdaf3c516b6067f186c345a6cff44e31bac785e7d"
+size = 152278
+mtime_ms = 1795013461490
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/1c7c7b8d-f328-4ded-9daa-146affd332fb/24b5acd0-52b7-4744-8b3f-e24b4022edd0"
+storage_version_token = "1795013471904100"
+content_type = "application/octet-stream"
