@@ -77,3 +77,17 @@ mtime_ms = 1795019866643
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/0d1ac62e-2c92-4515-b158-f3f6d8871992/6727bb79-7e8f-4541-b9b7-6b56aa18cb7e"
 storage_version_token = "1795019892865761"
 content_type = "text/html"
+
+[[outputs]]
+id = "bwC4infZkjWFJ-X7XNJqp"
+uri = "file://generated-artifacts/RosterHockey-Website.zip"
+type = "unspecified"
+title = "RosterHockey Website ZIP"
+description = "Download this verified standalone website package, then import it into a new Replit project."
+logical_id = "c31b41b1-49e6-4bf6-b0ae-792ac5fe254d"
+content_hash = "sha256:1829c2a447186144f010f2628ec913e15201d8ec9dad6529b2fd526058ebf63e"
+size = 20747684
+mtime_ms = 1795019732950
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/c31b41b1-49e6-4bf6-b0ae-792ac5fe254d/9054b299-a56b-4a3f-b0fd-c9f3362e82e3"
+storage_version_token = "1795025738102888"
+content_type = "application/octet-stream"
