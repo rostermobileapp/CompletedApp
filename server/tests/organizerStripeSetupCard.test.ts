@@ -38,7 +38,8 @@ test('Payments keeps Stripe setup visible until ready, then offers working manag
     const element = Card({ ...props, collectionEnabled });
     const html = renderToStaticMarkup(element);
     assert.match(html, /Set up Stripe/);
-    assert.doesNotMatch(html, /Manage Stripe info/);
+    assert.doesNotMatch(html, /Manage Stripe/);
+    assert.doesNotMatch(html, /<p[ >]/);
     assert.equal(button(element).props.disabled, false);
     button(element).props.onClick();
   }
@@ -47,9 +48,11 @@ test('Payments keeps Stripe setup visible until ready, then offers working manag
   // Finishing onboarding changes the action; it does not remove the button.
   const completed = Card({ ...props, ready: true });
   const completedHtml = renderToStaticMarkup(completed);
-  assert.match(completedHtml, /Manage Stripe info/);
+  assert.match(completedHtml, /Stripe Confirmed/);
+  assert.match(completedHtml, />Manage Stripe</);
   assert.doesNotMatch(completedHtml, />Set up Stripe</);
-  assert.match(completedHtml, /Card collection is not enabled yet/);
+  assert.doesNotMatch(completedHtml, /<p[ >]|Card collection|bank account|business details/);
+  assert.doesNotMatch(completedHtml, /flex-wrap/);
   button(completed).props.onClick();
   assert.equal(manageCalls, 1);
   assert.equal(setupCalls, 2);

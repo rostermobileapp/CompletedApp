@@ -19,7 +19,7 @@ Payments must always show “Set up Stripe” to eligible Pro/Commissioner accou
 
 **Why:** The owner explicitly requires persistent setup visibility, not a button hidden by collection switches or removed once onboarding completes.
 
-**How to apply:** Base card visibility on account access, not collection activation. Keep the setup wording for incomplete onboarding and change to management only after verified completion. Standard accounts manage details in Stripe's full dashboard.
+**How to apply:** Base card visibility on account access, not collection activation. Keep the setup wording for incomplete onboarding and change to management only after verified completion. The owner requires a single-line completed card showing only “Stripe Confirmed” and a “Manage Stripe” button, without descriptions. Standard accounts manage details in Stripe's full dashboard.
 
 Stripe-hosted onboarding must open in the system browser from the Natively app, not the default in-app browser.
 
