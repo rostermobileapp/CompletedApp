@@ -49,3 +49,17 @@ mtime_ms = 1795013461490
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/1c7c7b8d-f328-4ded-9daa-146affd332fb/24b5acd0-52b7-4744-8b3f-e24b4022edd0"
 storage_version_token = "1795013471904100"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "mUyJ7MCl4Fx6YA3bL8PC2"
+uri = "file://generated-artifacts/attribution-browser/attribution-review.html"
+type = "html"
+title = "Attribution checkpoint and test evidence"
+description = "Changed files, isolated signup/manual-fallback screenshots, 17 passing checks/flows, limitations, and release checklist. Website/app split remains paused."
+logical_id = "bfdd24f0-9342-470b-947f-6f1fc0751d46"
+content_hash = "sha256:f6974cdfb3fd3540ac25c1decfcfd377112bc63036fdbc08fcba3de9e37d0854"
+size = 85918
+mtime_ms = 1795016482542
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/bfdd24f0-9342-470b-947f-6f1fc0751d46/c4f3628d-5739-4882-bee7-fd2139d42889"
+storage_version_token = "1795016483184921"
+content_type = "text/html"
