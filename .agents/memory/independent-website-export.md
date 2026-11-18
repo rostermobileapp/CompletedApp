@@ -30,3 +30,13 @@ inventory; the isolated browser found missing images despite a successful build.
 **How to apply:** Resolve constructed public-media paths, verify actual requests
 across representative pages, and never infer media deletion safety from the
 literal-only inventory or from a filename.
+
+After import, treat the new website project as the authoritative website source,
+not the original APP exporter or ZIP.
+
+**Why:** The owner confirmed importing it and reported subsequent dependency
+hardening performed exclusively in that project. Regenerating the original
+handoff could overwrite independent fixes.
+
+**How to apply:** Make future website changes in the website project. The original
+ZIP is a historical handoff snapshot, not an up-to-date distribution.
