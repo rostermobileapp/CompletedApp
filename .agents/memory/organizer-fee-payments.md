@@ -3,6 +3,12 @@ name: Scrimmage and league-fee card payments
 description: Organizer-to-player fee collection is transaction-only and must not alter subscription tier.
 ---
 
+The owner calls the organizer Stripe setup and unlink-configuration process **“Stripe”** for future reference.
+
+**Why:** The owner explicitly named this process so it can be resumed without repeating the setup context.
+
+**How to apply:** Interpret references to resuming “Stripe” in this project as this organizer-payment setup, not subscription billing or permission to publish or enable charges.
+
 Receiving-account onboarding must be independently available before live payment collection is enabled, with separate production approval.
 
 **Why:** Tying Stripe setup visibility to the collection switch prevented the pilot organizers from completing the prerequisites while charges were intentionally disabled.
