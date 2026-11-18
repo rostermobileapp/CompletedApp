@@ -61,6 +61,20 @@ preventing the form from rendering.
 
 ## Read-only release review
 
+### Owner clarification: WEBSITE hosting
+
+The independent WEBSITE is to be hosted on **Replit**, using the owner's
+existing domain. Vercel access is not required for preparing or publishing that
+website. Do not continue requesting it as a WEBSITE prerequisite.
+
+The Vercel findings below describe the attempted review of the existing APP
+frontend only; they do not determine the future WEBSITE hosting provider.
+Configure WEBSITE publishing in its authoritative separate project, not this
+APP-cleanup workspace. Keep the existing APP unchanged and preserve the
+separate approval gates for APP release, WEBSITE publishing/domain cutover, and
+later APP cleanup. Verify required public APP destinations without requiring
+the owner to connect Vercel.
+
 The local candidate still resolves to the commit recorded above, and the active
 workspace remains on `10_1_2026`.
 

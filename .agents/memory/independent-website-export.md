@@ -41,6 +41,17 @@ handoff could overwrite independent fixes.
 **How to apply:** Make future website changes in the website project. The original
 ZIP is a historical handoff snapshot, not an up-to-date distribution.
 
+The standalone WEBSITE must be hosted on Replit using the owner's existing
+domain. Do not require a Vercel connection for this website work.
+
+**Why:** The owner explicitly corrected the hosting direction: "The website
+portion of this needs to be hosted by replit using the domain that I own."
+
+**How to apply:** Configure and verify publishing in the authoritative WEBSITE
+project, then guide the separately approved custom-domain connection. Do not
+publish this APP-cleanup workspace as the website, move APP hosting implicitly,
+or make further Vercel access a prerequisite for WEBSITE preparation.
+
 Release the additive APP prerequisites first, then cut over and verify WEBSITE,
 and only afterward release APP-only cleanup. Each release needs separate approval.
 
