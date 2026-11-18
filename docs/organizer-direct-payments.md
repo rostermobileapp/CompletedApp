@@ -12,6 +12,8 @@ Standard-account organizers manage their payout settings with Stripe. The applic
 
 The Payments screen always shows eligible account-level Pro/Commissioner users a **Set up Stripe** button, including when collection is disabled or onboarding has only been partially completed. Once Stripe verifies the account as ready, the button becomes **Manage Stripe info** and opens the full Stripe dashboard settings. Feature activation controls API actions, not setup-button visibility.
 
+In the Natively app, both actions explicitly open the device's system browser through `openExternalURL(url, true)`, not the wrapper's default in-app browser. Stripe-hosted onboarding does not support embedded webviews. Use each newly generated account link once; never prefetch or log it. On returning to the app, the existing foreground refresh retrieves verified account readiness; leaving or returning from Stripe is not proof of completion. If the native bridge is unavailable, show an explicit error rather than silently opening the unsupported in-app browser.
+
 ## Surcharge configuration
 
 Default: leave `ORGANIZER_DIRECT_SURCHARGE_POLICIES` unset. Organizers then cover all processing costs.

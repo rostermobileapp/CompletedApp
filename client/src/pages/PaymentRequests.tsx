@@ -14,6 +14,7 @@ import { PaymentSummaryCard } from '@/components/PaymentSummaryCard';
 import { useToast } from '@/hooks/use-toast';
 import { usePaymentReturnRefresh } from '@/hooks/usePaymentReturnRefresh';
 import { OrganizerStripeSetupCard } from '@/components/OrganizerStripeSetupCard';
+import { openOrganizerStripeUrl } from '@/lib/organizerStripeNavigation';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
@@ -44,10 +45,8 @@ export default function PaymentRequests() {
       if (typeof data?.url !== 'string' || !data.url) {
         throw new Error('Stripe did not return a setup link. Please try again.');
       }
+      openOrganizerStripeUrl(data.url);
       return data;
-    },
-    onSuccess: (data) => {
-      if (typeof data?.url === 'string') window.location.assign(data.url);
     },
     onError: (error: any) => {
       toast({
@@ -212,7 +211,17 @@ export default function PaymentRequests() {
           collectionEnabled={cardSetup?.enabled === true && cardSetup?.webhookReady === true}
           pending={connectCardAccount.isPending}
           onSetup={() => connectCardAccount.mutate()}
-          onManage={() => window.location.assign('https://dashboard.stripe.com/settings')}
+          onManage={() => {
+            try {
+              openOrganizerStripeUrl('https://dashboard.stripe.com/settings');
+            } catch (error) {
+              toast({
+                title: 'Could not open Stripe settings',
+                description: error instanceof Error ? error.message : 'Please try again.',
+                variant: 'destructive',
+              });
+            }
+          }}
         />
 
         {/* Tabs */}

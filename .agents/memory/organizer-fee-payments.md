@@ -21,6 +21,12 @@ Payments must always show “Set up Stripe” to eligible Pro/Commissioner accou
 
 **How to apply:** Base card visibility on account access, not collection activation. Keep the setup wording for incomplete onboarding and change to management only after verified completion. Standard accounts manage details in Stripe's full dashboard.
 
+Stripe-hosted onboarding must open in the system browser from the Natively app, not the default in-app browser.
+
+**Why:** The owner saw Stripe “Page not found” from the native app but confirmed that a fresh setup attempt worked in Chrome. Stripe documents hosted onboarding as browser-only; Natively ordinary external navigation defaults to its in-app browser.
+
+**How to apply:** Explicitly request the native system-browser handoff for onboarding and Stripe settings. Never prefetch or log single-use setup URLs, or silently fall back to in-app navigation if the bridge fails. Refresh verified account status when the app resumes; physical-device verification remains separate from bridge fixtures.
+
 The owner requires the Platform model: organizers collect payments directly, rather than RosterHockey creating marketplace/destination charges for them.
 
 **Why:** After being told that the destination-charge platform balance bears processing fees, refunds and chargebacks, the owner rejected that responsibility and explicitly requested a change to Platform.
