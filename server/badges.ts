@@ -1313,7 +1313,9 @@ async function loadBatchBadgeMetrics(
   const rsvpKingStatuses = new Map<string, RsvpKingStatus>();
   if (!users.length) return { values, careerGoalieEligible, earlyBirdStatuses, rsvpKingStatuses };
 
-  const inputUsers = sql`unnest(${users}::text[]) AS participants(user_id)`;
+  // Plain array interpolation expands to a SQL record, not one array parameter.
+  const userArray = sql.param(users);
+  const inputUsers = sql`unnest(${userArray}::text[]) AS participants(user_id)`;
   const metrics = await db.execute(sql`
     SELECT participants.user_id,
       EXISTS (
@@ -1378,11 +1380,11 @@ async function loadBatchBadgeMetrics(
 
   if (requestedKeys.has("season_hat_tricks") && context?.seasonId) {
     const result = await db.execute(sql`
-      WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+      WITH participants AS (SELECT unnest(${userArray}::text[]) AS user_id),
       qualifying AS (
         SELECT gg.scorer_id AS user_id, gg.game_id
         FROM game_goals gg JOIN games g ON g.id = gg.game_id
-        WHERE gg.scorer_id = ANY(${users}::text[])
+        WHERE gg.scorer_id = ANY(${userArray}::text[])
           AND g.season_id = ${context.seasonId} AND g.is_completed = true
         GROUP BY gg.scorer_id, gg.game_id HAVING COUNT(*) >= 3
       )
@@ -1395,7 +1397,7 @@ async function loadBatchBadgeMetrics(
 
   if (requestedKeys.has("career_shutouts")) {
     const result = await db.execute(sql`
-      WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+      WITH participants AS (SELECT unnest(${userArray}::text[]) AS user_id),
       eligible AS (
         SELECT p.user_id FROM participants p
         WHERE EXISTS (SELECT 1 FROM league_memberships lm WHERE lm.user_id = p.user_id
@@ -1407,7 +1409,7 @@ async function loadBatchBadgeMetrics(
       shutouts AS (
         SELECT goalie.goalie_user_id AS user_id, g.id AS game_id
         FROM game_goalies goalie JOIN games g ON g.id = goalie.game_id
-        WHERE goalie.goalie_user_id = ANY(${users}::text[])
+        WHERE goalie.goalie_user_id = ANY(${userArray}::text[])
           AND goalie.team_id IN (g.home_team_id, g.away_team_id)
           AND g.is_completed = true AND g.is_scrimmage = false
           AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
@@ -1416,7 +1418,7 @@ async function loadBatchBadgeMetrics(
         UNION
         SELECT ga.user_id, g.id
         FROM game_attendance ga JOIN games g ON g.id = ga.game_id
-        WHERE ga.user_id = ANY(${users}::text[])
+        WHERE ga.user_id = ANY(${userArray}::text[])
           AND ga.team_id IN (g.home_team_id, g.away_team_id)
           AND g.is_completed = true AND g.is_scrimmage = false
           AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
@@ -1454,7 +1456,7 @@ async function loadBatchBadgeMetrics(
           ROW_NUMBER() OVER (PARTITION BY r.user_id ORDER BY g.scheduled_at) -
           ROW_NUMBER() OVER (PARTITION BY r.user_id, r.status ORDER BY g.scheduled_at) AS run_id
         FROM game_rsvps r JOIN games g ON g.id = r.game_id
-        WHERE r.user_id = ANY(${users}::text[]) AND g.is_completed = true
+        WHERE r.user_id = ANY(${userArray}::text[]) AND g.is_completed = true
       )
       SELECT participants.user_id, COALESCE(MAX(runs.run_length), 0)::int AS value
       FROM ${inputUsers}
@@ -1469,7 +1471,7 @@ async function loadBatchBadgeMetrics(
 
   if (requestedKeys.has("consecutive_games_played")) {
     const result = await db.execute(sql`
-      WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+      WITH participants AS (SELECT unnest(${userArray}::text[]) AS user_id),
       eligible_games AS (
         SELECT DISTINCT p.user_id, g.id, g.scheduled_at,
           (
@@ -1547,7 +1549,7 @@ async function loadBatchBadgeMetrics(
 
     if (requestedKeys.has("season_48hr_rsvp_perfect")) {
       const result = await db.execute(sql`
-        WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+        WITH participants AS (SELECT unnest(${userArray}::text[]) AS user_id),
         eligible_games AS (
           SELECT DISTINCT p.user_id, g.id, g.home_team_id, g.away_team_id, g.is_completed,
             ((g.scheduled_at AT TIME ZONE COALESCE(l.timezone, 'America/New_York'))
@@ -1589,7 +1591,7 @@ async function loadBatchBadgeMetrics(
 
     if (requestedKeys.has("season_rsvp_perfect")) {
       const result = await db.execute(sql`
-        WITH participants AS (SELECT unnest(${users}::text[]) AS user_id),
+        WITH participants AS (SELECT unnest(${userArray}::text[]) AS user_id),
         eligible_games AS (
           SELECT DISTINCT p.user_id, g.id, g.home_team_id, g.away_team_id
           FROM participants p CROSS JOIN games g

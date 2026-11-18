@@ -50,6 +50,24 @@ summary inputs. Do not seed before replacing the old worker.
 The input sources and missing-data rules are documented in
 `supabase/win-chance-inputs.md`.
 
+## Application queue authentication
+
+The application recalculation worker reads `win_chance_project_url` and
+`win_chance_secret_key` from the same project's Vault through its server-only
+database connection. That database role must have permission to read
+`vault.decrypted_secrets`. The URL must match the server's `SUPABASE_URL`, and
+the key must be a modern `sb_secret_...` API secret accepted by the Edge
+Function's `auth: "secret"` protection. No extra Railway secret is needed.
+Do not substitute the legacy `SUPABASE_SERVICE_ROLE_KEY` JWT or weaken Edge
+Function authentication to make a dispatch pass.
+
+Queue jobs are acknowledged only after the synchronous Edge Function response
+confirms `{ "ok": true }`. HTTP errors, timeouts, malformed responses, and missing
+Vault configuration retain the job for retry. Credentials and remote error
+bodies must never be logged. Publishing the server fix and replaying previously
+failed live jobs are separate operational steps; tests must not dispatch against
+live games.
+
 ## Isolated input integration checks
 
 Run against a disposable local PostgreSQL database named `win_chance_test`:

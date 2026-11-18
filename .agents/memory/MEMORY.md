@@ -86,6 +86,7 @@
 - [Automatic line prediction tuning](line-combo-learning.md) — future verified results must change the formula, not merely update averages or report accuracy.
 - [PostgreSQL timestamp precision](postgres-timestamp-precision.md) — JavaScript Date drops microseconds; preserve canonical text for strict database timestamp equality.
 - [Drizzle array bindings](drizzle-array-bindings.md) — batch arrays need single-parameter binding for unnest/ANY; plain interpolation can become a record and fail with 42846.
+- [Prediction worker authentication](prediction-worker-authentication.md) — reuse the modern API secret in Vault; legacy service-role JWTs do not satisfy Edge Function secret authentication.
 - [In-app message email policy](in-app-message-email-policy.md) — chat messages may notify in-app or by push, but must never trigger email, including as a delivery fallback.
 - [Beercules season award](beercules-season-award.md) — season-long beer totals decide tied winners after completion; keep it independent of Beer Me's calendar-year reset.
 - [Static marketing prerender runtime](public-seo-prerender.md) — isolate Node 20 static rendering from Supabase realtime and Wouter's client-only memory location.

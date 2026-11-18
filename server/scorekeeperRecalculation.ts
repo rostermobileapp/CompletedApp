@@ -3,7 +3,7 @@ import { games } from "@shared/schema";
 import { db, pool } from "./db";
 import { storage } from "./storage";
 import { evaluateBadgesForUsers } from "./badges";
-import { supabase } from "./supabaseAuth";
+import { dispatchWinChance } from "./winChanceDispatch";
 import { finalizeOvernightScorekeeperSaves } from "./scorekeeperFinalization";
 
 type LineComboRequest = (teamIds: string[]) => Promise<void>;
@@ -33,9 +33,11 @@ async function invokeWinChance(body: Record<string, string | string[]>, scope: s
   let lastError: unknown;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const { error } = await supabase.functions.invoke("recalculate-win-chance", { body });
-      if (!error) return;
-      lastError = error;
+      await dispatchWinChance(body, {
+        query: (text) => pool.query(text),
+        projectUrl: process.env.SUPABASE_URL,
+      });
+      return;
     } catch (error) {
       lastError = error;
     }
