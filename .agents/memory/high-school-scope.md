@@ -70,6 +70,18 @@ knowing the shared password should permit changing it.
 not only in the app UI, and test fresh-login bypass attempts. This does not
 authorize changing adult-account behavior or production/provider settings.
 
+Supabase's built-in secure-password-change reauthentication exempts sessions
+created within the last 24 hours, so it cannot require a parent email code
+on every shared-password password change.
+
+**Why:** Supabase Auth's password update handler checks the session age before
+requiring a nonce; a fresh password login falls inside the exemption.
+
+**How to apply:** Do not treat enabling the global setting or adding an app
+email-code screen as an enforced HS password boundary. Obtain owner approval
+for a different, isolated authentication architecture or revised requirement
+before building the protected family flow.
+
 The league administrator approves the first school staff member (athletic
 director or head coach); school creation must not grant self-approval.
 
