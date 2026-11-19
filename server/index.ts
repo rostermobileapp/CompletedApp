@@ -103,7 +103,8 @@ app.use((req, res, next) => {
       // Award responses may contain private signed artwork URLs or base64 images.
       const privateAwardResponse = path.includes('/awards') || path.startsWith('/api/team-awards/');
       if (capturedJsonResponse && !path.startsWith('/api/iap/') &&
-          !path.startsWith('/api/organizer-card-payments/') && !privateAwardResponse) {
+          !path.startsWith('/api/organizer-card-payments/') &&
+          !path.startsWith('/api/high-school/parent-verification/') && !privateAwardResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

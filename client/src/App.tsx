@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect, useSyncExternalStore } from "react";
 import { MotionConfig } from "framer-motion";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -106,6 +106,9 @@ import BadgeCatalogAdmin from "@/pages/BadgeCatalogAdmin";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 import { applyCanonicalUrl } from "@/lib/seoMetadata";
 import { authenticatedEntryDestination, shouldShowAppLogin } from "@/lib/appRouteEntry";
+import { apiRequest } from "@/lib/queryClient";
+import { isDevParentClient, parentVerificationSession } from "@/lib/parentVerificationSession";
+import ParentVerification from "@/pages/ParentVerification";
 
 function LoadingScreen() {
   return (
@@ -142,14 +145,23 @@ export function Router() {
   useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
 
   const isDesktopWeb = useIsDesktopWeb();
+  const parentRevision = useSyncExternalStore(parentVerificationSession.subscribe, parentVerificationSession.snapshot, parentVerificationSession.snapshot);
+  const parentStatus = useQuery<{ enrolled: boolean; verified: boolean }>({
+    queryKey: ["dev-parent-verification-status", user?.id, parentRevision],
+    queryFn: async () => (await apiRequest("GET", "/api/high-school/parent-verification/status")).json(),
+    enabled: isDevParentClient && isAuthenticated && !authLoading,
+    staleTime: 0, retry: false, refetchInterval: 30_000,
+  });
   const { data: userData, isError: userDataError } = useQuery<any>({
     queryKey: ['/api/user'],
-    enabled: isAuthenticated && !authLoading,
+    enabled: isAuthenticated && !authLoading && (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true)
+      && !(isDevParentClient && location === "/high-school/parent-verification"),
     staleTime: Infinity,
     retry: 3,
   });
   // Load the account first; background requests must not compete with it.
-  useAppDataPrefetch(isAuthenticated && !authLoading && !!userData);
+  useAppDataPrefetch(isAuthenticated && !authLoading && !!userData &&
+    (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true));
   
   // This is only a safety timeout for slow data, not a mandatory splash delay.
   const [maxTimeoutReached, setMaxTimeoutReached] = useState(false);
@@ -219,6 +231,10 @@ export function Router() {
   }, [authLoading, user, userData, isDemoActive, location, resumeReady, setLocation]);
 
   // Always render standalone pages regardless of auth state
+  if (isDevParentClient && location === "/high-school/parent-verification") {
+    if (authLoading || (isAuthenticated && parentStatus.isLoading)) return <LoadingScreen />;
+    return <ParentVerification authenticated={isAuthenticated} enrolled={parentStatus.data?.enrolled} unavailable={parentStatus.isError} />;
+  }
   if (location === '/reset-password') {
     return <ResetPassword />;
   }
@@ -292,6 +308,13 @@ export function Router() {
         </Switch>
       </>
     );
+  }
+
+  if (isDevParentClient) {
+    if (parentStatus.isLoading) return <LoadingScreen />;
+    if (parentStatus.isError || (parentStatus.data?.enrolled && !parentStatus.data.verified)) {
+      return <ParentVerification enrolled={parentStatus.data?.enrolled} unavailable={parentStatus.isError} />;
+    }
   }
 
   if (!userData && !userDataError) {

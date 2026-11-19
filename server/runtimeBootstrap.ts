@@ -3,6 +3,7 @@ import { isTestProcess } from "./testDatabaseGuard";
 import { installDevelopmentNetworkGuard } from "./nonproductionNetwork";
 import { assertProductionRuntimeConfiguration, isVerifiedProductionRuntime } from "./runtimePolicy";
 import { configureLiveProjectPreview } from "./liveProjectPreview";
+import { developmentParentMailConfig } from "./developmentParentMailPolicy";
 
 // Run before SDK/application modules, before any startup work or listen().
 // Do not put this inside the development catch: production errors must remain
@@ -36,7 +37,7 @@ if (process.env.PREVIEW_USE_LIVE_SECRETS === "1") {
       if (!(key in isolated)) delete process.env[key];
     }
     Object.assign(process.env, isolated);
-    installDevelopmentNetworkGuard(isolated.SUPABASE_URL!, isolated.TESTING_STRIPE_SECRET_KEY);
+    installDevelopmentNetworkGuard(isolated.SUPABASE_URL!, isolated.TESTING_STRIPE_SECRET_KEY, developmentParentMailConfig(isolated));
   } catch {
     // Never expose URL parse errors, which can contain connection passwords.
     throw new Error("Development is stopped: isolated configuration is missing or unsafe.");

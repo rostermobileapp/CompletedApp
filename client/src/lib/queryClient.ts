@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase, clearStaleSession } from "./supabase";
+import { isDevParentClient, parentVerificationSession } from "./parentVerificationSession";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 const DEMO_ACTIVE_KEY = 'roster.demo.active';
@@ -169,7 +170,9 @@ export async function getAuthHeaders(requestUrl?: string): Promise<Record<string
   }
   // Raw authenticated fetches call this helper, so keep Demo identity handling
   // centralized rather than requiring every feature to know about Demo mode.
-  return { ...headers, ...(requestUrl && isDemoControlUrl(requestUrl) ? {} : getDemoPovHeader()) };
+  return { ...headers,
+    ...(isDevParentClient ? parentVerificationSession.headers(session?.access_token) : {}),
+    ...(requestUrl && isDemoControlUrl(requestUrl) ? {} : getDemoPovHeader()) };
 }
 
 export async function apiRequest(
@@ -247,3 +250,11 @@ export const queryClient = new QueryClient({
     },
   },
 });
+if (isDevParentClient) {
+  // Drop cached parent data immediately on expiry, lock or a new grant.
+  parentVerificationSession.subscribe(() => queryClient.clear());
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT" || !session) parentVerificationSession.clear();
+    else parentVerificationSession.headers(session.access_token); // clears on identity/session switch
+  });
+}

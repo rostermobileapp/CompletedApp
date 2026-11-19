@@ -1,4 +1,5 @@
 import { databaseEndpoint } from "./testDatabaseGuard";
+import { developmentParentMailConfig } from "./developmentParentMailPolicy";
 
 export function isolateDevelopmentEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   for (const key of [
@@ -67,7 +68,7 @@ export function isolateDevelopmentEnvironment(source: NodeJS.ProcessEnv): NodeJS
   delete result.PGUSER;
   delete result.PGPASSWORD;
   delete result.PGDATABASE;
-  return {
+  const isolated: NodeJS.ProcessEnv = {
     ...result,
     NODE_ENV: "development",
     DATABASE_URL: source.DEV_DATABASE_URL,
@@ -89,4 +90,11 @@ export function isolateDevelopmentEnvironment(source: NodeJS.ProcessEnv): NodeJS
     NONPRODUCTION_ISOLATED: "1",
     NONPRODUCTION_FORBIDDEN_DATABASES: JSON.stringify([...new Set(forbidden)]),
   };
+  if (source.DEV_PARENT_EMAIL_ENABLED === "1") {
+    // Validate against the original live key BEFORE dropping it. Retain only the
+    // separately named DEV key; the normal provider/connector credentials stay removed.
+    developmentParentMailConfig({ ...isolated, DEV_RESEND_API_KEY: source.DEV_RESEND_API_KEY, RESEND_API_KEY: source.RESEND_API_KEY });
+    isolated.DEV_RESEND_API_KEY = source.DEV_RESEND_API_KEY;
+  }
+  return isolated;
 }

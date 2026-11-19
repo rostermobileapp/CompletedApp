@@ -82,6 +82,43 @@ email-code screen as an enforced HS password boundary. Obtain owner approval
 for a different, isolated authentication architecture or revised requirement
 before building the protected family flow.
 
+The owner subsequently approved a custom DEV-only Auth database guard. The
+private guard and server verification implementation were exercised against
+synthetic DEV family/adult accounts, including direct password updates, separate
+password-purpose codes, expiry/replay/session binding and session revocation.
+
+**Why:** The explicit approval was “Implement DEV guard (recommended)” in the
+continuation conversation. This supersedes the need to ask again for that same
+DEV guard; it does not authorize production or real-family activation.
+
+**How to apply:** See `docs/high-school-parent-verification-dev.md` for the
+current implementation/evidence and limitations. Real email delivery remains
+disabled, no existing account is enrolled, and child/profile access is not
+implemented. Do not mistake captured-email verification for delivery to a real
+parent. Keep High School activation gated and production untouched.
+
+The follow-up added the DEV-only parent code/password screen and dedicated,
+allowlist-restricted mail adapter. The actual page passed captured-email
+browser checks against the DEV service; 44 focused tests and the build passed.
+
+**How to apply:** A separate DEV sender, single test-inbox allowlist and
+`DEV_RESEND_API_KEY` are now configured. One explicitly approved transport
+test was accepted by Resend, and the inbox owner confirmed receipt.
+This was transport-only, not a full real-inbox parent verification exercise.
+Persistent DEV sending remains disabled. Do not send again without approval,
+reuse live mailer credentials or replace an existing connector. The earlier timed-out
+merge did not put the intended files in the source as of the follow-up read;
+the saved implementation was preserved and synchronized, with no merge retry
+or production deployment. Consult the current evidence document before
+assuming source state or claiming real email receipt.
+
+The owner chose four-digit DEV codes after reviewing the tradeoff. Keep their
+two-minute expiry and account-wide maximum of three failed guesses per rolling
+15 minutes, including across resends, sessions and both purposes. This stricter
+policy passed captured-email operational/browser tests, including concurrent
+guesses and fresh-login lockout. No additional real email was approved or sent;
+the previously confirmed transport receipt used the earlier eight-digit format.
+
 The league administrator approves the first school staff member (athletic
 director or head coach); school creation must not grant self-approval.
 

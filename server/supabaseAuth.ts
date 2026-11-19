@@ -4,6 +4,9 @@ import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
 import { pool } from './db';
 import { containsForbiddenDemoBody, demoBodyUserIdsAreMapped, demoMutationAllowed, demoResourcesAreIsolated, hasDemoPaymentScrimmageFields, DEMO_OWNER_DISPLAY_ID, getDemoContext } from './demo';
+import { HighSchoolParentSecurity, ParentSecurityError, isParentSecurityDevelopment } from './highSchoolParentSecurity';
+import { parentActorFromVerifiedToken, parentErrorResponse, parentGrantHeader, registerParentVerificationRoutes, requireDevParentAuthority } from './highSchoolParentHttp';
+import { createDevelopmentParentMailer } from './developmentParentMailer';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -18,6 +21,13 @@ const supabase = createClient(
 // Export supabase client for use in other modules
 export { supabase };
 
+let devParentSecurity: HighSchoolParentSecurity | undefined;
+function parentSecurity() {
+  if (!isParentSecurityDevelopment()) return undefined;
+  return devParentSecurity ??= new HighSchoolParentSecurity(pool, createDevelopmentParentMailer());
+}
+const parentIssuer = () => `${new URL(process.env.SUPABASE_URL!).origin}/auth/v1`;
+
 export async function isRetiredAccount(authId: string, email?: string): Promise<boolean> {
   const result = await pool.query(`SELECT 1 FROM account_user_merges WHERE source_user_id=$1
     OR ($2::text IS NOT NULL AND lower(trim(source_email))=lower(trim($2)))`, [authId, email || null]);
@@ -28,6 +38,10 @@ export async function getAuthenticatedDatabaseUser(accessToken: string) {
   if (!accessToken || accessToken.length < 10) return null;
   const { data: { user }, error } = await supabase.auth.getUser(accessToken);
   if (error || !user) return null;
+  // Family sockets remain disabled until child/profile-scoped socket auth exists.
+  // A shared password alone must never subscribe a child to the adult stream.
+  const parent = parentSecurity();
+  if (parent && await parent.enrolled(user.id)) return null;
   if (await isRetiredAccount(user.id, user.email)) return null;
   return storage.upsertUser({
     id: user.id,
@@ -41,6 +55,20 @@ export async function getAuthenticatedDatabaseUser(accessToken: string) {
 export async function setupAuth(app: Express) {
   // No special setup needed for Supabase auth
   // Authentication will be handled via JWT verification middleware
+  const parent = parentSecurity();
+  if (parent) {
+    if (!await parent.installed()) {
+      throw new Error("DEV parent security must be explicitly installed before starting isolated development.");
+    }
+    registerParentVerificationRoutes(app, parent, async req => {
+      const header = req.get("authorization");
+      if (!header?.startsWith("Bearer ")) throw new ParentSecurityError("INVALID_SESSION", 401);
+      const token = header.slice(7);
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (error || !user) throw new ParentSecurityError("INVALID_SESSION", 401);
+      return parentActorFromVerifiedToken(token, user.id, parentIssuer());
+    });
+  }
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
@@ -74,6 +102,15 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     if (!user) {
       console.error('[Auth] No user returned from Supabase');
       return res.status(401).json({ message: 'Unauthorized' });
+    }
+    // Fail closed for EVERY existing authenticated adult API, reads included.
+    // No child-facing routes are enabled by this foundation; do not create a
+    // client-controlled role/profile exception here.
+    const parent = parentSecurity();
+    if (parent) {
+      try {
+        await requireDevParentAuthority(parent, user.id, token, parentIssuer(), req.get(parentGrantHeader));
+      } catch (error) { return parentErrorResponse(res, error); }
     }
     if (await isRetiredAccount(user.id, user.email)) {
       return res.status(403).json({ message: 'This account was retired. Sign in with the surviving account.' });

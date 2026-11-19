@@ -22,6 +22,12 @@ export const nonproductionHttpGuard: RequestHandler = (req, res, next) => {
     "worker-src 'none'",
     testCardsEnabled ? "frame-src https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com" : "frame-src 'none'",
   ].join("; "));
+  // These internal DEV endpoints have their own verified-session/code checks.
+  // This permits no provider delivery and no generic password/reset endpoints.
+  if (process.env.NONPRODUCTION_ISOLATED === "1" && req.method === "POST" &&
+      /^\/api\/high-school\/parent-verification\/(?:challenge|verify|revoke|password)$/.test(req.path)) {
+    return next();
+  }
   if (testCardsEnabled && (
     (req.method === "POST" && /^\/api\/organizer-card-payments\/(?:connect\/onboarding|checkout-session|[^/]+\/refund)$/.test(req.path)) ||
     (req.method === "POST" && /^\/api\/stripe-(?:card-payments|connect)-webhook$/.test(req.path)) ||

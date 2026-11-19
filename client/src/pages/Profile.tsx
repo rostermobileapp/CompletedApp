@@ -15,6 +15,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
+import { isDevParentClient } from '@/lib/parentVerificationSession';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -78,6 +79,12 @@ type PaymentMethodsForm = z.infer<typeof paymentMethodsSchema>;
 
 export default function Profile() {
   const { user: supabaseUser } = useAuth();
+  const { data: devParentStatus } = useQuery<{ enrolled: boolean }>({
+    queryKey: ["dev-parent-profile-status", supabaseUser?.id],
+    queryFn: async () => (await apiRequest("GET", "/api/high-school/parent-verification/status")).json(),
+    enabled: isDevParentClient && !!supabaseUser,
+    retry: false,
+  });
   const { removeExternalId, displayId: nativeDisplayId } = useNativelyNotifications();
   const { role, hasRole, canManageLeague, canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
@@ -674,6 +681,12 @@ export default function Profile() {
       </div>
       {/* Scrollable Content Section */}
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
+        {isDevParentClient && devParentStatus?.enrolled && <div className="px-6 mb-3">
+          <button className="w-full rounded-xl border px-4 py-3 text-left text-sm"
+            onClick={() => navigate("/high-school/parent-verification")}>
+            Parent verification &amp; shared password · DEV
+          </button>
+        </div>}
         {/* Profile Details */}
         <div className="px-6 mb-[12px] pt-[0px]">
         <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
