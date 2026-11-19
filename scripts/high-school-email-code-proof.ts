@@ -23,8 +23,10 @@ async function configuration(method = "GET", value?: boolean) {
     method, headers, redirect: "error", signal: AbortSignal.timeout(20_000),
     ...(method === "PATCH" ? { body: JSON.stringify({ [setting]: value }) } : {}),
   });
-  assert.equal(response.status, 200, `DEV Auth configuration ${method} failed`);
-  return await response.json() as Record<string, unknown>;
+  report[method === "GET" ? "lastReadStatus" : "lastWriteStatus"] = response.status;
+  assert.ok(response.status === 200 || (method === "PATCH" && response.status === 204),
+    `DEV Auth configuration ${method} failed`);
+  return response.status === 204 ? {} : await response.json() as Record<string, unknown>;
 }
 
 function probe(exercise: boolean) {
@@ -77,7 +79,9 @@ try {
 } finally {
   if (original !== undefined) {
     try {
-      if (mutationAttempted) await configuration("PATCH", original);
+      if (mutationAttempted && (await configuration())[setting] !== original) {
+        await configuration("PATCH", original);
+      }
       assert.equal((await configuration())[setting], original);
       report.originalSettingRestoredAndVerified = true;
     } catch {
