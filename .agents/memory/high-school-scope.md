@@ -48,3 +48,13 @@ feasibility or permission to weaken parent-device protections.
 **How to apply:** Prove account changes and parent-authority operations cannot
 bypass approved-device checks. If the proof fails, stop and report the
 incompatibility; do not silently replace family authentication.
+
+The league administrator approves the first school staff member (athletic
+director or head coach); school creation must not grant self-approval.
+
+**Why:** The owner selected league-administrator approval to establish the
+initial trusted school authority.
+
+**How to apply:** Require verified league authority for this initial approval.
+Pending staff have no roster access; later staff approvals retain their
+separately specified role hierarchy.
