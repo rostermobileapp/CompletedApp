@@ -82,6 +82,11 @@ externalPort = 3003
 [userenv.shared]
 REVENUECAT_PROJECT_ID = "proje0bd95aa"
 
+[userenv.development]
+DEV_PARENT_EMAIL_ALLOWLIST = "tobinkern88@gmail.com"
+DEV_PARENT_EMAIL_ENABLED = "0"
+DEV_PARENT_EMAIL_FROM = "contact@notifications.roster-app.com"
+
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 60000
