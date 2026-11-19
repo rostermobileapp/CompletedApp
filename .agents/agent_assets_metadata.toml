@@ -119,3 +119,17 @@ mtime_ms = 1795027360630
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/59b3c9a2-a4ba-4624-8e45-06720be81bc5/66611f95-2aa6-4200-91b0-a49af02b4679"
 storage_version_token = "1795027379818802"
 content_type = "text/csv"
+
+[[outputs]]
+id = "uocBxY-k1u-Omm5j91AjW"
+uri = "file://.local/tasks/high-school-mode-roadmap.md"
+type = "text"
+title = "High School mode: audit and phased plan"
+description = "Current-code and nonproduction-schema findings, conflicts, eight approval-gated phases, API test checklists, and decisions before Phase 1."
+logical_id = "6ef30de5-8c00-4d9c-a3b3-f29f4f9628f5"
+content_hash = "sha256:daad3b5fe64f8aec0909e0611c2dd197befdbe87f13c76df8d5e535737ad902e"
+size = 42488
+mtime_ms = 1795096240866
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/6ef30de5-8c00-4d9c-a3b3-f29f4f9628f5/9abe10e1-287a-4b22-a25e-d0525323785f"
+storage_version_token = "1795096285428961"
+content_type = "text/markdown"
