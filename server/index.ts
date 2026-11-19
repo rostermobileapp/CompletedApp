@@ -104,7 +104,8 @@ app.use((req, res, next) => {
       const privateAwardResponse = path.includes('/awards') || path.startsWith('/api/team-awards/');
       if (capturedJsonResponse && !path.startsWith('/api/iap/') &&
           !path.startsWith('/api/organizer-card-payments/') &&
-          !path.startsWith('/api/high-school/parent-verification/') && !privateAwardResponse) {
+          !path.startsWith('/api/high-school/parent-verification/') &&
+          !path.startsWith('/api/high-school/onboarding/') && !privateAwardResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

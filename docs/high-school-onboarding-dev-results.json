@@ -1,0 +1,58 @@
+{
+  "scope": "Isolated DEV; synthetic fixtures only",
+  "result": "guarded_onboarding_ready_for_review_not_section_2_complete",
+  "onboarding": {
+    "operationalCheckGroupsPassed": 12,
+    "browserCheckGroupsPassed": 7,
+    "bothSignupSurfacesBlockUnderageProgrammaticSubmit": true,
+    "initialSchoolAuthorityRequiresLeagueApproval": true,
+    "staffInvitationCannotEscalateRoleOrApproveItself": true,
+    "parentIntakeRequiresSessionBoundEmailGrant": true,
+    "perPlayerConsentVersionAndServerTimestampVerified": true,
+    "fourPlayerHouseholdLimitEnforced": true,
+    "importedIdentityAndUniqueClaimVerified": true,
+    "expiredStagingInvitationsAndRevokedCreatorFailClosed": true,
+    "authorityExpiryHidesPlayerFields": true,
+    "verifiedReturnResumesSavedIntake": true,
+    "selfEntryStopsAtStaffReview": true,
+    "coverageAndProtectedAccessRemainPending": true,
+    "memoryOnlyPreviewMakesNoApiCalls": true,
+    "phoneAndDesktopBrowserLayoutsChecked": true,
+    "browserAuthPlumbing": "Injected fixture session/query plumbing; actual components and private DEV service",
+    "fullAppRouterSdkAcceptanceVerified": false,
+    "physicalIosAndroidAcceptanceVerified": false
+  },
+  "regressions": {
+    "unitTestsPassed": 44,
+    "parentGuardOperationalCheckGroupsPassed": 16,
+    "parentGuardBrowserCheckGroupsPassed": 7,
+    "directAuthPasswordBypassRejected": true,
+    "sharedCredentialsPreserved": true,
+    "fourDigitEmailCodePolicyPreserved": true,
+    "realInboxParentPasswordAcceptance": "Deferred by owner"
+  },
+  "build": {
+    "productionBundle": "passed; no deployment",
+    "focusedStrictTypecheck": "passed",
+    "baselineTypeScriptDiagnostics": 226,
+    "currentTypeScriptDiagnostics": 226,
+    "introducedTypeScriptDiagnostics": 0,
+    "diffWhitespaceCheck": "passed"
+  },
+  "database": {
+    "installation": "Explicit separate DEV private schema only",
+    "rlsTableCount": 11,
+    "clientAndAuthApiRoleSchemaAccessDenied": true,
+    "existingAccountsEnrolledByInstaller": 0,
+    "onboardingSyntheticAccountsDeletedAndVerified": 11,
+    "onboardingFlowRecordsRemaining": 0,
+    "enrolledFamilyAccountsRemaining": 0
+  },
+  "productionDeploymentPerformed": false,
+  "liveDatabaseWritesPerformed": false,
+  "realEmailsSent": 0,
+  "pushNotificationsSent": 0,
+  "purchasesPerformed": 0,
+  "realFamiliesActivated": 0,
+  "section2Complete": false
+}

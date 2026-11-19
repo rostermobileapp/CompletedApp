@@ -1,0 +1,30 @@
+import { z } from "zod";
+
+export const HS_CONSENT_VERSION = "dev-draft-2026-11-19";
+export const HS_CONSENT_TEXT = "Roster stores your player's name, graduation year, position and optional jersey number. Approved team staff, team parents and teammates may see team information; opponents see first name and last initial only. No child email, phone, address or date of birth is collected. Photos and public-name sharing are off unless separately selected. This DEV draft does not activate a player or grant team access.";
+export const HS_PATHS = ["player", "organizer", "staff", "parent"] as const;
+export const HS_STAFF_ROLES = ["head_coach", "assistant_coach", "athletic_director", "team_manager"] as const;
+const name = z.string().trim().min(1).max(80).refine(s => !/[\u0000-\u001f\u007f]/.test(s));
+export const hsPlayerDraft = z.object({
+  id: z.string().uuid(), firstName: name, lastName: name,
+  gradYear: z.number().int().min(2026).max(2040),
+  position: z.enum(["F", "D", "G"]), jerseyNumber: z.string().regex(/^\d{0,2}$/).default(""),
+  consent: z.literal(true), consentVersion: z.literal(HS_CONSENT_VERSION),
+  photoConsent: z.boolean().default(false), publicNameConsent: z.boolean().default(false),
+}).strict();
+export const hsChoosePath = z.object({ path: z.enum(HS_PATHS), adultConfirmed: z.literal(true) }).strict();
+export const hsSaveDraft = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("staff"), revision: z.number().int().nonnegative(), role: z.enum(HS_STAFF_ROLES),
+    programId: z.string().uuid().optional(), teamId: z.string().uuid().optional(),
+    newSchool: z.object({ leagueId: z.string().uuid(), name: name, town: name }).strict().optional(),
+  }).strict(),
+  z.object({ kind: z.literal("parent"), revision: z.number().int().nonnegative(), guardianConfirmed: z.literal(true),
+    players: z.array(hsPlayerDraft).min(1).max(4),
+  }).strict(),
+]);
+export const hsTeamEntry = z.object({
+  revision: z.number().int().nonnegative(), teamCode: z.string().trim().min(4).max(80).optional(),
+  invitation: z.string().regex(/^[A-Za-z0-9_-]{32,128}$/).optional(),
+}).strict().refine(v => Boolean(v.teamCode) !== Boolean(v.invitation), "Use a team code or an invitation, not both.");
+export type HsPlayerDraft = z.infer<typeof hsPlayerDraft>;
+export type HsPath = typeof HS_PATHS[number];

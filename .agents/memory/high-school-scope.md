@@ -159,3 +159,35 @@ adult leagues. League admins must approve sponsor selection and replacement,
 as explicitly chosen by the owner. Never automatically allocate another
 league's capacity. Without approved replacement or verified household Pro,
 block new joins; settle existing-access behavior before onboarding.
+
+## Approved guarded DEV onboarding phase (November 19, 2026)
+
+The owner approved "Build guarded DEV onboarding": entry selection, DEV-only
+18+ gating before all new self-signups, staff requests, parent player intake
+with per-player consent, and resumable drafts. Existing adult options remain.
+No real registrations/families, production changes, outgoing email/push or
+purchases are enabled. Shared credentials and parent-email verification remain;
+automatic parent-device approval from the original document is superseded.
+
+Implemented in a separate private `hs_onboarding` DEV schema; authenticated HS
+mutations require server-owned synthetic fixture metadata and reserved-domain
+confirmed email. New HS-only accounts are blocked from legacy adult APIs and
+sockets; completed adults adding staff intake retain unrelated adult access.
+Adding a family context to an existing completed adult remains blocked.
+
+Staff requests use league approval for initial school authority and scoped
+AD/Head Coach approval thereafter. Player imports/claims remain restricted
+staging/intake, not active child profiles. Self-entry stops for protected staff
+review; new-school approval can stop at team setup, otherwise coverage remains
+pending. Seat allocation, protected chats, real notifications and child access
+are not implemented by this phase.
+
+`/high-school/onboarding-preview` is a DEV-only, memory-only screen review:
+no Auth or API mutation and no real parent authority. Real guarded flow:
+`/high-school/onboarding`. See `docs/high-school-onboarding-dev.md` for precise
+boundaries and validation instructions. Do not describe Section 2 or native
+acceptance as complete.
+
+The earlier parent-code merge was reconciled successfully against source commit
+`7031f064` before this phase; the preserved copy was synced without losing its
+previous changes. Real-inbox parent/password acceptance remains deferred.

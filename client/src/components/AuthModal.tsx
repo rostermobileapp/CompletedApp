@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
+import { isDevParentClient } from "@/lib/parentVerificationSession";
+import { AdultSignupConfirmation } from "@/components/AdultSignupConfirmation";
 
 interface AuthModalProps {
   open: boolean;
@@ -20,6 +22,7 @@ interface AuthModalProps {
 
 export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [adultConfirmed,setAdultConfirmed]=useState<boolean|null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,6 +31,9 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(isDevParentClient&&isSignUp&&adultConfirmed!==true){
+      toast({title:"Confirm you are 18 or older before creating an account.",variant:"destructive"});return;
+    }
     setLoading(true);
 
     try {
@@ -92,7 +98,8 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md top-4 translate-y-0" data-testid="modal-auth">
+      <DialogContent className="sm:max-w-md top-4 translate-y-0" disableAnimation={isDevParentClient}
+        style={isDevParentClient?{maxHeight:"calc(100dvh - 2rem)",overflowY:"auto"}:undefined} data-testid="modal-auth">
         <DialogHeader>
           <DialogTitle data-testid="text-auth-title">
             {isSignUp ? 'Create Account' : 'Sign In'}
@@ -105,6 +112,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isDevParentClient&&isSignUp&&<AdultSignupConfirmation value={adultConfirmed} onChange={v=>{setAdultConfirmed(v);if(!v){setEmail("");setPassword("");}}}/>}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -135,7 +143,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           <Button
             type="submit"
             className="w-full"
-            disabled={loading}
+            disabled={loading || (isDevParentClient&&isSignUp&&adultConfirmed!==true)}
             data-testid="button-submit"
           >
             {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}

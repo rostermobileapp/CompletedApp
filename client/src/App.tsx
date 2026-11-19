@@ -108,6 +108,8 @@ import { applyCanonicalUrl } from "@/lib/seoMetadata";
 import { authenticatedEntryDestination, shouldShowAppLogin } from "@/lib/appRouteEntry";
 import { apiRequest } from "@/lib/queryClient";
 import { isDevParentClient, parentVerificationSession } from "@/lib/parentVerificationSession";
+import HighSchoolOnboarding from "@/pages/HighSchoolOnboarding";
+import HighSchoolOnboardingPreview from "@/pages/HighSchoolOnboardingPreview";
 import ParentVerification from "@/pages/ParentVerification";
 
 function LoadingScreen() {
@@ -142,6 +144,7 @@ export function Router() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isActive: isDemoActive } = useDemo();
   const [location, setLocation] = useLocation();
+  const isOnboardingPreview=isDevParentClient&&location==="/high-school/onboarding-preview";
   useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
 
   const isDesktopWeb = useIsDesktopWeb();
@@ -149,18 +152,29 @@ export function Router() {
   const parentStatus = useQuery<{ enrolled: boolean; verified: boolean }>({
     queryKey: ["dev-parent-verification-status", user?.id, parentRevision],
     queryFn: async () => (await apiRequest("GET", "/api/high-school/parent-verification/status")).json(),
-    enabled: isDevParentClient && isAuthenticated && !authLoading,
+    enabled: isDevParentClient && isAuthenticated && !authLoading && !isOnboardingPreview,
     staleTime: 0, retry: false, refetchInterval: 30_000,
   });
+  const onboardingState=useQuery<{active:boolean}>({
+    queryKey:["dev-hs-onboarding",user?.id,parentRevision],
+    queryFn:async()=>(await apiRequest("GET","/api/high-school/onboarding/state")).json(),
+    enabled:isDevParentClient&&isAuthenticated&&!authLoading&&!isOnboardingPreview,
+    staleTime:0,retry:false,
+  });
+  const onboardingAllowsLegacy=!isDevParentClient||onboardingState.data?.active===false;
+  const refreshOnboarding=()=>{
+    void queryClient.invalidateQueries({queryKey:["dev-hs-onboarding"]});
+    void queryClient.invalidateQueries({queryKey:["dev-parent-verification-status"]});
+  };
   const { data: userData, isError: userDataError } = useQuery<any>({
     queryKey: ['/api/user'],
-    enabled: isAuthenticated && !authLoading && (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true)
-      && !(isDevParentClient && location === "/high-school/parent-verification"),
+    enabled: isAuthenticated && !authLoading && onboardingAllowsLegacy && !isOnboardingPreview && (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true)
+      && !(isDevParentClient && ["/high-school/parent-verification","/high-school/onboarding"].includes(location)),
     staleTime: Infinity,
     retry: 3,
   });
   // Load the account first; background requests must not compete with it.
-  useAppDataPrefetch(isAuthenticated && !authLoading && !!userData &&
+  useAppDataPrefetch(isAuthenticated && !authLoading && !!userData && onboardingAllowsLegacy && !isOnboardingPreview &&
     (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true));
   
   // This is only a safety timeout for slow data, not a mandatory splash delay.
@@ -231,6 +245,14 @@ export function Router() {
   }, [authLoading, user, userData, isDemoActive, location, resumeReady, setLocation]);
 
   // Always render standalone pages regardless of auth state
+  if(isOnboardingPreview)return <HighSchoolOnboardingPreview/>;
+  if(isDevParentClient&&location==="/high-school/onboarding"){
+    if(authLoading||(isAuthenticated&&parentStatus.isLoading))return <LoadingScreen/>;
+    if(isAuthenticated&&(parentStatus.isError||(parentStatus.data?.enrolled&&!parentStatus.data.verified))){
+      return <ParentVerification enrolled={parentStatus.data?.enrolled} unavailable={parentStatus.isError}/>;
+    }
+    return <HighSchoolOnboarding key={`${user?.id}:${parentRevision}`} authenticated={isAuthenticated} onChange={refreshOnboarding}/>;
+  }
   if (isDevParentClient && location === "/high-school/parent-verification") {
     if (authLoading || (isAuthenticated && parentStatus.isLoading)) return <LoadingScreen />;
     return <ParentVerification authenticated={isAuthenticated} enrolled={parentStatus.data?.enrolled} unavailable={parentStatus.isError} />;
@@ -314,6 +336,10 @@ export function Router() {
     if (parentStatus.isLoading) return <LoadingScreen />;
     if (parentStatus.isError || (parentStatus.data?.enrolled && !parentStatus.data.verified)) {
       return <ParentVerification enrolled={parentStatus.data?.enrolled} unavailable={parentStatus.isError} />;
+    }
+    if(onboardingState.isLoading)return <LoadingScreen/>;
+    if(onboardingState.isError||onboardingState.data?.active){
+      return <HighSchoolOnboarding key={`${user?.id}:${parentRevision}`} onChange={refreshOnboarding}/>;
     }
   }
 

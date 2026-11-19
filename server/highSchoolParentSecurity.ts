@@ -155,12 +155,13 @@ export class HighSchoolParentSecurity {
     if (!outcome) throw new ParentSecurityError("INVALID_OR_EXPIRED_CODE", 403);
     return { ...outcome, verificationToken: token };
   }
-  async authorized(actor: ParentActor, token?: string) {
-    await this.active(actor);
+  async authorized(actor: ParentActor, token?: string, tx?: ParentTransaction) {
+    const db=tx??this.pool;
+    await this.active(actor,db);
     if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
-    const result = await this.pool.query(`SELECT 1 FROM hs_parent_security.grants
+    const result = await db.query(`SELECT 1 FROM hs_parent_security.grants
       WHERE token_digest=$1 AND auth_id=$2 AND session_id=$3 AND purpose='parent_action'
-        AND NOT consumed AND expires_at>now()`, [parentDigest(token), actor.authId, actor.sessionId]);
+         AND NOT consumed AND expires_at>now()${tx?" FOR SHARE":""}`, [parentDigest(token), actor.authId, actor.sessionId]);
     return result.rows.length === 1;
   }
   async revoke(actor: ParentActor) {

@@ -7,6 +7,8 @@ import { containsForbiddenDemoBody, demoBodyUserIdsAreMapped, demoMutationAllowe
 import { HighSchoolParentSecurity, ParentSecurityError, isParentSecurityDevelopment } from './highSchoolParentSecurity';
 import { parentActorFromVerifiedToken, parentErrorResponse, parentGrantHeader, registerParentVerificationRoutes, requireDevParentAuthority } from './highSchoolParentHttp';
 import { createDevelopmentParentMailer } from './developmentParentMailer';
+import { HighSchoolOnboarding } from './highSchoolOnboarding';
+import { registerHighSchoolOnboarding } from './highSchoolOnboardingHttp';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -27,6 +29,11 @@ function parentSecurity() {
   return devParentSecurity ??= new HighSchoolParentSecurity(pool, createDevelopmentParentMailer());
 }
 const parentIssuer = () => `${new URL(process.env.SUPABASE_URL!).origin}/auth/v1`;
+let devOnboarding: HighSchoolOnboarding | undefined;
+function onboardingSecurity() {
+  const parent=parentSecurity();
+  return parent ? devOnboarding ??= new HighSchoolOnboarding(pool,parent) : undefined;
+}
 
 export async function isRetiredAccount(authId: string, email?: string): Promise<boolean> {
   const result = await pool.query(`SELECT 1 FROM account_user_merges WHERE source_user_id=$1
@@ -42,6 +49,7 @@ export async function getAuthenticatedDatabaseUser(accessToken: string) {
   // A shared password alone must never subscribe a child to the adult stream.
   const parent = parentSecurity();
   if (parent && await parent.enrolled(user.id)) return null;
+  if (await onboardingSecurity()?.blocksLegacy(user.id,user.email,!!user.email_confirmed_at)) return null;
   if (await isRetiredAccount(user.id, user.email)) return null;
   return storage.upsertUser({
     id: user.id,
@@ -67,6 +75,17 @@ export async function setupAuth(app: Express) {
       const { data: { user }, error } = await supabase.auth.getUser(token);
       if (error || !user) throw new ParentSecurityError("INVALID_SESSION", 401);
       return parentActorFromVerifiedToken(token, user.id, parentIssuer());
+    });
+    const onboarding=onboardingSecurity()!;
+    if(!await onboarding.installed()) throw new Error("Explicit DEV onboarding installation is required.");
+    registerHighSchoolOnboarding(app,onboarding,parent,async req=>{
+      const header=req.get("authorization");
+      if(!header?.startsWith("Bearer "))throw new ParentSecurityError("INVALID_SESSION",401);
+      const token=header.slice(7);
+      const {data:{user},error}=await supabase.auth.getUser(token);
+      if(error||!user)throw new ParentSecurityError("INVALID_SESSION",401);
+      return {...parentActorFromVerifiedToken(token,user.id,parentIssuer()),email:user.email??"",
+        emailVerified:!!user.email_confirmed_at,fixture:!!user.app_metadata?.synthetic_high_school_onboarding_dev};
     });
   }
 }
@@ -102,6 +121,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     if (!user) {
       console.error('[Auth] No user returned from Supabase');
       return res.status(401).json({ message: 'Unauthorized' });
+    }
+    if(await onboardingSecurity()?.blocksLegacy(user.id,user.email,!!user.email_confirmed_at)){
+      return res.status(403).json({code:"HS_ONBOARDING_PENDING",message:"Finish the guarded DEV onboarding flow before using adult APIs."});
     }
     // Fail closed for EVERY existing authenticated adult API, reads included.
     // No child-facing routes are enabled by this foundation; do not create a
