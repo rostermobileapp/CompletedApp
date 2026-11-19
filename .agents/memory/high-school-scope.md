@@ -34,7 +34,7 @@ The requested shared-password/device-approval design requires a proven Auth
 security boundary; a profile picker alone must not be treated as that proof.
 
 **How to apply:** Enforce restrictions in database/API/storage/socket paths,
-not only screens. Do not assume unresolved family-session, multi-team chat,
+not only screens. Do not assume unresolved security feasibility,
 cross-league seat or guardian-identity decisions have been approved.
 
 Keep shared parent credentials: the owner explicitly chose this when offered
@@ -58,3 +58,12 @@ initial trusted school authority.
 **How to apply:** Require verified league authority for this initial approval.
 Pending staff have no roster access; later staff approvals retain their
 separately specified role hierarchy.
+
+Children may join each approved team's system Team chat plus their household's
+Family chat, not only two conversations total.
+
+**Why:** The owner explicitly chose each team's chat plus Family for multi-team
+players, resolving the original "exactly two chats" wording as two categories.
+
+**How to apply:** Preserve the prohibition on child DMs and custom groups.
+Do not infer permission for temporary call-up chat access from this decision.
