@@ -60,6 +60,16 @@ Application device checks cannot protect an independently exposed Auth endpoint.
 passes direct Auth attacks. This finding concerns the tested configuration,
 not proof that every possible Supabase configuration is insecure.
 
+Require an email verification code sent to the parent's existing email before
+a High School family password change. Shared parent credentials remain.
+
+**Why:** The owner chose email-code verification after discussing whether
+knowing the shared password should permit changing it.
+
+**How to apply:** Enforce verification at the actual password-mutation boundary,
+not only in the app UI, and test fresh-login bypass attempts. This does not
+authorize changing adult-account behavior or production/provider settings.
+
 The league administrator approves the first school staff member (athletic
 director or head coach); school creation must not grant self-approval.
 
