@@ -35,7 +35,7 @@ security boundary; a profile picker alone must not be treated as that proof.
 
 **How to apply:** Enforce restrictions in database/API/storage/socket paths,
 not only screens. Do not assume unresolved security feasibility,
-sponsor selection/reassignment or guardian-identity decisions have been approved.
+coverage-loss access or guardian-identity decisions have been approved.
 
 Keep shared parent credentials: the owner explicitly chose this when offered
 safer child sessions as an alternative. Children knowing the parent password is
@@ -85,5 +85,7 @@ other league pools must not consume duplicate seats for that household.
 separate household seat in each league.
 
 **How to apply:** Keep this coverage restricted to HS contexts, not unrelated
-adult leagues. Sponsor selection and loss/reassignment rules require a separate
-decision; do not silently allocate another league's capacity.
+adult leagues. League admins must approve sponsor selection and replacement,
+as explicitly chosen by the owner. Never automatically allocate another
+league's capacity. Without approved replacement or verified household Pro,
+block new joins; settle existing-access behavior before onboarding.
