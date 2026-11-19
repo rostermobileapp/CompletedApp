@@ -67,3 +67,13 @@ players, resolving the original "exactly two chats" wording as two categories.
 
 **How to apply:** Preserve the prohibition on child DMs and custom groups.
 Do not infer permission for temporary call-up chat access from this decision.
+
+Coach imports may create restricted, expiring invitation staging before
+guardian consent, but not active child profiles.
+
+**Why:** The owner approved restricted staging to support roster-claim
+invitations while retaining consent-before-activation.
+
+**How to apply:** Grant no active roster visibility or app/chat access until
+authorized guardian claim and consent. Verify the school's authority to supply
+the details separately; product approval does not establish a legal basis.
