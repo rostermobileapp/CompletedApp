@@ -36,3 +36,15 @@ security boundary; a profile picker alone must not be treated as that proof.
 **How to apply:** Enforce restrictions in database/API/storage/socket paths,
 not only screens. Do not assume unresolved family-session, multi-team chat,
 cross-league seat or guardian-identity decisions have been approved.
+
+Keep shared parent credentials: the owner explicitly chose this when offered
+safer child sessions as an alternative. Children knowing the parent password is
+part of the threat model, not an assumption that may be removed.
+
+**Why:** The owner confirmed the shared-login requirement after the direct
+Supabase Auth bypass risk was raised. This confirms product scope, not security
+feasibility or permission to weaken parent-device protections.
+
+**How to apply:** Prove account changes and parent-authority operations cannot
+bypass approved-device checks. If the proof fails, stop and report the
+incompatibility; do not silently replace family authentication.
