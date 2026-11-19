@@ -49,6 +49,17 @@ feasibility or permission to weaken parent-device protections.
 bypass approved-device checks. If the proof fails, stop and report the
 incompatibility; do not silently replace family authentication.
 
+Do not assume the shared-password model is secure under the DEV Auth settings
+tested on 2026-11-19: direct password takeover succeeded without parent approval.
+
+**Why:** A real temporary-account exercise confirmed a fresh password login
+could replace the password, use the replacement, and invalidate the original.
+Application device checks cannot protect an independently exposed Auth endpoint.
+
+**How to apply:** Keep the foundation blocked until an owner-approved mitigation
+passes direct Auth attacks. This finding concerns the tested configuration,
+not proof that every possible Supabase configuration is insecure.
+
 The league administrator approves the first school staff member (athletic
 director or head coach); school creation must not grant self-approval.
 

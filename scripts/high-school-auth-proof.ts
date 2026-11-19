@@ -99,9 +99,13 @@ async function main() {
     return;
   }
 
-  const email = `hs-auth-proof-${randomUUID()}@roster-dev.invalid`;
-  const password = `HsProof1!${randomBytes(32).toString("hex")}`;
-  const replacement = `HsProof2!${randomBytes(32).toString("hex")}`;
+  // Reserved documentation domain: syntactically valid for Auth validators.
+  // Admin creation confirms it without email; delivery hooks/notifications were
+  // checked above and no signup, recovery or email-change endpoint is called.
+  const email = `hs-auth-proof-${randomUUID()}@example.com`;
+  // Keep ASCII passwords below bcrypt's 72-byte input limit.
+  const password = `HsProof1!${randomBytes(24).toString("hex")}`;
+  const replacement = `HsProof2!${randomBytes(24).toString("hex")}`;
   let createdUserId: string | undefined;
   async function auth(path: string, key: string, method: string, body?: object, token = key) {
     const response = await fetch(`${base}/auth/v1/${path}`, {
@@ -120,6 +124,12 @@ async function main() {
       app_metadata: { synthetic_high_school_auth_proof: true },
     });
     createdUserId = created.data.id;
+    checks.push({
+      name: "synthetic_auth_user_creation_response",
+      status: created.status,
+      errorCode: typeof created.data.error_code === "string" &&
+        /^[a-z_]+$/.test(created.data.error_code) ? created.data.error_code : null,
+    });
     assert.ok(createdUserId, "Synthetic Auth user creation did not return an ID");
     assert.equal(created.status, 200, "Synthetic Auth user creation failed");
     checks.push({ name: "created_one_confirmed_synthetic_auth_user_without_email", passed: true });
