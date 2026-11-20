@@ -64,5 +64,28 @@
     "realAdultFlowChanged": false,
     "backendOrDatabaseChanged": false,
     "parentAuthorityGrantedByPreview": false
+  },
+  "routerIntegrationRevision": {
+    "browserCheckGroupsPassed": 12,
+    "scope": "Actual App.Router, query/request plumbing, parent-session store and HS screens; fixture Auth events and loopback HTTP; unrelated pages are markers",
+    "guestRoutesRequireSignIn": true,
+    "previewSkipsAuthenticatedApiQueries": true,
+    "bothAdultPathsHandoffToExistingSetupBoundary": true,
+    "returningAdultRoutePreserved": true,
+    "cachedAdultProfileCannotBypassParentOrPendingStaffGate": true,
+    "unavailableServicesFailClosed": true,
+    "passwordPurposeDoesNotUnlockParentIntake": true,
+    "lockExpiryReloadSessionReplacementAndSignoutChecked": true,
+    "parentLockClearsCachedPlayerIntake": true,
+    "realProviderSdkAcceptanceVerified": false,
+    "fullAppProviderStackAcceptanceVerified": false,
+    "focusedScriptStrictTypecheck": "passed",
+    "previewBrowserRegressionGroupsPassed": 6,
+    "unitRegressionTestsPassed": 44,
+    "applicationBehaviorChanged": false,
+    "databaseConnections": 0,
+    "externalRequests": 0,
+    "realEmailsSent": 0,
+    "passwordChangesPerformed": 0
   }
 }

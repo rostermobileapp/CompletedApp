@@ -46,6 +46,29 @@ This covers six browser groups: under-18 parent handoff; Player continuation;
 organizer continuation; staff request; parent consent/join; and reset with no API,
 Auth, browser-storage or verification-authority mutation.
 
+### App-router integration checks
+
+```sh
+npx tsx scripts/verify-high-school-onboarding-router.ts
+```
+
+This separately bundles the actual exported `App.Router`, React Query client,
+request/header plumbing, parent-session store, onboarding and verification
+screens. Twelve browser groups cover guest entry, preview isolation even for a
+signed-in parent, both adult-path handoffs, returning adult access, locked-parent
+and pending-staff routing, unavailable services, distinct password-approval
+purpose, and removal of player fields/cached intake on lock, expiry, reload,
+same-account session replacement and sign-out. A cached completed-adult response
+must not bypass an active HS onboarding or parent gate.
+
+Auth events and HTTP responses are **synthetic loopback fixtures**; unrelated
+pages/layouts are markers. Adult handoff checks verify the route boundary, not
+the internals of the existing adult setup screens. The script opens no database
+connection and contacts no provider. Its code-request buttons call a local
+fixture only; no email is sent and no password is changed. This does **not**
+complete real-provider SDK, full App-provider-stack, real-inbox or native-device
+acceptance. No application behavior changed in this testing revision.
+
 The authenticated workflow is `/high-school/onboarding`. Its state is also
 checked before new DEV accounts enter existing adult onboarding. Returning
 completed adults keep their unrelated adult features when requesting staff
@@ -105,7 +128,7 @@ profile/context separation exists.
   household/role management still require their own implementation.
 - Expired invitations/staging cannot be claimed. This is not a claim that a
   production retention/deletion service exists.
-- Full App-router/SDK acceptance, physical iOS/Android acceptance and the
+- Full App-provider-stack/real SDK acceptance, physical iOS/Android acceptance and the
   previously deferred real-inbox parent/password acceptance are still pending.
 
 ## Installation and validation
