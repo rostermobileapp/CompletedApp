@@ -1,9 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import HighSchoolOnboarding from "./HighSchoolOnboarding";
 import { hsChoosePath,hsSaveDraft } from "@shared/highSchoolOnboarding";
 
 /** DEV visual review only: no fetch, Auth calls, storage, grants or records. */
 export default function HighSchoolOnboardingPreview(){
+  const [revision,setRevision]=useState(0);
+  return <><nav aria-label="Preview navigation" className="mx-auto max-w-2xl px-4 pt-5">
+    <button type="button" className="rounded-lg border px-4 py-3" onClick={()=>setRevision(r=>r+1)}>Choose another path</button>
+    <p className="mt-2 text-xs text-muted-foreground">Restarts this demonstration only. No account or saved onboarding is changed.</p>
+  </nav><PreviewFlow key={revision}/></>;
+}
+function PreviewFlow(){
   const request=useMemo(()=>{
     let state:any={active:true,path:null,revision:0,status:"choose"};
     const leagueId="00000000-0000-4000-8000-000000000001",programId="00000000-0000-4000-8000-000000000002",teamId="00000000-0000-4000-8000-000000000003";

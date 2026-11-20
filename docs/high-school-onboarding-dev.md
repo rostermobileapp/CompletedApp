@@ -18,6 +18,34 @@ Auth, browser storage, email or database writes. The parent checkpoint is
 explicitly simulated; it never creates verification authority. Do not enter real
 child information. Reload to reset; `PREVIEW` is the demonstration team code.
 
+### Preview review fixes
+
+The under-18 choice includes “My parent is here” in the preview, followed by
+parent name/email, a masked four-digit setup-code field and an explicit
+parent/18+ attestation. These values never leave the local form and are cleared
+before the walkthrough continues. Any four digits are accepted **only in this
+demonstration**; no email verification, child signup or parent grant occurs.
+The authenticated workflow still uses the parent's registered email and the
+existing server verification service. Entering another email in a preview
+cannot change that trusted destination.
+
+Player and Captain/league-admin selections no longer link out of the preview.
+They have local profile and example team/setup-request steps, with Back controls
+and a clearly marked demonstration outcome. This is not a replacement for, or a
+claim to reproduce every screen of, the existing adult account flow. The real
+adult flow is unchanged. “Choose another path” resets the entire demonstration
+so all four entry paths can be reviewed without reloading or leaving the page.
+
+Fast UI verification, with no database or provider credentials:
+
+```sh
+npx tsx scripts/verify-high-school-onboarding-preview.ts
+```
+
+This covers six browser groups: under-18 parent handoff; Player continuation;
+organizer continuation; staff request; parent consent/join; and reset with no API,
+Auth, browser-storage or verification-authority mutation.
+
 The authenticated workflow is `/high-school/onboarding`. Its state is also
 checked before new DEV accounts enter existing adult onboarding. Returning
 completed adults keep their unrelated adult features when requesting staff

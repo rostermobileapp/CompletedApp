@@ -54,5 +54,15 @@
   "pushNotificationsSent": 0,
   "purchasesPerformed": 0,
   "realFamiliesActivated": 0,
-  "section2Complete": false
+  "section2Complete": false,
+  "previewReviewRevision": {
+    "browserWalkthroughGroupsPassed": 6,
+    "under18ParentInfoAndMaskedSetupCode": "Local demonstration only; no information or code submitted",
+    "playerAndOrganizerStepsContinueInPreview": true,
+    "allFourPathsHaveNextSteps": true,
+    "backAndRestartNavigationChecked": true,
+    "realAdultFlowChanged": false,
+    "backendOrDatabaseChanged": false,
+    "parentAuthorityGrantedByPreview": false
+  }
 }

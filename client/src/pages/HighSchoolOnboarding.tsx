@@ -2,6 +2,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "wouter";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { AdultSignupConfirmation } from "@/components/AdultSignupConfirmation";
+import { ParentAssistedSetupPreview } from "@/components/ParentAssistedSetupPreview";
+import { AdultOnboardingPreview } from "@/components/AdultOnboardingPreview";
 import { parentVerificationSession } from "@/lib/parentVerificationSession";
 import { supabase } from "@/lib/supabase";
 import { HS_CONSENT_TEXT, HS_CONSENT_VERSION, HS_STAFF_ROLES, type HsPath } from "@shared/highSchoolOnboarding";
@@ -43,6 +45,7 @@ export default function HighSchoolOnboarding({request=realRequest,onChange,authe
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
   const [adult,setAdult]=useState<boolean|null>(null);
+  const [parentTakeover,setParentTakeover]=useState(false);
   const [catalog,setCatalog]=useState<any>({programs:[],leagues:[]});
   const [search,setSearch]=useState("");
   const [role,setRole]=useState("head_coach");
@@ -82,6 +85,11 @@ export default function HighSchoolOnboarding({request=realRequest,onChange,authe
     await request("POST",`${API}/lookup`,{invitation:entry.trim(),revision:state.revision});await refresh();
     setMessage("Invitation matched. No active player or team access was created.");
   });
+  const continueParentPreview=(fromMinor=false)=>run(async()=>{
+    if(!preview)return;
+    if(fromMinor)await request("POST",`${API}/choose`,{path:"parent",adultConfirmed:true});
+    await request("POST",`${API}/preview-checkpoint`,{});setParentTakeover(false);await refresh();
+  });
   const waiting=state && !["draft","choose","parent_verification_required"].includes(state.status);
   const dirty=JSON.stringify(players)!==JSON.stringify(state?.draft?.players??[])||guardian!==!!state?.draft?.guardianConfirmed;
   const selected=catalog.programs.find((p:any)=>p.id===programId);
@@ -93,18 +101,19 @@ export default function HighSchoolOnboarding({request=realRequest,onChange,authe
       <p className="text-sm text-muted-foreground">Set up your adult account or request a High School role. A selection is not permission to see a roster.</p>
       {!authenticated?<p>Sign in to continue. <Link href="/login" className="underline">Go to sign in</Link></p>:!state?<p role="status">Loading your saved progress…</p>:<>
         {!state.path&&<>
-          <AdultSignupConfirmation value={adult} onChange={setAdult}/>
+          <AdultSignupConfirmation value={adult} onChange={v=>{setAdult(v);setParentTakeover(false);}}
+            onParentSetup={preview?()=>setParentTakeover(true):undefined}/>
+          {preview&&adult===false&&parentTakeover&&<ParentAssistedSetupPreview busy={busy} onContinue={()=>continueParentPreview(true)}/>}
           {adult!==false&&<div className="grid gap-3 sm:grid-cols-2">
             {([["player","Player","Continue existing player setup"],["organizer","Captain or league admin","Keep the existing organizer options"],["staff","Coach or school staff","Request an approved school role"],["parent","Parent of a player","Set up a household of up to four players"]] as const).map(([path,title,subtitle])=>
               <button key={path} disabled={busy||adult!==true} className={`${button} text-left`} onClick={()=>choose(path)}><strong className="block">{title}</strong><span className="text-xs text-muted-foreground">{subtitle}</span></button>)}
           </div>}
         </>}
-        {["player","organizer"].includes(state.path)&&<div className="space-y-3"><p role="status">{preview?"Preview: adult paths continue the existing setup. This demonstration did not save a selection.":"Your existing adult onboarding is ready to continue. No High School role was granted."}</p><Link href="/" className={button}>Continue existing setup</Link></div>}
+        {["player","organizer"].includes(state.path)&&(preview?<AdultOnboardingPreview organizer={state.path==="organizer"}/>:
+          <div className="space-y-3"><p role="status">Your existing adult onboarding is ready to continue. No High School role was granted.</p><Link href="/" className={button}>Continue existing setup</Link></div>)}
         {state.status==="parent_verification_required"&&<div className="space-y-3">
           <p>Shared credentials let you sign in, but parent setup needs a code sent to the parent's registered email. This device is not automatically approved.</p>
-          {preview?<button className={button} disabled={busy} onClick={()=>void run(async()=>{
-            await request("POST",`${API}/preview-checkpoint`,{});await refresh();
-          })}>View consent screens without granting access</button>:<Link href="/high-school/parent-verification" className={button}>Verify parent access</Link>}
+          {preview?<ParentAssistedSetupPreview busy={busy} onContinue={()=>continueParentPreview()}/>:<Link href="/high-school/parent-verification" className={button}>Verify parent access</Link>}
         </div>}
         {waiting&&<div role="status" className="space-y-3 rounded-xl border p-4">
           <h2 className="font-semibold">{preview?"Preview: ":""}{state.status==="waiting_approval"?"Waiting for staff approval":state.status==="waiting_staff_review"?"Waiting for staff review":state.status==="denied"?"Request was not approved":state.status==="team_setup_pending"?"Approval recorded · team setup pending":"Approval recorded · coverage pending"}</h2>
@@ -159,6 +168,7 @@ export default function HighSchoolOnboarding({request=realRequest,onChange,authe
           {state.draft?.guardianConfirmed&&<div className="space-y-3 border-t pt-4">
             <h3 className="font-semibold">Request the team join</h3>
             {!state.draft?.imported&&<><label>Team code<input aria-label="Team code" className={field} value={entryKind==="code"?entry:""} onChange={e=>{setEntryKind("code");setEntry(e.target.value);}}/></label><p className="text-xs">Self-entered joins require staff review.</p></>}
+            {preview&&<p className="text-sm">Use PREVIEW as the demonstration team code. This does not join a real team.</p>}
             {state.draft?.imported&&<p className="text-sm">Keep the matched invitation token entered above to claim these exact staged records.</p>}
             {dirty&&<p className="text-sm">Save the latest player details and consent before joining.</p>}
             <button className={button} disabled={busy||!entry.trim()||dirty} onClick={()=>void run(async()=>{

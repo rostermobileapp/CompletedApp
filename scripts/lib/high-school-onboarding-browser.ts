@@ -142,7 +142,11 @@ export async function verifyOnboardingBrowser(input:{
     await preview.goto(`${input.origin}/__hs-test/preview`);
     await preview.getByRole("button",{name:"Yes, I am 18+",exact:true}).click();
     await preview.getByRole("button",{name:/Parent of a player/}).click();
-    await preview.getByRole("button",{name:"View consent screens without granting access",exact:true}).click();
+    await preview.getByLabel("Parent or guardian name",{exact:true}).fill("Example Guardian");
+    await preview.getByLabel("Parent email",{exact:true}).fill("guardian@example.com");
+    await preview.getByLabel("Setup code (four digits)",{exact:true}).fill("2468");
+    await preview.getByLabel("I am the parent or guardian, and I am 18 or older.",{exact:true}).check();
+    await preview.getByRole("button",{name:"Continue parent preview",exact:true}).click();
     await preview.getByRole("heading",{name:"Set up your players"}).waitFor();
     assert.equal(await preview.getByRole("button",{name:"Sign out",exact:true}).count(),0);
     assert.equal(await preview.getByRole("button",{name:"Lock parent controls",exact:true}).count(),0);
