@@ -1,0 +1,36 @@
+:root {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 13%;
+  --card: 0 0% 96%;
+  --card-foreground: 0 0% 13%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 13%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 0 0% 13%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 45%;
+  --accent: 142 76% 36%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 90%;
+  --input: 0 0% 96%;
+  --ring: 217 91% 60%;
+  --font-sans: "Inter", sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --radius: 0.75rem;
+  color-scheme: light;
+}
+
+.onboarding-gallery {
+  font-family: var(--font-sans);
+}
+
+.onboarding-gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
