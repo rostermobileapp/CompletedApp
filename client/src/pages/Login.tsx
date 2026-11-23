@@ -13,6 +13,8 @@ import { loginDestination } from '@/lib/appRouteEntry';
 import { isTransientAuthError, retryTransientSignIn } from '@/lib/authSessionController';
 import { signupAttributionMetadata, bindSignupAttributionUser } from '@/lib/signupAttributionBrowser';
 import { isDevParentClient } from "@/lib/parentVerificationSession";
+import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
+import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
 
 const rosterLogo = '/roster-logo-transparent.png';
 
@@ -26,6 +28,8 @@ export default function Login() {
   const [showVerification, setShowVerification] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
   const [emailTaken, setEmailTaken] = useState(false);
+  const [showAge, setShowAge] = useState(false);
+  const [ageAnswer, setAgeAnswer] = useState<boolean | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const currentUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -34,8 +38,13 @@ export default function Login() {
     if (currentUrl() !== startedAt) return;
     setLocation(loginDestination(window.location.pathname, window.location.search, window.location.hash), { replace: true });
   };
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, ageConfirmed = false) => {
+    e?.preventDefault();
+    if (isDevParentClient && isSignUp && (!ageConfirmed || ageAnswer !== true)) {
+      setAgeAnswer(null);
+      setShowAge(true);
+      return;
+    }
     const startedAt = currentUrl();
     setLoading(true);
 
@@ -48,7 +57,7 @@ export default function Login() {
           password,
           options: {
             emailRedirectTo: undefined,
-            data: attribution,
+            data: { ...attribution, ...(isDevParentClient ? { signup_age_answer: "adult" } : {}) },
           }
         });
         
@@ -63,6 +72,7 @@ export default function Login() {
         if (error) throw error;
 
         if (data.user && data.user.identities && data.user.identities.length === 0) {
+          setShowAge(false);
           setEmailTaken(true);
           return;
         }
@@ -76,6 +86,7 @@ export default function Login() {
             toast({ variant: 'destructive', title: 'Account created', description: 'Local referral storage is unavailable. Your signup context is saved to your account.' });
           }
         }
+        setShowAge(false);
 
         if (data.user && !data.session) {
           console.log('[Signup] User created but no session - showing verification modal for:', email);
@@ -106,6 +117,7 @@ export default function Login() {
         
         if (error) throw error;
         
+        if (isDevParentClient) signupAgeRestriction.allowAdult();
         toast({
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
@@ -149,6 +161,19 @@ export default function Login() {
       handleClose();
     }
   };
+
+  if (isDevParentClient && showAge) return <AgeConfirmationScreen
+    value={ageAnswer} onChange={setAgeAnswer} busy={loading}
+    onBack={() => { if (!loading) { setShowAge(false); setAgeAnswer(null); } }}
+    onContinue={() => {
+      if (loading || ageAnswer === null) return;
+      if (ageAnswer === false) {
+        signupAgeRestriction.requireParent();
+        setEmail(""); setPassword(""); setShowAge(false);
+        setLocation("/under-18");
+      } else { signupAgeRestriction.allowAdult(); void handleSubmit(undefined, true); }
+    }}
+  />;
 
   return (
     <div className="min-h-screen bg-white flex flex-col overflow-hidden" data-testid="login-page">

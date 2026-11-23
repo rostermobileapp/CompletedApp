@@ -225,3 +225,17 @@ acceptance as complete.
 The earlier parent-code merge was reconciled successfully against source commit
 `7031f064` before this phase; the preserved copy was synced without losing its
 previous changes. Real-inbox parent/password acceptance remains deferred.
+
+## Age question after the signup form
+
+Show the separate age screen after the user taps Sign Up, but create an account
+only after an explicit Yes. Store that adult answer on the created account.
+No opens parent-led Under 18 handling without registering an account.
+
+**Why:** The owner explicitly selected “Wait for Yes” when asked whether an
+account should exist before the age answer. This preserves the existing
+no-self-registration boundary for minors; there is no account on which to save No.
+
+**How to apply:** Keep this in isolated DEV onboarding, preserve the existing
+adult post-signup flow, and do not move account creation ahead of the age answer
+or create restricted minor accounts without a new explicit decision.

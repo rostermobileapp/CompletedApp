@@ -3,6 +3,8 @@ import { HS_CONSENT_VERSION, hsChoosePath, hsSaveDraft, hsTeamEntry } from "@sha
 import { hsHockeyType, hsJourneyInput, hsLeagueDraftInput, validateHsLeagueDraft } from "@shared/highSchoolYouthOnboarding";
 import HighSchoolYouthOnboarding, { type RequestFn } from "./HighSchoolYouthOnboarding";
 import Under18Onboarding from "./Under18Onboarding";
+import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
+import { Under18ShareScreen } from "@/components/high-school-onboarding/Under18ShareScreen";
 
 const makeMemoryAdapter=():RequestFn=>{
   let state:any={active:true,path:null,revision:1,status:"choose",draft:{role:null,programId:null,teamId:null,players:[],guardianConfirmed:false,imported:false},journey:{}};
@@ -94,6 +96,14 @@ export default function HighSchoolYouthOnboardingPreview() {
   const request=useMemo(()=>makeMemoryAdapter(),[]);
   const [childDemo,setChildDemo]=useState(false);
   const [previewMessage,setPreviewMessage]=useState("");
+  const [agePreview,setAgePreview]=useState(new URLSearchParams(window.location.search).get("screen")==="age");
+  const [ageAnswer,setAgeAnswer]=useState<boolean|null>(null);
+  const [under18Preview,setUnder18Preview]=useState(false);
+  if(under18Preview)return <Under18ShareScreen onBack={()=>setUnder18Preview(false)}
+    onCode={()=>{setUnder18Preview(false);setAgePreview(false);setChildDemo(true);}}/>;
+  if(agePreview)return <AgeConfirmationScreen value={ageAnswer} onChange={setAgeAnswer}
+    onBack={()=>window.location.assign("/login?signup=1")}
+    onContinue={()=>{if(ageAnswer===false)setUnder18Preview(true);else if(ageAnswer===true)setAgePreview(false);}}/>;
   return <div>
     <aside style={{position:"sticky",top:0,zIndex:20,background:"#7c2d12",color:"#fff",padding:"10px 16px",font:"600 13px/1.4 Inter,system-ui,sans-serif",textAlign:"center"}}>
       SIMULATION ONLY · Memory-only preview. No API, auth, browser storage, real family information, approval, or security proof.

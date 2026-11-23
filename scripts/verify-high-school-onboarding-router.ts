@@ -168,13 +168,15 @@ const browser = await chromium.launch({ executablePath: "/repl/tools/bin/chromiu
 const report: any = { scope: "Actual App.Router and request/query/session plumbing; fixture Auth/events and loopback HTTP; unrelated pages are markers",
   checks: [], realProviderSdkAcceptance: false, realEmailsSent: 0, databaseConnections: 0, externalRequests: 0 };
 const mark = (name: string) => report.checks.push(name);
-async function runCase(id: string, options: Partial<Fixture> & { guest?: boolean; cachedAdult?: boolean; width?: number }, visit: string,
+async function runCase(id: string, options: Partial<Fixture> & { guest?: boolean; cachedAdult?: boolean; width?: number; ageRestricted?: boolean }, visit: string,
   test: (page: Page, fixture: Fixture) => Promise<void>) {
   const f: Fixture = { enrolled: false, active: true, completed: false, path: null, ...options, calls: [], unexpected: [] };
   fixtures.set(id, f);
   const context = await browser.newContext({ viewport: { width: options.width || 390, height: 844 } });
-  await context.addInitScript(({ token, cachedAdult }) => { (window as any).__fixtureAccessToken = token; (window as any).__preloadAdultCache = cachedAdult; },
-    { token: options.guest ? null : firstSession, cachedAdult: !!options.cachedAdult });
+  await context.addInitScript(({ token, cachedAdult, ageRestricted }) => {
+    (window as any).__fixtureAccessToken = token; (window as any).__preloadAdultCache = cachedAdult;
+    if(ageRestricted)sessionStorage.setItem("roster-dev-signup-parent-required","1");
+  }, { token: options.guest ? null : firstSession, cachedAdult: !!options.cachedAdult, ageRestricted:!!options.ageRestricted });
   const page = await context.newPage(); page.setDefaultTimeout(10000);
   let errors = 0;
   page.on("pageerror", () => errors++);
@@ -203,6 +205,20 @@ async function verifyParent(page: Page) {
   assert.equal(await page.getByLabel("First name", { exact: true }).inputValue(), "RouterFixtureChild");
 }
 try {
+  for(const route of ["/get-started","/high-school/onboarding","/"]){
+    await runCase("under18-denied"+route,{guest:true,ageRestricted:true},route,async(p,f)=>{
+      await p.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
+      await p.reload();
+      await p.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
+      assert.equal(f.calls.length,0);
+    });
+  }
+  await runCase("under18-cached-adult",{ageRestricted:true,cachedAdult:true,completed:true,active:false},"/get-started",async(p,f)=>{
+    await p.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
+    assert.equal((await inspection(p)).prefetch,0);
+    assert.equal(f.calls.length,0);
+  });
+  mark("under18_answer_blocks_questionnaire_roles_and_cached_adult_content_including_reload");
   for (const route of ["/high-school/onboarding", "/high-school/parent-verification"]) {
     await runCase("guest" + route, { guest: true }, route, async (p, f) => {
       if(route==="/high-school/onboarding")await p.getByRole("button",{name:"Sign Up",exact:true}).waitFor();

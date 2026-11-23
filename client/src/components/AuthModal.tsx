@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { isDevParentClient } from "@/lib/parentVerificationSession";
-import { AdultSignupConfirmation } from "@/components/AdultSignupConfirmation";
+import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
+import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
 
 interface AuthModalProps {
   open: boolean;
@@ -23,16 +24,17 @@ interface AuthModalProps {
 export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [adultConfirmed,setAdultConfirmed]=useState<boolean|null>(null);
+  const [showAge,setShowAge]=useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(isDevParentClient&&isSignUp&&adultConfirmed!==true){
-      toast({title:"Confirm you are 18 or older before creating an account.",variant:"destructive"});return;
+  const handleSubmit = async (e?: React.FormEvent, ageConfirmed=false) => {
+    e?.preventDefault();
+    if(isDevParentClient&&isSignUp&&(!ageConfirmed||adultConfirmed!==true)){
+      setAdultConfirmed(null);setShowAge(true);return;
     }
     setLoading(true);
 
@@ -41,9 +43,11 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          ...(isDevParentClient ? { options: { data: { signup_age_answer: "adult" } } } : {}),
         });
 
         if (error) throw error;
+        setShowAge(false);
 
         if (data.session) {
           toast({
@@ -83,6 +87,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
         });
+        if(isDevParentClient)signupAgeRestriction.allowAdult();
         onOpenChange(false);
       }
     } catch (error: any) {
@@ -96,6 +101,24 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
     }
   };
 
+  if (isDevParentClient && open && showAge) return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="inset-0 h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto [&>button]:hidden"
+        style={{inset:0,transform:"none",width:"100%",maxWidth:"none",height:"100dvh"}} disableAnimation>
+        <DialogTitle className="sr-only">Age confirmation</DialogTitle>
+        <DialogDescription className="sr-only">Choose your age group to continue signup.</DialogDescription>
+        <AgeConfirmationScreen value={adultConfirmed} onChange={setAdultConfirmed} busy={loading}
+          onBack={()=>{if(!loading){setShowAge(false);setAdultConfirmed(null);}}}
+          onContinue={()=>{
+            if(loading||adultConfirmed===null)return;
+            if(adultConfirmed===false){
+              signupAgeRestriction.requireParent();
+              setEmail("");setPassword("");setShowAge(false);onOpenChange(false);setLocation("/under-18");
+            }else{signupAgeRestriction.allowAdult();void handleSubmit(undefined,true);}
+          }}/>
+      </DialogContent>
+    </Dialog>
+  );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md top-4 translate-y-0" disableAnimation={isDevParentClient}
@@ -112,7 +135,6 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isDevParentClient&&isSignUp&&<AdultSignupConfirmation value={adultConfirmed} onChange={v=>{setAdultConfirmed(v);if(!v){setEmail("");setPassword("");}}}/>}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -143,7 +165,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           <Button
             type="submit"
             className="w-full"
-            disabled={loading || (isDevParentClient&&isSignUp&&adultConfirmed!==true)}
+            disabled={loading}
             data-testid="button-submit"
           >
             {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}

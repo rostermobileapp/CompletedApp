@@ -113,6 +113,7 @@ import HighSchoolOnboardingPreview from "@/pages/HighSchoolOnboardingPreview";
 import HighSchoolYouthOnboarding from "@/pages/HighSchoolYouthOnboarding";
 import HighSchoolYouthOnboardingPreview from "@/pages/HighSchoolYouthOnboardingPreview";
 import Under18Onboarding from "@/pages/Under18Onboarding";
+import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
 import ParentVerification from "@/pages/ParentVerification";
 
 function LoadingScreen() {
@@ -149,6 +150,8 @@ export function Router() {
   const [location, setLocation] = useLocation();
   const isOnboardingPreview=isDevParentClient&&["/high-school/onboarding-preview","/high-school/legacy-onboarding-preview"].includes(location);
   const isStandaloneChildEntry=isDevParentClient&&["/under-18","/under-18/code"].includes(location);
+  const ageRestricted=useSyncExternalStore(signupAgeRestriction.subscribe,signupAgeRestriction.snapshot,()=>false);
+  const ageAllowsOnboarding=!isDevParentClient||!ageRestricted;
   useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
 
   const isDesktopWeb = useIsDesktopWeb();
@@ -156,13 +159,13 @@ export function Router() {
   const parentStatus = useQuery<{ enrolled: boolean; verified: boolean }>({
     queryKey: ["dev-parent-verification-status", user?.id, parentRevision],
     queryFn: async () => (await apiRequest("GET", "/api/high-school/parent-verification/status")).json(),
-    enabled: isDevParentClient && isAuthenticated && !authLoading && !isOnboardingPreview && !isStandaloneChildEntry,
+    enabled: isDevParentClient && isAuthenticated && !authLoading && !isOnboardingPreview && !isStandaloneChildEntry && ageAllowsOnboarding,
     staleTime: 0, retry: false, refetchInterval: 30_000,
   });
   const onboardingState=useQuery<{active:boolean}>({
     queryKey:["dev-hs-onboarding",user?.id,parentRevision],
     queryFn:async()=>(await apiRequest("GET","/api/high-school/onboarding/state")).json(),
-    enabled:isDevParentClient&&isAuthenticated&&!authLoading&&!isOnboardingPreview&&!isStandaloneChildEntry,
+    enabled:isDevParentClient&&isAuthenticated&&!authLoading&&!isOnboardingPreview&&!isStandaloneChildEntry&&ageAllowsOnboarding,
     staleTime:0,retry:false,
   });
   const onboardingAllowsLegacy=!isDevParentClient||onboardingState.data?.active===false;
@@ -172,13 +175,13 @@ export function Router() {
   };
   const { data: userData, isError: userDataError } = useQuery<any>({
     queryKey: ['/api/user'],
-    enabled: isAuthenticated && !authLoading && onboardingAllowsLegacy && !isOnboardingPreview && !isStandaloneChildEntry && (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true)
+    enabled: isAuthenticated && !authLoading && onboardingAllowsLegacy && ageAllowsOnboarding && !isOnboardingPreview && !isStandaloneChildEntry && (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true)
       && !(isDevParentClient && ["/high-school/parent-verification","/high-school/onboarding"].includes(location)),
     staleTime: Infinity,
     retry: 3,
   });
   // Load the account first; background requests must not compete with it.
-  useAppDataPrefetch(isAuthenticated && !authLoading && !!userData && onboardingAllowsLegacy && !isOnboardingPreview && !isStandaloneChildEntry &&
+  useAppDataPrefetch(isAuthenticated && !authLoading && !!userData && onboardingAllowsLegacy && ageAllowsOnboarding && !isOnboardingPreview && !isStandaloneChildEntry &&
     (!isDevParentClient || parentStatus.data?.enrolled === false || parentStatus.data?.verified === true));
   
   // This is only a safety timeout for slow data, not a mandatory splash delay.
@@ -252,6 +255,7 @@ export function Router() {
   if(isDevParentClient&&location==="/high-school/legacy-onboarding-preview")return <HighSchoolOnboardingPreview/>;
   if(isOnboardingPreview)return <HighSchoolYouthOnboardingPreview/>;
   if(isStandaloneChildEntry)return <Under18Onboarding/>;
+  if(!ageAllowsOnboarding&&location!=="/login")return <Under18Onboarding/>;
   if(isDevParentClient&&location==="/high-school/onboarding"){
     if(authLoading||(isAuthenticated&&parentStatus.isLoading))return <LoadingScreen/>;
     if(isAuthenticated&&(parentStatus.isError||(parentStatus.data?.enrolled&&!parentStatus.data.verified))){
