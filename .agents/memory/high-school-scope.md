@@ -256,3 +256,17 @@ identified overlapping questions elsewhere in onboarding.
 **How to apply:** Treat future questionnaire deduplication, field removal and
 route/order changes as separate decisions. Matching the newer intake's look
 does not make adult profiles part of the High School authority or family model.
+
+## Light onboarding auth and verification
+
+Keep signup/sign-in dialogs, signup email verification and every parent
+verification state in the same light design as the onboarding, even when the
+surrounding app uses dark mode. Apply the light styling locally, not globally.
+
+**Why:** The owner explicitly requested light styling for E03–E05 and V01–V09
+to match most onboarding screens. This is a presentation change, not approval
+to change verification, passwords, account creation or parent authority.
+
+**How to apply:** Keep portal-rendered dialogs inside their own local light
+boundary. Preserve code lengths, resend limits, grants, expiry, guards and all
+existing security behavior; do not change the user's global theme.

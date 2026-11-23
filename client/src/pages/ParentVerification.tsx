@@ -4,6 +4,7 @@ import { apiRequest, getAuthHeaders, ApiError } from "@/lib/queryClient";
 import { parentVerificationSession } from "@/lib/parentVerificationSession";
 import { Link } from "wouter";
 import { PARENT_CODE_DIGITS } from "@shared/highSchoolParentCodePolicy";
+import "@/components/onboarding-auth-light.css";
 
 const API = "/api/high-school/parent-verification";
 type Purpose = "parent_action" | "password_change";
@@ -108,8 +109,8 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
   };
   const button = "rounded-lg border px-4 py-3 text-sm font-medium disabled:opacity-50";
   const input = "w-full rounded-lg border bg-background px-3 py-3";
-  return <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-10">
-    <section className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-lg space-y-5" aria-labelledby="parent-verification-title">
+  return <main className="onboarding-light parent-verification-light min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-10">
+    <section className="parent-verification-card w-full max-w-md rounded-2xl border bg-card p-6 shadow-lg space-y-5" aria-labelledby="parent-verification-title">
       <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">DEV only · parent verification</p>
       <h1 id="parent-verification-title" className="text-2xl font-semibold">Verify you're the parent</h1>
       <p className="text-sm text-muted-foreground">The shared password allows sign-in. Parent controls and password changes also need a code sent to the parent's registered email.</p>

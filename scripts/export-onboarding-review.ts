@@ -14,6 +14,11 @@ import { screens, type ReviewSpec } from "./onboarding-review/catalog";
 import { renderReviewDocument } from "./onboarding-review/document";
 
 const out=path.resolve(process.argv.find(argument=>argument.startsWith("--out-dir="))?.slice("--out-dir=".length)||"generated-artifacts/onboarding-review");
+const onlyIds=process.argv.find(argument=>argument.startsWith("--only="))?.slice("--only=".length).split(",");
+const captureOnly=process.argv.includes("--capture-only");
+const verifyLight=process.argv.includes("--verify-light");
+const reviewScreens=onlyIds?screens.filter(screen=>onlyIds.includes(screen.id)):screens;
+if(onlyIds&&reviewScreens.length!==new Set(onlyIds).size)throw Error("Unknown screen ID in --only");
 await mkdir(path.join(out,"screens"),{recursive:true});
 const resumeArgument=process.argv.find(argument=>argument.startsWith("--resume-log="));
 const resumed=new Map<string,{heading:string;count:number}>();
@@ -106,12 +111,13 @@ const bundled=await build({
     });
   }}]
 });
-console.log(`Prepared ${screens.length} screen definitions; compiling the current app styles.`);
+console.log(`Prepared ${reviewScreens.length} screen definitions; compiling the current app styles.`);
 execFileSync(process.execPath,["node_modules/.bin/tailwindcss","-i","client/src/index.css","-o",path.join(out,"capture.css"),"--minify"],{stdio:"pipe"});
 let css=await readFile(path.join(out,"capture.css"),"utf8");
 css+="\n"+await getSource("client/src/components/high-school-onboarding/onboarding.css");
 css+="\n"+await getSource("client/src/components/high-school-onboarding/age-confirmation.css");
 css+="\n"+await getSource("client/src/pages/onboarding-profile.css");
+css+="\n"+await getSource("client/src/components/onboarding-auth-light.css");
 const app=express();let rejectedApi=0;
 app.use("/api",(_req,res)=>{rejectedApi++;res.status(503).json({code:"PDF_CAPTURE_NO_API"});});
 app.get("/capture.js",(_req,res)=>res.type("js").send(bundled.outputFiles[0].text));
@@ -134,12 +140,13 @@ await context.route("**/*",route=>{
 });
 type Captured=ReviewSpec&{heading:string;images:string[];error?:string;pageErrors:string[]};
 const captured:Captured[]=[];
+const lightChecks:{id:string;width:number;dark:boolean}[]=[];
 async function settle(page:Page){
   await page.waitForTimeout(950);
   await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(img=>img.decode().catch(()=>{})));});
 }
 try{
-  for(const spec of screens){
+  for(const spec of reviewScreens){
     const previous=resumed.get(spec.id);
     if(previous){
       const images=Array.from({length:previous.count},(_,index)=>path.join(out,"screens",spec.id+(index?"-"+(index+1):"")+".jpg"));
@@ -166,6 +173,50 @@ try{
         await page.getByRole("button",{name:spec.setup==="team-chat"?/Example team chat/:/Example family chat/}).click();
       }
       await settle(page);
+      if(verifyLight){
+        if(spec.id==="E05"){
+          const otp=page.locator("input[data-input-otp]");
+          await otp.fill("123456");
+          if(await page.getByRole("button",{name:"Verify & Activate Account",exact:true}).isDisabled())throw Error("Signup OTP action did not enable after six digits");
+          const otpView=await page.evaluate(()=>{
+            const input=document.querySelector<HTMLInputElement>("input[data-input-otp]")!;
+            return{digits:[...document.querySelectorAll(".onboarding-otp-slot")].map(slot=>slot.textContent).join(""),background:getComputedStyle(input).backgroundColor,color:getComputedStyle(input).color};
+          });
+          if(otpView.digits!=="123456"||otpView.background!=="rgba(0, 0, 0, 0)"||otpView.color!=="rgba(0, 0, 0, 0)")throw Error("OTP carrier must remain transparent: "+JSON.stringify(otpView));
+          await otp.fill("");
+        }
+        for(const width of [320,390,1280]){
+          await page.setViewportSize({width,height:844});
+          for(const dark of [false,true]){
+            await page.evaluate(value=>document.documentElement.classList.toggle("dark",value),dark);
+            const appearance=await page.evaluate(()=>{
+              const root=document.querySelector<HTMLElement>(".onboarding-light[role='dialog'],main.onboarding-light");
+              if(!root)return{error:"Missing local light boundary"};
+              const panel=root.querySelector(".parent-verification-card")||root;
+              const box=root.getBoundingClientRect();
+              const inputs=[...root.querySelectorAll<HTMLInputElement>("input:not([data-input-otp])")].filter(input=>input.type!=="hidden").map(input=>{
+                const style=getComputedStyle(input);
+                return{background:style.backgroundColor,color:style.color};
+              });
+              return{
+                background:getComputedStyle(panel).backgroundColor,
+                color:getComputedStyle(root).color,
+                fits:box.left>=-.5&&box.right<=innerWidth+.5&&root.scrollWidth<=root.clientWidth+1,
+                bounds:{left:box.left,right:box.right,clientWidth:root.clientWidth,scrollWidth:root.scrollWidth},
+                overflow:[...root.querySelectorAll<HTMLElement>("*")].filter(element=>element.getBoundingClientRect().right>box.right+1).map(element=>({tag:element.tagName,classes:element.className,right:element.getBoundingClientRect().right})).slice(0,5),
+                inputs,
+              };
+            });
+            if("error" in appearance||appearance.background!=="rgb(255, 255, 255)"||appearance.color!=="rgb(15, 23, 42)"||!appearance.fits
+              ||appearance.inputs?.some(input=>input.background!=="rgb(255, 255, 255)"||input.color!=="rgb(15, 23, 42)")){
+              throw Error(`Light design failed at ${width}px / dark=${dark}: ${JSON.stringify(appearance)}`);
+            }
+            lightChecks.push({id:spec.id,width,dark});
+          }
+        }
+        await page.setViewportSize({width:390,height:844});
+        await page.evaluate(()=>document.documentElement.classList.add("dark"));
+      }
       const primary=page.locator("h1:visible");
       record.heading=((await primary.count())?await primary.first().innerText():await page.locator("h2:visible").first().innerText().catch(()=>"")).trim()||spec.title||spec.component;
       if(pageErrors.length)throw Error(pageErrors.join(" | "));
@@ -213,10 +264,11 @@ try{
     captured.push(record);
     await writeFile(path.join(out,"capture-progress.json"),JSON.stringify(captured,null,2));
   }
-  const manifest={generatedAt:new Date().toISOString(),viewport:{width:390,height:844},source:"current workspace; synthetic offline component rendering",forbiddenApiAttempts:rejectedApi,externalNonFontRequestsBlocked:externalBlocked,screens:captured};
+  const manifest={generatedAt:new Date().toISOString(),viewport:{width:390,height:844},source:"current workspace; synthetic offline component rendering",forbiddenApiAttempts:rejectedApi,externalNonFontRequestsBlocked:externalBlocked,lightChecks,screens:captured};
   await writeFile(path.join(out,"manifest.json"),JSON.stringify(manifest,null,2));
   const failures=captured.filter(item=>item.error);
   if(failures.length||rejectedApi)throw Error(`${failures.length} failed screen captures; ${rejectedApi} unexpected API requests. See manifest.json.`);
+  if(!captureOnly){
   const html=await renderReviewDocument(captured);
   await writeFile(path.join(out,"onboarding-review.html"),html);
   const documentPage=await context.newPage();
@@ -227,6 +279,9 @@ try{
   await documentPage.screenshot({path:path.join(out,"document-preview.jpg"),type:"jpeg",quality:85});
   const pdf=await stat(path.join(out,"onboarding-review.pdf"));
   console.log(JSON.stringify({screens:captured.length,phoneViews:captured.reduce((n,s)=>n+s.images.length,0),pdfBytes:pdf.size,pdf:path.relative(process.cwd(),path.join(out,"onboarding-review.pdf")),realAccountsCreated:0,realMessagesSent:0,apiRequests:rejectedApi},null,2));
+  }else{
+    console.log(JSON.stringify({screens:captured.length,phoneViews:captured.reduce((n,s)=>n+s.images.length,0),lightChecks:lightChecks.length,realAccountsCreated:0,realMessagesSent:0,apiRequests:rejectedApi},null,2));
+  }
 }finally{
   await browser.close();
   await new Promise<void>(r=>server.close(()=>r()));

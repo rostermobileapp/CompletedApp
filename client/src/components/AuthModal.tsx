@@ -15,6 +15,7 @@ import { useLocation } from 'wouter';
 import { isDevParentClient } from "@/lib/parentVerificationSession";
 import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
 import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
+import "./onboarding-auth-light.css";
 
 interface AuthModalProps {
   open: boolean;
@@ -103,7 +104,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
   if (isDevParentClient && open && showAge) return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="inset-0 h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto [&>button]:hidden"
+      <DialogContent className="onboarding-light inset-0 h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto [&>button]:hidden"
         style={{inset:0,transform:"none",width:"100%",maxWidth:"none",height:"100dvh"}} disableAnimation>
         <DialogTitle className="sr-only">Age confirmation</DialogTitle>
         <DialogDescription className="sr-only">Choose your age group to continue signup.</DialogDescription>
@@ -121,7 +122,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md top-4 translate-y-0" disableAnimation={isDevParentClient}
+      <DialogContent className="onboarding-light sm:max-w-md top-4 translate-y-0" disableAnimation={isDevParentClient}
         style={isDevParentClient?{maxHeight:"calc(100dvh - 2rem)",overflowY:"auto"}:undefined} data-testid="modal-auth">
         <DialogHeader>
           <DialogTitle data-testid="text-auth-title">

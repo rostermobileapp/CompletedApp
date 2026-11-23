@@ -1,0 +1,273 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+/*
+ * Local light palette for the onboarding auth surfaces. Keep these tokens on
+ * the rendered content/root so portalled dialogs remain independent of
+ * html.dark and all unrelated dialogs retain their existing appearance.
+ */
+.onboarding-light {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 214 100% 97%;
+  --accent-foreground: 221 83% 40%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 84%;
+  --ring: 221 83% 53%;
+  --hairline: 214 32% 91%;
+  --elev-lift: 0 18px 48px rgb(15 23 42 / 16%);
+  box-sizing: border-box;
+  color: #0f172a;
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.onboarding-light *,
+.onboarding-light *::before,
+.onboarding-light *::after {
+  box-sizing: border-box;
+}
+
+/* DialogContent is portalled, so this class is the local token boundary. */
+.onboarding-light[role="dialog"]:not(.inset-0) {
+  width: min(calc(100% - 32px), 430px);
+  max-height: calc(100dvh - 32px);
+  padding: 24px 20px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  border-color: #e2e8f0 !important;
+  border-radius: 16px;
+  background: #fff !important;
+  color: #0f172a !important;
+  box-shadow: 0 18px 48px rgb(15 23 42 / 16%);
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.onboarding-light[role="dialog"] h2 {
+  color: #0f172a;
+  font-weight: 750;
+  letter-spacing: -.025em;
+}
+
+.onboarding-light[role="dialog"] .text-muted-foreground {
+  color: #64748b !important;
+}
+
+.onboarding-light input:not([data-input-otp]) {
+  border-color: #cbd5e1;
+  background: #fff !important;
+  color: #0f172a !important;
+  color-scheme: light;
+}
+
+.onboarding-light input:not([data-input-otp])::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1;
+}
+
+.onboarding-light input:not([data-input-otp]):focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 13%);
+}
+
+.onboarding-light[role="dialog"] > button:last-child {
+  color: #64748b;
+}
+
+.onboarding-light[role="dialog"] > button:last-child:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.onboarding-light[role="dialog"] > button:last-child:focus-visible,
+.onboarding-light button:focus-visible,
+.onboarding-light a:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 38%);
+  outline-offset: 3px;
+}
+
+.onboarding-light[role="dialog"] button {
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.onboarding-light[role="dialog"] button:disabled,
+.onboarding-light button:disabled {
+  cursor: not-allowed;
+}
+
+.onboarding-light .onboarding-otp-slot {
+  border-color: #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+}
+
+/* Clip the OTP library's invisible password-manager extension, not its slots.
+ * Keep room for the active slot's focus ring and leave the carrier transparent.
+ */
+.onboarding-light [data-input-otp-container] {
+  overflow-x: clip;
+  overflow-clip-margin: 4px;
+}
+
+.onboarding-light .onboarding-otp-slot.ring-2 {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 13%);
+}
+
+.onboarding-light.parent-verification-light {
+  --onboarding-blue: #2563eb;
+  --onboarding-blue-dark: #1d4ed8;
+  --onboarding-ink: #0f172a;
+  --onboarding-muted: #64748b;
+  --onboarding-border: #e2e8f0;
+  --onboarding-input: #cbd5e1;
+  --onboarding-panel: #f8fafc;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: #f1f5f9 !important;
+  color: var(--onboarding-ink) !important;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.parent-verification-light .parent-verification-card {
+  width: min(100%, 430px);
+  border: 1px solid var(--onboarding-border);
+  border-radius: 20px;
+  padding: 26px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 7%);
+}
+
+.parent-verification-light .parent-verification-card h1 {
+  color: var(--onboarding-ink);
+  font-size: clamp(25px, 6vw, 29px);
+  font-weight: 800;
+  letter-spacing: -.045em;
+  line-height: 1.16;
+}
+
+.parent-verification-light .parent-verification-card p {
+  color: #475569;
+}
+
+.parent-verification-light .parent-verification-card .text-muted-foreground {
+  color: var(--onboarding-muted);
+}
+
+.parent-verification-light .parent-verification-card input {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--onboarding-input);
+  border-radius: 12px;
+  padding: 0 14px;
+  background: #fff !important;
+  color: var(--onboarding-ink) !important;
+  font: inherit;
+  color-scheme: light;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.parent-verification-light .parent-verification-card input:focus {
+  border-color: var(--onboarding-blue);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 13%);
+}
+
+.parent-verification-light .parent-verification-card button,
+.parent-verification-light .parent-verification-card a {
+  min-height: 44px;
+  border-radius: 12px;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.parent-verification-light .parent-verification-card button:not(:disabled):hover,
+.parent-verification-light .parent-verification-card a:hover {
+  border-color: #94a3b8;
+}
+
+.parent-verification-light .parent-verification-card button[aria-pressed="true"] {
+  border-color: var(--onboarding-blue);
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.parent-verification-light .parent-verification-card button.bg-primary {
+  border-color: var(--onboarding-blue);
+  background: var(--onboarding-blue);
+  color: #fff;
+}
+
+.parent-verification-light .parent-verification-card button.bg-primary:hover:not(:disabled) {
+  border-color: var(--onboarding-blue-dark);
+  background: var(--onboarding-blue-dark);
+}
+
+.parent-verification-light .parent-verification-card button:disabled {
+  opacity: .52;
+  cursor: not-allowed;
+}
+
+.parent-verification-light .parent-verification-card [role="alert"] {
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.parent-verification-light .parent-verification-card [role="status"] {
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.parent-verification-light .parent-verification-card a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--onboarding-border);
+  padding: 0 14px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+@media (max-width: 420px) {
+  .parent-verification-light {
+    align-items: flex-start;
+    padding: 16px 12px;
+  }
+
+  .parent-verification-light .parent-verification-card {
+    border-radius: 16px;
+    padding: 21px 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-light *,
+  .onboarding-light *::before,
+  .onboarding-light *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

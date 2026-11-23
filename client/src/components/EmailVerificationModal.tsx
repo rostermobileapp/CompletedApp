@@ -14,6 +14,7 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { useToast } from '@/hooks/use-toast';
+import './onboarding-auth-light.css';
 
 interface EmailVerificationModalProps {
   open: boolean;
@@ -98,7 +99,7 @@ export function EmailVerificationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md top-4 translate-y-0">
+      <DialogContent className="onboarding-light sm:max-w-md top-4 translate-y-0">
         <DialogHeader>
           <DialogTitle>Verify your email</DialogTitle>
           <DialogDescription>
@@ -113,12 +114,12 @@ export function EmailVerificationModal({
             onChange={(value) => setCode(value)}
           >
             <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
+              <InputOTPSlot index={0} className="onboarding-otp-slot" />
+              <InputOTPSlot index={1} className="onboarding-otp-slot" />
+              <InputOTPSlot index={2} className="onboarding-otp-slot" />
+              <InputOTPSlot index={3} className="onboarding-otp-slot" />
+              <InputOTPSlot index={4} className="onboarding-otp-slot" />
+              <InputOTPSlot index={5} className="onboarding-otp-slot" />
             </InputOTPGroup>
           </InputOTP>
 
