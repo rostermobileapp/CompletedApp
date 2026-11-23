@@ -106,6 +106,10 @@ try{
     if(form==="modal")await page.getByTestId("button-toggle-mode").click();
     await page.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
     await page.getByRole("button",{name:"Continue",exact:true}).click();
+    if(form==="login"){
+      await page.getByRole("heading",{name:"Create your account",exact:true}).waitFor();
+      await page.getByText("Enter your email and choose a password to set up your account.",{exact:true}).waitFor();
+    }
     await page.getByTestId("input-email").fill("synthetic@example.invalid");
     await page.getByTestId("input-password").fill("Synthetic-only-123!");
     assert.equal(await page.evaluate(()=>(window as any).__calls.length),0);
@@ -124,6 +128,7 @@ try{
     checks.push(form+"_adult_answer_saved_on_creation_without_changing_existing_handoff");
     await page.goto(origin+(form==="login"?"/login":"/modal"));
     if(form==="login")await page.getByTestId("button-login-initial").click();
+    assert.equal(await page.getByText("Enter your email and choose a password to set up your account.",{exact:true}).count(),0);
     await page.getByTestId("input-email").fill("synthetic@example.invalid");
     await page.getByTestId("input-password").fill("Synthetic-only-123!");
     await page.getByTestId("button-submit").click();

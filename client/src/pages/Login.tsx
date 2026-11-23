@@ -282,7 +282,17 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
                   />
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-2">
+                {isDevParentClient && isSignUp && (
+                  <div className="mb-4 text-center">
+                    <h1 className="text-2xl font-bold leading-tight text-slate-900">Create your account</h1>
+                    <p id="signup-purpose" className="mt-2 text-sm leading-relaxed text-slate-500">
+                      Enter your email and choose a password to set up your account.
+                    </p>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-2"
+                  aria-describedby={isDevParentClient && isSignUp ? "signup-purpose" : undefined}>
                   <div className="space-y-0.5">
                     <Label htmlFor="email" className="text-black text-sm">Email</Label>
                     <Input
