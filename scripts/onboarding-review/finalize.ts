@@ -5,7 +5,7 @@ import { chromium } from "playwright-core";
 import { screens } from "./catalog";
 import { renderReviewDocument } from "./document";
 
-const out=path.resolve("generated-artifacts/onboarding-review");
+const out=path.resolve(process.argv.find(argument=>argument.startsWith("--out-dir="))?.slice("--out-dir=".length)||"generated-artifacts/onboarding-review");
 const manifest=JSON.parse(await readFile(path.join(out,"manifest.json"),"utf8"));
 const definitions=new Map(screens.map(screen=>[screen.id,screen]));
 manifest.screens=manifest.screens.map((captured:any)=>{

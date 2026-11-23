@@ -10,11 +10,11 @@ export async function renderReviewDocument(screens:Captured[]){
   const box=(id:string,label?:string)=>`<a class="flow-box" href="#${id}"><b>${id}</b><span>${esc(label||byId.get(id)?.heading||id)}</span></a>`;
   const line=(label:string,ids:string[])=>`<div class="flow-line"><div class="lane-label">${esc(label)}</div>${ids.map((id,index)=>(index?'<span class="arrow">→</span>':"")+box(id)).join("")}</div>`;
   const page=(title:string,subtitle:string,body:string,cls="")=>`<section class="pdf-page ${cls}"><header><div class="brand">ROSTERHOCKEY <span>ONBOARDING REVIEW</span></div><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></header>${body}</section>`;
-  pages.push(page("Every onboarding screen, in context","Current workspace / isolated DEV · Captured at 390 × 844 · November 23, 2026",`
-    <div class="cover-title">A visual inventory<br>of the flow as it exists.</div>
+  pages.push(page("Every onboarding screen, in context","Updated review · Current workspace / isolated DEV · Captured at 390 × 844 · November 23, 2026",`
+    <div class="cover-title">An updated visual inventory<br>of the current onboarding.</div>
     <div class="cover-grid">
       <div><h3>${screens.length} screen definitions</h3><p>Actual component renders, exact visible headings, lower-scroll continuations, branch arrows and linked screen references.</p></div>
-      <div><h3>Review, not a redesign</h3><p>No onboarding screens, routing, accounts, permissions, billing, or provider settings were changed to produce this export.</p></div>
+      <div><h3>Updated adult profile screens</h3><p>P01–P03 now match the newer onboarding’s white-and-blue style. Their fields, validation, saving and screen order remain unchanged.</p></div>
       <div><h3>Potential repeats are marked</h3><p>The DEV intake and existing questionnaire both ask hockey type and role. Other similar questions belong to separate branches.</p></div>
       <div><h3>Blocked states are labelled</h3><p>Child activation, device approvals and password-success states use synthetic fixtures. They are not proof of live acceptance or enabled access.</p></div>
     </div>

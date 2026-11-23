@@ -13,7 +13,7 @@ import path from "node:path";
 import { screens, type ReviewSpec } from "./onboarding-review/catalog";
 import { renderReviewDocument } from "./onboarding-review/document";
 
-const out=path.resolve("generated-artifacts/onboarding-review");
+const out=path.resolve(process.argv.find(argument=>argument.startsWith("--out-dir="))?.slice("--out-dir=".length)||"generated-artifacts/onboarding-review");
 await mkdir(path.join(out,"screens"),{recursive:true});
 const resumeArgument=process.argv.find(argument=>argument.startsWith("--resume-log="));
 const resumed=new Map<string,{heading:string;count:number}>();
@@ -173,6 +173,16 @@ try{
       // A phone viewport plus lower scroll positions preserves readable layouts
       // and includes fields hidden inside independently scrollable panels.
       const scroller=await page.evaluate(()=>{
+        const profile=document.querySelector(".adult-profile .profile-content");
+        const profileActions=document.querySelector(".adult-profile .profile-actions");
+        if(profile&&profileActions){
+          const content=profile.getBoundingClientRect();
+          // The preview bar can add scroll range even when every actual field
+          // already fits. Don't present that empty scroll range as another view.
+          if(content.top>=0&&content.bottom<=profileActions.getBoundingClientRect().top){
+            return{kind:"body",max:0,step:744};
+          }
+        }
         const candidates=[...document.querySelectorAll<HTMLElement>("*")].filter(el=>{
           const style=getComputedStyle(el);
           return el.clientHeight>100&&el.scrollHeight>el.clientHeight+40&&["auto","scroll"].includes(style.overflowY);
