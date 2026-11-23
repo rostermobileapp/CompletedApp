@@ -5,6 +5,7 @@ import HighSchoolYouthOnboarding, { type RequestFn } from "./HighSchoolYouthOnbo
 import Under18Onboarding from "./Under18Onboarding";
 import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
 import { Under18ShareScreen } from "@/components/high-school-onboarding/Under18ShareScreen";
+import { SignupFlowPreview } from "./Login";
 
 const makeMemoryAdapter=():RequestFn=>{
   let state:any={active:true,path:null,revision:1,status:"choose",draft:{role:null,programId:null,teamId:null,players:[],guardianConfirmed:false,imported:false},journey:{}};
@@ -92,15 +93,19 @@ const makeMemoryAdapter=():RequestFn=>{
   };
 };
 
-export default function HighSchoolYouthOnboardingPreview() {
+export default function HighSchoolYouthOnboardingPreview({startAtSignup=false}:{startAtSignup?:boolean}={}) {
+  const startsFromSignup=startAtSignup||new URLSearchParams(window.location.search).get("screen")==="signup";
   const request=useMemo(()=>makeMemoryAdapter(),[]);
   const [childDemo,setChildDemo]=useState(false);
   const [previewMessage,setPreviewMessage]=useState("");
   const [agePreview,setAgePreview]=useState(new URLSearchParams(window.location.search).get("screen")==="age");
   const [ageAnswer,setAgeAnswer]=useState<boolean|null>(null);
   const [under18Preview,setUnder18Preview]=useState(false);
-  if(under18Preview)return <Under18ShareScreen onBack={()=>setUnder18Preview(false)}
+  const [signupPreview,setSignupPreview]=useState(startsFromSignup);
+  if(under18Preview)return <Under18ShareScreen onBack={()=>{setUnder18Preview(false);if(startsFromSignup)setSignupPreview(true);}}
     onCode={()=>{setUnder18Preview(false);setAgePreview(false);setChildDemo(true);}}/>;
+  if(signupPreview)return <><div style={{position:"fixed",top:12,left:0,right:0,zIndex:100,textAlign:"center",pointerEvents:"none",font:"500 12px Inter, sans-serif",color:"#64748b"}}>PREVIEW ONLY · No account will be created</div>
+    <SignupFlowPreview onComplete={adult=>{setSignupPreview(false);if(!adult)setUnder18Preview(true);}}/></>;
   if(agePreview)return <AgeConfirmationScreen value={ageAnswer} onChange={setAgeAnswer}
     onBack={()=>window.location.assign("/login?signup=1")}
     onContinue={()=>{if(ageAnswer===false)setUnder18Preview(true);else if(ageAnswer===true)setAgePreview(false);}}/>;

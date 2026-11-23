@@ -19,8 +19,17 @@ import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
 const rosterLogo = '/roster-logo-transparent.png';
 
 export default function Login() {
-  const [showForm, setShowForm] = useState(isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1");
-  const [isSignUp, setIsSignUp] = useState(isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1");
+  return <LoginScreen/>;
+}
+
+/** Reuses the real form and age screen without calling authentication in the DEV demo. */
+export function SignupFlowPreview({onComplete}:{onComplete:(adult:boolean)=>void}) {
+  return <LoginScreen onPreviewSignup={onComplete}/>;
+}
+
+function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}={}) {
+  const [showForm, setShowForm] = useState(!!onPreviewSignup || (isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1"));
+  const [isSignUp, setIsSignUp] = useState(!!onPreviewSignup || (isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1"));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -40,11 +49,16 @@ export default function Login() {
   };
   const handleSubmit = async (e?: React.FormEvent, ageConfirmed = false) => {
     e?.preventDefault();
+    if(onPreviewSignup&&!isSignUp){
+      toast({title:"Preview only",description:"Sign-in is not connected in this demo. Switch to Sign up to review the new screens."});
+      return;
+    }
     if (isDevParentClient && isSignUp && (!ageConfirmed || ageAnswer !== true)) {
       setAgeAnswer(null);
       setShowAge(true);
       return;
     }
+    if(onPreviewSignup){onPreviewSignup(true);return;}
     const startedAt = currentUrl();
     setLoading(true);
 
@@ -168,10 +182,11 @@ export default function Login() {
     onContinue={() => {
       if (loading || ageAnswer === null) return;
       if (ageAnswer === false) {
+        if(onPreviewSignup){setEmail("");setPassword("");onPreviewSignup(false);return;}
         signupAgeRestriction.requireParent();
         setEmail(""); setPassword(""); setShowAge(false);
         setLocation("/under-18");
-      } else { signupAgeRestriction.allowAdult(); void handleSubmit(undefined, true); }
+      } else { if(!onPreviewSignup)signupAgeRestriction.allowAdult(); void handleSubmit(undefined, true); }
     }}
   />;
 
@@ -357,7 +372,7 @@ export default function Login() {
                   {isDevParentClient && isSignUp && (
                     <button
                       type="button"
-                      onClick={() => { setEmail(""); setPassword(""); setLocation("/under-18"); }}
+                      onClick={() => { setEmail(""); setPassword(""); if(onPreviewSignup)onPreviewSignup(false);else setLocation("/under-18"); }}
                       className="block w-full min-h-11 px-2 text-center text-sm text-[#2563EB] underline-offset-4 hover:underline"
                     >
                       Under 18? A parent sets up your account.

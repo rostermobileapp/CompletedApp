@@ -205,6 +205,24 @@ async function verifyParent(page: Page) {
   assert.equal(await page.getByLabel("First name", { exact: true }).inputValue(), "RouterFixtureChild");
 }
 try {
+  await runCase("preview-home",{guest:true},"/",async(p,f)=>{
+    await p.getByTestId("input-email").fill("preview@example.invalid");
+    await p.getByTestId("input-password").fill("Preview-only-123!");
+    await p.getByTestId("button-submit").click();
+    await p.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
+    await p.getByRole("button",{name:"No, I'm under 18",exact:true}).click();
+    await p.getByRole("button",{name:"Continue",exact:true}).click();
+    await p.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
+    await p.getByRole("button",{name:"Back",exact:true}).first().click();
+    await p.getByTestId("input-email").fill("preview@example.invalid");
+    await p.getByTestId("input-password").fill("Preview-only-123!");
+    await p.getByTestId("button-submit").click();
+    await p.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
+    await p.getByRole("button",{name:"Continue",exact:true}).click();
+    await p.getByRole("heading",{name:"What kind of hockey?",exact:true}).waitFor();
+    assert.equal(f.calls.length,0);
+  });
+  mark("preview_home_reuses_actual_signup_and_age_screens_without_auth_or_api_calls");
   for(const route of ["/get-started","/high-school/onboarding","/"]){
     await runCase("under18-denied"+route,{guest:true,ageRestricted:true},route,async(p,f)=>{
       await p.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();

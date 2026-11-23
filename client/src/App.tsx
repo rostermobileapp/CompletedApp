@@ -148,9 +148,10 @@ export function Router() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isActive: isDemoActive } = useDemo();
   const [location, setLocation] = useLocation();
-  const isOnboardingPreview=isDevParentClient&&["/high-school/onboarding-preview","/high-school/legacy-onboarding-preview"].includes(location);
-  const isStandaloneChildEntry=isDevParentClient&&["/under-18","/under-18/code"].includes(location);
   const ageRestricted=useSyncExternalStore(signupAgeRestriction.subscribe,signupAgeRestriction.snapshot,()=>false);
+  const isPreviewHome=isDevParentClient&&location==="/"&&!isAuthenticated&&!ageRestricted;
+  const isOnboardingPreview=isPreviewHome||(isDevParentClient&&["/high-school/onboarding-preview","/high-school/legacy-onboarding-preview"].includes(location));
+  const isStandaloneChildEntry=isDevParentClient&&["/under-18","/under-18/code"].includes(location);
   const ageAllowsOnboarding=!isDevParentClient||!ageRestricted;
   useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
 
@@ -253,7 +254,7 @@ export function Router() {
 
   // Always render standalone pages regardless of auth state
   if(isDevParentClient&&location==="/high-school/legacy-onboarding-preview")return <HighSchoolOnboardingPreview/>;
-  if(isOnboardingPreview)return <HighSchoolYouthOnboardingPreview/>;
+  if(isOnboardingPreview)return <HighSchoolYouthOnboardingPreview startAtSignup={isPreviewHome}/>;
   if(isStandaloneChildEntry)return <Under18Onboarding/>;
   if(!ageAllowsOnboarding&&location!=="/login")return <Under18Onboarding/>;
   if(isDevParentClient&&location==="/high-school/onboarding"){

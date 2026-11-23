@@ -29,13 +29,22 @@ same screen, rebuilt using the existing screen/button components.
 Open `/high-school/onboarding-preview?screen=age` in the DEV preview.
 This is a screen simulation, not a registration.
 
+The signed-out DEV preview homepage now starts with the actual signup form in
+simulation mode, followed by the age screen and memory-only onboarding.
+`/high-school/onboarding-preview?screen=signup` opens the same complete review
+even when signed in. Enter example credentials; neither signup nor sign-in
+contacts authentication in this simulation. No opens parent handling, and Back
+lets you return to signup and try Yes. Signed-in users retain their normal
+homepage outside this explicit preview route.
+
 ## Verification
 
 - Six offline browser journeys exercised the actual Login and AuthModal,
   including layout measurements, Back, No without registration, adult answer
   metadata, preserved referral metadata, error retry, and later sign-in.
 - Two unit checks covered tab restriction persistence and storage failure.
-- Thirteen actual-router fixture checks passed, including direct under-18
+- Fourteen actual-router fixture checks passed, including the complete DEV
+  homepage signup/age preview without any Auth or API calls, direct under-18
   route attempts, reload, cached adult content, and existing parent boundaries.
 - Production build passed. The repository-wide TypeScript check still has
   pre-existing errors; the changed age/signup modules added none.

@@ -41,7 +41,7 @@ const bundled = await build({
           export async function apiRequest(){window.__unexpectedCalls=(window.__unexpectedCalls||0)+1;throw Error('Real API is forbidden');}
           export async function getAuthHeaders(){throw Error('Real Auth is forbidden');}
         ` : args.path.endsWith("nativePurchases") ? "export const setSubscriberAttributes=()=>{};" :
-          args.path.endsWith("signupAttributionBrowser") ? "export const loadSignupAttribution=async()=>({});export const signupAttribution=()=>({clear(){}});" :
+          args.path.endsWith("signupAttributionBrowser") ? "export const loadSignupAttribution=async()=>({});export const signupAttribution=()=>({clear(){}});export async function signupAttributionMetadata(){throw Error('Real signup forbidden')};export function bindSignupAttributionUser(){throw Error('Real signup forbidden')};" :
             "export const supabase={auth:{signOut:async()=>{throw Error('Real Auth is forbidden')}}};",
       }));
     },
