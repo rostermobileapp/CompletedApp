@@ -1,7 +1,7 @@
 export type ReviewSpec = {
   id:string; group:string; component:string; title?:string; note:string;
   next?:string[]; params?:Record<string,string>; setup?:string;
-  status?:"fixture"|"optional"|"loop";
+  status?:"fixture"|"optional"|"loop"|"conditional";
 };
 export const screens:ReviewSpec[]=[
   {id:"E00",group:"Entry and account creation",component:"SignupEntryScreen",note:"Alternate unauthenticated High School entry; opens the age-first signup route.",next:["E01"]},
@@ -9,7 +9,7 @@ export const screens:ReviewSpec[]=[
   {id:"E02",group:"Entry and account creation",component:"SignupFlowPreview",setup:"adult-signup",note:"Yes reveals this email/password form. Submitting creates the account outside the simulation.",next:["E05","H01"]},
   {id:"E03",group:"Entry and account creation",component:"AuthModal",note:"Existing-account sign-in is a separate entry, not a required new-account step.",status:"optional",next:["H01"]},
   {id:"E04",group:"Entry and account creation",component:"AuthModal",setup:"modal-signup",note:"Alternative signup dialog, also gated by age first; not an extra step after E02.",status:"optional",next:["E05","H01"]},
-  {id:"E05",group:"Entry and account creation",component:"EmailVerificationModal",note:"Only when the provider requires email verification. No actual email was requested.",status:"fixture",next:["H01"]},
+  {id:"E05",group:"Entry and account creation",component:"EmailVerificationModal",note:"Conditional on the provider requiring email verification; not disabled. Capture only: delivery and activation were not tested.",status:"conditional",next:["H01"]},
   {id:"H01",group:"DEV intake: hockey and roles",component:"HockeyTypeScreen",note:"Shared component also used by questionnaire Q03. Adult and High School/Youth split here.",next:["H02","H03"]},
   {id:"H02",group:"DEV intake: hockey and roles",component:"AdultRoleScreen",note:"Five compact adult choices. Compare the separate questionnaire role selector Q04.",next:["P01"]},
   {id:"H03",group:"DEV intake: hockey and roles",component:"HighSchoolRoleScreen",note:"Staff, parent, or league admin; minors do not register here.",next:["H04","V01"]},

@@ -14,12 +14,12 @@ export async function renderReviewDocument(screens:Captured[]){
     <div class="cover-title">An updated visual inventory<br>of the current onboarding.</div>
     <div class="cover-grid">
       <div><h3>${screens.length} screen definitions</h3><p>Actual component renders, exact visible headings, lower-scroll continuations, branch arrows and linked screen references.</p></div>
-      <div><h3>Updated adult profile screens</h3><p>P01–P03 now match the newer onboarding’s white-and-blue style. Their fields, validation, saving and screen order remain unchanged.</p></div>
+      <div><h3>Light onboarding design aligned</h3><p>Refreshed E03–E05 and V01–V09 to match the light onboarding and P01–P03. Fields, verification, saving and screen order remain unchanged.</p></div>
       <div><h3>Potential repeats are marked</h3><p>The DEV intake and existing questionnaire both ask hockey type and role. Other similar questions belong to separate branches.</p></div>
       <div><h3>Blocked states are labelled</h3><p>Child activation, device approvals and password-success states use synthetic fixtures. They are not proof of live acceptance or enabled access.</p></div>
     </div>
     <div class="callout blue"><b>How to use this PDF</b><p>Start with the next three flow maps and the findings page. Then inspect the screenshot catalog. Screen IDs and “Next” links are clickable. A lower-scroll view is the same screen, not another onboarding step.</p></div>
-    <div class="legend"><span class="badge">CURRENT / DEV</span><span class="badge optional">OPTIONAL ENTRY</span><span class="badge fixture">FIXTURE / BLOCKED</span><span class="badge loop">SELF-LOOP</span></div>
+    <div class="legend"><span class="badge">CURRENT / DEV</span><span class="badge optional">OPTIONAL ENTRY</span><span class="badge conditional">CONDITIONAL EMAIL</span><span class="badge fixture">FIXTURE / BLOCKED</span><span class="badge loop">SELF-LOOP</span></div>
     <p class="small">Scope: account entry, age gate, signup, existing adult profile and questionnaire, High School staff/parent/league setup, parent verification and restricted child UI. Retired legacy implementations have been removed. Routine field-validation permutations, loading skeletons, global app pages after onboarding, operating-system share sheets and third-party provider screens are not counted as distinct screens.</p>
     <p class="small">Capture method: isolated, read-only renders of current components with reserved-domain examples. API/Auth operations were blocked. Some screen-local state was seeded inside the capture bundle only; application files and live services were not modified.</p>
   `,"cover"));
@@ -78,7 +78,7 @@ export async function renderReviewDocument(screens:Captured[]){
         const next=batch[column+1];
         const sequential=!!next&&((next.screen.id===screen.id&&next.index===index+1)||(index===screen.images.length-1&&screen.next?.includes(next.screen.id)));
         return `<article class="screen-card"${index===0?` id="${screen.id}"`:""}>
-          <div class="screen-label"><b>${screen.id}${index?` · lower view ${index+1}`:""}</b><span class="badge ${status}">${status==="current"?"CURRENT / DEV":status==="fixture"?"FIXTURE / BLOCKED":status==="loop"?"SELF-LOOP":status.toUpperCase()}</span></div>
+          <div class="screen-label"><b>${screen.id}${index?` · lower view ${index+1}`:""}</b><span class="badge ${status}">${status==="current"?"CURRENT / DEV":status==="fixture"?"FIXTURE / BLOCKED":status==="conditional"?"CONDITIONAL EMAIL":status==="loop"?"SELF-LOOP":status.toUpperCase()}</span></div>
           <h3>${esc(screen.heading)}</h3>
           <div class="phone"><img alt="${esc(screen.heading)}" src="data:image/jpeg;base64,${data}"></div>
           <p class="screen-note">${esc(index?"Continuation of the same screen; scrolled to show the remaining layout.":screen.note)}</p>

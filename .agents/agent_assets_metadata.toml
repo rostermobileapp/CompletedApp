@@ -161,3 +161,17 @@ mtime_ms = 1795469913648
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/1bf91122-065e-41a3-a020-d69ba3ca9e01/15e480c4-d3e2-4967-bfc9-b65b04b037fe"
 storage_version_token = "1795469943214424"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "NTdosl9lvVXGjmfGTOhK-"
+uri = "file://generated-artifacts/onboarding-review/onboarding-review-light.pdf"
+type = "pdf"
+title = "Onboarding Review — Light Designs"
+description = "31 pages · 72 screens/states · 80 phone views. E03–E05 and V01–V09 now show the light designs; E05 is correctly labelled conditional email verification. The rest of the review is retained."
+logical_id = "64e05147-c2e5-4ebe-932b-acefd24d4b5f"
+content_hash = "sha256:d84f6dde2b771d14f73cd2e9675d5aa9405827d1df5b133bbbc2937bacd3ac71"
+size = 4723598
+mtime_ms = 1795471414792
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/64e05147-c2e5-4ebe-932b-acefd24d4b5f/728ce05c-0af3-47a0-b21e-b319a3227ad0"
+storage_version_token = "1795471439883865"
+content_type = "application/pdf"
