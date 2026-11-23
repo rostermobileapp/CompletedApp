@@ -133,3 +133,17 @@ mtime_ms = 1795096240866
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/6ef30de5-8c00-4d9c-a3b3-f29f4f9628f5/9abe10e1-287a-4b22-a25e-d0525323785f"
 storage_version_token = "1795096285428961"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "vCcZXnht-coxJUKU-jujC"
+uri = "file://generated-artifacts/onboarding-review/onboarding-review.pdf"
+type = "pdf"
+title = "Onboarding Screens & Flow Review"
+description = "36-page PDF with 88 screen/state entries, 99 phone captures, linked flow maps, and highlighted repetition findings. Legacy and blocked states are labelled separately."
+logical_id = "ebce1ec4-64a2-409a-908e-fd2505ee735c"
+content_hash = "sha256:8c70f5e94cb9688947de3681ae4a0ee9a4ccdc27223b5b9a25adec075eb56598"
+size = 5660602
+mtime_ms = 1795453801592
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/ebce1ec4-64a2-409a-908e-fd2505ee735c/c5ae1824-f70d-4c58-a945-fc8e8ce447a8"
+storage_version_token = "1795453821415342"
+content_type = "application/pdf"
