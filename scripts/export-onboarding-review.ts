@@ -111,6 +111,7 @@ execFileSync(process.execPath,["node_modules/.bin/tailwindcss","-i","client/src/
 let css=await readFile(path.join(out,"capture.css"),"utf8");
 css+="\n"+await getSource("client/src/components/high-school-onboarding/onboarding.css");
 css+="\n"+await getSource("client/src/components/high-school-onboarding/age-confirmation.css");
+css+="\n"+await getSource("client/src/pages/onboarding-profile.css");
 const app=express();let rejectedApi=0;
 app.use("/api",(_req,res)=>{rejectedApi++;res.status(503).json({code:"PDF_CAPTURE_NO_API"});});
 app.get("/capture.js",(_req,res)=>res.type("js").send(bundled.outputFiles[0].text));

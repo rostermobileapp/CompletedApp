@@ -242,3 +242,17 @@ still applies; there is no account on which to save No.
 adult post-signup flow and existing-user sign-in, and never put new-signup
 credentials ahead of the age question or create restricted minor accounts
 without a new explicit decision. Apply the same order to the Replit walkthrough.
+
+## Adult profile visual alignment
+
+The owner authorized matching the adult profile's three screens to the newer
+onboarding's visual style, not consolidating or reordering the adult journey.
+Keep its fields, validation, persistence and profile-to-questionnaire handoff.
+
+**Why:** The request was specifically that the adult profile looked visually
+out of style. The agreed change was presentation only, despite the separately
+identified overlapping questions elsewhere in onboarding.
+
+**How to apply:** Treat future questionnaire deduplication, field removal and
+route/order changes as separate decisions. Matching the newer intake's look
+does not make adult profiles part of the High School authority or family model.

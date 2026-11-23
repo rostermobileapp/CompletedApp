@@ -103,4 +103,4 @@
 - [Organizer fee payments](organizer-fee-payments.md) — scrimmage and league-fee card transactions are separate from subscriptions and never change a user's tier.
 - [Signup attribution policy](signup-attribution-policy.md) — first valid referral, explicit confirmation, campaign/credit separation, and manual install fallback; preserve HPIB tracking.
 - [Independent website project](independent-website-export.md) — new project, not another artifact; copy/import verification precedes cleanup, publishing, and domain approval.
-- [High School boundaries](high-school-scope.md) — HS-only behavior, separate nonproduction development, per-phase approval, and database/API-enforced child safety.
+- [Onboarding and HS boundaries](high-school-scope.md) — adult visual-only scope, age-first signup, isolated HS development, per-phase approval and child safety.

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, ArrowRight, Camera, Check } from 'lucide-react';
 import rosterLogo from '@assets/Untitled_design_(42)_1771448459349.png';
+import './onboarding-profile.css';
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -185,14 +186,13 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <div className="adult-profile">
       {isPreviewMode && (
-        <div className="flex items-center gap-3 px-6 py-3 bg-amber-950 border-b border-amber-700 text-amber-50">
-          <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap">Dev preview</span>
+        <div className="profile-preview-bar">
+          <span className="profile-preview-label">Dev preview</span>
           <select
             value={currentStep}
             onChange={(event) => selectPreviewStep(Number(event.target.value))}
-            className="min-w-0 flex-1 rounded-lg border border-amber-700 bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
             aria-label="Preview profile onboarding step"
           >
             {PROFILE_PREVIEW_STEPS.map(({ value, label }) => (
@@ -201,23 +201,27 @@ export default function Onboarding() {
           </select>
         </div>
       )}
-      <div className="px-6 pt-8 pb-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-zinc-400 font-medium">Step {currentStep} of {TOTAL_STEPS}</span>
-        </div>
-        <div className="flex gap-1.5">
+      <div className="profile-shell">
+      <div className="profile-progress">
+        <span className="profile-step-count">Step {currentStep} of {TOTAL_STEPS}</span>
+        <div
+          className="profile-progress-track"
+          role="progressbar"
+          aria-label="Profile onboarding progress"
+          aria-valuemin={1}
+          aria-valuemax={TOTAL_STEPS}
+          aria-valuenow={currentStep}
+        >
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
             <div
               key={i}
-              className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                i < currentStep ? 'bg-white' : 'bg-zinc-800'
-              }`}
+              className={`profile-progress-segment${i < currentStep ? ' is-complete' : ''}`}
             />
           ))}
         </div>
       </div>
 
-      <div className="flex-1 px-6 pb-6 overflow-y-auto">
+      <div className="profile-content">
         {currentStep === 1 && (
           <StepBasicInfo
             formData={formData}
@@ -236,13 +240,13 @@ export default function Onboarding() {
         {currentStep === 3 && <StepAbout />}
       </div>
 
-      <div className="px-6 pb-8 pt-4 border-t border-zinc-800">
+      <div className="profile-actions">
         <div className="flex gap-3">
           {currentStep > 1 && (
             <Button
               variant="outline"
               onClick={handleBack}
-              className="flex-1 h-12 bg-zinc-900 border-zinc-700 text-white hover:bg-zinc-800"
+              className="profile-back flex-1"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -252,7 +256,7 @@ export default function Onboarding() {
             <Button
               onClick={handleNext}
               disabled={!canAdvance() || saveMutation.isPending}
-              className="flex-1 h-12 bg-white text-black hover:bg-zinc-200 font-semibold disabled:opacity-40"
+              className="profile-primary flex-1"
             >
               {saveMutation.isPending ? 'Saving...' : 'Next'}
               {!saveMutation.isPending && <ArrowRight className="w-4 h-4 ml-2" />}
@@ -261,13 +265,14 @@ export default function Onboarding() {
             <Button
               onClick={handleFinish}
               disabled={saveMutation.isPending}
-              className="flex-1 h-12 bg-white text-black hover:bg-zinc-200 font-semibold disabled:opacity-40"
+              className="profile-primary flex-1"
             >
               {saveMutation.isPending ? 'Finishing...' : 'Finish'}
               {!saveMutation.isPending && <Check className="w-4 h-4 ml-2" />}
             </Button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
@@ -287,19 +292,19 @@ function StepBasicInfo({
   onUploadComplete: (result: any) => void;
 }) {
   return (
-    <div className="space-y-6 pt-4">
-      <div>
+    <section className="profile-section">
+      <div className="profile-heading">
         <h1 className="text-2xl font-bold">Basic Information</h1>
-        <p className="text-zinc-400 mt-1">Let's get to know you</p>
+        <p>Let's get to know you</p>
       </div>
 
-      <div className="flex justify-center">
+      <div className="profile-avatar-block">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border-2 border-zinc-700">
+          <div className="profile-avatar">
             {photoPreview ? (
               <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
             ) : (
-              <Camera className="w-8 h-8 text-zinc-500" />
+              <Camera size={31} aria-hidden="true" />
             )}
           </div>
           <ObjectUploader
@@ -307,44 +312,45 @@ function StepBasicInfo({
             onComplete={onUploadComplete}
             cropShape="round"
             cropDialogTitle="Position your profile photo"
-            buttonClassName="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white text-black hover:bg-zinc-200 p-0 flex items-center justify-center"
+            buttonClassName="profile-photo-button absolute -bottom-1 -right-1 p-0 flex items-center justify-center"
           >
-            <Camera className="w-4 h-4" />
+            <Camera className="w-4 h-4" aria-hidden="true" />
+            <span className="sr-only">Upload profile photo</span>
           </ObjectUploader>
         </div>
       </div>
-      <p className="text-center text-xs text-zinc-500">Upload Profile Photo (Optional)</p>
+      <p className="profile-avatar-caption">Upload Profile Photo (Optional)</p>
 
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="firstName" className="text-sm font-medium text-zinc-300">
-            First Name <span className="text-red-400">*</span>
+      <div className="profile-fields">
+        <div className="profile-field">
+          <Label htmlFor="firstName">
+            First Name <span className="profile-required">*</span>
           </Label>
           <Input
             id="firstName"
             value={formData.firstName}
             onChange={(e) => updateField('firstName', e.target.value)}
             placeholder="Enter your first name"
-            className="mt-1.5 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 h-12"
+            className="profile-input"
           />
         </div>
 
-        <div>
-          <Label htmlFor="lastName" className="text-sm font-medium text-zinc-300">
-            Last Name <span className="text-red-400">*</span>
+        <div className="profile-field">
+          <Label htmlFor="lastName">
+            Last Name <span className="profile-required">*</span>
           </Label>
           <Input
             id="lastName"
             value={formData.lastName}
             onChange={(e) => updateField('lastName', e.target.value)}
             placeholder="Enter your last name"
-            className="mt-1.5 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 h-12"
+            className="profile-input"
           />
         </div>
 
-        <div>
-          <Label htmlFor="phoneNumber" className="text-sm font-medium text-zinc-300">
-            Phone Number <span className="text-zinc-600">(Optional)</span>
+        <div className="profile-field">
+          <Label htmlFor="phoneNumber">
+            Phone Number <span className="profile-optional">(Optional)</span>
           </Label>
           <Input
             id="phoneNumber"
@@ -352,24 +358,24 @@ function StepBasicInfo({
             value={formData.phoneNumber}
             onChange={(e) => updateField('phoneNumber', e.target.value)}
             placeholder="(555) 123-4567"
-            className="mt-1.5 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 h-12"
+            className="profile-input"
           />
         </div>
 
-        <div>
-          <Label htmlFor="dateOfBirth" className="text-sm font-medium text-zinc-300">
-            Date of Birth <span className="text-zinc-600">(Optional)</span>
+        <div className="profile-field">
+          <Label htmlFor="dateOfBirth">
+            Date of Birth <span className="profile-optional">(Optional)</span>
           </Label>
           <Input
             id="dateOfBirth"
             type="date"
             value={formData.dateOfBirth}
             onChange={(e) => updateField('dateOfBirth', e.target.value)}
-            className="mt-1.5 bg-zinc-900 border-zinc-700 text-white h-12 [color-scheme:dark]"
+            className="profile-input"
           />
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -381,21 +387,22 @@ function StepAdditionalInfo({
   updateField: (field: keyof OnboardingData, value: string) => void;
 }) {
   return (
-    <div className="space-y-6 pt-4">
-      <div>
+    <section className="profile-section">
+      <div className="profile-heading">
         <h1 className="text-2xl font-bold">Additional Information</h1>
-        <p className="text-zinc-400 mt-1">Help us personalize your experience</p>
+        <p>Help us personalize your experience</p>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <Label className="text-sm font-medium text-zinc-300">
-            Timezone <span className="text-red-400">*</span>
+      <div className="profile-fields">
+        <div className="profile-field">
+          <Label htmlFor="timezone">
+            Timezone <span className="profile-required">*</span>
           </Label>
           <select
+            id="timezone"
             value={formData.timezone}
             onChange={(e) => updateField('timezone', e.target.value)}
-            className="mt-1.5 w-full bg-zinc-900 border border-zinc-700 text-white h-12 rounded-md px-3 appearance-none focus:outline-none focus:ring-2 focus:ring-white"
+            className="profile-select"
           >
             <option value="" disabled>Select your timezone</option>
             {TIMEZONE_OPTIONS.map((tz) => (
@@ -404,14 +411,15 @@ function StepAdditionalInfo({
           </select>
         </div>
 
-        <div>
-          <Label className="text-sm font-medium text-zinc-300">
-            Player Type <span className="text-red-400">*</span>
+        <div className="profile-field">
+          <Label htmlFor="competitiveLevel">
+            Player Type <span className="profile-required">*</span>
           </Label>
           <select
+            id="competitiveLevel"
             value={formData.competitiveLevel}
             onChange={(e) => updateField('competitiveLevel', e.target.value)}
-            className="mt-1.5 w-full bg-zinc-900 border border-zinc-700 text-white h-12 rounded-md px-3 appearance-none focus:outline-none focus:ring-2 focus:ring-white"
+            className="profile-select"
           >
             <option value="" disabled>Select your player type</option>
             {COMPETITIVE_LEVELS.map((level) => (
@@ -420,78 +428,76 @@ function StepAdditionalInfo({
           </select>
         </div>
 
-        <div>
-          <Label htmlFor="venmoUsername" className="text-sm font-medium text-zinc-300">
-            Venmo ID <span className="text-zinc-600">(Optional)</span>
+        <div className="profile-field">
+          <Label htmlFor="venmoUsername">
+            Venmo ID <span className="profile-optional">(Optional)</span>
           </Label>
           <Input
             id="venmoUsername"
             value={formData.venmoUsername}
             onChange={(e) => updateField('venmoUsername', e.target.value)}
             placeholder="@username"
-            className="mt-1.5 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 h-12"
+            className="profile-input"
           />
         </div>
 
-        <div>
-          <Label htmlFor="cashappUsername" className="text-sm font-medium text-zinc-300">
-            CashApp ID <span className="text-zinc-600">(Optional)</span>
+        <div className="profile-field">
+          <Label htmlFor="cashappUsername">
+            CashApp ID <span className="profile-optional">(Optional)</span>
           </Label>
           <Input
             id="cashappUsername"
             value={formData.cashappUsername}
             onChange={(e) => updateField('cashappUsername', e.target.value)}
             placeholder="$username"
-            className="mt-1.5 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 h-12"
+            className="profile-input"
           />
         </div>
 
-        <div>
-          <Label htmlFor="city" className="text-sm font-medium text-zinc-300">
-            City <span className="text-zinc-600">(Optional)</span>
+        <div className="profile-field">
+          <Label htmlFor="city">
+            City <span className="profile-optional">(Optional)</span>
           </Label>
           <Input
             id="city"
             value={formData.city}
             onChange={(e) => updateField('city', e.target.value)}
             placeholder="Enter your city"
-            className="mt-1.5 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 h-12"
+            className="profile-input"
           />
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
 function StepAbout() {
   return (
-    <div className="space-y-8 pt-4">
-      <div className="text-center pt-8">
-        <img src={rosterLogo} alt="RosterHockey logo" className="w-24 h-24 rounded-2xl mx-auto mb-6" />
+    <section className="profile-section profile-about">
+      <div className="profile-heading profile-about-intro">
+        <img src={rosterLogo} alt="RosterHockey logo" className="profile-logo" />
         <h1 className="text-2xl font-bold">Welcome to RosterHockey</h1>
       </div>
 
-      <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800">
-        <p className="text-zinc-300 leading-relaxed text-center">
+      <div className="profile-about-card">
+        <p>
           RosterHockey was built to make organizing and joining recreational sports teams simple, fair, and fun for everyone.
           Whether you're looking for a pickup game or managing an entire league, we've got you covered.
         </p>
       </div>
 
-      <div className="space-y-3 pt-2">
+      <div className="profile-legal-links">
         <a
           href="#"
-          className="block w-full text-center py-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 transition-colors"
         >
           Terms of Service
         </a>
         <a
           href="#"
-          className="block w-full text-center py-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 transition-colors"
         >
           Privacy Policy
         </a>
       </div>
-    </div>
+    </section>
   );
 }
