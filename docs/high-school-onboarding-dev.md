@@ -5,9 +5,10 @@
 The 25-screen revision is documented in
 [`high-school-youth-onboarding-dev.md`](high-school-youth-onboarding-dev.md).
 The current review route is `/high-school/onboarding-preview`.
-The walkthrough described below is historical and remains at
-`/high-school/legacy-onboarding-preview`; its age question and demonstration
-parent checkpoint are not the revised signup or child-pairing protocol.
+The former combined preview and unused older wizard were removed on
+November 23, 2026. Their frontend components, exclusive walkthrough tests and
+legacy preview route are no longer available. The shared guarded backend
+services documented here remain in use by the revised flow.
 
 ## Scope and current boundary
 
@@ -21,39 +22,14 @@ The authenticated implementation accepts HS mutations only for confirmed
 client role claims do not establish school authority. Ordinary adult selection
 does not grant a school role.
 
-For the historical visual review, open `/high-school/legacy-onboarding-preview` in the isolated DEV app.
-No sign-in is needed. This screen demonstration uses only memory, not APIs,
-Auth, browser storage, email or database writes. The parent checkpoint is
-explicitly simulated; it never creates verification authority. Do not enter real
-child information. Reload to reset; `PREVIEW` is the demonstration team code.
-
-### Preview review fixes
-
-The under-18 choice includes “My parent is here” in the preview, followed by
-parent name/email, a masked four-digit setup-code field and an explicit
-parent/18+ attestation. These values never leave the local form and are cleared
-before the walkthrough continues. Any four digits are accepted **only in this
-demonstration**; no email verification, child signup or parent grant occurs.
-The authenticated workflow still uses the parent's registered email and the
-existing server verification service. Entering another email in a preview
-cannot change that trusted destination.
-
-Player and Captain/league-admin selections no longer link out of the preview.
-They have local profile and example team/setup-request steps, with Back controls
-and a clearly marked demonstration outcome. This is not a replacement for, or a
-claim to reproduce every screen of, the existing adult account flow. The real
-adult flow is unchanged. “Choose another path” resets the entire demonstration
-so all four entry paths can be reviewed without reloading or leaving the page.
-
-Fast UI verification, with no database or provider credentials:
+Fast current-preview verification, with no database or provider credentials:
 
 ```sh
-npx tsx scripts/verify-high-school-onboarding-preview.ts
+npx tsx scripts/verify-high-school-youth-preview.ts
 ```
 
-This covers six browser groups: under-18 parent handoff; Player continuation;
-organizer continuation; staff request; parent consent/join; and reset with no API,
-Auth, browser-storage or verification-authority mutation.
+This verifies the revised memory-only preview. The retired combined preview's
+browser harness was removed with its components; it is not current UI coverage.
 
 ### App-router integration checks
 
@@ -149,7 +125,7 @@ Default invocation is read-only; `--apply` installs only the private DEV schema:
 ```sh
 npx tsx scripts/install-high-school-onboarding-dev.ts --apply
 npx tsx scripts/install-high-school-onboarding-dev.ts
-npx tsx scripts/verify-high-school-onboarding-dev.ts --browser
+npx tsx scripts/verify-high-school-onboarding-dev.ts
 npx tsx scripts/verify-high-school-parent-dev.ts --browser
 ```
 
@@ -159,13 +135,11 @@ reserved-domain addresses and captures OTP delivery **inside the private test
 process**, never through an HTTP inbox or real email transport. It removes and
 verifies deletion of its fixture accounts and dependent data.
 
-The onboarding browser harness uses the actual signup surfaces, onboarding,
-preview and parent-verification components, with injected fixture Auth/query
-plumbing and the actual private DEV service. It covers phone/desktop layouts,
-underage programmatic-submit rejection in both signup surfaces, parent grant
-expiry, saved-intake resumption, consent, four-player limits, staff requests and
-the non-mutating visual preview. This is not full App-router or native-device
-acceptance.
+The onboarding service verifier remains available without `--browser`; its old
+browser harness depended on the retired combined UI and was removed. Passing
+that switch now fails before connecting to DEV services, with directions to the
+current preview and router checks above. The independent parent-security
+browser verifier remains available. These checks are not native-device acceptance.
 
 Current verification results are in `high-school-onboarding-dev-results.json`.
 The repository already has TypeScript diagnostics; compare against HEAD rather

@@ -104,16 +104,6 @@ const bundled=await build({
       source=seedState(source,"view","new URLSearchParams(window.location.search).get('view')||'entry'");
       return{contents:source,loader:"tsx",resolveDir:path.dirname(a.path)};
     });
-    b.onLoad({filter:/AdultOnboardingPreview\.tsx$/},async a=>({
-      contents:seedState(await readFile(a.path,"utf8"),"step","Number(new URLSearchParams(window.location.search).get('step')||1)"),
-      loader:"tsx",resolveDir:path.dirname(a.path)
-    }));
-    b.onLoad({filter:/components\/OnboardingFlow\.tsx$/},async a=>{
-      let source=await readFile(a.path,"utf8");
-      source=seedState(source,"currentScreen","Number(new URLSearchParams(window.location.search).get('step')||0)");
-      source=seedState(source,"isLoadingProgress","false");
-      return{contents:source,loader:"tsx",resolveDir:path.dirname(a.path)};
-    });
   }}]
 });
 console.log(`Prepared ${screens.length} screen definitions; compiling the current app styles.`);
@@ -173,11 +163,6 @@ try{
       }
       if(spec.setup==="team-chat"||spec.setup==="family-chat"){
         await page.getByRole("button",{name:spec.setup==="team-chat"?/Example team chat/:/Example family chat/}).click();
-      }
-      if(spec.setup?.startsWith("legacy-")){
-        await page.getByRole("button",{name:"Yes, I am 18+",exact:true}).click();
-        const name=spec.setup==="legacy-staff"?/^Coach or school staff/:spec.setup==="legacy-parent"?/^Parent of a player/:/^High School league admin/;
-        await page.getByRole("button",{name}).click();
       }
       await settle(page);
       const primary=page.locator("h1:visible");

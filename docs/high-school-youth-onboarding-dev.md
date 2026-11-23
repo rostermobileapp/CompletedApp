@@ -4,10 +4,13 @@
 
 - `/high-school/onboarding-preview`: interactive, memory-only screen review.
 - `/high-school/onboarding`: authenticated, guarded DEV onboarding.
-- `/login?signup=1`: existing real signup form, without the old age question.
+- `/login?signup=1`: existing real signup form with age-first confirmation.
 - `/under-18`: parent-share/code-entry choices.
 - `/under-18/code`: child-device entry. Code-only activation is deliberately blocked.
-- `/high-school/legacy-onboarding-preview`: historical walkthrough, not the revised flow.
+
+The previous combined preview, its adult demonstration branches and the unused
+older wizard were removed on November 23, 2026. The former legacy-preview URL
+is no longer an entry point. Shared onboarding backend services remain in use.
 
 The preview is a simulation, not a successful registration, identity check,
 parent approval, coverage allocation or security acceptance. Its school and

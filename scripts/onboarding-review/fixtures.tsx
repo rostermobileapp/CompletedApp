@@ -9,10 +9,7 @@ import AdultProfile from "@/pages/Onboarding";
 import Questionnaire from "@/pages/OnboardingQuestionnaire";
 import ParentVerification from "@/pages/ParentVerification";
 import Under18Onboarding from "@/pages/Under18Onboarding";
-import LegacyPreview from "@/pages/HighSchoolOnboardingPreview";
 import HighSchoolYouthOnboarding from "@/pages/HighSchoolYouthOnboarding";
-import { AdultOnboardingPreview } from "@/components/AdultOnboardingPreview";
-import { OnboardingFlow } from "@/components/OnboardingFlow";
 import * as Entry from "@/components/high-school-onboarding/EntryScreens";
 import * as Parent from "@/components/high-school-onboarding/ParentScreens";
 import * as Staff from "@/components/high-school-onboarding/StaffScreens";
@@ -36,7 +33,7 @@ const savedState=(parent:boolean)=>async(_method:string,route:string)=>route.end
 };
 const AdultSetupReady=()=> <HighSchoolYouthOnboarding request={savedState(false)} onAdult={noop}/>;
 const ParentAuthorityRequired=()=> <HighSchoolYouthOnboarding request={savedState(true)}/>;
-const components:Record<string,any>={...Entry,...Parent,...Staff,...League,SignupFlowPreview,AuthModal,EmailVerificationModal,AdultProfile,Questionnaire,ParentVerification,Under18Onboarding,LegacyPreview,AdultOnboardingPreview,OldWizard:OnboardingFlow,AgeConfirmationScreen,ProfileScreen,ReferralScreen,StaffSchoolRequestScreen,ChildProfileScreen,Under18ShareScreen,AdultSetupReady,ParentAuthorityRequired};
+const components:Record<string,any>={...Entry,...Parent,...Staff,...League,SignupFlowPreview,AuthModal,EmailVerificationModal,AdultProfile,Questionnaire,ParentVerification,Under18Onboarding,AgeConfirmationScreen,ProfileScreen,ReferralScreen,StaffSchoolRequestScreen,ChildProfileScreen,Under18ShareScreen,AdultSetupReady,ParentAuthorityRequired};
 const base:any={onBack:noop,onContinue:noop,busy:false,update:noop,onChange:noop,onSignup:noop,onUnder18:noop,onComplete:noop,onSkip:noop,onOpenChange:noop,onVerificationSuccess:noop,onRefresh:noop,onRetry:noop,onReset:noop};
 const props:Record<string,any>={
   SignupFlowPreview:{onComplete:noop},
@@ -72,8 +69,6 @@ export function ReviewScreen(){
   const spec=screens.find(screen=>screen.id===query.get("id"));
   if(!spec)return <h1>Unknown review screen</h1>;
   const extra:any={};
-  if(spec.component==="AdultOnboardingPreview")extra.organizer=spec.params?.organizer==="true";
-  if(spec.component==="OldWizard")extra.isReplay=true;
   if(spec.component==="StaffWaitingScreen"&&spec.params?.status)extra.status=spec.params.status;
   if(spec.component==="ParentVerification"){
     extra.unavailable=spec.params?.guard==="unavailable";

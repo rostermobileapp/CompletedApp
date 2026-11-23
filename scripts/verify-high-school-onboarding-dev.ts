@@ -13,7 +13,12 @@ import { parentActorFromVerifiedToken,registerParentVerificationRoutes,requireDe
 import { HighSchoolOnboarding } from "../server/highSchoolOnboarding";
 import { registerHighSchoolOnboarding,HS_ONBOARDING_API as API } from "../server/highSchoolOnboardingHttp";
 import { HS_CONSENT_VERSION } from "../shared/highSchoolOnboarding";
-import { verifyOnboardingBrowser } from "./lib/high-school-onboarding-browser";
+
+// The old combined onboarding UI was retired. Reject its former switch before
+// connecting to DEV services rather than silently claiming browser coverage.
+if(process.argv.includes("--browser")){
+  throw new Error("The legacy onboarding browser harness was retired. Run scripts/verify-high-school-youth-preview.ts and scripts/verify-high-school-onboarding-router.ts for current UI coverage; run this script without --browser for service checks.");
+}
 
 const report:Record<string,any>={scope:"Separate DEV only; synthetic fixture accounts",checks:[],outcome:"not_finished",realMailSent:false};
 const check=(name:string)=>report.checks.push({name,passed:true});
@@ -47,7 +52,7 @@ try{
   }
   const head=await create("head"),assistant=await create("assistant"),ad=await create("ad"),manager=await create("manager"),
     adminActor=await create("league-admin"),parent1=await create("parent1"),parent2=await create("parent2"),
-    returning=await create("returning"),unmarked=await create("unmarked",false),browserParent=await create("browser-parent"),invitedStaff=await create("invited-staff");
+    returning=await create("returning"),unmarked=await create("unmarked",false),invitedStaff=await create("invited-staff");
   const parent=new HighSchoolParentSecurity(db,async mail=>{mailbox.push({to:mail.to,code:mail.code});});
   const onboarding=new HighSchoolOnboarding(db,parent);
   const app=express();app.use(express.json({limit:"64kb"}));
@@ -200,13 +205,6 @@ try{
   await db.query("INSERT INTO hs_onboarding.invitations(token_digest,team_id,kind,recipient_email,staff_role,created_by,expires_at) VALUES($1,$2,'staff',$3,'assistant_coach',$4,now()-interval '1 second')",[parentDigest(expired),team,returning.email,head.id]);
   assert.equal((await request(returning,`${API}/lookup`,{invitation:expired,revision:0})).status,403);
   check("expired_invitations_fail_closed_and_private_parent_state_never_leaks_without_verification");
-  if(process.argv.includes("--browser")){
-    report.browserChecks=await verifyOnboardingBrowser({app,origin:local,token:browserParent.token,code:()=>mailbox.at(-1)!.code,
-      staffToken:returning.token,programId:programs[0],teamId:team,teamCode:"DEV-TEAM",
-      allowFixtureResend:async()=>{await db.query("UPDATE hs_parent_security.challenges SET created_at=now()-interval '2 minutes' WHERE auth_id=$1",[browserParent.id]);},
-      onProgress:name=>{report.lastBrowserCheck=name;}});
-    check("actual_onboarding_pages_pass_phone_desktop_and_guarded_parent_intake_checks");
-  }
   report.outcome="guarded_dev_onboarding_verified_no_activation";
 }catch(e:any){
   report.outcome="verification_incomplete";report.failedAfter=report.checks.at(-1)?.name??"isolation";

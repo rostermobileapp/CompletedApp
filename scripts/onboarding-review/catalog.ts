@@ -1,7 +1,7 @@
 export type ReviewSpec = {
   id:string; group:string; component:string; title?:string; note:string;
   next?:string[]; params?:Record<string,string>; setup?:string;
-  status?:"fixture"|"legacy"|"optional"|"loop";
+  status?:"fixture"|"optional"|"loop";
 };
 export const screens:ReviewSpec[]=[
   {id:"E00",group:"Entry and account creation",component:"SignupEntryScreen",note:"Alternate unauthenticated High School entry; opens the age-first signup route.",next:["E01"]},
@@ -73,17 +73,4 @@ export const screens:ReviewSpec[]=[
   {id:"L04",group:"High School league-admin branch",component:"LeagueInvitesScreen",note:"AD/head-coach invitation drafts. The UI explicitly says no emails are sent.",next:["L05"]},
   {id:"L05",group:"High School league-admin branch",component:"LeaguePlanScreen",note:"Plan and seats review; amounts/entitlements are not live billing acceptance.",next:["L06"]},
   {id:"L06",group:"High School league-admin branch",component:"LeagueDraftHomeScreen",note:"Private draft summary, not an active league.",next:[]},
-  {id:"X01",group:"Legacy preview appendix: not the current path",component:"LegacyPreview",note:"Older HS preview reachable only through the explicitly named legacy preview URL.",status:"legacy",next:["X02","X05","X08","X09"]},
-  ...[false,true].flatMap((organizer,index)=>[1,2,3].map(step=>({
-    id:"X"+String(2+index*3+step-1).padStart(2,"0"),group:"Legacy preview appendix: not the current path",component:"AdultOnboardingPreview",
-    params:{organizer:String(organizer),step:String(step)},note:`Old memory-only ${organizer?"organizer":"player"} walkthrough. Not mounted by the real adult-account path.`,
-    status:"legacy" as const,next:step<3?["X"+String(2+index*3+step).padStart(2,"0")]:[],
-  }))),
-  {id:"X08",group:"Legacy preview appendix: not the current path",component:"LegacyPreview",setup:"legacy-staff",note:"Older combined staff intake layout. Explicit legacy preview only; not the revised staff journey.",status:"legacy",next:[]},
-  {id:"X09",group:"Legacy preview appendix: not the current path",component:"LegacyPreview",setup:"legacy-parent",note:"Older parent-verification/intake layout. Explicit legacy preview only.",status:"legacy",next:[]},
-  ...Array.from({length:7},(_,step)=>({
-    id:"Z"+String(step+1).padStart(2,"0"),group:"Unreferenced older wizard appendix",component:"OldWizard",params:{step:String(step)},
-    note:"OnboardingFlow exists in source, but no caller/import was found in the current app. Included for inventory, not shown as a required journey.",
-    status:"legacy" as const,next:step<6?["Z"+String(step+2).padStart(2,"0")]:[],
-  })),
 ];

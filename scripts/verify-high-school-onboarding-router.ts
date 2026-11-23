@@ -14,7 +14,9 @@ import path from "node:path";
 const output = path.resolve("generated-artifacts/high-school-onboarding-router");
 const appPath = path.resolve("client/src/App.tsx");
 const source = await readFile(appPath, "utf8");
-const realPages = new Set(["HighSchoolOnboarding", "HighSchoolOnboardingPreview", "HighSchoolYouthOnboarding", "HighSchoolYouthOnboardingPreview", "Under18Onboarding", "ParentVerification"]);
+assert.ok(!source.includes('legacy-onboarding-preview'),"The retired preview route must not be restored.");
+assert.ok(!source.includes('@/pages/HighSchoolOnboarding"'),"The retired combined UI must not be imported.");
+const realPages = new Set(["HighSchoolYouthOnboarding", "HighSchoolYouthOnboardingPreview", "Under18Onboarding", "ParentVerification"]);
 const imports = new Map<string, { names: string[]; defaultName?: string }>();
 for (const match of source.matchAll(/import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\}\s*)?from\s*["']([^"']+)["']/g)) {
   imports.set(match[3], { defaultName: match[1], names: (match[2] || "").split(",").map(s => s.trim()).filter(Boolean) });

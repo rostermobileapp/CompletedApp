@@ -108,8 +108,6 @@ import { applyCanonicalUrl } from "@/lib/seoMetadata";
 import { authenticatedEntryDestination, shouldShowAppLogin } from "@/lib/appRouteEntry";
 import { apiRequest } from "@/lib/queryClient";
 import { isDevParentClient, parentVerificationSession } from "@/lib/parentVerificationSession";
-import HighSchoolOnboarding from "@/pages/HighSchoolOnboarding";
-import HighSchoolOnboardingPreview from "@/pages/HighSchoolOnboardingPreview";
 import HighSchoolYouthOnboarding from "@/pages/HighSchoolYouthOnboarding";
 import HighSchoolYouthOnboardingPreview from "@/pages/HighSchoolYouthOnboardingPreview";
 import Under18Onboarding from "@/pages/Under18Onboarding";
@@ -150,7 +148,7 @@ export function Router() {
   const [location, setLocation] = useLocation();
   const ageRestricted=useSyncExternalStore(signupAgeRestriction.subscribe,signupAgeRestriction.snapshot,()=>false);
   const isPreviewHome=isDevParentClient&&location==="/"&&!isAuthenticated&&!ageRestricted;
-  const isOnboardingPreview=isPreviewHome||(isDevParentClient&&["/high-school/onboarding-preview","/high-school/legacy-onboarding-preview"].includes(location));
+  const isOnboardingPreview=isPreviewHome||(isDevParentClient&&location==="/high-school/onboarding-preview");
   const isStandaloneChildEntry=isDevParentClient&&["/under-18","/under-18/code"].includes(location);
   const ageAllowsOnboarding=!isDevParentClient||!ageRestricted;
   useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
@@ -253,7 +251,6 @@ export function Router() {
   }, [authLoading, user, userData, isDemoActive, location, resumeReady, setLocation]);
 
   // Always render standalone pages regardless of auth state
-  if(isDevParentClient&&location==="/high-school/legacy-onboarding-preview")return <HighSchoolOnboardingPreview/>;
   if(isOnboardingPreview)return <HighSchoolYouthOnboardingPreview startAtSignup={isPreviewHome}/>;
   if(isStandaloneChildEntry)return <Under18Onboarding/>;
   if(!ageAllowsOnboarding&&location!=="/login")return <Under18Onboarding/>;
