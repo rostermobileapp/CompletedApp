@@ -99,7 +99,7 @@ export function EmailVerificationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="onboarding-light sm:max-w-md top-4 translate-y-0">
+      <DialogContent overlayClassName="onboarding-auth-backdrop" className="onboarding-light sm:max-w-md top-4 translate-y-0">
         <DialogHeader>
           <DialogTitle>Verify your email</DialogTitle>
           <DialogDescription>

@@ -270,3 +270,12 @@ to change verification, passwords, account creation or parent authority.
 **How to apply:** Keep portal-rendered dialogs inside their own local light
 boundary. Preserve code lengths, resend limits, grants, expiry, guards and all
 existing security behavior; do not change the user's global theme.
+
+The light requirement includes the entire background outside the auth dialog,
+not just its white panel. Use white or off-white for that full-screen surface.
+
+**Why:** The owner rejected E03–E05 with white panels over jet-black backgrounds.
+Leaving the dark modal backdrop was not considered a light onboarding design.
+
+**How to apply:** Review the full screenshot, including the area below and around
+the dialog. Keep unrelated app dialogs' backdrops unchanged.

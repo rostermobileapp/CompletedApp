@@ -1,5 +1,14 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
+/* These onboarding dialogs use a light full-screen canvas, not a dark scrim.
+ * Opt in per dialog so every other app dialog keeps its existing backdrop.
+ */
+.onboarding-auth-backdrop[data-state] {
+  background: #f8fafc;
+  animation: none;
+  opacity: 1;
+}
+
 /*
  * Local light palette for the onboarding auth surfaces. Keep these tokens on
  * the rendered content/root so portalled dialogs remain independent of

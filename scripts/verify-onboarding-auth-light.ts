@@ -18,7 +18,7 @@ function withoutStyling(source:string){
   const transformed=ts.transform(ast,[context=>{
     const visit=(node:ts.Node):ts.VisitResult<ts.Node>=>{
       if(ts.isImportDeclaration(node)&&ts.isStringLiteral(node.moduleSpecifier)&&node.moduleSpecifier.text.endsWith(".css"))return undefined;
-      if(ts.isJsxAttribute(node)&&node.name.getText(ast)==="className")return undefined;
+      if(ts.isJsxAttribute(node)&&["className","overlayClassName"].includes(node.name.getText(ast)))return undefined;
       return ts.visitEachChild(node,visit,context);
     };
     return root=>ts.visitNode(root,visit) as ts.SourceFile;

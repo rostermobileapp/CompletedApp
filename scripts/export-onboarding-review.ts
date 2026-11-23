@@ -194,6 +194,14 @@ try{
               if(!root)return{error:"Missing local light boundary"};
               const panel=root.querySelector(".parent-verification-card")||root;
               const box=root.getBoundingClientRect();
+              const overlay=document.querySelector<HTMLElement>(".onboarding-auth-backdrop");
+              const overlayBox=overlay?.getBoundingClientRect();
+              let defaultBackdrop:string|undefined;
+              if(overlay){
+                overlay.classList.remove("onboarding-auth-backdrop");
+                defaultBackdrop=getComputedStyle(overlay).backgroundColor;
+                overlay.classList.add("onboarding-auth-backdrop");
+              }
               const inputs=[...root.querySelectorAll<HTMLInputElement>("input:not([data-input-otp])")].filter(input=>input.type!=="hidden").map(input=>{
                 const style=getComputedStyle(input);
                 return{background:style.backgroundColor,color:style.color};
@@ -201,6 +209,13 @@ try{
               return{
                 background:getComputedStyle(panel).backgroundColor,
                 color:getComputedStyle(root).color,
+                backdrop:root.matches("[role='dialog']")?{
+                  background:overlay?getComputedStyle(overlay).backgroundColor:null,
+                  opacity:overlay?getComputedStyle(overlay).opacity:null,
+                  coversViewport:!!overlayBox&&overlayBox.left===0&&overlayBox.top===0&&overlayBox.right===innerWidth&&overlayBox.bottom===innerHeight,
+                  visibleAtBottom:!!document.elementFromPoint(5,innerHeight-5)?.closest(".onboarding-auth-backdrop"),
+                  defaultBackdrop,
+                }:undefined,
                 fits:box.left>=-.5&&box.right<=innerWidth+.5&&root.scrollWidth<=root.clientWidth+1,
                 bounds:{left:box.left,right:box.right,clientWidth:root.clientWidth,scrollWidth:root.scrollWidth},
                 overflow:[...root.querySelectorAll<HTMLElement>("*")].filter(element=>element.getBoundingClientRect().right>box.right+1).map(element=>({tag:element.tagName,classes:element.className,right:element.getBoundingClientRect().right})).slice(0,5),
@@ -208,7 +223,9 @@ try{
               };
             });
             if("error" in appearance||appearance.background!=="rgb(255, 255, 255)"||appearance.color!=="rgb(15, 23, 42)"||!appearance.fits
-              ||appearance.inputs?.some(input=>input.background!=="rgb(255, 255, 255)"||input.color!=="rgb(15, 23, 42)")){
+              ||appearance.inputs?.some(input=>input.background!=="rgb(255, 255, 255)"||input.color!=="rgb(15, 23, 42)")
+              ||(appearance.backdrop&&(appearance.backdrop.background!=="rgb(248, 250, 252)"||appearance.backdrop.opacity!=="1"
+                ||!appearance.backdrop.coversViewport||!appearance.backdrop.visibleAtBottom||appearance.backdrop.defaultBackdrop!=="rgba(0, 0, 0, 0.8)"))){
               throw Error(`Light design failed at ${width}px / dark=${dark}: ${JSON.stringify(appearance)}`);
             }
             lightChecks.push({id:spec.id,width,dark});

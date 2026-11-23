@@ -175,3 +175,17 @@ mtime_ms = 1795471414792
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/64e05147-c2e5-4ebe-932b-acefd24d4b5f/728ce05c-0af3-47a0-b21e-b319a3227ad0"
 storage_version_token = "1795471439883865"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "CPXziMUnhY8RjJNDedNS7"
+uri = "file://generated-artifacts/onboarding-review/onboarding-review-light-backgrounds.pdf"
+type = "pdf"
+title = "Onboarding Review — Corrected Light Backgrounds"
+description = "Updated PDF: E03, E04 and E05 now have off-white full-screen backgrounds, not black surrounds. All 31 pages, 72 screen states and 80 phone views are retained."
+logical_id = "356d879e-e4f9-4a89-b0a3-ccc500016e29"
+content_hash = "sha256:8e6230bb13caf00233bedabdbdc9ccefcd9bda51cfdcc40737b896900b457514"
+size = 4723887
+mtime_ms = 1795471805419
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/356d879e-e4f9-4a89-b0a3-ccc500016e29/12512666-9bf1-4465-aecc-724adf2237de"
+storage_version_token = "1795471837023563"
+content_type = "application/pdf"
