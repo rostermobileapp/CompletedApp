@@ -189,3 +189,17 @@ mtime_ms = 1795471805419
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/356d879e-e4f9-4a89-b0a3-ccc500016e29/12512666-9bf1-4465-aecc-724adf2237de"
 storage_version_token = "1795471837023563"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "W9KzedFt-W93944uTeOfq"
+uri = "file://generated-artifacts/onboarding-review/onboarding-review-no-preview-banners.pdf"
+type = "pdf"
+title = "Revised onboarding review"
+description = "31 pages covering all 72 screen states, with developer preview banners removed and light backgrounds preserved."
+logical_id = "b121365b-5852-4137-a9e3-f8b7375c790f"
+content_hash = "sha256:4574c78c15b27a38168836df150e9a1663b99973cc082d4c511af875f3e6651c"
+size = 4488112
+mtime_ms = 1795474026252
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/b121365b-5852-4137-a9e3-f8b7375c790f/5fe6d0f4-2eac-4f9b-bbf3-34d146160011"
+storage_version_token = "1795474060049314"
+content_type = "application/pdf"

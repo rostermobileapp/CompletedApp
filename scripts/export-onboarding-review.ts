@@ -173,6 +173,27 @@ try{
         await page.getByRole("button",{name:spec.setup==="team-chat"?/Example team chat/:/Example family chat/}).click();
       }
       await settle(page);
+       // Keep preview state seeding and safety boundaries, but omit developer
+       // navigation from the exported customer-facing screen captures only.
+       const previewToolbarRemoved=await page.evaluate(()=>{
+         const selectors=[
+           'select[aria-label="Preview profile onboarding step"]',
+           'select[aria-label="Preview onboarding screen"]',
+         ];
+         let removed=0;
+         for(const selector of selectors){
+           const toolbar=document.querySelector(selector)?.parentElement;
+           if(toolbar){toolbar.remove();removed++;}
+         }
+         return removed;
+       });
+       // Hockey type returns the shared intake directly, without a toolbar.
+       const expectsToolbar=spec.component==="AdultProfile"
+         ||(spec.component==="Questionnaire"&&spec.params?.preview!=="hockey_type");
+       if(expectsToolbar&&previewToolbarRemoved!==1){
+         throw Error("Expected exactly one preview toolbar to omit from capture");
+       }
+       if(await page.getByText(/^Dev preview$/i).count())throw Error("Preview banner remained in capture");
       if(verifyLight){
         if(spec.id==="E05"){
           const otp=page.locator("input[data-input-otp]");
