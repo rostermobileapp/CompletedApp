@@ -36,7 +36,7 @@ export class HighSchoolOnboarding {
   }
   async blocksLegacy(authId: string,email?:string,emailVerified=false) {
     const row=(await this.pool.query(`SELECT coalesce(
-      (SELECT block_legacy AND path IN('staff','parent') FROM hs_onboarding.flows WHERE auth_id=$1::uuid),
+      (SELECT block_legacy AND path IN('staff','parent','league_admin') FROM hs_onboarding.flows WHERE auth_id=$1::uuid),
       NOT EXISTS(SELECT 1 FROM users WHERE onboarding_completed=true AND
         (id=$1::text OR($3::boolean AND lower(email)=lower($2::text))))) AS blocked`,[authId,email??null,emailVerified])).rows[0];
     return row?.blocked!==false;
@@ -47,7 +47,7 @@ export class HighSchoolOnboarding {
     if (!row) {
       return { active: !await this.completedAdult(actor), path: null, revision: 0, status: "choose", fixtureOnly: true };
     }
-    const active = ["staff","parent"].includes(row.path) && row.block_legacy;
+    const active = ["staff","parent","league_admin"].includes(row.path) && row.block_legacy;
     if (row.path==="parent" && !await this.parent.authorized(actor,grant)) {
       return { active, path: row.path, revision: row.revision, status: "parent_verification_required", fixtureOnly: true };
     }
@@ -56,11 +56,21 @@ export class HighSchoolOnboarding {
   }
   async choose(actor: OnboardingActor, input: unknown) {
     const data = hsChoosePath.parse(input);
-    if (["staff","parent"].includes(data.path)) this.fixture(actor);
+    if (["staff","parent","league_admin"].includes(data.path)) this.fixture(actor);
+    const youthInstalled = !!(await this.pool.query("SELECT to_regclass('hs_onboarding.youth_version') AS installed")).rows[0]?.installed;
+    if (data.path === "league_admin" && !youthInstalled) fail("DEV_YOUTH_INSTALL_REQUIRED", 503);
     await this.tx(async tx => {
       await this.active(actor,tx);
       // Serialize enrollment and path selection, including when no flow exists.
       await tx.query("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", [actor.authId]);
+      if (youthInstalled) {
+        const expected = ["player", "organizer"].includes(data.path) ? "adult" : "high_school_youth";
+        const context = (await tx.query("SELECT hockey_type FROM hs_onboarding.contexts WHERE auth_id=$1", [actor.authId])).rows[0];
+        if (context && context.hockey_type !== expected) fail("HOCKEY_TYPE_ROLE_MISMATCH", 409);
+        // Older DEV clients can resume without forging a mixed-role context.
+        await tx.query(`INSERT INTO hs_onboarding.contexts(auth_id,hockey_type) VALUES($1,$2)
+          ON CONFLICT(auth_id) DO NOTHING`, [actor.authId, expected]);
+      }
       const current = (await tx.query("SELECT * FROM hs_onboarding.flows WHERE auth_id=$1", [actor.authId])).rows[0];
       if (current && current.path!==data.path) fail("PATH_ALREADY_SELECTED",409);
       if (current) return;
@@ -74,7 +84,7 @@ export class HighSchoolOnboarding {
             user.email!==actor.email || !user.email.endsWith("@example.com")) fail("DEV_FIXTURE_REQUIRED",403);
         await tx.query("INSERT INTO hs_parent_security.accounts(auth_id,parent_email) VALUES($1,$2) ON CONFLICT(auth_id) DO NOTHING", [actor.authId,user.email]);
       }
-      await this.event(tx,actor,"adult_attestation_and_path_selected");
+      await this.event(tx,actor,"onboarding_path_selected");
     });
   }
   private async flow(tx: ParentTransaction, actor: OnboardingActor, kind: string, revision: number, grant?: string) {

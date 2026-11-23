@@ -13,14 +13,12 @@ import { loginDestination } from '@/lib/appRouteEntry';
 import { isTransientAuthError, retryTransientSignIn } from '@/lib/authSessionController';
 import { signupAttributionMetadata, bindSignupAttributionUser } from '@/lib/signupAttributionBrowser';
 import { isDevParentClient } from "@/lib/parentVerificationSession";
-import { AdultSignupConfirmation } from "@/components/AdultSignupConfirmation";
 
 const rosterLogo = '/roster-logo-transparent.png';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1");
   const [isSignUp, setIsSignUp] = useState(isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1");
-  const [adultConfirmed,setAdultConfirmed]=useState<boolean|null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,9 +36,6 @@ export default function Login() {
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(isDevParentClient && isSignUp && adultConfirmed!==true){
-      toast({title:"Confirm you are 18 or older before creating an account.",variant:"destructive"});return;
-    }
     const startedAt = currentUrl();
     setLoading(true);
 
@@ -245,7 +240,6 @@ export default function Login() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-2">
-                  {isDevParentClient&&isSignUp&&<AdultSignupConfirmation value={adultConfirmed} onChange={v=>{setAdultConfirmed(v);if(!v){setEmail("");setPassword("");}}}/>}
                   <div className="space-y-0.5">
                     <Label htmlFor="email" className="text-black text-sm">Email</Label>
                     <Input
@@ -314,7 +308,7 @@ export default function Login() {
                   <Button
                     type="submit"
                     className="w-full min-h-[48px] bg-primary text-primary-foreground font-semibold text-base rounded-xl hover:bg-primary/90"
-                    disabled={loading || (isDevParentClient&&isSignUp&&adultConfirmed!==true)}
+                    disabled={loading}
                     data-testid="button-submit"
                   >
                     {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
@@ -335,6 +329,15 @@ export default function Login() {
                       </span>
                     </button>
                   </div>
+                  {isDevParentClient && isSignUp && (
+                    <button
+                      type="button"
+                      onClick={() => { setEmail(""); setPassword(""); setLocation("/under-18"); }}
+                      className="block w-full min-h-11 px-2 text-center text-sm text-[#2563EB] underline-offset-4 hover:underline"
+                    >
+                      Under 18? A parent sets up your account.
+                    </button>
+                  )}
                 </form>
               </motion.div>
             </>

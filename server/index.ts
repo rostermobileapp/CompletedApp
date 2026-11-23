@@ -105,6 +105,7 @@ app.use((req, res, next) => {
       if (capturedJsonResponse && !path.startsWith('/api/iap/') &&
           !path.startsWith('/api/organizer-card-payments/') &&
           !path.startsWith('/api/high-school/parent-verification/') &&
+          !path.startsWith('/api/high-school/child-device/') &&
           !path.startsWith('/api/high-school/onboarding/') && !privateAwardResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }

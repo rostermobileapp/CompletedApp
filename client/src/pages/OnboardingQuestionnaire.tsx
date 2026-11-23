@@ -6,8 +6,10 @@ import { ArrowLeft, BarChart2, Bell, Calendar, Check, DollarSign, MessageSquare,
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { loadSignupAttribution, signupAttribution } from '@/lib/signupAttributionBrowser';
+import { isDevParentClient } from "@/lib/parentVerificationSession";
+import { HockeyTypeScreen } from "@/components/high-school-onboarding/EntryScreens";
 
-const TOTAL_STEPS = 9;
+const TOTAL_STEPS = isDevParentClient ? 10 : 9;
 
 type OnboardingRole =
   | 'player'
@@ -21,6 +23,7 @@ type OnboardingRole =
 type Screen =
   | 'welcome'
   | 'social_proof'
+  | 'hockey_type'
   | 'role'
   | 'pain'
   | 'join_play_features'
@@ -32,6 +35,7 @@ type Screen =
 const QUESTIONNAIRE_SCREENS: { value: Screen; label: string }[] = [
   { value: 'welcome', label: 'Welcome' },
   { value: 'social_proof', label: 'Social proof' },
+  ...(isDevParentClient ? [{ value: 'hockey_type' as const, label: 'What kind of hockey?' }] : []),
   { value: 'role', label: 'Role' },
   { value: 'pain', label: 'Pain points' },
   { value: 'solution', label: 'Solution' },
@@ -115,6 +119,7 @@ const ROLE_PAIN_POINTS: Record<OnboardingRole, PainPoint[]> = {
 const SCREEN_ORDER: Screen[] = [
   'welcome',
   'social_proof',
+  ...(isDevParentClient ? ['hockey_type' as const] : []),
   'role',
   'pain',
   'solution',
@@ -147,6 +152,9 @@ export default function OnboardingQuestionnaire() {
     : null;
   const isPreviewMode = import.meta.env.DEV && previewParam !== null;
   const [screen, setScreen] = useState<Screen>(previewScreen || 'welcome');
+  const [hockeyType, setHockeyType] = useState<"adult" | "high_school_youth" | "">("");
+  const [choosingHockey, setChoosingHockey] = useState(false);
+  const [hockeyError, setHockeyError] = useState("");
   const [state, setState] = useState<QuestionnaireState>({
     role: previewScreen ? 'player' : '',
     pains: previewScreen ? PREVIEW_SAMPLE_PAINS : [],
@@ -232,6 +240,28 @@ export default function OnboardingQuestionnaire() {
   const selectedRole = GOALS.find(g => g.value === state.role);
   const rolePainPoints = state.role ? ROLE_PAIN_POINTS[state.role] : [];
   const selectedPains = rolePainPoints.filter(p => state.pains.includes(p.value));
+
+  if (isDevParentClient && screen === "hockey_type") {
+    return <>
+      <HockeyTypeScreen value={hockeyType} setValue={setHockeyType}
+        onBack={() => goTo("social_proof")} busy={choosingHockey}
+        onContinue={async () => {
+          if (!hockeyType || choosingHockey) return;
+          setChoosingHockey(true); setHockeyError("");
+          try {
+            if (isAuthenticated && !isPreviewMode) {
+              await apiRequest("POST", "/api/high-school/onboarding/hockey-type", { hockeyType });
+              await queryClient.invalidateQueries({ queryKey: ["dev-hs-onboarding"] });
+            }
+            if (hockeyType === "adult") goTo("role");
+            else navigate("/high-school/onboarding");
+          } catch {
+            setHockeyError("The DEV hockey choice could not be saved. High School setup requires an authorized synthetic test account.");
+          } finally { setChoosingHockey(false); }
+        }} />
+      {hockeyError && <p role="alert" className="mx-auto max-w-lg p-4 text-sm text-red-700">{hockeyError}</p>}
+    </>;
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col max-w-lg mx-auto">
@@ -380,7 +410,7 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('role')}
+              onClick={() => goTo(isDevParentClient ? 'hockey_type' : 'role')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
               Choose my role →
@@ -394,7 +424,7 @@ export default function OnboardingQuestionnaire() {
             <h2 className="text-2xl font-black text-gray-900 mb-2">What is your Role?</h2>
             <p className="text-gray-500 mb-6">Pick the one that fits best.</p>
             <div className="space-y-3">
-              {GOALS.map(g => (
+              {GOALS.filter(g => !isDevParentClient || !g.comingSoon).map(g => (
                 <button
                   key={g.value}
                   type="button"

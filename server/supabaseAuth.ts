@@ -9,6 +9,9 @@ import { parentActorFromVerifiedToken, parentErrorResponse, parentGrantHeader, r
 import { createDevelopmentParentMailer } from './developmentParentMailer';
 import { HighSchoolOnboarding } from './highSchoolOnboarding';
 import { registerHighSchoolOnboarding } from './highSchoolOnboardingHttp';
+import { HighSchoolYouthOnboarding } from './highSchoolYouthOnboarding';
+import { HighSchoolChildDevices } from './highSchoolChildDevices';
+import { registerHighSchoolYouthRoutes } from './highSchoolYouthHttp';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -78,7 +81,7 @@ export async function setupAuth(app: Express) {
     });
     const onboarding=onboardingSecurity()!;
     if(!await onboarding.installed()) throw new Error("Explicit DEV onboarding installation is required.");
-    registerHighSchoolOnboarding(app,onboarding,parent,async req=>{
+    const authenticateOnboarding = async (req: import('express').Request) => {
       const header=req.get("authorization");
       if(!header?.startsWith("Bearer "))throw new ParentSecurityError("INVALID_SESSION",401);
       const token=header.slice(7);
@@ -86,7 +89,13 @@ export async function setupAuth(app: Express) {
       if(error||!user)throw new ParentSecurityError("INVALID_SESSION",401);
       return {...parentActorFromVerifiedToken(token,user.id,parentIssuer()),email:user.email??"",
         emailVerified:!!user.email_confirmed_at,fixture:!!user.app_metadata?.synthetic_high_school_onboarding_dev};
-    });
+    };
+    const youth = new HighSchoolYouthOnboarding(pool, parent, onboarding);
+    // No environment variable or client input can activate child access here.
+    // The approved plan requires further provider, coverage and native proof.
+    const children = new HighSchoolChildDevices(pool, parent, false);
+    registerHighSchoolOnboarding(app,onboarding,parent,authenticateOnboarding,(actor, grant) => youth.state(actor, grant));
+    registerHighSchoolYouthRoutes(app,youth,children,authenticateOnboarding);
   }
 }
 

@@ -8,6 +8,7 @@ export const HS_ONBOARDING_API = "/api/high-school/onboarding";
 export function registerHighSchoolOnboarding(
   app: Express, service: HighSchoolOnboarding, parent: HighSchoolParentSecurity,
   authenticate: (req: Request) => Promise<OnboardingActor>,
+  state?: (actor: OnboardingActor, grant?: string) => Promise<unknown>,
 ) {
   const handler = (work: (req: Request, actor: OnboardingActor) => Promise<unknown>, bootstrap = false) =>
     async (req: Request, res: any) => {
@@ -26,7 +27,7 @@ export function registerHighSchoolOnboarding(
           .json({code:known?e.code:e instanceof ZodError?"INVALID_ONBOARDING_INPUT":duplicate?"CONFLICT_RELOAD":"ONBOARDING_UNAVAILABLE"});
       }
     };
-  app.get(`${HS_ONBOARDING_API}/state`,handler((req,a)=>service.state(a,req.get(parentGrantHeader)),true));
+  app.get(`${HS_ONBOARDING_API}/state`,handler((req,a)=>(state??service.state.bind(service))(a,req.get(parentGrantHeader)),true));
   app.post(`${HS_ONBOARDING_API}/choose`,handler((req,a)=>service.choose(a,req.body),true));
   app.get(`${HS_ONBOARDING_API}/catalog`,handler((req,a)=>service.catalog(a,String(req.query.q??""))));
   app.post(`${HS_ONBOARDING_API}/draft`,handler((req,a)=>service.save(a,req.body,req.get(parentGrantHeader))));

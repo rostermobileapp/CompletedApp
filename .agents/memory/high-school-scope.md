@@ -9,7 +9,7 @@ The owner supplied a 25-screen High School / Youth export and explicitly request
 planning first, with implementation only after approval. The new specification
 removes signup's age Yes/No question, inserts hockey type before Role, separates
 adult roles from staff/parent/HS league-admin roles, and keeps adult behavior
-otherwise unchanged. These are requested revisions, not implemented behavior.
+otherwise unchanged. These revisions do not authorize production activation.
 
 **Why:** The export supersedes the earlier signup-question design, but does not
 authorize production changes or silently remove the shared-parent-credential
@@ -23,6 +23,19 @@ any child access. Keep these separate from parent email-verification codes.
 Child sessions remain restricted to their own profile, schedule and authorized
 Team/Family chats; no parent access, payments or coach messaging. HS League Plan
 pricing remains unspecified; iOS seats show status only, with no web-buy links.
+
+Plain six-character code entry cannot attribute an arbitrary wrong guess to a
+particular child's challenge. Do not describe per-IP throttling as a complete
+five-wrong-attempts-per-code guarantee.
+
+**Why:** The exported manual-entry flow specifies a per-challenge lock, but
+identifies the challenge only through the secret being guessed. A separate
+challenge reference changes that protocol and needs owner approval.
+
+**How to apply:** Keep activation blocked until the pairing protocol and
+shared-credential/provider boundary have explicit acceptance. Distinguish
+synthetic UI/service checks from native or real-provider evidence, and never
+put the secret setup code in a URL.
 
 High School behavior is opt-in by `teams.program_type = 'high_school'`; existing
 adult/beer-league teams must retain their behavior, including for adults who

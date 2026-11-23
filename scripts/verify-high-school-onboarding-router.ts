@@ -14,7 +14,7 @@ import path from "node:path";
 const output = path.resolve("generated-artifacts/high-school-onboarding-router");
 const appPath = path.resolve("client/src/App.tsx");
 const source = await readFile(appPath, "utf8");
-const realPages = new Set(["HighSchoolOnboarding", "HighSchoolOnboardingPreview", "ParentVerification"]);
+const realPages = new Set(["HighSchoolOnboarding", "HighSchoolOnboardingPreview", "HighSchoolYouthOnboarding", "HighSchoolYouthOnboardingPreview", "Under18Onboarding", "ParentVerification"]);
 const imports = new Map<string, { names: string[]; defaultName?: string }>();
 for (const match of source.matchAll(/import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\}\s*)?from\s*["']([^"']+)["']/g)) {
   imports.set(match[3], { defaultName: match[1], names: (match[2] || "").split(",").map(s => s.trim()).filter(Boolean) });
@@ -40,7 +40,7 @@ export const supabase={auth:{
 export async function clearStaleSession(){window.__setFixtureSession(null);}
 `;
 const bundle = await build({
-  bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", loader: { ".png": "dataurl" },
+  bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", loader: { ".png": "dataurl", ".css": "empty" },
   define: { "process.env.NODE_ENV": '"development"', "import.meta.env.DEV": "true",
     "import.meta.env.VITE_ISOLATED_DEVELOPMENT": '"true"', "import.meta.env.VITE_API_BASE_URL": '""' },
   stdin: { resolveDir: process.cwd(), loader: "tsx", contents: `
@@ -127,6 +127,8 @@ app.use("/api", (req, res) => {
     if (f.stateError) return res.status(503).json({ code: "FIXTURE_UNAVAILABLE" });
     return res.json({
       active: f.active, path: f.path, revision: 0,
+      hockeyType: f.path ? ["player","organizer"].includes(f.path) ? "adult" : "high_school_youth" : undefined,
+      ...((f.path==="staff"||f.path==="parent"&&verified)?{journey:{profile:{firstName:"Fixture",lastName:"Adult",timezone:"America/New_York"}}}:{}),
       status: f.path === "parent" ? verified ? "draft" : "parent_verification_required" : f.path === "staff" ? "waiting_approval" : "choose",
       ...(f.path === "parent" && verified ? { draft: { guardianConfirmed: false, players: [{
         id: "00000000-0000-4000-8000-000000000009", firstName: "RouterFixtureChild", lastName: "Example",
@@ -135,9 +137,11 @@ app.use("/api", (req, res) => {
     });
   }
   if (req.method === "GET" && requestPath.startsWith("/high-school/onboarding/catalog")) return res.json({ programs: [], leagues: [] });
+  if (req.method === "GET" && requestPath === "/high-school/onboarding/referral-partners") return res.json([]);
+  if (req.method === "POST" && requestPath === "/high-school/onboarding/hockey-type") return res.json({saved:true,hockeyType:req.body.hockeyType});
   if (req.method === "GET" && requestPath === "/user") return res.json({ id: "router-synthetic-adult", onboardingCompleted: f.completed });
   if (req.method === "POST" && requestPath === "/high-school/onboarding/choose") {
-    assert.equal(req.body.adultConfirmed, true); assert.ok(["player", "organizer"].includes(req.body.path));
+    assert.ok(["player", "organizer"].includes(req.body.path));
     f.path = req.body.path; f.active = false; return res.json({ ok: true });
   }
   if (req.method === "POST" && requestPath === "/high-school/parent-verification/challenge") {
@@ -195,29 +199,33 @@ async function verifyParent(page: Page) {
   await page.getByRole("button", { name: "Email a verification code", exact: true }).click();
   await page.getByLabel("Four-digit email code", { exact: true }).fill("2468");
   await page.getByRole("button", { name: "Verify email code", exact: true }).click();
-  await page.getByLabel("First name 1", { exact: true }).waitFor();
-  assert.equal(await page.getByLabel("First name 1", { exact: true }).inputValue(), "RouterFixtureChild");
+  await page.getByLabel("First name", { exact: true }).waitFor();
+  assert.equal(await page.getByLabel("First name", { exact: true }).inputValue(), "RouterFixtureChild");
 }
 try {
   for (const route of ["/high-school/onboarding", "/high-school/parent-verification"]) {
     await runCase("guest" + route, { guest: true }, route, async (p, f) => {
-      await p.getByRole("link", { name: /Go to sign.in/ }).waitFor();
+      if(route==="/high-school/onboarding")await p.getByRole("button",{name:"Sign Up",exact:true}).waitFor();
+      else await p.getByRole("link", { name: /Go to sign.in/ }).waitFor();
       assert.equal(await p.getByRole("button", { name: "Email a verification code", exact: true }).count(), 0);
       assert.equal(f.calls.length, 0);
     });
   }
   mark("guest_direct_routes_require_sign_in_without_api_or_code_requests");
   await runCase("preview", { enrolled: true, path: "parent" }, "/high-school/onboarding-preview", async (p, f) => {
-    await p.getByRole("button", { name: "No, I am under 18", exact: true }).click();
-    await p.getByRole("button", { name: "My parent is here — enter parent info and setup code", exact: true }).waitFor();
+    await p.getByRole("heading", { name: "What kind of hockey?", exact: true }).waitFor();
+    await p.getByRole("button", { name: "Open child-phone role demo", exact: true }).click();
+    await p.getByRole("heading", { name: "Enter your parent's code", exact: true }).waitFor();
     assert.equal(f.calls.length, 0); assert.equal((await inspection(p)).parentHeadersPresent, false);
   });
   mark("preview_route_avoids_authenticated_api_queries_even_for_locked_parent");
   for (const role of ["player", "organizer"]) {
     await runCase("adult-" + role, {}, "/", async (p, f) => {
-      await p.getByRole("button", { name: "Yes, I am 18+", exact: true }).click();
+      await p.getByRole("button", { name: /^Adult Hockey/ }).click();
+      await p.getByRole("button", { name: "Continue", exact: true }).click();
       noLegacyRequests(f);
-      await p.getByRole("button", { name: role === "player" ? /^Player/ : /^Captain or league admin/ }).click();
+      await p.getByRole("button", { name: role === "player" ? /^Player/ : /^Team Captain/ }).click();
+      await p.getByRole("button", { name: "Continue", exact: true }).click();
       await p.locator('[data-router-page="Onboarding"]').waitFor();
       assert.equal(f.calls.filter(c => c.path === "/high-school/onboarding/choose").length, 1);
     });
@@ -235,7 +243,7 @@ try {
       noLegacyRequests(f);
       const state = await inspection(p);
       assert.equal(state.prefetch, 0); assert.deepEqual(state.legacyPageMounts, []);
-      assert.equal(await p.getByLabel("First name 1", { exact: true }).count(), 0);
+      assert.equal(await p.getByLabel("First name", { exact: true }).count(), 0);
     });
   }
   mark("locked_parent_cannot_reach_legacy_routes_or_cached_adult_content_or_prefetch");
@@ -250,7 +258,7 @@ try {
   });
   mark("verification_or_onboarding_service_failure_keeps_existing_routes_closed");
   await runCase("pending-staff", { path: "staff", cachedAdult: true }, "/roster", async (p, f) => {
-    await p.getByRole("heading", { name: "Waiting for staff approval", exact: true }).waitFor();
+    await p.getByRole("heading", { name: "Waiting for approval", exact: true }).waitFor();
     noLegacyRequests(f); assert.equal((await inspection(p)).prefetch, 0);
     assert.deepEqual((await inspection(p)).legacyPageMounts, []);
   });
@@ -264,7 +272,7 @@ try {
     assert.equal((await inspection(p)).parentHeadersPresent, false);
     await p.evaluate(() => history.pushState({}, "", "/high-school/onboarding"));
     await p.getByRole("heading", { name: "Verify you're the parent", exact: true }).waitFor();
-    assert.equal(await p.getByLabel("First name 1", { exact: true }).count(), 0); noLegacyRequests(f);
+    assert.equal(await p.getByLabel("First name", { exact: true }).count(), 0); noLegacyRequests(f);
     assert.equal(f.calls.some(c => c.path.endsWith("/password")), false);
   });
   mark("password_purpose_fixture_approval_does_not_unlock_parent_intake_or_change_any_password");
@@ -274,7 +282,7 @@ try {
     assert.equal((await inspection(p)).cacheContainsPlayer, true);
     await p.getByRole("button", { name: "Lock parent controls", exact: true }).click();
     await p.getByRole("heading", { name: "Verify you're the parent", exact: true }).waitFor();
-    assert.equal(await p.getByLabel("First name 1", { exact: true }).count(), 0);
+    assert.equal(await p.getByLabel("First name", { exact: true }).count(), 0);
     const state = await inspection(p);
     assert.equal(state.parentHeadersPresent, false); assert.equal(state.cacheContainsPlayer, false);
     assert.equal(state.local, 0); assert.equal(state.session, 0); noLegacyRequests(f);
@@ -286,7 +294,7 @@ try {
     await p.getByRole("heading", { name: "Verify you're the parent", exact: true }).waitFor();
     const state = await inspection(p);
     assert.equal(state.parentHeadersPresent, false); assert.equal(state.cacheContainsPlayer, false);
-    assert.equal(await p.getByLabel("First name 1", { exact: true }).count(), 0); noLegacyRequests(f);
+    assert.equal(await p.getByLabel("First name", { exact: true }).count(), 0); noLegacyRequests(f);
   });
   mark("parent_expiry_relocks_actual_router_and_removes_cached_intake");
   await runCase("parent-reload", { enrolled: true, path: "parent" }, "/roster", async (p, f) => {
@@ -302,8 +310,8 @@ try {
     assert.equal((await inspection(p)).parentHeadersPresent, false);
     assert.equal((await inspection(p)).cacheContainsPlayer, false);
     await p.evaluate(() => (window as any).__setFixtureSession(null));
-    await p.getByRole("link", { name: "Go to sign in", exact: true }).waitFor();
-    assert.equal(await p.getByLabel("First name 1", { exact: true }).count(), 0); noLegacyRequests(f);
+    await p.getByRole("link", { name: "Sign in", exact: true }).waitFor();
+    assert.equal(await p.getByLabel("First name", { exact: true }).count(), 0); noLegacyRequests(f);
   });
   mark("same_account_new_session_and_signout_remove_parent_authority_in_router");
   assert.equal(report.externalRequests, 0); report.outcome = "passed";

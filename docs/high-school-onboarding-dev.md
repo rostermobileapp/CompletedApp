@@ -1,5 +1,14 @@
 # Guarded High School onboarding — DEV phase
 
+## Revised export
+
+The 25-screen revision is documented in
+[`high-school-youth-onboarding-dev.md`](high-school-youth-onboarding-dev.md).
+The current review route is `/high-school/onboarding-preview`.
+The walkthrough described below is historical and remains at
+`/high-school/legacy-onboarding-preview`; its age question and demonstration
+parent checkpoint are not the revised signup or child-pairing protocol.
+
 ## Scope and current boundary
 
 This is the owner-approved **guarded DEV onboarding phase**, not completion of
@@ -12,7 +21,7 @@ The authenticated implementation accepts HS mutations only for confirmed
 client role claims do not establish school authority. Ordinary adult selection
 does not grant a school role.
 
-For visual review, open `/high-school/onboarding-preview` in the isolated DEV app.
+For the historical visual review, open `/high-school/legacy-onboarding-preview` in the isolated DEV app.
 No sign-in is needed. This screen demonstration uses only memory, not APIs,
 Auth, browser storage, email or database writes. The parent checkpoint is
 explicitly simulated; it never creates verification authority. Do not enter real
