@@ -107,6 +107,28 @@ try {
   await noOverflow();
   mark("actual_questionnaire_inserts_hockey_type_3_of_10_and_preserves_five_adult_roles_and_pain_path");
 
+  await page.goto(origin);
+  await page.getByRole("button",{name:/Adult Hockey/}).click();
+  await page.getByRole("button",{name:"Continue",exact:true}).click();
+  const compactRoles=page.locator(".hsy-adult-role-options > .hsy-choice");
+  assert.equal(await compactRoles.count(),5);
+  for(const width of [390,320]){
+    await page.setViewportSize({width,height:844});
+    for(const role of ["Player","Team Captain","League Manager","Tournament Organizer","Scorekeeper"]){
+      const option=page.getByRole("button",{name:role,exact:true});
+      await option.click();
+      assert.equal(await option.getAttribute("aria-pressed"),"true");
+      const height=(await option.boundingBox())!.height;
+      assert.ok(height>=44&&height<=66,`${role} should remain compact and tappable, got ${height}`);
+    }
+    await noOverflow();
+  }
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isEnabled(),true);
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.screenshot({path:path.join(out,"compact-adult-roles.jpg")});
+  mark("five_adult_role_options_stay_compact_and_selectable_at_390_and_320_pixels");
+
   await openHs(/^Coach or school staff/);
   await page.getByRole("heading", { name: "What's your role?", exact: true }).waitFor();
   await page.getByRole("button", { name: /^Assistant Coach/ }).click();

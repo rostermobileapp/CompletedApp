@@ -29,11 +29,13 @@ export function AdultRoleScreen({ value,setValue,onBack,onContinue,busy }: {
   value:string;setValue:(v:string)=>void;onBack:()=>void;onContinue:()=>void;busy?:boolean;
 }) {
   const roles=[["Player","Player"],["Team Captain","Team Captain"],["League Manager","League Manager"],["Tournament Organizer","Tournament Organizer"],["Scorekeeper","Scorekeeper"]];
-  return <ScreenFrame header={<StepHeader step={4} total={10} onBack={onBack}/>} action={<button className="hsy-primary" disabled={!value||busy} onClick={onContinue}>Continue</button>}>
-    <section className="hsy-content"><h1>What is your Role?</h1><p className="hsy-subtitle">Adult Hockey · Pick the one that fits best.</p><div className="hsy-stack">
-      {roles.map(([v,title])=><button key={v} className={`hsy-choice${value===v?" selected":""}`} onClick={()=>setValue(v)} type="button" aria-pressed={value===v}><span className="hsy-choice-icon"><Trophy size={24}/></span><span className="hsy-choice-copy"><strong>{title}</strong></span>{value===v&&<Check className="hsy-check" size={20}/>}</button>)}
-    </div></section>
-  </ScreenFrame>;
+  return (
+    <ScreenFrame header={<StepHeader step={4} total={10} onBack={onBack}/>} action={<button className="hsy-primary" disabled={!value||busy} onClick={onContinue}>Continue</button>}>
+      <section className="hsy-content"><h1>What is your Role?</h1><p className="hsy-subtitle">Adult Hockey · Pick the one that fits best.</p><div className="hsy-stack hsy-adult-role-options">
+        {roles.map(([v,title])=><button key={v} className="hsy-choice" onClick={()=>setValue(v)} type="button" aria-pressed={value===v}><span className="hsy-choice-icon"><Trophy size={24}/></span><span className="hsy-choice-copy"><strong>{title}</strong></span>{value===v&&<Check className="hsy-check" size={20}/>}</button>)}
+      </div></section>
+    </ScreenFrame>
+  );
 }
 
 export function HighSchoolRoleScreen({ value,setValue,onBack,onContinue,busy,onReferralChange,referral,onOtherReferralChange,otherReferral,partners,partnerId,onPartnerChange }: {

@@ -44,6 +44,11 @@
 .hsy-choice-copy { flex:1; min-width:0; }
 .hsy-choice-copy strong { display:block; font-size:18px; font-weight:750; line-height:1.2; margin-bottom:5px; }
 .hsy-choice-copy small { display:block; font-size:15px; color:#475569; line-height:1.4; }
+.hsy .hsy-adult-role-options { gap:10px; }
+.hsy .hsy-adult-role-options .hsy-choice { min-height:64px; padding:10px 16px; gap:12px; }
+.hsy .hsy-adult-role-options .hsy-choice-icon { width:40px; height:40px; border-radius:10px; }
+.hsy .hsy-adult-role-options .hsy-choice-icon svg { width:22px; height:22px; }
+.hsy .hsy-adult-role-options .hsy-choice-copy strong { font-size:17px; margin-bottom:0; }
 .hsy-check { color:var(--hsy-blue); flex:none; }
 .hsy-card { border:1px solid var(--hsy-border); border-radius:14px; padding:16px; background:#fff; }
 .hsy-card.tint { background:var(--hsy-panel); }
