@@ -3,6 +3,27 @@ name: High School scope boundaries
 description: Owner-supplied High School product constraints and phase-by-phase approval rules.
 ---
 
+## Revised onboarding export (November 23, 2026)
+
+The owner supplied a 25-screen High School / Youth export and explicitly requested
+planning first, with implementation only after approval. The new specification
+removes signup's age Yes/No question, inserts hockey type before Role, separates
+adult roles from staff/parent/HS league-admin roles, and keeps adult behavior
+otherwise unchanged. These are requested revisions, not implemented behavior.
+
+**Why:** The export supersedes the earlier signup-question design, but does not
+authorize production changes or silently remove the shared-parent-credential
+requirement. Its claimed adult profile ordering differs from current routing.
+
+**How to apply:** Resolve the ordering conflict before changing adult routing.
+Rebuild with existing components, not pasted reference HTML. Child-device setup
+codes use six alphanumeric characters excluding 0/O and 1/I, ten-minute expiry,
+one use, five wrong attempts, and approval on an approved parent phone before
+any child access. Keep these separate from parent email-verification codes.
+Child sessions remain restricted to their own profile, schedule and authorized
+Team/Family chats; no parent access, payments or coach messaging. HS League Plan
+pricing remains unspecified; iOS seats show status only, with no web-buy links.
+
 High School behavior is opt-in by `teams.program_type = 'high_school'`; existing
 adult/beer-league teams must retain their behavior, including for adults who
 also participate in a school team.
