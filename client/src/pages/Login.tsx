@@ -37,7 +37,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
   const [showVerification, setShowVerification] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
   const [emailTaken, setEmailTaken] = useState(false);
-  const [showAge, setShowAge] = useState(false);
+  const [showAge, setShowAge] = useState(!!onPreviewSignup || (isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1"));
   const [ageAnswer, setAgeAnswer] = useState<boolean | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -47,13 +47,13 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
     if (currentUrl() !== startedAt) return;
     setLocation(loginDestination(window.location.pathname, window.location.search, window.location.hash), { replace: true });
   };
-  const handleSubmit = async (e?: React.FormEvent, ageConfirmed = false) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if(onPreviewSignup&&!isSignUp){
       toast({title:"Preview only",description:"Sign-in is not connected in this demo. Switch to Sign up to review the new screens."});
       return;
     }
-    if (isDevParentClient && isSignUp && (!ageConfirmed || ageAnswer !== true)) {
+    if (isDevParentClient && isSignUp && ageAnswer !== true) {
       setAgeAnswer(null);
       setShowAge(true);
       return;
@@ -178,7 +178,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
 
   if (isDevParentClient && showAge) return <AgeConfirmationScreen
     value={ageAnswer} onChange={setAgeAnswer} busy={loading}
-    onBack={() => { if (!loading) { setShowAge(false); setAgeAnswer(null); } }}
+    onBack={() => { if (!loading) { setShowAge(false); setAgeAnswer(null); setShowForm(false); setIsSignUp(false); } }}
     onContinue={() => {
       if (loading || ageAnswer === null) return;
       if (ageAnswer === false) {
@@ -186,7 +186,10 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
         signupAgeRestriction.requireParent();
         setEmail(""); setPassword(""); setShowAge(false);
         setLocation("/under-18");
-      } else { if(!onPreviewSignup)signupAgeRestriction.allowAdult(); void handleSubmit(undefined, true); }
+      } else {
+        if(!onPreviewSignup)signupAgeRestriction.allowAdult();
+        setShowAge(false);setShowForm(true);setIsSignUp(true);
+      }
     }}
   />;
 
@@ -357,7 +360,10 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
                   <div className="text-center">
                     <button
                       type="button"
-                      onClick={() => setIsSignUp(!isSignUp)}
+                      onClick={() => {
+                        if(!isSignUp&&isDevParentClient){setAgeAnswer(null);setShowAge(true);}
+                        setIsSignUp(!isSignUp);
+                      }}
                       className="text-xs min-h-[36px] px-2 text-black"
                       data-testid="button-toggle-mode"
                     >

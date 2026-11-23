@@ -206,19 +206,18 @@ async function verifyParent(page: Page) {
 }
 try {
   await runCase("preview-home",{guest:true},"/",async(p,f)=>{
-    await p.getByTestId("input-email").fill("preview@example.invalid");
-    await p.getByTestId("input-password").fill("Preview-only-123!");
-    await p.getByTestId("button-submit").click();
     await p.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
+    assert.equal(await p.getByTestId("input-email").count(),0);
+    assert.equal(await p.getByTestId("input-password").count(),0);
     await p.getByRole("button",{name:"No, I'm under 18",exact:true}).click();
     await p.getByRole("button",{name:"Continue",exact:true}).click();
     await p.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
     await p.getByRole("button",{name:"Back",exact:true}).first().click();
+    await p.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
+    await p.getByRole("button",{name:"Continue",exact:true}).click();
     await p.getByTestId("input-email").fill("preview@example.invalid");
     await p.getByTestId("input-password").fill("Preview-only-123!");
     await p.getByTestId("button-submit").click();
-    await p.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
-    await p.getByRole("button",{name:"Continue",exact:true}).click();
     await p.getByRole("heading",{name:"What kind of hockey?",exact:true}).waitFor();
     assert.equal(f.calls.length,0);
   });

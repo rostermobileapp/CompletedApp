@@ -66,16 +66,21 @@ try{
     await page.goto(origin+(form==="login"?"/login?signup=1":"/modal"));
     if(form==="modal")await page.getByTestId("button-toggle-mode").click();
     assert.equal(await page.getByText("I am 18 or older",{exact:true}).count(),0);
-    await page.getByTestId("input-email").fill("synthetic@example.invalid");
-    await page.getByTestId("input-password").fill("Synthetic-only-123!");
-    await page.getByTestId("button-submit").click();
     await page.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
+    assert.equal(await page.getByTestId("input-email").count(),0);
+    assert.equal(await page.getByTestId("input-password").count(),0);
     assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);
     assert.equal(await page.evaluate(()=>(window as any).__calls.length),0);
     assert.equal(await page.locator(".hsy-progress,.hsy-count").count(),0);
     await page.getByRole("button",{name:"Back",exact:true}).click();
-    assert.equal(await page.getByTestId("input-email").inputValue(),"synthetic@example.invalid");
-    await page.getByTestId("button-submit").click();
+    if(form==="login"){
+      assert.equal(await page.getByTestId("input-email").count(),0);
+      await page.getByTestId("button-login-initial").click();
+    }
+    assert.equal(await page.getByTestId("button-submit").textContent(),"Sign In");
+    await page.getByTestId("button-toggle-mode").click();
+    await page.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
+    assert.equal(await page.getByTestId("input-email").count(),0);
     await page.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
     const geometry=await page.evaluate(()=>{
       const option=document.querySelector(".is-selected") as HTMLElement;
@@ -91,24 +96,27 @@ try{
     assert.deepEqual(geometry,{height:64,x:20,border:"2px",color:"rgb(37, 99, 235)",background:"rgb(239, 246, 255)",
       titleSize:"28px",titleWeight:"800",button:52,bottom:36,overflow:false});
     await page.getByRole("button",{name:"No, I'm under 18",exact:true}).click();
+    assert.equal(await page.getByTestId("input-email").count(),0);
     await page.getByRole("button",{name:"Continue",exact:true}).click();
     await page.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>(window as any).__calls.length),0);
     assert.equal(await page.evaluate(()=>sessionStorage.getItem("fixture-account")),null);
-    checks.push(form+"_signup_back_layout_and_under18_without_registration");
+    checks.push(form+"_age_precedes_credentials_and_no_never_requests_them");
     await page.goto(origin+(form==="login"?"/login?signup=1":"/modal"));
     if(form==="modal")await page.getByTestId("button-toggle-mode").click();
+    await page.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
+    await page.getByRole("button",{name:"Continue",exact:true}).click();
     await page.getByTestId("input-email").fill("synthetic@example.invalid");
     await page.getByTestId("input-password").fill("Synthetic-only-123!");
-    await page.getByTestId("button-submit").click();
-    await page.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
+    assert.equal(await page.evaluate(()=>(window as any).__calls.length),0);
     if(form==="login")await page.evaluate(()=>(window as any).__failSignup=true);
-    await page.getByRole("button",{name:"Continue",exact:true}).click();
+    await page.getByTestId("button-submit").click();
     if(form==="login"){
       await page.waitForFunction(()=>(window as any).__toasts.some((t:any)=>t.description==="Synthetic signup error"));
-      await page.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
+      assert.equal(await page.getByRole("heading",{name:"Are you 18 or older?",exact:true}).count(),0);
+      await page.getByTestId("input-email").waitFor();
       await page.evaluate(()=>(window as any).__failSignup=false);
-      await page.getByRole("button",{name:"Continue",exact:true}).click();
+      await page.getByTestId("button-submit").click();
       await page.getByRole("heading",{name:"Existing post-signup flow",exact:true}).waitFor();
     }else await page.getByRole("dialog").waitFor({state:"hidden"});
     assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem("fixture-account")!).user_metadata.signup_age_answer),"adult");

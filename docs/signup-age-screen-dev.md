@@ -3,16 +3,16 @@
 This change stays within isolated DEV onboarding. Production signup and
 existing adult onboarding steps are unchanged.
 
-- The signup form collects email/password without an age question.
-- Tapping Sign Up opens the separate reference-matched age screen, with no
-  progress count and no default selection.
-- Back restores the signup form without losing the entered credentials.
+- New signup starts with the separate reference-matched age screen, before
+  email/password fields, with no progress count and no default selection.
+- Back returns to the login entry or existing-account sign-in.
 - Continue stays disabled until a selection is made.
-- **Yes:** creates the account through the existing signup handler, with
+- **Yes:** reveals the email/password signup form. Submitting Sign Up then
+  creates the account through the existing signup handler, with
   `signup_age_answer: "adult"` in Supabase account metadata. Referral metadata,
   existing session handling, and email verification are preserved. Ordinary
   later sign-ins do not enter the age screen.
-- **No:** clears the pending credentials and opens the existing Under 18 parent
+- **No:** opens the existing Under 18 parent
   screen. No signup request or minor account is created. As explicitly chosen
   by the owner, No therefore is not saved on a nonexistent account.
 - A tab-scoped parent-required navigation flag blocks roles, the questionnaire,
@@ -29,8 +29,8 @@ same screen, rebuilt using the existing screen/button components.
 Open `/high-school/onboarding-preview?screen=age` in the DEV preview.
 This is a screen simulation, not a registration.
 
-The signed-out DEV preview homepage now starts with the actual signup form in
-simulation mode, followed by the age screen and memory-only onboarding.
+The signed-out DEV preview homepage starts with the age screen in simulation
+mode, followed by the actual signup form only after Yes, then memory-only onboarding.
 `/high-school/onboarding-preview?screen=signup` opens the same complete review
 even when signed in. Enter example credentials; neither signup nor sign-in
 contacts authentication in this simulation. No opens parent handling, and Back

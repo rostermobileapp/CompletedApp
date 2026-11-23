@@ -31,9 +31,9 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const handleSubmit = async (e?: React.FormEvent, ageConfirmed=false) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if(isDevParentClient&&isSignUp&&(!ageConfirmed||adultConfirmed!==true)){
+    if(isDevParentClient&&isSignUp&&adultConfirmed!==true){
       setAdultConfirmed(null);setShowAge(true);return;
     }
     setLoading(true);
@@ -108,13 +108,13 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         <DialogTitle className="sr-only">Age confirmation</DialogTitle>
         <DialogDescription className="sr-only">Choose your age group to continue signup.</DialogDescription>
         <AgeConfirmationScreen value={adultConfirmed} onChange={setAdultConfirmed} busy={loading}
-          onBack={()=>{if(!loading){setShowAge(false);setAdultConfirmed(null);}}}
+          onBack={()=>{if(!loading){setShowAge(false);setAdultConfirmed(null);setIsSignUp(false);}}}
           onContinue={()=>{
             if(loading||adultConfirmed===null)return;
             if(adultConfirmed===false){
               signupAgeRestriction.requireParent();
               setEmail("");setPassword("");setShowAge(false);onOpenChange(false);setLocation("/under-18");
-            }else{signupAgeRestriction.allowAdult();void handleSubmit(undefined,true);}
+            }else{signupAgeRestriction.allowAdult();setShowAge(false);}
           }}/>
       </DialogContent>
     </Dialog>
@@ -190,7 +190,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           <div className="text-center text-sm">
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                if(!isSignUp&&isDevParentClient){setAdultConfirmed(null);setShowAge(true);}
+                setIsSignUp(!isSignUp);
+              }}
               className="text-primary hover:underline"
               data-testid="button-toggle-mode"
             >
