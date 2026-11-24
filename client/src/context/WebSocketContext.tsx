@@ -365,6 +365,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     connect();
 
     return () => {
+      // A skin switch can unmount this provider without starting another
+      // effect. Invalidate late onclose/auth callbacks before closing, or
+      // they can reconnect and restart adult polling after leaving the skin.
+      connectionTokenRef.current++;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;

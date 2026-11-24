@@ -225,6 +225,10 @@ export class HighSchoolChildDevices {
     if (!row || row.family_players > HS_MAX_FAMILY_PLAYERS) return null;
     return { parentId: session.parent_auth_id as string, teamId, leagueId: row.league_id as string };
   }
+  async skinActor(token: unknown): Promise<import("../shared/teamSkin").SkinActor> {
+    const session = await this.session(token);
+    return { id: session.child_id, type: "child" };
+  }
   async ownSession(token: unknown) {
     const session = await this.session(token);
     const schedule = (await this.pool.query(`SELECT id,title,starts_at AS "startsAt",location

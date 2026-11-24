@@ -40,6 +40,27 @@ authorize real child activation. Stop for approval before every later phase.
 **How to apply:** Read canonical role/program fields for skin decisions;
 onboarding records are a migration input, not the runtime role authority.
 
+Keep nonproduction-only canonical fields out of the main production Drizzle
+mappings until a production migration is separately approved.
+
+**Why:** Normal whole-table selects would otherwise request columns that do
+not exist in production, breaking the adult app despite a DEV-only installer.
+
+**How to apply:** Use explicit isolated-DEV SQL and narrowly parameterized
+canonical-context queries. Never run this installation from startup, publish
+or post-merge setup. Preserve the established adult selector's eligibility
+rules instead of recreating them when adding mixed-team switching.
+
+Saved team selections are hints, not authority. If one becomes unavailable,
+offer the actor's remaining approved teams without implicitly entering adult
+mode or requiring a reload.
+
+**Why:** A stale selection after revocation or account switching can otherwise
+hide the only team switcher and permanently lock out an authorized account.
+
+**How to apply:** Test both a selected membership disappearing and a different
+account inheriting a saved selection, including accounts with adult teams.
+
 Fundraisers are a payment-request type, not a separate permission or feature.
 Use the existing creation rules and 5% + 50¢ fee. A fundraiser adds a goal,
 lets payers choose an amount and continues accepting contributions past the

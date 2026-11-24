@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { getImageUrl } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { useTeamSkinFacts, skinTeamLabel } from '@/context/TeamSkinFacts';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import { DesktopMenuColumn } from '@/components/DesktopMenuColumn';
@@ -56,6 +57,7 @@ interface DesktopAppShellProps {
 }
 
 export function DesktopAppShell({ children }: DesktopAppShellProps) {
+  const skinFacts = useTeamSkinFacts();
   const [location, navigate] = useLocation();
   const { isAuthenticated } = useAuth();
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -109,16 +111,16 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const getTeamDisplayName = (team: any) => {
     if (!team) return 'Select Team';
-    if (!team.leagueId && !team.membershipLeagueId) return team.name;
+    if (!team.leagueId && !team.membershipLeagueId) return skinTeamLabel(skinFacts, team.id, team.name);
     const effectiveLeagueId = team.membershipLeagueId ?? team.leagueId;
     const league = Array.isArray(userLeagues)
       ? userLeagues.find((l: any) => l.id === effectiveLeagueId)
       : null;
     if (league) {
       const leagueIdSuffix = league.uniqueLeagueId ? ` - ${league.uniqueLeagueId}` : '';
-      return `${league.name}: ${team.name}${leagueIdSuffix}`;
+      return skinTeamLabel(skinFacts, team.id, `${league.name}: ${team.name}${leagueIdSuffix}`);
     }
-    return team.name;
+    return skinTeamLabel(skinFacts, team.id, team.name);
   };
 
   const getLeagueDisplayName = (league: any) => {

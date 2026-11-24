@@ -1,6 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase, clearStaleSession } from "./supabase";
 import { isDevParentClient, parentVerificationSession } from "./parentVerificationSession";
+import { teamRequestSignal } from "./teamRequestScope";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 const DEMO_ACTIVE_KEY = 'roster.demo.active';
@@ -179,7 +180,9 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  signal?: AbortSignal,
 ): Promise<Response> {
+  const scopeSignal = signal ?? (isDevParentClient ? teamRequestSignal() : undefined);
   const fullUrl = `${API_BASE_URL}${url}`;
   const authHeaders = await getAuthHeaders(url);
   const headers = {
@@ -188,6 +191,7 @@ export async function apiRequest(
   };
   
   const res = await fetch(fullUrl, {
+    signal: scopeSignal,
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,

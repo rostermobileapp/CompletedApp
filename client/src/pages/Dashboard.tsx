@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { usePermissions } from '@/context/SubscriptionContext';
+import { useTeamSkinFacts, skinTeamLabel } from '@/context/TeamSkinFacts';
 import { notifyDashboardSelectionChange, DASHBOARD_SELECTION_CHANGE_EVENT } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
 import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, BrickWall, BarChart3, Award, ChevronDown, ChevronRight, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2, RefreshCw } from 'lucide-react';
@@ -1246,6 +1247,7 @@ export default function Dashboard() {
 }
 
 function DashboardMobile() {
+  const skinFacts = useTeamSkinFacts();
   const { user: supabaseUser } = useAuth();
   const tier = (supabaseUser as any)?.role || 'free_tier';
   const { user: currentUser, canAccessPremiumFeatures, hasStatManagerAccess } = usePermissions();
@@ -2141,7 +2143,7 @@ function DashboardMobile() {
     
     // If team is not in a league, just show team name
     if (!team.leagueId && !team.membershipLeagueId) {
-      return team.name;
+      return skinTeamLabel(skinFacts, team.id, team.name);
     }
     
     // Prefer the league ID from the membership record (source of truth for which
@@ -2156,12 +2158,12 @@ function DashboardMobile() {
     
     if (league) {
       const seasonSuffix = league.seasonName ? ` - ${league.seasonName}` : '';
-      return `${league.name}: ${team.name}${seasonSuffix}`;
+      return skinTeamLabel(skinFacts, team.id, `${league.name}: ${team.name}${seasonSuffix}`);
     }
     
     // Fallback if league not found (shouldn't happen)
-    return team.name;
-  }, [userLeagues]);
+    return skinTeamLabel(skinFacts, team.id, team.name);
+  }, [userLeagues, skinFacts]);
   
   // Helper function to get league display name
   const getLeagueDisplayName = React.useCallback((league: any) => {

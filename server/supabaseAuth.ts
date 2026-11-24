@@ -12,6 +12,8 @@ import { registerHighSchoolOnboarding } from './highSchoolOnboardingHttp';
 import { HighSchoolYouthOnboarding } from './highSchoolYouthOnboarding';
 import { HighSchoolChildDevices } from './highSchoolChildDevices';
 import { registerHighSchoolYouthRoutes } from './highSchoolYouthHttp';
+import { TeamSkinService } from './teamSkinService';
+import { registerTeamSkinRoutes } from './teamSkinHttp';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -96,6 +98,7 @@ export async function setupAuth(app: Express) {
     const children = new HighSchoolChildDevices(pool, parent, false);
     registerHighSchoolOnboarding(app,onboarding,parent,authenticateOnboarding,(actor, grant) => youth.state(actor, grant));
     registerHighSchoolYouthRoutes(app,youth,children,authenticateOnboarding);
+    registerTeamSkinRoutes(app,new TeamSkinService(pool,id=>storage.getUserTeams(id)),parent,children,authenticateOnboarding);
   }
 }
 

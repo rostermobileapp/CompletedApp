@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
-import { requestChildSession } from "@/lib/highSchoolChildSession";
+import { requestChildSession, childSkinSession } from "@/lib/highSchoolChildSession";
 import { ChildProfileScreen } from "@/components/high-school-onboarding/ChildProfileScreen";
 import { ScreenFrame } from "@/components/high-school-onboarding/shared";
 import { Under18ShareScreen } from "@/components/high-school-onboarding/Under18ShareScreen";
@@ -44,6 +44,7 @@ export default function Under18Onboarding({ request=realRequest,initialView,chal
           if(request===realRequest)data=await requestChildSession(token,"GET",`${API}/session`);
           else data=await request("GET",`${API}/session`,{sessionToken:token});
           if(cancelled)return;
+          if(request===realRequest) childSkinSession.save(token);
           setSession({data,token});setView("approved");return;
         }
         if(result.status==="denied"||result.status==="expired"){setView(result.status);return;}

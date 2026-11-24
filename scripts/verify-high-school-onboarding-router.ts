@@ -84,7 +84,8 @@ const bundle = await build({
       let contents: string;
       if (a.path === "fixture-image") contents = `export default 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E';`;
       else if (a.path === "fixture-auth") contents = provider;
-      else if (a.path === "supabase") contents = `export{supabase,clearStaleSession}from'fixture-auth';`;
+      else if (a.path === "supabase") contents = `export{supabase,clearStaleSession}from'fixture-auth';
+        export async function requireSignupEmailConfirmation(){throw Error('Provider signup is outside this offline router fixture');}`;
       else if (a.path === "@/hooks/useAuth") contents = `export{useFixtureAuth as useAuth}from'fixture-auth';`;
       else if (a.path === "@/hooks/useAppDataPrefetch") contents =
         `export function useAppDataPrefetch(enabled){if(enabled)window.__prefetchEnabled=(window.__prefetchEnabled||0)+1}`;

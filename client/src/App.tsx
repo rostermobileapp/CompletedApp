@@ -113,6 +113,7 @@ import HighSchoolYouthOnboardingPreview from "@/pages/HighSchoolYouthOnboardingP
 import Under18Onboarding from "@/pages/Under18Onboarding";
 import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
 import ParentVerification from "@/pages/ParentVerification";
+import { TeamSkinBoundary } from "@/components/high-school-skins/TeamSkinBoundary";
 
 function LoadingScreen() {
   return (
@@ -505,23 +506,25 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <TooltipProvider>
-            <WebSocketProvider>
               {/* Honor the user's OS-level "reduce motion" preference for any
                   framer-motion animation in the app (e.g. the bottom-nav
                   active-tab morph). */}
               <MotionConfig reducedMotion="user">
                 <Toaster />
-                <NativeCalendarAutoSync />
-                <BadgeEarnedHost />
                 <ErrorBoundary>
                   <DemoContextProvider>
-                    <BirthdayHost />
-                    <TriviaHost />
-                    <Router />
+                    <TeamSkinBoundary entry={<Router />}>
+                      <WebSocketProvider>
+                        <NativeCalendarAutoSync />
+                        <BadgeEarnedHost />
+                        <BirthdayHost />
+                        <TriviaHost />
+                        <Router />
+                      </WebSocketProvider>
+                    </TeamSkinBoundary>
                   </DemoContextProvider>
                 </ErrorBoundary>
               </MotionConfig>
-            </WebSocketProvider>
           </TooltipProvider>
         </ThemeProvider>
       </QueryClientProvider>

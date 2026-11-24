@@ -26,7 +26,9 @@ const bundled = await build({
       import Questionnaire from './client/src/pages/OnboardingQuestionnaire';
       import {queryClient} from '@/lib/queryClient';
       createRoot(document.getElementById('root')).render(
-        location.pathname==='/questionnaire' ? <QueryClientProvider client={queryClient}><Questionnaire/></QueryClientProvider> : <Preview/>);
+        <QueryClientProvider client={queryClient}>
+          {location.pathname==='/questionnaire' ? <Questionnaire/> : <Preview/>}
+        </QueryClientProvider>);
     `,
   },
   plugins: [{
@@ -42,7 +44,7 @@ const bundled = await build({
           export async function getAuthHeaders(){throw Error('Real Auth is forbidden');}
         ` : args.path.endsWith("nativePurchases") ? "export const setSubscriberAttributes=()=>{};" :
           args.path.endsWith("signupAttributionBrowser") ? "export const loadSignupAttribution=async()=>({});export const signupAttribution=()=>({clear(){}});export async function signupAttributionMetadata(){throw Error('Real signup forbidden')};export function bindSignupAttributionUser(){throw Error('Real signup forbidden')};" :
-            "export const supabase={auth:{signOut:async()=>{throw Error('Real Auth is forbidden')}}};",
+            "export const supabase={auth:{signOut:async()=>{throw Error('Real Auth is forbidden')}}};export async function requireSignupEmailConfirmation(){throw Error('Real signup is forbidden')};",
       }));
     },
   }],
