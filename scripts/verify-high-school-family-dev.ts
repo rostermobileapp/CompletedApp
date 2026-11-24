@@ -92,8 +92,8 @@ try {
     accounts.push(created.body.id);
     const signed = await auth("token?grant_type=password", "POST", { email, password });
     assert.equal(signed.status, 200); sessions[who] = signed.body;
-    await pool.query(`INSERT INTO public.users(id,email,first_name,last_name,onboarding_completed)
-      VALUES($1,$2,$3,'Fixture',true)`, [created.body.id, email, who === "parent" ? "Adult" : "Coach"]);
+    await pool.query(`INSERT INTO public.users(id,email,first_name,last_name,onboarding_completed,date_of_birth)
+      VALUES($1,$2,$3,'Fixture',true,'1990-01-01')`, [created.body.id, email, who === "parent" ? "Adult" : "Coach"]);
     await pool.query(`INSERT INTO hs_onboarding.flows(auth_id,path,block_legacy,revision,draft,status)
       VALUES($1,$2,$3,7,$4,$5)`, [created.body.id, who === "parent" ? "player" : "staff", who !== "parent",
       { originalJourney: "must remain unchanged" }, who === "parent" ? "draft" : "coverage_pending"]);

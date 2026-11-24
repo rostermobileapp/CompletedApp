@@ -5,6 +5,7 @@ import { hsPlayerDraft, HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS } from "../sha
 import { HighSchoolOnboarding, OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
 import { HighSchoolParentSecurity, ParentSecurityError, type ParentSql, type ParentTransaction } from "./highSchoolParentSecurity";
 import { StaffBase, staffFail, uuid } from "./highSchoolStaffBase";
+import { requireFamilyAdultAccount } from "./familyEligibility";
 
 const revisionInput = z.object({ revision: z.number().int().nonnegative() }).strict();
 type Coverage = FamilyRequest["coverage"];
@@ -15,7 +16,8 @@ export class HighSchoolFamilySetup {
   readonly intake: HighSchoolOnboarding;
   constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity,
     private coverage: FamilyCoverage = async () => "uncovered") {
-    this.intake = new HighSchoolOnboarding(pool, parent, true);
+    this.intake = new HighSchoolOnboarding(pool, parent, true,
+      (actor, db) => requireFamilyAdultAccount(db, actor));
   }
   async installed() {
     return !!(await this.pool.query("SELECT to_regclass('hs_onboarding.family_version') AS installed")).rows[0]?.installed;
@@ -33,20 +35,18 @@ export class HighSchoolFamilySetup {
       AND u.email=$3 AND u.email_confirmed_at IS NOT NULL
       AND u.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true'`, [actor.sessionId, actor.authId, actor.email]);
     if (!row.rows.length) throw new OnboardingError("INVALID_SESSION", 401);
+    return requireFamilyAdultAccount(db, actor);
   }
   async begin(actor: OnboardingActor) {
     await this.transaction(async db => {
-      await this.active(db, actor);
+      const adult = await this.active(db, actor);
       await db.query("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", [actor.authId]);
       // Same verified mapping as the adult account: never create a replacement
       // user, overwrite an ID, promote a role or move somebody's playing data.
-      const adults = (await db.query(`SELECT id FROM public.users
-        WHERE onboarding_completed=true AND(id=$1 OR lower(email)=lower($2))`, [actor.authId, actor.email])).rows;
-      if (adults.length !== 1) throw new OnboardingError("EXISTING_ADULT_ACCOUNT_REQUIRED", 403);
       await db.query(`INSERT INTO hs_parent_security.accounts(auth_id,parent_email) VALUES($1,$2)
         ON CONFLICT(auth_id) DO NOTHING`, [actor.authId, actor.email]);
       await db.query(`INSERT INTO hs_onboarding.family_flows(auth_id,adult_user_id) VALUES($1,$2)
-        ON CONFLICT(auth_id) DO NOTHING`, [actor.authId, adults[0].id]);
+        ON CONFLICT(auth_id) DO NOTHING`, [actor.authId, adult.id]);
     });
     // This enrolls protection only. No child data, consent or authority is created.
     return { started: true, verificationRequired: true };

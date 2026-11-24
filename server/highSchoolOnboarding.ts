@@ -14,7 +14,8 @@ export class HighSchoolOnboarding {
   // Only trusted server composition selects this store. The public original
   // onboarding routes always use the primary store.
   private readonly flowTable: "hs_onboarding.flows" | "hs_onboarding.family_flows";
-  constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity, family = false) {
+  constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity, family = false,
+    private familyEligibility?: (actor: OnboardingActor, db: Pick<ParentSql, "query">) => Promise<unknown>) {
     this.flowTable = family ? "hs_onboarding.family_flows" : "hs_onboarding.flows";
   }
   async installed() {
@@ -31,6 +32,12 @@ export class HighSchoolOnboarding {
   private async active(actor: OnboardingActor, tx: Pick<ParentSql, "query"> = this.pool) {
     const session = await tx.query("SELECT 1 FROM auth.sessions WHERE id=$1 AND user_id=$2 AND (not_after IS NULL OR not_after>now())", [actor.sessionId, actor.authId]);
     if (!session.rows.length) fail("INVALID_SESSION", 401);
+    if (this.flowTable === "hs_onboarding.family_flows") {
+      // A family store must not bypass eligibility through shared intake
+      // methods such as consent, invitation lookup or join.
+      if (this.familyEligibility) await this.familyEligibility(actor, tx);
+      else fail("FAMILY_ELIGIBILITY_UNAVAILABLE", 503);
+    }
   }
   private async event(tx: ParentTransaction, actor: OnboardingActor, event: string, id?: string) {
     await tx.query("INSERT INTO hs_onboarding.audit(auth_id,event,target_id) VALUES($1,$2,$3)", [actor.authId,event,id??null]);

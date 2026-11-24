@@ -30,7 +30,7 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
   const adult = a.applicant;
   let grant = "", first = player(), second = player("Jamie");
   try {
-    await pool.query(`ALTER TABLE public.users ADD COLUMN onboarding_completed boolean DEFAULT false;
+    await pool.query(`ALTER TABLE public.users ADD COLUMN onboarding_completed boolean DEFAULT false, ADD COLUMN date_of_birth varchar;
       CREATE TABLE hs_parent_security.grants(token_digest text PRIMARY KEY,auth_id uuid,session_id uuid,purpose text,expires_at timestamptz,consumed boolean DEFAULT false);
       CREATE TABLE hs_parent_security.audit(auth_id uuid,session_id uuid,event text,created_at timestamptz DEFAULT now());
       CREATE TABLE hs_parent_security.challenges(id uuid PRIMARY KEY,auth_id uuid,session_id uuid,purpose text,code_digest text,expires_at timestamptz,
@@ -42,7 +42,7 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
       await db.query(await readFile("scripts/dev-only/high-school-family-setup.sql", "utf8"));
       await db.query(await readFile("scripts/dev-only/high-school-family-setup.sql", "utf8"));
     } finally { db.release(); }
-    await pool.query("UPDATE public.users SET onboarding_completed=true WHERE id=$1", [adult.authId]);
+    await pool.query("UPDATE public.users SET onboarding_completed=true,date_of_birth='1990-01-01' WHERE id=$1", [adult.authId]);
     await pool.query("UPDATE hs_onboarding.flows SET path='player',block_legacy=false,draft=$2 WHERE auth_id=$1", [adult.authId, { untouchedAdult: true }]);
     await pool.query("INSERT INTO hs_onboarding.contexts(auth_id,hockey_type,journey) VALUES($1,'adult',$2)", [adult.authId, { original: "player profile" }]);
     const adultTeam = randomUUID();
@@ -54,7 +54,7 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
 
     await t.test("additive enrollment is idempotent and changes no adult or staff account data", async () => {
       assert.equal((await family.state(adult)).started, false);
-      await reject(() => family.begin(a.head), "EXISTING_ADULT_ACCOUNT_REQUIRED");
+      await reject(() => family.begin(a.head), "FAMILY_DOB_REQUIRED");
       await family.begin(adult); await family.begin(adult);
       assert.deepEqual((await pool.query("SELECT * FROM hs_onboarding.flows WHERE auth_id=$1", [adult.authId])).rows[0], originalFlow);
       assert.deepEqual((await pool.query("SELECT * FROM public.users WHERE id=$1", [adult.authId])).rows[0], originalUser);
@@ -72,6 +72,35 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
       assert.equal((await family.state(fresh, grant)).verified, false);
       assert.equal((await new HighSchoolOnboarding(pool, parent).state(fresh, grant)).status, "parent_verification_required");
       assert.equal((await family.state(adult, grant)).verified, true);
+    });
+    await t.test("stored DOB gates every own-family entry point, including shared invitation and consent intake", async () => {
+      const operations = [
+        () => family.state(adult, grant),
+        () => family.begin(adult),
+        () => family.draft(adult, { revision: 0, players: [first] }, grant),
+        () => family.consent(adult, { revision: 0, players: [first], guardianConfirmed: true }, grant),
+        () => family.newDraft(adult, { revision: 0 }, grant),
+        () => family.intake.lookup(adult, "a".repeat(43), 0, grant),
+        () => family.intake.join(adult, { revision: 0, teamCode: "NORTH123" }, grant),
+      ];
+      try {
+        for (const [dob, code] of [[null, "FAMILY_DOB_REQUIRED"], ["invalid", "FAMILY_DOB_INVALID"],
+          ["2008-01-01", "FAMILY_AGE_REQUIRED"]] as const) {
+          await pool.query("UPDATE public.users SET date_of_birth=$2 WHERE id=$1", [adult.authId, dob]);
+          for (const operation of operations) await reject(operation, code);
+        }
+        assert.equal((await pool.query("SELECT revision FROM hs_onboarding.family_flows WHERE auth_id=$1", [adult.authId])).rows[0].revision, 0);
+        assert.equal((await pool.query("SELECT count(*)::int AS n FROM hs_onboarding.player_requests WHERE auth_id=$1", [adult.authId])).rows[0].n, 0);
+      } finally {
+        await pool.query("UPDATE public.users SET date_of_birth='1990-01-01' WHERE id=$1", [adult.authId]);
+      }
+    });
+    await t.test("an existing verified 21+ account needs no completed onboarding or adult-team membership", async () => {
+      await pool.query("UPDATE public.users SET date_of_birth='1990-01-01' WHERE id=$1", [a.head.authId]);
+      assert.equal((await family.state(a.head)).started, false);
+      assert.equal((await pool.query("SELECT onboarding_completed FROM public.users WHERE id=$1", [a.head.authId])).rows[0].onboarding_completed, false);
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
+        WHERE m.user_id=$1 AND coalesce(t.program_type,'adult')='adult'`, [a.head.authId])).rows[0].n, 0);
     });
     await t.test("incomplete drafts resume, revisions conflict and consent is never implied", async () => {
       await family.draft(adult, { revision: 0, players: [{ ...first, firstName: "", consent: false }] }, grant);
@@ -131,7 +160,7 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
       const adultId = `legacy-${randomUUID()}`;
       await pool.query("INSERT INTO auth.users VALUES($1,$2,now(),$3,'{}')", [actor.authId, actor.email, { synthetic_high_school_onboarding_dev: true }]);
       await pool.query("INSERT INTO auth.sessions VALUES($1,$2,NULL)", [actor.sessionId, actor.authId]);
-      await pool.query("INSERT INTO public.users(id,email,first_name,last_name,onboarding_completed) VALUES($1,$2,'Legacy','Fixture',true)", [adultId, actor.email]);
+      await pool.query("INSERT INTO public.users(id,email,first_name,last_name,onboarding_completed,date_of_birth) VALUES($1,$2,'Legacy','Fixture',true,'1990-01-01')", [adultId, actor.email]);
       await pool.query("INSERT INTO public.team_memberships(user_id,team_id,role,status) VALUES($1,$2,'player','approved')", [adultId, adultTeam]);
       await family.begin(actor);
       const c = await parent.challenge(actor, "parent_action");

@@ -17,7 +17,7 @@ type FamilySetupProps = {
   onTeamChange: (teamId: string) => void;
 };
 type JoinMode = "code" | "invitation";
-type AuthorityFailure = "PARENT_VERIFICATION_REQUIRED" | "INVALID_SESSION" | "";
+type AuthorityFailure = "PARENT_VERIFICATION_REQUIRED" | "INVALID_SESSION" | "FAMILY_ELIGIBILITY_REQUIRED" | "";
 const INVITATION_TOKEN = /^[A-Za-z0-9_-]{32,128}$/;
 
 function apiErrorCode(error: unknown) {
@@ -34,6 +34,9 @@ function errorMessage(error: unknown) {
     DEV_FIXTURE_REQUIRED: "This family setup is available only to an eligible development account.",
     DEV_FAMILY_INSTALL_REQUIRED: "Family setup is not installed in this environment. Contact the administrator.",
     EXISTING_ADULT_ACCOUNT_REQUIRED: "Family setup requires an existing adult account. Your current account was not changed.",
+    FAMILY_DOB_REQUIRED: "Add your date of birth in your profile before starting family setup.",
+    FAMILY_DOB_INVALID: "Your profile needs a valid date of birth before you can use family setup.",
+    FAMILY_AGE_REQUIRED: "Family setup is available to accounts aged 21 or older based on their recorded date of birth.",
     INVALID_REVISION: "Setup changed in another session. Refresh to continue with the latest version.",
     DRAFT_CONFLICT: "Setup changed in another session. Refresh to continue with the latest version.",
     REQUEST_ALREADY_SUBMITTED: "This draft has already been submitted. Refresh to see the current request status.",
@@ -138,9 +141,11 @@ export function FamilySetup({
 
   const handleRequestError = useCallback((reason: unknown) => {
     const code = apiErrorCode(reason);
-    if (code === "PARENT_VERIFICATION_REQUIRED" || code === "PARENT_PROOF_REQUIRED" || code === "INVALID_SESSION") {
+    const ageDenied = ["FAMILY_DOB_REQUIRED", "FAMILY_DOB_INVALID", "FAMILY_AGE_REQUIRED",
+      "EXISTING_ADULT_ACCOUNT_REQUIRED"].includes(code ?? "");
+    if (ageDenied || code === "PARENT_VERIFICATION_REQUIRED" || code === "PARENT_PROOF_REQUIRED" || code === "INVALID_SESSION") {
       requestGenerationRef.current += 1;
-      parentVerificationSession.clear();
+      if (!ageDenied) parentVerificationSession.clear();
       busyRef.current = false;
       setBusy("");
       setLoading(false);
@@ -151,7 +156,8 @@ export function FamilySetup({
       setTeamCode("");
       setNotice("");
       setError(errorMessage(reason));
-      setAuthorityFailure(code === "INVALID_SESSION" ? "INVALID_SESSION" : "PARENT_VERIFICATION_REQUIRED");
+      setAuthorityFailure(ageDenied ? "FAMILY_ELIGIBILITY_REQUIRED"
+        : code === "INVALID_SESSION" ? "INVALID_SESSION" : "PARENT_VERIFICATION_REQUIRED");
       return;
     }
     setError(errorMessage(reason));
@@ -417,7 +423,7 @@ export function FamilySetup({
     </div>;
   }
 
-  if (authorityFailure === "INVALID_SESSION") {
+  if (authorityFailure === "INVALID_SESSION" || authorityFailure === "FAMILY_ELIGIBILITY_REQUIRED") {
     return <div className="hsy family-setup">
       <div className="family-topline">
         <span className="family-brand">Roster · Family setup</span>
@@ -425,9 +431,11 @@ export function FamilySetup({
       </div>
       <section className="hsy-content">
         <div className="family-intro-mark" />
-        <div className="hsy-section-label">Session ended</div>
+        <div className="hsy-section-label">{authorityFailure === "INVALID_SESSION" ? "Session ended" : "Eligibility required"}</div>
         <h1>Family details are locked</h1>
-        <p className="hsy-subtitle">Your sign-in session is no longer valid. Child details, consent and invitation tokens have been cleared. Return to your account and sign in again.</p>
+        <p className="hsy-subtitle">{authorityFailure === "INVALID_SESSION"
+          ? "Your sign-in session is no longer valid. Child details, consent and invitation tokens have been cleared. Return to your account and sign in again."
+          : "Family setup requires a valid recorded date of birth showing age 21 or older. Child details, consent and invitation tokens have been cleared from this screen. Your adult account has not been changed."}</p>
         {error && <div className="hsy-error" role="alert">{error}</div>}
         <button className="hsy-primary" style={{ marginTop: 16 }} disabled={loading} onClick={() => void refresh(false)}>Retry status</button>
       </section>

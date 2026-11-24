@@ -8,6 +8,12 @@ resumable journey, separate from original adult/player/organizer/staff intake.
 It is available only in isolated DEV to server-identified, confirmed,
 owned synthetic accounts. It is not a production release.
 
+The subsequently requested live rollout has a separate readiness record in
+`docs/high-school-family-live-rollout.md`. Recorded DOB must now establish age
+21 or older, regardless of plan, role, completed onboarding or adult-team
+membership. That rule is enforced in the guarded DEV journey; it does not
+itself activate production.
+
 The explicit installer is `scripts/install-high-school-family-dev.ts`, backed
 by `scripts/dev-only/high-school-family-setup.sql`. It requires a separate
 DEV Auth/database target. It is not called by application startup or merge

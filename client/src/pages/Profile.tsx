@@ -16,6 +16,7 @@ import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
 import { isDevParentClient } from '@/lib/parentVerificationSession';
+import { familyAgeEligibility } from '@shared/familyEligibility';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -685,8 +686,14 @@ export default function Profile() {
           <div className="rounded-xl border bg-card p-4">
             <h2 id="profile-family-title" className="font-semibold mb-1">Family</h2>
             <p className="text-sm text-muted-foreground mb-3">Set up your children without changing your adult teams or account.</p>
-            <button type="button" className="w-full rounded-xl border px-4 py-3 text-left text-sm font-medium"
-              onClick={() => navigate("/high-school/family")}>Add a child</button>
+            {familyAgeEligibility((user as any)?.dateOfBirth).eligible
+              ? <button type="button" className="w-full rounded-xl border px-4 py-3 text-left text-sm font-medium"
+                onClick={() => navigate("/high-school/family")}>Add a child</button>
+              : <p className="text-sm text-muted-foreground">
+                {(user as any)?.dateOfBirth
+                  ? "Family setup is available to accounts aged 21 or older based on their recorded date of birth."
+                  : "Add your date of birth in your profile below to check family setup eligibility."}
+              </p>}
           </div>
         </section>}
         {isDevParentClient && devParentStatus?.enrolled && <div className="px-6 mb-3">

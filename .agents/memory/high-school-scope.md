@@ -3,6 +3,24 @@ name: High School scope boundaries
 description: Owner-supplied High School product constraints and phase-by-phase approval rules.
 ---
 
+## Authorized live family rollout (November 24, 2026)
+
+The owner now wants family setup in the live app for “Every account that has an
+age of 21+ per DOB.” Use recorded DOB, not paid plan, account role, existing adult
+team membership or completed adult onboarding. Missing/invalid DOB must not
+silently qualify. Shared credentials and parent/provider protection remain;
+child sign-in and device activation remain disabled.
+
+**Why:** This explicit request supersedes the earlier production prohibition
+for the family rollout only. It does not approve unrelated High School phases.
+
+**How to apply:** Prepare and verify production-safe account protection,
+recovery, mail delivery and schema prerequisites rather than removing DEV flags.
+Observe the separate requirement to explain and authorize specific live
+Auth/schema changes before applying them. Preserve unrelated adult behavior.
+Use the application's New York calendar for DOB boundaries, not a caller's
+chosen timezone; February 29 reaches the threshold on March 1 in non-leap years.
+
 ## Revised onboarding export (November 23, 2026)
 
 The owner supplied a 25-screen High School / Youth export and explicitly requested
