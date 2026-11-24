@@ -30,6 +30,18 @@ from parent login credentials and paid coverage. Staff-only identities must
 not enter HS player rosters, RSVPs or stats; preserve unrelated adult playing
 memberships.
 
+Staff management is not AD-only. Head coaches approve or decline assistants
+and managers for their own team; ADs manage staff across their approved
+program. Initial program authority still comes from the league, never
+self-approval.
+
+**Why:** This is the owner's approved staff hierarchy. A server permission
+without its corresponding coach controls does not satisfy that workflow.
+
+**How to apply:** Apply the same scoped management capability in the UI and
+API, and exercise a signed-in head-coach approval through reload as well as
+the AD path.
+
 Child chat is limited to the approved Team group shared with coaches and
 teammates, and the child's own Family conversation with their parent. No
 coach/teammate direct messages, new conversations or custom groups.
@@ -41,6 +53,18 @@ when continuing from the skin foundation on November 24, 2026.
 in the composer. Coach and teammate replies belong in the same approved Team
 thread; Family access never grants access to unrelated parents or staff rooms.
 Preserve disabled child activation until its separately approved phase.
+
+Approved player roster membership and permission to use a child device are
+separate. Staff may manage a consented, guardian-linked player's lineup before
+that child's own login/device access is activated.
+
+**Why:** The owner chose coach/AD operations before parent/player operations;
+requiring an active child session to populate staff tools would either leave
+those tools unusable or encourage premature child activation.
+
+**How to apply:** Retain canonical player/guardian/consent checks for staff
+rosters and lineups, while keeping all independent child session/device and
+activation safeguards closed until the later approved phase.
 
 The owner approved Phase 1 with canonical nonproduction membership roles and
 team program types, not runtime role inference from onboarding drafts.

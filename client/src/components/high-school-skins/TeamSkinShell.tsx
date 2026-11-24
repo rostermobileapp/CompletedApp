@@ -22,12 +22,15 @@ import {
   type SkinContext,
   type SkinTeam,
 } from "@shared/teamSkin";
+import { queryClient } from "@/lib/queryClient";
+import { StaffOperations } from "./StaffOperations";
 import "./team-skin-shell.css";
 
 type TeamSkinShellProps = {
   context: SkinContext;
   activeTeam: SkinTeam;
   onTeamChange: (id: string) => void;
+  operational?: boolean;
 };
 
 const TAB_ICONS: Record<string, LucideIcon> = {
@@ -41,7 +44,7 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   Team: UsersRound,
 };
 
-export function TeamSkinShell({ context, activeTeam, onTeamChange }: TeamSkinShellProps) {
+export function TeamSkinShell({ context, activeTeam, onTeamChange, operational = false }: TeamSkinShellProps) {
   const [location, navigate] = useLocation();
   const childMode = context.actor.type === "child";
 
@@ -100,6 +103,9 @@ export function TeamSkinShell({ context, activeTeam, onTeamChange }: TeamSkinShe
   const tabs = SKIN_TABS[skin];
   const currentTab = tabs.find((tab) => location === `/high-school/${tab.toLowerCase()}`);
   const roleLabel = ROLE_LABELS[safeTeam.role];
+  const staffOperational = operational &&
+    context.actor.type === "adult" &&
+    ["head_coach", "assistant_coach", "team_manager", "athletic_director"].includes(safeTeam.role);
 
   return (
     <main className="tss" data-testid="team-skin-shell">
@@ -155,7 +161,14 @@ export function TeamSkinShell({ context, activeTeam, onTeamChange }: TeamSkinShe
           </section>
 
           <div className="tss-content">
-            {allowed ? (
+            {allowed && staffOperational ? (
+              <StaffOperations
+                actorId={context.actor.id}
+                teamId={safeTeam.id}
+                role={safeTeam.role as "head_coach" | "assistant_coach" | "team_manager" | "athletic_director"}
+                onContextRefresh={() => { void queryClient.invalidateQueries({ queryKey: ["team-skin-context"] }); }}
+              />
+            ) : allowed ? (
               <section className="tss-welcome" aria-live="polite">
                 <div className="tss-welcome-top">
                   <span className="tss-kicker"><span className="tss-live-dot" /> APPROVED TEAM SPACE</span>

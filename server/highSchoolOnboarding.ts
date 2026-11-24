@@ -10,6 +10,7 @@ export type OnboardingActor = ParentActor & { email: string; emailVerified: bool
 const fail = (code: string, status = 400): never => { throw new OnboardingError(code, status); };
 const uuid = z.string().uuid();
 export class HighSchoolOnboarding {
+  staffDecisions?: { installed(): Promise<boolean>; decide(actor: OnboardingActor, id: string, approve: boolean): Promise<unknown> };
   constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity) {}
   async installed() {
     return !!(await this.pool.query("SELECT to_regclass('hs_onboarding.version') AS installed")).rows[0]?.installed;
@@ -156,7 +157,11 @@ export class HighSchoolOnboarding {
       WHERE token_digest=$1 AND expires_at>now()`,[digest])).rows[0];
     if(!row || row.program_status!=="approved" || row.recipient_email.toLowerCase()!==actor.email.toLowerCase() || (kind && row.kind!==kind)) fail("INVALID_INVITATION",403);
     // Recheck creator authority at use time, so revocation invalidates links.
-    const creator=await tx.query(`SELECT 1 FROM hs_onboarding.staff_requests WHERE auth_id=$1 AND program_id=$2 AND status='approved'
+    const canonical = this.staffDecisions && await this.staffDecisions.installed();
+    const creator= canonical ? await tx.query(`SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
+      WHERE m.user_id=$1::text AND m.child_profile_id IS NULL AND m.status='approved' AND t.program_type='high_school'
+      AND t.program_id=$2 AND(m.role='athletic_director' OR(m.role='head_coach' AND t.id=$3::text))`,
+    [row.created_by,row.program_id,row.team_id]) : await tx.query(`SELECT 1 FROM hs_onboarding.staff_requests WHERE auth_id=$1 AND program_id=$2 AND status='approved'
       AND (role='athletic_director' OR (role='head_coach' AND team_id=$3))`,[row.created_by,row.program_id,row.team_id]);
     if(!creator.rows.length) fail("INVALID_INVITATION",403);
     const players=(await tx.query(`SELECT id,first_name AS "firstName",last_name AS "lastName",grad_year AS "gradYear",position,jersey_number AS "jerseyNumber"
@@ -179,7 +184,11 @@ export class HighSchoolOnboarding {
           [actor.authId,{invitationDigest:parentDigest(text),teamId:invite.team_id,players:invite.players.map((p:any)=>({...p,consent:false,photoConsent:false,publicNameConsent:false,consentVersion:HS_CONSENT_VERSION}))}]);
       } else {
         if(!["assistant_coach","team_manager","head_coach","athletic_director"].includes(invite.staff_role)) fail("INVALID_INVITATION",403);
-        const creatorIsAd=(await tx.query("SELECT 1 FROM hs_onboarding.staff_requests WHERE auth_id=$1 AND program_id=$2 AND role='athletic_director' AND status='approved'",[invite.created_by,invite.program_id])).rows.length;
+        const canonical = this.staffDecisions && await this.staffDecisions.installed();
+        const creatorIsAd=(canonical ? await tx.query(`SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
+          WHERE m.user_id=$1::text AND m.child_profile_id IS NULL AND m.role='athletic_director' AND m.status='approved'
+          AND t.program_type='high_school' AND t.program_id=$2`,[invite.created_by,invite.program_id])
+          : await tx.query("SELECT 1 FROM hs_onboarding.staff_requests WHERE auth_id=$1 AND program_id=$2 AND role='athletic_director' AND status='approved'",[invite.created_by,invite.program_id])).rows.length;
         if(!creatorIsAd && !["assistant_coach","team_manager"].includes(invite.staff_role)) fail("INVALID_INVITATION",403);
         const id=randomUUID();
         await tx.query("INSERT INTO hs_onboarding.staff_requests(id,auth_id,program_id,team_id,role) VALUES($1,$2,$3,$4,$5)",[id,actor.authId,invite.program_id,invite.team_id,invite.staff_role]);
@@ -234,6 +243,18 @@ export class HighSchoolOnboarding {
   }
   async approvals(actor:OnboardingActor){
     await this.active(actor);this.fixture(actor);
+    if (this.staffDecisions && await this.staffDecisions.installed()) {
+      return (await this.pool.query(`SELECT r.id,r.role,r.status,p.name AS school
+        FROM hs_onboarding.staff_requests r JOIN hs_onboarding.programs p ON p.id=r.program_id
+        WHERE r.status='pending' AND r.auth_id<>$1 AND (
+          EXISTS(SELECT 1 FROM hs_onboarding.league_approvers a WHERE a.auth_id=$1 AND a.league_id=p.league_id)
+          OR EXISTS(SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
+            WHERE m.user_id=$1::text AND m.status='approved' AND m.child_profile_id IS NULL
+            AND t.program_type='high_school' AND t.program_id=r.program_id
+            AND(m.role='athletic_director' OR(m.role='head_coach' AND t.id=r.team_id::text
+              AND r.role IN('assistant_coach','team_manager')))))
+        ORDER BY r.created_at LIMIT 50`,[actor.authId])).rows;
+    }
     return (await this.pool.query(`SELECT r.id,r.role,r.status,p.name AS school
       FROM hs_onboarding.staff_requests r JOIN hs_onboarding.programs p ON p.id=r.program_id
       WHERE r.status='pending' AND r.auth_id<>$1 AND (
@@ -244,6 +265,11 @@ export class HighSchoolOnboarding {
   }
   async decide(actor:OnboardingActor,id:unknown,approve:unknown){
     uuid.parse(id);z.boolean().parse(approve);
+    // Once Phase 2 is installed, ALL approval entry points use the atomic
+    // canonical writer, including the existing league bootstrap UI.
+    if (this.staffDecisions && await this.staffDecisions.installed()) {
+      await this.staffDecisions.decide(actor,id as string,approve as boolean); return;
+    }
     await this.tx(async tx=>{
       await this.active(actor,tx);this.fixture(actor);
       const row=(await tx.query(`SELECT r.*,p.league_id FROM hs_onboarding.staff_requests r

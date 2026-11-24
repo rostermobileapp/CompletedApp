@@ -105,7 +105,14 @@ export function ResolvedSkinRuntime({ context, adult, entry }: {
     return <PendingSkin failed />;
   }
   return <TeamSkinFacts.Provider value={context}>
-    <TeamSkinShell key={scope} context={context} activeTeam={team} onTeamChange={changeTeam} />
+    <TeamSkinShell
+      key={scope}
+      context={context}
+      activeTeam={team}
+      onTeamChange={changeTeam}
+      operational={context.actor.type === "adult" &&
+        ["head_coach", "assistant_coach", "team_manager", "athletic_director"].includes(team.role)}
+    />
   </TeamSkinFacts.Provider>;
 }
 function AdultDiscovery({ adult, entry }: { adult: ReactNode; entry: ReactNode }) {

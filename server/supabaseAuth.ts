@@ -14,6 +14,11 @@ import { HighSchoolChildDevices } from './highSchoolChildDevices';
 import { registerHighSchoolYouthRoutes } from './highSchoolYouthHttp';
 import { TeamSkinService } from './teamSkinService';
 import { registerTeamSkinRoutes } from './teamSkinHttp';
+import { HighSchoolStaffOperations } from './highSchoolStaffOperations';
+import { HighSchoolStaffEvents } from './highSchoolStaffEvents';
+import { HighSchoolStaffChat } from './highSchoolStaffChat';
+import { registerHighSchoolStaffRoutes } from './highSchoolStaffHttp';
+import { existingStaffPaymentEligibility } from './highSchoolStaffPaymentEligibility';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -99,6 +104,9 @@ export async function setupAuth(app: Express) {
     registerHighSchoolOnboarding(app,onboarding,parent,authenticateOnboarding,(actor, grant) => youth.state(actor, grant));
     registerHighSchoolYouthRoutes(app,youth,children,authenticateOnboarding);
     registerTeamSkinRoutes(app,new TeamSkinService(pool,id=>storage.getUserTeams(id)),parent,children,authenticateOnboarding);
+    const staff = new HighSchoolStaffOperations(pool, existingStaffPaymentEligibility);
+    onboarding.staffDecisions = staff;
+    registerHighSchoolStaffRoutes(app,staff,new HighSchoolStaffEvents(pool),new HighSchoolStaffChat(pool),parent,authenticateOnboarding);
   }
 }
 

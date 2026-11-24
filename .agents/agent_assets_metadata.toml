@@ -245,3 +245,45 @@ mtime_ms = 1795535802175
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/22de20eb-c806-4545-94a5-e8507b6d4298/c4570129-7567-4877-98b9-688890f6b845"
 storage_version_token = "1795535816045428"
 content_type = "text/html"
+
+[[outputs]]
+id = "MQJBk2rLTLM9L18-QQnBk"
+uri = "file://generated-artifacts/high-school-staff/coach-phone.jpg"
+type = "image"
+title = "Coach Home — phone"
+description = "Actual signed-in isolated DEV capture using an owned synthetic Head Coach account."
+logical_id = "cdb784f7-93ed-4240-aa34-0df11e5c94cb"
+content_hash = "sha256:01d8e1db40ceab2c93217325a23d80c1a4f4f2af7d09106a755693b839632cfb"
+size = 39906
+mtime_ms = 1795553238218
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/cdb784f7-93ed-4240-aa34-0df11e5c94cb/0699fd4c-b86b-47d4-bf00-7ebf8aff312f"
+storage_version_token = "1795553529245820"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "PfCw3LMxL6HXiXp7dN6d6"
+uri = "file://generated-artifacts/high-school-staff/ad-desktop.jpg"
+type = "image"
+title = "AD program view — desktop"
+description = "Actual signed-in isolated DEV capture after switching to another authorized program team."
+logical_id = "7381bb95-ed9f-47e0-b260-91f4a3db4486"
+content_hash = "sha256:ac1aa0906ba5b75bf3b97aa659181b655381a2a7de7145ac33e217bef8e92af8"
+size = 61462
+mtime_ms = 1795553358938
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/7381bb95-ed9f-47e0-b260-91f4a3db4486/a8019297-6654-430d-8057-c8f93a3d8058"
+storage_version_token = "1795553529994001"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "ZNBirKY9mcwFA9znA9NUF"
+uri = "file://generated-artifacts/high-school-staff/coach-approvals-phone.jpg"
+type = "image"
+title = "Head coach staff approvals — phone"
+description = "Actual signed-in DEV capture after approving a synthetic same-team assistant and reloading; the canonical membership remained approved."
+logical_id = "f9e60d37-16fb-4dcb-b725-3fc42d2e6d61"
+content_hash = "sha256:caa3443f91cc16952bcb1fbfbb4e53672e5c49072f91a05005e80cbecce5973b"
+size = 36552
+mtime_ms = 1795553900121
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/f9e60d37-16fb-4dcb-b725-3fc42d2e6d61/af96eb13-0648-4034-ba91-32cfa528341a"
+storage_version_token = "1795554092956686"
+content_type = "image/jpeg"

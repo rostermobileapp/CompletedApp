@@ -246,7 +246,17 @@ export class HighSchoolChildDevices {
       WHERE m.child_id=$1 AND c.id=$4 AND ${this.chatScope}`,
     [session.child_id, session.parent_auth_id, session.child.team_id, chatId])).rows.length;
     if (!allowed) throw new OnboardingError("CHILD_CHAT_FORBIDDEN", 403);
+    const sharedStaff = !!(await this.pool.query("SELECT to_regclass('hs_onboarding.staff_version') AS installed")).rows[0]?.installed;
+    if (sharedStaff) await this.canonicalChatMember(this.pool, session, chatId);
     // No participant IDs, parent contacts, attachments, signed URLs or DM routes.
+    if (sharedStaff) return { messages: (await this.pool.query(`SELECT m.id,m.body,m.created_at AS "createdAt",
+      CASE WHEN m.child_id=$2 THEN 'You'
+        WHEN m.author_auth_id IS NOT NULL THEN coalesce(nullif(trim(concat(u.first_name,' ',u.last_name)),''),'Team staff')
+        ELSE coalesce(c.first_name,'Teammate') END AS sender,
+      CASE WHEN m.author_auth_id IS NOT NULL THEN 'staff' ELSE 'child' END AS "authorType"
+      FROM hs_onboarding.child_messages m LEFT JOIN public.users u ON u.id=m.author_auth_id::text
+      LEFT JOIN hs_onboarding.children c ON c.id=m.child_id WHERE m.chat_id=$1
+      ORDER BY m.created_at DESC,m.id DESC LIMIT 100`, [chatId, session.child_id])).rows.reverse() };
     return { messages: (await this.pool.query(`SELECT m.id,m.body,m.created_at AS "createdAt",
       CASE WHEN m.child_id=$2 THEN 'You' ELSE 'Teammate' END AS sender
       FROM hs_onboarding.child_messages m WHERE m.chat_id=$1
@@ -259,6 +269,9 @@ export class HighSchoolChildDevices {
       const beforeLock = await this.session(token, tx);
       await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [beforeLock.parent_auth_id]);
       const session = await this.session(token, tx);
+      if ((await tx.query("SELECT to_regclass('hs_onboarding.staff_version') AS installed")).rows[0]?.installed) {
+        await this.canonicalChatMember(tx, session, chatId);
+      }
       const inserted = await tx.query(`INSERT INTO hs_onboarding.child_messages(id,chat_id,child_id,body)
         SELECT $5,c.id,$1,$6 FROM hs_onboarding.child_chats c
         JOIN hs_onboarding.child_chat_members m ON m.chat_id=c.id
@@ -267,6 +280,20 @@ export class HighSchoolChildDevices {
       if (!inserted.rows.length) throw new OnboardingError("CHILD_CHAT_FORBIDDEN", 403);
       return { saved: true, id: inserted.rows[0].id };
     });
+  }
+  private async canonicalChatMember(db: Pick<ParentSql, "query">, session: any, chatId: string) {
+    const allowed = (await db.query(`SELECT 1 FROM hs_onboarding.child_chats c
+      JOIN hs_onboarding.child_chat_members cm ON cm.chat_id=c.id AND cm.child_id=$2
+      WHERE c.id=$1 AND(
+        (c.kind='family' AND c.parent_auth_id=$3 AND c.team_id IS NULL)
+        OR(c.kind='team' AND c.parent_auth_id IS NULL AND c.team_id=$4
+          AND EXISTS(SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
+            WHERE m.child_profile_id=$2 AND m.user_id IS NULL AND m.role='player' AND m.status='approved'
+            AND t.id=c.team_id::text AND t.program_type='high_school')
+          AND EXISTS(SELECT 1 FROM public.team_memberships m WHERE m.user_id=$3::text
+            AND m.team_id=c.team_id::text AND m.role='parent' AND m.status='approved')))` ,
+    [chatId, session.child_id, session.parent_auth_id, session.child.team_id])).rows.length;
+    if (!allowed) throw new OnboardingError("CHILD_CHAT_FORBIDDEN", 403);
   }
   async revoke(actor: OnboardingActor, childId: string, grant?: string) {
     await this.authority(actor, grant); uuid.parse(childId);
