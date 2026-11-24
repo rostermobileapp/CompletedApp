@@ -114,6 +114,7 @@ import Under18Onboarding from "@/pages/Under18Onboarding";
 import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
 import ParentVerification from "@/pages/ParentVerification";
 import { TeamSkinBoundary } from "@/components/high-school-skins/TeamSkinBoundary";
+import { familyAgeEligibility } from "@shared/familyEligibility";
 
 function LoadingScreen() {
   return (
@@ -375,7 +376,8 @@ export function Router() {
   }
 
   if (!userData.onboardingCompleted) {
-    return <Onboarding />;
+    return <Onboarding familyAccountId={import.meta.env.PROD && familyAgeEligibility(userData.dateOfBirth).eligible
+      ? user?.id : undefined} />;
   }
 
   if (isInsideNativeWrapper() && !resumeReady) return <LoadingScreen />;

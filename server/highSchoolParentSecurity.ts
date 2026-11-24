@@ -33,12 +33,14 @@ export const unavailableParentMailer: ParentCodeMailer = async () => {
 };
 
 /**
- * Only instantiated by the isolated DEV integration. Enrollment is a trusted
- * operator action, not a route. No client-provided destination or parent flag.
+ * Instantiated by isolated DEV or a verified production installation. Live
+ * enrollment activates only after email proof. No client-provided destination
+ * or parent-authority flag is trusted.
  * The injected mailer is PRIVATE; never provide an HTTP code-retrieval endpoint.
  */
 export class HighSchoolParentSecurity {
-  constructor(private pool: ParentSql, private mail: ParentCodeMailer = unavailableParentMailer) {}
+  constructor(private pool: ParentSql, private mail: ParentCodeMailer = unavailableParentMailer,
+    private stagedEnrollment = false) {}
 
   private async transaction<T>(fn: (tx: ParentTransaction) => Promise<T>): Promise<T> {
     const tx = await this.pool.connect();
@@ -58,7 +60,7 @@ export class HighSchoolParentSecurity {
   }
   async enrolled(authId: string) {
     // A missing install MUST stop the DEV integration, never silently skip it.
-    const rows = await this.pool.query("SELECT 1 FROM hs_parent_security.accounts WHERE auth_id=$1", [authId]);
+    const rows = await this.pool.query(`SELECT 1 FROM hs_parent_security.accounts WHERE auth_id=$1${this.stagedEnrollment ? " AND activated_at IS NOT NULL" : ""}`, [authId]);
     return rows.rows.length === 1;
   }
   private async active(actor: ParentActor, tx: Pick<ParentSql, "query"> = this.pool) {
@@ -95,7 +97,9 @@ export class HighSchoolParentSecurity {
     const destination = await this.transaction(async tx => {
       await this.active(actor, tx);
       // Account lock serializes rate limits across every device/server instance.
-      const account = await tx.query("SELECT parent_email FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [actor.authId]);
+      const account = await tx.query(`SELECT parent_email FROM hs_parent_security.accounts WHERE auth_id=$1
+        ${this.stagedEnrollment ? "AND EXISTS(SELECT 1 FROM auth.users u WHERE u.id=$1 AND u.email=parent_email AND u.email_confirmed_at IS NOT NULL)" : ""}
+        FOR UPDATE`, [actor.authId]);
       if (account.rows.length !== 1) throw new ParentSecurityError("FAMILY_NOT_ENROLLED", 403);
       await this.checkGuessBudget(tx, actor);
       const limits = await tx.query(`SELECT
@@ -130,7 +134,9 @@ export class HighSchoolParentSecurity {
     const token = randomBytes(32).toString("base64url");
     const outcome = await this.transaction(async tx => {
       await this.active(actor, tx);
-      const account = await tx.query("SELECT 1 FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [actor.authId]);
+      const account = await tx.query(`SELECT 1 FROM hs_parent_security.accounts WHERE auth_id=$1
+        ${this.stagedEnrollment ? "AND EXISTS(SELECT 1 FROM auth.users u WHERE u.id=$1 AND u.email=parent_email AND u.email_confirmed_at IS NOT NULL)" : ""}
+        FOR UPDATE`, [actor.authId]);
       if (account.rows.length !== 1) throw new ParentSecurityError("FAMILY_NOT_ENROLLED", 403);
       await this.checkGuessBudget(tx, actor);
       const rows = await tx.query(`UPDATE hs_parent_security.challenges SET attempts=attempts+1
@@ -145,6 +151,11 @@ export class HighSchoolParentSecurity {
       }
       await tx.query("UPDATE hs_parent_security.challenges SET consumed=true WHERE id=$1", [id]);
       const purpose = rows.rows[0].purpose as ParentPurpose;
+      // Live enrollment becomes protective only after actual email possession
+      // is proven. Failed delivery must never lock an ordinary adult out.
+      if (this.stagedEnrollment && purpose === "parent_action") {
+        await tx.query("UPDATE hs_parent_security.accounts SET activated_at=coalesce(activated_at,now()) WHERE auth_id=$1", [actor.authId]);
+      }
       const seconds = purpose === "password_change" ? 120 : 600;
       await tx.query(`INSERT INTO hs_parent_security.grants(token_digest,auth_id,session_id,purpose,expires_at)
         VALUES ($1,$2,$3,$4,now()+($5 * interval '1 second'))`,
@@ -200,6 +211,7 @@ export class HighSchoolParentSecurity {
       await tx.query("INSERT INTO hs_parent_security.writes VALUES (txid_current(),$1,$2)", [actor.authId, hash]);
       const updated = await tx.query("UPDATE auth.users SET encrypted_password=$1,updated_at=now() WHERE id=$2 RETURNING id", [hash, actor.authId]);
       if (updated.rows.length !== 1) throw new ParentSecurityError("PASSWORD_UPDATE_FAILED", 503);
+      await tx.query("DELETE FROM hs_parent_security.writes WHERE transaction_id=txid_current() AND auth_id=$1", [actor.authId]);
       await tx.query("UPDATE hs_parent_security.grants SET consumed=true WHERE auth_id=$1", [actor.authId]);
       await tx.query("UPDATE hs_parent_security.challenges SET consumed=true WHERE auth_id=$1", [actor.authId]);
       // Remove refresh tokens before sessions. Supabase schemas can differ in

@@ -15,7 +15,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
-import { isDevParentClient } from '@/lib/parentVerificationSession';
+import { isParentSecurityClient } from '@/lib/parentVerificationSession';
 import { familyAgeEligibility } from '@shared/familyEligibility';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
@@ -83,8 +83,18 @@ export default function Profile() {
   const { data: devParentStatus } = useQuery<{ enrolled: boolean }>({
     queryKey: ["dev-parent-profile-status", supabaseUser?.id],
     queryFn: async () => (await apiRequest("GET", "/api/high-school/parent-verification/status")).json(),
-    enabled: isDevParentClient && !!supabaseUser,
+    enabled: isParentSecurityClient && !!supabaseUser,
     retry: false,
+  });
+  const { data: familyAvailability } = useQuery<{ enabled: boolean }>({
+    queryKey: ["family-availability", supabaseUser?.id],
+    queryFn: async () => (await apiRequest("GET", "/api/high-school/family/availability")).json(),
+    enabled: isParentSecurityClient && !!supabaseUser, retry: false, staleTime: 30_000,
+  });
+  const { data: familyReviewTeams } = useQuery<{ teams: { id: string; name: string }[] }>({
+    queryKey: ["family-staff-teams", supabaseUser?.id],
+    queryFn: async () => (await apiRequest("GET", "/api/high-school/family/staff/teams")).json(),
+    enabled: import.meta.env.PROD && !!supabaseUser && !!familyAvailability, retry: false,
   });
   const { removeExternalId, displayId: nativeDisplayId } = useNativelyNotifications();
   const { role, hasRole, canManageLeague, hasPersonalProAccess } = usePermissions();
@@ -682,7 +692,7 @@ export default function Profile() {
       </div>
       {/* Scrollable Content Section */}
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
-        {isDevParentClient && <section className="px-6 mb-3" aria-labelledby="profile-family-title" data-testid="profile-family">
+        {(familyAvailability?.enabled || devParentStatus?.enrolled) && <section className="px-6 mb-3" aria-labelledby="profile-family-title" data-testid="profile-family">
           <div className="rounded-xl border bg-card p-4">
             <h2 id="profile-family-title" className="font-semibold mb-1">Family</h2>
             <p className="text-sm text-muted-foreground mb-3">Set up your children without changing your adult teams or account.</p>
@@ -696,10 +706,14 @@ export default function Profile() {
               </p>}
           </div>
         </section>}
-        {isDevParentClient && devParentStatus?.enrolled && <div className="px-6 mb-3">
+        {import.meta.env.PROD && !!familyReviewTeams?.teams.length && <div className="px-6 mb-3">
+          <button className="w-full rounded-xl border px-4 py-3 text-left text-sm"
+            onClick={() => navigate("/high-school/family-review")}>Review family requests</button>
+        </div>}
+        {isParentSecurityClient && devParentStatus?.enrolled && <div className="px-6 mb-3">
           <button className="w-full rounded-xl border px-4 py-3 text-left text-sm"
             onClick={() => navigate("/high-school/parent-verification")}>
-            Parent verification &amp; shared password · DEV
+            Parent verification &amp; shared password
           </button>
         </div>}
         {/* Profile Details */}

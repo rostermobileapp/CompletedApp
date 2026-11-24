@@ -7,6 +7,8 @@ import { containsForbiddenDemoBody, demoBodyUserIdsAreMapped, demoMutationAllowe
 import { HighSchoolParentSecurity, ParentSecurityError, isParentSecurityDevelopment } from './highSchoolParentSecurity';
 import { parentActorFromVerifiedToken, parentErrorResponse, parentGrantHeader, registerParentVerificationRoutes, requireDevParentAuthority } from './highSchoolParentHttp';
 import { createDevelopmentParentMailer } from './developmentParentMailer';
+import { createProductionParentMailer } from './productionParentMailer';
+import { productionFamilyInstalled, productionFamilyEnrollmentEnabled } from './productionFamilyRuntime';
 import { HighSchoolOnboarding } from './highSchoolOnboarding';
 import { registerHighSchoolOnboarding } from './highSchoolOnboardingHttp';
 import { HighSchoolYouthOnboarding } from './highSchoolYouthOnboarding';
@@ -37,13 +39,15 @@ const supabase = createClient(
 export { supabase };
 
 let devParentSecurity: HighSchoolParentSecurity | undefined;
+let liveParentSecurity: HighSchoolParentSecurity | undefined;
 function parentSecurity() {
-  if (!isParentSecurityDevelopment()) return undefined;
+  if (!isParentSecurityDevelopment()) return liveParentSecurity;
   return devParentSecurity ??= new HighSchoolParentSecurity(pool, createDevelopmentParentMailer());
 }
 const parentIssuer = () => `${new URL(process.env.SUPABASE_URL!).origin}/auth/v1`;
 let devOnboarding: HighSchoolOnboarding | undefined;
 function onboardingSecurity() {
+  if (!isParentSecurityDevelopment()) return undefined;
   const parent=parentSecurity();
   return parent ? devOnboarding ??= new HighSchoolOnboarding(pool,parent) : undefined;
 }
@@ -90,6 +94,9 @@ export async function getAuthenticatedDatabaseUser(accessToken: string, parentGr
 export async function setupAuth(app: Express) {
   // No special setup needed for Supabase auth
   // Authentication will be handled via JWT verification middleware
+  if (process.env.NODE_ENV === "production" && await productionFamilyInstalled(pool)) {
+    liveParentSecurity = new HighSchoolParentSecurity(pool, createProductionParentMailer(), true);
+  }
   const parent = parentSecurity();
   if (parent) {
     if (!await parent.installed()) {
@@ -104,7 +111,6 @@ export async function setupAuth(app: Express) {
       return parentActorFromVerifiedToken(token, user.id, parentIssuer());
     });
     const onboarding=onboardingSecurity()!;
-    if(!await onboarding.installed()) throw new Error("Explicit DEV onboarding installation is required.");
     const authenticateOnboarding = async (req: import('express').Request) => {
       const header=req.get("authorization");
       if(!header?.startsWith("Bearer "))throw new ParentSecurityError("INVALID_SESSION",401);
@@ -114,6 +120,15 @@ export async function setupAuth(app: Express) {
       return {...parentActorFromVerifiedToken(token,user.id,parentIssuer()),email:user.email??"",
         emailVerified:!!user.email_confirmed_at,fixture:!!user.app_metadata?.synthetic_high_school_onboarding_dev};
     };
+    if (!isParentSecurityDevelopment()) {
+      const family = new HighSchoolFamilySetup(pool, parent, async (id, leagueId) =>
+        await hasPersonalPro(id) ? "personal" : await proCoverage.hasProFor(id, { leagueId }) ? "league" : "uncovered",
+      true, productionFamilyEnrollmentEnabled());
+      registerHighSchoolFamilyRoutes(app, family, new HighSchoolFamilyReview(pool, undefined, undefined, true),
+        parent, authenticateOnboarding, true);
+      return;
+    }
+    if(!await onboarding.installed()) throw new Error("Explicit DEV onboarding installation is required.");
     const youth = new HighSchoolYouthOnboarding(pool, parent, onboarding);
     // No environment variable or client input can activate child access here.
     // The approved plan requires further provider, coverage and native proof.
@@ -128,6 +143,17 @@ export async function setupAuth(app: Express) {
       await hasPersonalPro(id) ? "personal" : await proCoverage.hasProFor(id, { leagueId }) ? "league" : "uncovered");
     family.intake.staffDecisions = staff;
     registerHighSchoolFamilyRoutes(app, family, new HighSchoolFamilyReview(pool), parent, authenticateOnboarding);
+  } else {
+    // Backward-compatible recovery/availability contract before installation.
+    // No family account can exist when productionFamilyInstalled returns false.
+    app.get("/api/high-school/parent-verification/status", (_req, res) => {
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ enrolled: false, verified: false });
+    });
+    app.get("/api/high-school/family/availability", (_req, res) => {
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ enabled: false });
+    });
   }
 }
 

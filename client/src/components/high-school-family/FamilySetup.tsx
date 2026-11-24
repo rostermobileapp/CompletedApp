@@ -15,6 +15,7 @@ type FamilySetupProps = {
   request?: FamilyRequestFn;
   onExit: () => void;
   onTeamChange: (teamId: string) => void;
+  teamAccessAvailable?: boolean;
 };
 type JoinMode = "code" | "invitation";
 type AuthorityFailure = "PARENT_VERIFICATION_REQUIRED" | "INVALID_SESSION" | "FAMILY_ELIGIBILITY_REQUIRED" | "";
@@ -33,6 +34,7 @@ function errorMessage(error: unknown) {
     INVALID_SESSION: "Your sign-in session is no longer valid. Return to your account and sign in again.",
     DEV_FIXTURE_REQUIRED: "This family setup is available only to an eligible development account.",
     DEV_FAMILY_INSTALL_REQUIRED: "Family setup is not installed in this environment. Contact the administrator.",
+    FAMILY_RELEASE_UNAVAILABLE: "New family enrollment is not available yet. Your adult account has not been changed.",
     EXISTING_ADULT_ACCOUNT_REQUIRED: "Family setup requires an existing adult account. Your current account was not changed.",
     FAMILY_DOB_REQUIRED: "Add your date of birth in your profile before starting family setup.",
     FAMILY_DOB_INVALID: "Your profile needs a valid date of birth before you can use family setup.",
@@ -115,6 +117,7 @@ export function FamilySetup({
   request = familyRequest,
   onExit,
   onTeamChange,
+  teamAccessAvailable = true,
 }: FamilySetupProps) {
   const queryClient = useQueryClient();
   const verificationRevision = useSyncExternalStore(
@@ -668,7 +671,8 @@ export function FamilySetup({
         {requests.length === 0 && draftRows.length === 0 && <div className="family-empty" style={{ marginTop: 11 }}>
           <strong>No team requests yet</strong><p>Child profiles are created only after a team approves a request.</p>
         </div>}
-        {requests.map(item => <FamilyRequestCard key={item.id} request={item} busy={busy === `team-${item.teamId}`} onViewTeam={() => void viewTeam(item.teamId)} />)}
+        {requests.map(item => <FamilyRequestCard key={item.id} request={item} busy={busy === `team-${item.teamId}`}
+          onViewTeam={teamAccessAvailable ? () => void viewTeam(item.teamId) : undefined} />)}
       </section>
 
       {mayCreateNew && <div className="family-panel soft" style={{ marginTop: 15 }}>
@@ -710,7 +714,7 @@ export function FamilySetup({
 function FamilyRequestCard({ request, busy, onViewTeam }: {
   request: FamilyRequest;
   busy: boolean;
-  onViewTeam: () => void;
+  onViewTeam?: () => void;
 }) {
   const statusClass = request.status === "approved" ? "approved" : request.status === "denied" ? "denied" : "pending";
   const name = `${request.details.firstName} ${request.details.lastName}`.trim();
@@ -725,7 +729,7 @@ function FamilyRequestCard({ request, busy, onViewTeam }: {
     </div>
     <div className="family-request-bottom">
       <span className="family-coverage"><strong>Coverage</strong><br />{coverageLabel(request.coverage)}</span>
-        {request.status === "approved" && <button className="family-team-link" disabled={busy} onClick={onViewTeam}>{busy ? "Opening team…" : "View team"}</button>}
+        {request.status === "approved" && onViewTeam && <button className="family-team-link" disabled={busy} onClick={onViewTeam}>{busy ? "Opening team…" : "View team"}</button>}
     </div>
     <div className="family-device-state"><span>Child sign-in and device access</span><strong>Disabled</strong></div>
   </article>;

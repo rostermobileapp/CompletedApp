@@ -21,6 +21,22 @@ Auth/schema changes before applying them. Preserve unrelated adult behavior.
 Use the application's New York calendar for DOB boundaries, not a caller's
 chosen timezone; February 29 reaches the threshold on March 1 in non-leap years.
 
+The owner subsequently selected **Authorize protected production rollout**
+after reviewing the private-family-storage, parent/child-membership and
+enrolled-account Auth changes, including safe email recovery and existing-provider
+compatibility before installation. This authorizes those scoped production
+changes after verification; do not ask for the same approval again.
+
+Live family enrollment must remain pending until parent-email possession is
+proven. Disabling new enrollment must not remove existing family protection.
+
+**Why:** The shared-login boundary must not lock ordinary adult accounts when
+mail delivery fails, or disappear merely because a rollout switch is disabled.
+
+**How to apply:** Preserve staged activation and independent existing-family
+protection when changing enrollment, recovery, release flags or account access.
+It does not authorize automatic enrollment or child-device activation.
+
 ## Revised onboarding export (November 23, 2026)
 
 The owner supplied a 25-screen High School / Youth export and explicitly requested

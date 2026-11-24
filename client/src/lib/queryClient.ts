@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase, clearStaleSession } from "./supabase";
-import { isDevParentClient, parentVerificationSession } from "./parentVerificationSession";
+import { isParentSecurityClient, parentVerificationSession } from "./parentVerificationSession";
 import { teamRequestSignal } from "./teamRequestScope";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
@@ -172,7 +172,7 @@ export async function getAuthHeaders(requestUrl?: string): Promise<Record<string
   // Raw authenticated fetches call this helper, so keep Demo identity handling
   // centralized rather than requiring every feature to know about Demo mode.
   return { ...headers,
-    ...(isDevParentClient ? parentVerificationSession.headers(session?.access_token) : {}),
+    ...parentVerificationSession.headers(session?.access_token),
     ...(requestUrl && isDemoControlUrl(requestUrl) ? {} : getDemoPovHeader()) };
 }
 
@@ -182,7 +182,7 @@ export async function apiRequest(
   data?: unknown | undefined,
   signal?: AbortSignal,
 ): Promise<Response> {
-  const scopeSignal = signal ?? (isDevParentClient ? teamRequestSignal() : undefined);
+  const scopeSignal = signal ?? (isParentSecurityClient ? teamRequestSignal() : undefined);
   const fullUrl = `${API_BASE_URL}${url}`;
   const authHeaders = await getAuthHeaders(url);
   const headers = {
@@ -254,7 +254,7 @@ export const queryClient = new QueryClient({
     },
   },
 });
-if (isDevParentClient) {
+if (isParentSecurityClient) {
   // Drop cached parent data immediately on expiry, lock or a new grant.
   parentVerificationSession.subscribe(() => queryClient.clear());
   supabase.auth.onAuthStateChange((event, session) => {

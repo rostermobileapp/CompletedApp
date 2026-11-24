@@ -85,6 +85,10 @@ export function useDashboardSelection() {
   };
 
   return {
+    clearSelection: () => {
+      localStorage.removeItem(typeKey); localStorage.removeItem(idKey);
+      setSelectedType(null); setSelectedId(null); notifyDashboardSelectionChange();
+    },
     selectedType,
     selectedId,
     selectedTeamId,

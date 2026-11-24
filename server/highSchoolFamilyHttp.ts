@@ -6,11 +6,12 @@ import { parentGrantHeader } from "./highSchoolParentHttp";
 import type { HighSchoolFamilySetup, HighSchoolFamilyReview } from "./highSchoolFamilySetup";
 
 export function registerHighSchoolFamilyRoutes(app: Express, family: HighSchoolFamilySetup,
-  review: HighSchoolFamilyReview, parent: HighSchoolParentSecurity, authenticate: (req: Request) => Promise<OnboardingActor>) {
+  review: HighSchoolFamilyReview, parent: HighSchoolParentSecurity, authenticate: (req: Request) => Promise<OnboardingActor>,
+  allowProduction = false) {
   const base = "/api/high-school/family";
   const handle = (work: (r: Request, a: OnboardingActor, grant?: string) => Promise<unknown>, bootstrap = false): RequestHandler => async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store"); res.setHeader("Pragma", "no-cache");
-    if (!isParentSecurityDevelopment()) { res.sendStatus(404); return; }
+    if (!isParentSecurityDevelopment() && !allowProduction) { res.sendStatus(404); return; }
     try {
       if (!await family.installed()) throw new OnboardingError("DEV_FAMILY_INSTALL_REQUIRED", 503);
       const actor = await authenticate(req), grant = req.get(parentGrantHeader);
@@ -23,6 +24,10 @@ export function registerHighSchoolFamilyRoutes(app: Express, family: HighSchoolF
         .json({ code: known ? error.code : error instanceof ZodError ? "INVALID_FAMILY_INPUT" : "FAMILY_SETUP_UNAVAILABLE" });
     }
   };
+  app.get(`${base}/availability`, handle(async (_r, actor) => ({
+    enabled: family.enrollmentEnabled || await parent.enrolled(actor.authId),
+  }), true));
+  app.get(`${base}/adult-team-ids`, handle((_r, a) => family.adultTeamIds(a)));
   app.get(`${base}/state`, handle((_r, a, g) => family.state(a, g), true));
   app.post(`${base}/begin`, handle((_r, a) => family.begin(a), true));
   app.post(`${base}/draft`, handle((r, a, g) => family.draft(a, r.body, g)));
@@ -31,6 +36,7 @@ export function registerHighSchoolFamilyRoutes(app: Express, family: HighSchoolF
   app.post(`${base}/join`, handle((r, a, g) => family.intake.join(a, r.body, g)));
   app.post(`${base}/new-draft`, handle((r, a, g) => family.newDraft(a, r.body, g)));
   const staff = `${base}/staff/teams/:teamId/requests`;
+  app.get(`${base}/staff/teams`, handle((_r, a) => review.teams(a)));
   app.get(staff, handle((r, a) => review.requests(a, r.params.teamId)));
   app.post(`${staff}/:id/decision`, handle((r, a) => review.decide(a, r.params.teamId, r.params.id, r.body)));
 }

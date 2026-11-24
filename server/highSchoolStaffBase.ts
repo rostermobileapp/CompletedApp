@@ -12,7 +12,8 @@ export const uuid = z.string().uuid();
 export const staffName = z.string().trim().min(1).max(100).refine(v => !/[\x00-\x1f\x7f]/.test(v));
 export class StaffBase {
   constructor(protected pool: ParentSql, protected paymentEligibility: StaffPaymentEligibility = async () => false,
-    protected dispatch: StaffDispatch = async () => { /* Explicit no-delivery DEV transport. */ }) {}
+    protected dispatch: StaffDispatch = async () => { /* Explicit no-delivery DEV transport. */ },
+    protected live = false) {}
   async installed() {
     return !!(await this.pool.query("SELECT to_regclass('hs_onboarding.staff_version') AS installed")).rows[0]?.installed;
   }
@@ -22,11 +23,12 @@ export class StaffBase {
     catch (error) { await db.query("ROLLBACK"); throw error; } finally { db.release(); }
   }
   protected async active(db: ParentTransaction, actor: OnboardingActor) {
-    if (!actor.fixture || !actor.emailVerified || !actor.email.endsWith("@example.com")) staffFail("DEV_FIXTURE_REQUIRED", 403);
+    if (!actor.emailVerified || (!this.live && (!actor.fixture || !actor.email.endsWith("@example.com")))) staffFail("DEV_FIXTURE_REQUIRED", 403);
     const row = await db.query(`SELECT 1 FROM auth.sessions s JOIN auth.users u ON u.id=s.user_id
       WHERE s.id=$1 AND s.user_id=$2 AND(s.not_after IS NULL OR s.not_after>now())
-      AND u.email_confirmed_at IS NOT NULL AND lower(u.email) LIKE '%@example.com'
-      AND u.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true'`, [actor.sessionId, actor.authId]);
+      AND u.email=$3 AND u.email_confirmed_at IS NOT NULL
+      AND($4::boolean OR(lower(u.email) LIKE '%@example.com'
+        AND u.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true'))`, [actor.sessionId, actor.authId, actor.email, this.live]);
     if (!row.rows.length) staffFail("INVALID_SESSION", 401);
   }
   /** Every operation locks the program before checking canonical roles.

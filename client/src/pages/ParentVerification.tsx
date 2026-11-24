@@ -18,15 +18,15 @@ function friendlyError(error: unknown) {
     INVALID_PASSWORD: "Use 12 or more characters with uppercase, lowercase, a number and a symbol. Keep it within 72 UTF-8 bytes.",
     PASSWORD_MUST_DIFFER: "Choose a password different from the current shared password.",
     PASSWORD_VERIFICATION_REQUIRED: "A fresh password-change code is required. Request another code.",
-    FAMILY_NOT_ENROLLED: "This account is not enrolled in the DEV family test.",
+    FAMILY_NOT_ENROLLED: "This account has not started family setup.",
   };
   if (code && messages[code]) return messages[code];
-  return "DEV verification is unavailable. No parent access or password change was approved. Try again later.";
+  return "Verification is unavailable. No parent access or password change was approved. Try again later.";
 }
-export default function ParentVerification({ authenticated = true, enrolled = true, unavailable = false }: {
-  authenticated?: boolean; enrolled?: boolean; unavailable?: boolean;
+export default function ParentVerification({ authenticated = true, enrolled = true, unavailable = false, initialPurpose = "parent_action" }: {
+  authenticated?: boolean; enrolled?: boolean; unavailable?: boolean; initialPurpose?: Purpose;
 }) {
-  const [purpose, setPurpose] = useState<Purpose>("parent_action");
+  const [purpose, setPurpose] = useState<Purpose>(initialPurpose);
   const [challenge, setChallenge] = useState<string>();
   const [code, setCode] = useState("");
   const [passwordGrant, setPasswordGrant] = useState<{ value: string; until: number }>();
@@ -111,13 +111,13 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
   const input = "w-full rounded-lg border bg-background px-3 py-3";
   return <main className="onboarding-light parent-verification-light min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-10">
     <section className="parent-verification-card w-full max-w-md rounded-2xl border bg-card p-6 shadow-lg space-y-5" aria-labelledby="parent-verification-title">
-      <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">DEV only · parent verification</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Parent verification</p>
       <h1 id="parent-verification-title" className="text-2xl font-semibold">Verify you're the parent</h1>
       <p className="text-sm text-muted-foreground">The shared password allows sign-in. Parent controls and password changes also need a code sent to the parent's registered email.</p>
       {finished ? <div role="status" className="space-y-3"><p>The shared password was changed. All previous sessions were ended.</p><a href="/login" className={button}>Sign in again</a></div>
         : !authenticated ? <p>Sign in with the shared family login first. <a className="underline" href="/login">Go to sign-in</a>.</p>
-        : unavailable ? <p role="alert">The DEV verification service is unavailable. Parent controls remain locked. Refresh to retry.</p>
-        : !enrolled ? <p role="status">This account is not enrolled in the DEV family test. Existing adult accounts are unchanged.</p>
+        : unavailable ? <p role="alert">The verification service is unavailable. Parent controls remain locked. Refresh to retry.</p>
+        : !enrolled ? <p role="status">This account has not started family setup. Existing adult accounts are unchanged.</p>
         : <>
           <div className="grid grid-cols-2 gap-2" aria-label="Verification purpose">
             <button className={button} disabled={busy} aria-pressed={purpose === "parent_action"} onClick={() => selectPurpose("parent_action")}>Parent controls</button>

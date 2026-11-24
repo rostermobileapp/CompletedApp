@@ -14,6 +14,7 @@ import { TeamSkinShell } from "./TeamSkinShell";
 import { TeamSkinPreview } from "./TeamSkinPreview";
 import ParentVerification from "@/pages/ParentVerification";
 import { FamilySetup } from "@/components/high-school-family/FamilySetup";
+import { LiveFamilyBoundary } from "@/components/high-school-family/LiveFamilyBoundary";
 
 function PendingSkin({ failed = false }: { failed?: boolean }) {
   return <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center" role="status">
@@ -178,6 +179,7 @@ function IsolatedBoundary({ children, entry }: { children: ReactNode; entry: Rea
   return token ? <ChildDiscovery token={token} entry={entry} /> : <AdultDiscovery adult={children} entry={entry} />;
 }
 export function TeamSkinBoundary({ children, entry }: { children: ReactNode; entry: ReactNode }) {
+  if (import.meta.env.PROD) return <LiveFamilyBoundary entry={entry}>{children}</LiveFamilyBoundary>;
   if (!isDevParentClient) return <>{children}</>;
   return <IsolatedBoundary entry={entry}>{children}</IsolatedBoundary>;
 }

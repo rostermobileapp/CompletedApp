@@ -15,7 +15,8 @@ export class HighSchoolOnboarding {
   // onboarding routes always use the primary store.
   private readonly flowTable: "hs_onboarding.flows" | "hs_onboarding.family_flows";
   constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity, family = false,
-    private familyEligibility?: (actor: OnboardingActor, db: Pick<ParentSql, "query">) => Promise<unknown>) {
+    private familyEligibility?: (actor: OnboardingActor, db: Pick<ParentSql, "query">) => Promise<unknown>,
+    private liveFamily = false) {
     this.flowTable = family ? "hs_onboarding.family_flows" : "hs_onboarding.flows";
   }
   async installed() {
@@ -27,6 +28,7 @@ export class HighSchoolOnboarding {
     catch (e) { await tx.query("ROLLBACK"); throw e; } finally { tx.release(); }
   }
   private fixture(actor: OnboardingActor) {
+    if (this.liveFamily && this.flowTable === "hs_onboarding.family_flows" && actor.emailVerified) return;
     if (!actor.fixture || !actor.emailVerified || !actor.email.endsWith("@example.com")) fail("DEV_FIXTURE_REQUIRED", 403);
   }
   private async active(actor: OnboardingActor, tx: Pick<ParentSql, "query"> = this.pool) {
@@ -179,7 +181,7 @@ export class HighSchoolOnboarding {
       WHERE token_digest=$1 AND expires_at>now()`,[digest])).rows[0];
     if(!row || row.program_status!=="approved" || row.recipient_email.toLowerCase()!==actor.email.toLowerCase() || (kind && row.kind!==kind)) fail("INVALID_INVITATION",403);
     // Recheck creator authority at use time, so revocation invalidates links.
-    const canonical = this.staffDecisions && await this.staffDecisions.installed();
+    const canonical = this.liveFamily || this.staffDecisions && await this.staffDecisions.installed();
     const creator= canonical ? await tx.query(`SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
       WHERE m.user_id=$1::text AND m.child_profile_id IS NULL AND m.status='approved' AND t.program_type='high_school'
       AND t.program_id=$2 AND(m.role='athletic_director' OR(m.role='head_coach' AND t.id=$3::text))`,

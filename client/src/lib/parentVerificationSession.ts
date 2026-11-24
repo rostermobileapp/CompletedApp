@@ -44,3 +44,4 @@ export function createParentVerificationSessionStore(now = () => Date.now()) {
 }
 export const parentVerificationSession = createParentVerificationSessionStore();
 export const isDevParentClient = import.meta.env?.DEV === true && import.meta.env?.VITE_ISOLATED_DEVELOPMENT === "true";
+export const isParentSecurityClient = isDevParentClient || import.meta.env?.PROD === true;

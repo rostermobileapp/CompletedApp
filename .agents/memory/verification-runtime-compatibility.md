@@ -3,6 +3,16 @@ name: Verification runtime compatibility
 description: Browser-test delegation may be documented but unavailable in the current runtime.
 ---
 
+Standalone Node 20 Supabase Auth checks must explicitly supply the installed
+`ws` transport when constructing the SDK client, or use the existing HTTP helper.
+
+**Why:** The current SDK constructs Realtime even for Auth-only use, and Node 20
+has no native WebSocket; otherwise client construction fails before any Auth test.
+
+**How to apply:** Set `realtime.transport` for standalone checks without enabling
+Realtime or changing application authentication. Keep runtime-adapter failures
+distinct from provider/security failures.
+
 Do not assume the testing subagent kind is available merely because the testing skill documents it.
 
 **Why:** The current runtime rejected a correctly formed testing delegation with “Unknown config kind: testing”; design delegation worked.

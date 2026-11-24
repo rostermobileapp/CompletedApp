@@ -4,7 +4,8 @@
 
 The owner requested live family setup for **every account with a recorded DOB
 showing age 21 or older**, independent of plan, role, team membership or completed
-adult onboarding. This authorizes preparing the family rollout, not child login,
+adult onboarding. The owner subsequently authorized the protected production
+storage, canonical membership and Auth rollout. This does not authorize child login,
 device activation or unrelated High School features.
 
 The age rule reads the existing public account's DOB through its verified Auth
@@ -38,17 +39,84 @@ catalog reads only; no production users, settings or schemas were changed.
   repository/branch and existing Resend/Supabase configuration names. No family
   rollout configuration was present. No release was triggered.
 
-## Why activation remains blocked
+## Why the database foundation alone does not enable Family
 
 The private tables and provider protection are prerequisites, not optional UI
 details. Removing DEV flags would either leave the flow unavailable or weaken
 the shared-password boundary.
 
-The DEV Auth guard intentionally rejects provider recovery-token changes,
+The original DEV Auth guard intentionally rejects provider recovery-token changes,
 email/phone changes and identity/MFA mutations after family enrollment. It must
 not be copied into production without a safe parent-email recovery path and
 compatibility checks for the login providers real accounts use. A captured DEV
-mailer is not production inbox verification.
+mailer is not production inbox verification. The separate production package
+now permits legitimate recovery while retaining independent email approval for
+password changes. The original DEV guard was not installed on production.
+
+## Installed protected foundation — November 24, 2026
+
+The explicitly authorized, transactional installation **completed on external
+production Supabase**. Readiness checks passed before commit, and an actual
+read-only PostgREST request observed the installed API guard after commit.
+
+- Added private parent-security and family storage, plus additive program and
+  canonical parent/child membership fields. No production school, team, child,
+  family, account or fixture was seeded.
+- No existing account was enrolled. Child login and device activation remain
+  disabled, including a database constraint against enabling a child.
+- Existing ordinary adult accounts are outside family protection. Parent
+  protection begins only after a successfully delivered parent-action code is
+  verified; failed mail cannot activate it or lock ordinary adult access.
+- Protected accounts use the backend, not direct Supabase table, RPC, Storage
+  or realtime reads. Restrictive public-table policies and a PostgREST pre-request
+  guard enforce that boundary. Private tables and write capabilities have no
+  browser/provider-role grants.
+- Existing-identity profile refresh and ordinary recovery-session issuance are
+  allowed; changes to login identity, identity linking, MFA setup and unapproved
+  password writes remain blocked. Administrator deletion can still cascade.
+- Turning off new enrollment never disables protection for existing families.
+- The installer checks the target, verified TLS, required Auth columns, existing
+  API hook, public-table RLS, triggers and installed manifest. It refuses an
+  incompatible existing installation rather than replacing it.
+
+This was a database installation, **not a Railway/Vercel app release**. The
+application changes have not been published, and new live enrollment remains
+off until the matching backend is released with `FAMILY_SETUP_ENABLED=1`.
+
+## Current application implementation and verification
+
+The application changes now include a production-only family boundary, Profile
+entry (including a shortcut before adult onboarding is complete), parent verification/recovery, private proof headers and cache clearing,
+canonical-review team discovery and the existing approval panel. School dashboard,
+chat, child-device and broader DEV onboarding routes are not promoted. Returning
+to adult mode checks actual approved adult teams rather than trusting selection
+storage.
+
+- Latest focused run: **45 checks passed**, including actual disposable
+  PostgreSQL, failed-install rollback, unchanged original account/team/membership
+  fields, failed-mail enrollment safety, real-account service composition,
+  role-scoped review, direct-data denial, disabled children and recovery permits.
+- Hosted DEV provider proof used an owned temporary account with the exact
+  production guard definitions in a temporary private namespace. Actual sign-in,
+  denied unapproved password change, actual recovery-session redemption, approved
+  password change, session revocation and administrator deletion passed. Its
+  temporary account, namespace and triggers were removed. Mail was captured.
+- The hosted DEV acceptance runner again passed all **ten groups**, using
+  actual isolated Auth, SQL, HTTP and signed-in 390px/desktop browser contexts.
+  Owned synthetic fixture cleanup succeeded; no real email was sent.
+- The actual production boundary passed ordinary access, proof gating, child-data
+  clearing, incomplete-profile entry without profile mutations, school-selection
+  isolation, adult return, review and recovery routing
+  checks at **390px and 1440px**. These checks used isolated Auth/API adapters,
+  not a production sign-in or a physical-phone test.
+- The production frontend and backend bundles built successfully into ignored
+  verification output; neither was published or served as the main preview.
+  The final full TypeScript check retained **224 pre-existing diagnostics**,
+  with none introduced by this work. The application workflow restarted cleanly.
+
+Actual live inbox receipt, a complete Google/Apple provider handshake, and
+signed-in acceptance of the published Railway/Vercel release have **not** been
+verified. Simulated delivery and identity-refresh SQL are not those checks.
 
 ## DOB change verification
 
@@ -69,11 +137,11 @@ mailer is not production inbox verification.
 
 ## Required production implementation and acceptance
 
-1. Prepare a separate, reviewed, explicit production installation; never run
+1. Completed: prepare and apply a separate, explicit production installation; never run
    the DEV installers against live. Document the private tables and additive
    program/child-membership changes. Preserve existing rows, memberships,
-   account identity, billing and original onboarding. Obtain the owner's
-   authorization for the specific live Auth/schema changes before applying them.
+   account identity, billing and original onboarding. The owner's authorization
+   for the specific live Auth/schema changes was obtained before applying them.
 2. Promote only the approved family surface and its required canonical review
    path, not all DEV High School onboarding, staff dashboards or preview tools.
    Establish real authorized school/team sources separately; do not seed fake
@@ -95,5 +163,6 @@ mailer is not production inbox verification.
    changes. Replit Publish does not migrate the external Supabase database.
    Confirm the actual live release before describing the feature as live.
 
-**Current status:** DOB eligibility implemented in the guarded DEV flow.
-Production family activation is **not enabled** and production data is unchanged.
+**Current status:** Protected production database foundation installed and
+verified; no accounts enrolled. Matching application release and live acceptance
+remain outstanding. Family is **not yet enabled for live users**.

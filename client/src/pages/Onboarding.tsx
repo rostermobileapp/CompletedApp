@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
@@ -60,10 +60,15 @@ interface OnboardingData {
   competitiveLevel: string;
 }
 
-export default function Onboarding() {
+export default function Onboarding({ familyAccountId }: { familyAccountId?: string } = {}) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: familyAvailability } = useQuery<{ enabled: boolean }>({
+    queryKey: ["family-availability", familyAccountId],
+    queryFn: async () => (await apiRequest("GET", "/api/high-school/family/availability")).json(),
+    enabled: !!familyAccountId, retry: false, staleTime: 30_000,
+  });
   const profilePreviewParam = new URLSearchParams(window.location.search).get('profileStep');
   const profilePreviewStep = import.meta.env.DEV && PROFILE_PREVIEW_STEPS.some(({ value }) => String(value) === profilePreviewParam)
     ? Number(profilePreviewParam)
@@ -197,6 +202,9 @@ export default function Onboarding() {
           ))}
         </div>
       </div>
+
+      {familyAvailability?.enabled && <Button type="button" variant="outline" className="w-full mb-4"
+        onClick={() => navigate("/high-school/family")}>Add a child without finishing my playing profile</Button>}
 
       <div className="profile-content">
         {currentStep === 1 && (

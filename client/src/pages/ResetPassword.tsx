@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { Lock, CheckCircle } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
+import ParentVerification from './ParentVerification';
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
@@ -15,6 +17,18 @@ export default function ResetPassword() {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
   const { toast } = useToast();
+  const [familyStatus, setFamilyStatus] = useState<"checking" | "ordinary" | "family" | "unavailable">("checking");
+
+  useEffect(() => {
+    if (isValidToken !== true) return;
+    let current = true;
+    setFamilyStatus("checking");
+    void apiRequest("GET", "/api/high-school/parent-verification/status")
+      .then(r => r.json()).then(result => {
+        if (current) setFamilyStatus(result.enrolled === true ? "family" : "ordinary");
+      }).catch(() => { if (current) setFamilyStatus("unavailable"); });
+    return () => { current = false; };
+  }, [isValidToken]);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -56,6 +70,7 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (familyStatus !== "ordinary") return;
 
     if (password !== confirmPassword) {
       toast({
@@ -103,7 +118,17 @@ export default function ResetPassword() {
     }
   };
 
-  if (isValidToken === null) {
+  if (isValidToken === true && familyStatus === "family") {
+    return <ParentVerification initialPurpose="password_change" />;
+  }
+  if (isValidToken === true && familyStatus === "unavailable") {
+    return <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
+      <h1 className="text-xl font-semibold">Password recovery is temporarily unavailable</h1>
+      <p>Your account protection could not be checked. No password was changed.</p>
+      <Button onClick={() => window.location.reload()}>Try again</Button>
+    </main>;
+  }
+  if (isValidToken === null || (isValidToken === true && familyStatus === "checking")) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4" data-testid="page-reset-password-validating">
         <div className="w-full max-w-md text-center">

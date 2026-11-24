@@ -15,9 +15,10 @@ export type FamilyCoverage = (userId: string, leagueId: string) => Promise<Cover
 export class HighSchoolFamilySetup {
   readonly intake: HighSchoolOnboarding;
   constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity,
-    private coverage: FamilyCoverage = async () => "uncovered") {
+    private coverage: FamilyCoverage = async () => "uncovered",
+    private live = false, readonly enrollmentEnabled = true) {
     this.intake = new HighSchoolOnboarding(pool, parent, true,
-      (actor, db) => requireFamilyAdultAccount(db, actor));
+      (actor, db) => requireFamilyAdultAccount(db, actor), live);
   }
   async installed() {
     return !!(await this.pool.query("SELECT to_regclass('hs_onboarding.family_version') AS installed")).rows[0]?.installed;
@@ -28,23 +29,33 @@ export class HighSchoolFamilySetup {
     catch (error) { await db.query("ROLLBACK"); throw error; } finally { db.release(); }
   }
   private async active(db: Pick<ParentSql, "query">, actor: OnboardingActor) {
-    if (!actor.fixture || !actor.emailVerified || !actor.email.endsWith("@example.com"))
+    if (!actor.emailVerified || (!this.live && (!actor.fixture || !actor.email.endsWith("@example.com"))))
       throw new OnboardingError("DEV_FIXTURE_REQUIRED", 403);
     const row = await db.query(`SELECT 1 FROM auth.sessions s JOIN auth.users u ON u.id=s.user_id
       WHERE s.id=$1 AND s.user_id=$2 AND(s.not_after IS NULL OR s.not_after>now())
       AND u.email=$3 AND u.email_confirmed_at IS NOT NULL
-      AND u.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true'`, [actor.sessionId, actor.authId, actor.email]);
+      AND($4::boolean OR u.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true')`, [actor.sessionId, actor.authId, actor.email, this.live]);
     if (!row.rows.length) throw new OnboardingError("INVALID_SESSION", 401);
     return requireFamilyAdultAccount(db, actor);
   }
   async begin(actor: OnboardingActor) {
+    if (!this.enrollmentEnabled) throw new OnboardingError("FAMILY_RELEASE_UNAVAILABLE", 503);
     await this.transaction(async db => {
       const adult = await this.active(db, actor);
       await db.query("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", [actor.authId]);
       // Same verified mapping as the adult account: never create a replacement
       // user, overwrite an ID, promote a role or move somebody's playing data.
+      if (this.live) {
+        // A not-yet-protected adult may legitimately change their login email.
+        // Never deliver to its stale pending address or retain old approvals.
+        for (const table of ["challenges", "grants"]) {
+          await db.query(`UPDATE hs_parent_security.${table} SET consumed=true WHERE auth_id=$1
+            AND EXISTS(SELECT 1 FROM hs_parent_security.accounts
+              WHERE auth_id=$1 AND activated_at IS NULL AND parent_email<>$2)`, [actor.authId, actor.email]);
+        }
+      }
       await db.query(`INSERT INTO hs_parent_security.accounts(auth_id,parent_email) VALUES($1,$2)
-        ON CONFLICT(auth_id) DO NOTHING`, [actor.authId, actor.email]);
+        ON CONFLICT(auth_id) ${this.live ? "DO UPDATE SET parent_email=excluded.parent_email WHERE accounts.activated_at IS NULL" : "DO NOTHING"}`, [actor.authId, actor.email]);
       await db.query(`INSERT INTO hs_onboarding.family_flows(auth_id,adult_user_id) VALUES($1,$2)
         ON CONFLICT(auth_id) DO NOTHING`, [actor.authId, adult.id]);
     });
@@ -81,6 +92,15 @@ export class HighSchoolFamilySetup {
     return { ...empty, revision: flow.revision, status: flow.status,
       players: flow.draft.players ?? [], guardianConfirmed: flow.draft.guardianConfirmed === true,
       imported: flow.status === "draft" && !!flow.draft.invitationDigest, requests };
+  }
+  /** Adult-mode recovery is independent of family DOB eligibility. An adult
+   * correcting their DOB must still be able to return to their adult teams. */
+  async adultTeamIds(actor: OnboardingActor) {
+    return { teamIds: (await this.pool.query(`SELECT DISTINCT m.team_id FROM hs_onboarding.family_flows f
+      JOIN public.team_memberships m ON m.user_id=f.adult_user_id
+      JOIN public.teams t ON t.id=m.team_id
+      WHERE f.auth_id=$1 AND m.status='approved' AND m.child_profile_id IS NULL
+        AND t.program_type='adult'`, [actor.authId])).rows.map(r => r.team_id as string) };
   }
   async draft(actor: OnboardingActor, input: unknown, grant?: string) {
     const data = z.object({ revision: z.number().int().nonnegative(),
@@ -123,6 +143,19 @@ export class HighSchoolFamilySetup {
 
 /** Review shares the staff program lock and hierarchy, not a requested role. */
 export class HighSchoolFamilyReview extends StaffBase {
+  async teams(actor: OnboardingActor) {
+    return this.transaction(async db => {
+      await this.active(db, actor);
+      const teams = (await db.query(`SELECT DISTINCT source.id,source.name FROM hs_onboarding.teams source
+        JOIN hs_onboarding.programs p ON p.id=source.program_id AND p.status='approved'
+        JOIN public.teams t ON t.id=source.id::text AND t.program_id=p.id AND t.program_type='high_school'
+        JOIN public.team_memberships m ON m.user_id=$1 AND m.status='approved' AND m.child_profile_id IS NULL
+        JOIN public.teams own ON own.id=m.team_id AND own.program_type='high_school' AND own.program_id=p.id
+        WHERE(m.role='head_coach' AND m.team_id=t.id) OR m.role='athletic_director'
+        ORDER BY source.name,source.id`, [actor.authId])).rows;
+      return { teams };
+    });
+  }
   async requests(actor: OnboardingActor, teamId: string) {
     return this.withScope(actor, teamId, async (db, scope) => {
       this.manager(scope);
@@ -147,7 +180,7 @@ export class HighSchoolFamilyReview extends StaffBase {
         const guardian = (await db.query(`SELECT a.auth_id,f.adult_user_id FROM hs_parent_security.accounts a
           JOIN auth.users u ON u.id=a.auth_id LEFT JOIN hs_onboarding.family_flows f ON f.auth_id=a.auth_id
           WHERE a.auth_id=$1 AND u.email_confirmed_at IS NOT NULL AND u.email=a.parent_email
-          AND u.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true'`, [row.auth_id])).rows[0];
+          ${this.live ? "AND a.activated_at IS NOT NULL" : "AND u.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true'"}`, [row.auth_id])).rows[0];
         const household = (await db.query(`SELECT count(DISTINCT player_key)::int AS n FROM hs_onboarding.player_requests WHERE auth_id=$1`, [row.auth_id])).rows[0].n;
         if (!guardian || household > HS_MAX_FAMILY_PLAYERS) staffFail("GUARDIAN_LINK_REQUIRED", 403);
         if (row.consent_version !== HS_CONSENT_VERSION || !row.consented_at ||

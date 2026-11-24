@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const HS_CONSENT_VERSION = "dev-draft-2026-11-19";
 export const HS_MAX_FAMILY_PLAYERS = 2;
-export const HS_CONSENT_TEXT = "Roster stores your player's name, graduation year, position and optional jersey number. Approved team staff, team parents and teammates may see team information; opponents see first name and last initial only. No child email, phone, address or date of birth is collected. Photos and public-name sharing are off unless separately selected. This DEV draft does not activate a player or grant team access.";
+export const HS_CONSENT_TEXT = "Roster stores your player's name, graduation year, position and optional jersey number. Approved team staff, team parents and teammates may see team information; opponents see first name and last initial only. No child email, phone, address or date of birth is collected. Photos and public-name sharing are off unless separately selected. This setup does not activate a player or grant team access.";
 export const HS_PATHS = ["player", "organizer", "staff", "parent", "league_admin"] as const;
 export const HS_STAFF_ROLES = ["head_coach", "assistant_coach", "athletic_director", "team_manager"] as const;
 const name = z.string().trim().min(1).max(80).refine(s => !/[\u0000-\u001f\u007f]/.test(s));
