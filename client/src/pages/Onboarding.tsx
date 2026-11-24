@@ -68,7 +68,6 @@ export default function Onboarding() {
   const profilePreviewStep = import.meta.env.DEV && PROFILE_PREVIEW_STEPS.some(({ value }) => String(value) === profilePreviewParam)
     ? Number(profilePreviewParam)
     : null;
-  const isPreviewMode = import.meta.env.DEV && window.location.pathname === '/onboarding-preview';
   const [currentStep, setCurrentStep] = useState(profilePreviewStep || 1);
   const [formData, setFormData] = useState<OnboardingData>({
     firstName: '',
@@ -86,14 +85,6 @@ export default function Onboarding() {
 
   const updateField = (field: keyof OnboardingData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const selectPreviewStep = (step: number) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('profileStep', String(step));
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-    setCurrentStep(step);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const saveMutation = useMutation({
@@ -187,20 +178,6 @@ export default function Onboarding() {
 
   return (
     <div className="adult-profile">
-      {isPreviewMode && (
-        <div className="profile-preview-bar">
-          <span className="profile-preview-label">Dev preview</span>
-          <select
-            value={currentStep}
-            onChange={(event) => selectPreviewStep(Number(event.target.value))}
-            aria-label="Preview profile onboarding step"
-          >
-            {PROFILE_PREVIEW_STEPS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </div>
-      )}
       <div className="profile-shell">
       <div className="profile-progress">
         <span className="profile-step-count">Step {currentStep} of {TOTAL_STEPS}</span>

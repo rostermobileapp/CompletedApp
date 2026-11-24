@@ -141,6 +141,7 @@ await context.route("**/*",route=>{
 type Captured=ReviewSpec&{heading:string;images:string[];error?:string;pageErrors:string[]};
 const captured:Captured[]=[];
 const lightChecks:{id:string;width:number;dark:boolean}[]=[];
+const previewToolbarChecks:string[]=[];
 async function settle(page:Page){
   await page.waitForTimeout(950);
   await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(img=>img.decode().catch(()=>{})));});
@@ -173,27 +174,12 @@ try{
         await page.getByRole("button",{name:spec.setup==="team-chat"?/Example team chat/:/Example family chat/}).click();
       }
       await settle(page);
-       // Keep preview state seeding and safety boundaries, but omit developer
-       // navigation from the exported customer-facing screen captures only.
-       const previewToolbarRemoved=await page.evaluate(()=>{
-         const selectors=[
-           'select[aria-label="Preview profile onboarding step"]',
-           'select[aria-label="Preview onboarding screen"]',
-         ];
-         let removed=0;
-         for(const selector of selectors){
-           const toolbar=document.querySelector(selector)?.parentElement;
-           if(toolbar){toolbar.remove();removed++;}
-         }
-         return removed;
-       });
-       // Hockey type returns the shared intake directly, without a toolbar.
-       const expectsToolbar=spec.component==="AdultProfile"
-         ||(spec.component==="Questionnaire"&&spec.params?.preview!=="hockey_type");
-       if(expectsToolbar&&previewToolbarRemoved!==1){
-         throw Error("Expected exactly one preview toolbar to omit from capture");
-       }
-       if(await page.getByText(/^Dev preview$/i).count())throw Error("Preview banner remained in capture");
+      // Verify the real rendered UI: never hide or remove toolbars for captures.
+      if(await page.locator('.profile-preview-bar,select[aria-label="Preview profile onboarding step"],select[aria-label="Preview onboarding screen"]').count()
+        ||await page.getByText(/^Dev preview$/i).count()){
+        throw Error("Developer preview toolbar must not be rendered");
+      }
+      previewToolbarChecks.push(spec.id);
       if(verifyLight){
         if(spec.id==="E05"){
           const otp=page.locator("input[data-input-otp]");
@@ -266,8 +252,8 @@ try{
         const profileActions=document.querySelector(".adult-profile .profile-actions");
         if(profile&&profileActions){
           const content=profile.getBoundingClientRect();
-          // The preview bar can add scroll range even when every actual field
-          // already fits. Don't present that empty scroll range as another view.
+          // If every field fits above the actions, don't present any empty
+          // scroll range as another view.
           if(content.top>=0&&content.bottom<=profileActions.getBoundingClientRect().top){
             return{kind:"body",max:0,step:744};
           }
@@ -302,7 +288,7 @@ try{
     captured.push(record);
     await writeFile(path.join(out,"capture-progress.json"),JSON.stringify(captured,null,2));
   }
-  const manifest={generatedAt:new Date().toISOString(),viewport:{width:390,height:844},source:"current workspace; synthetic offline component rendering",forbiddenApiAttempts:rejectedApi,externalNonFontRequestsBlocked:externalBlocked,lightChecks,screens:captured};
+  const manifest={generatedAt:new Date().toISOString(),viewport:{width:390,height:844},source:"current workspace; synthetic offline component rendering",forbiddenApiAttempts:rejectedApi,externalNonFontRequestsBlocked:externalBlocked,lightChecks,previewToolbarChecks,screens:captured};
   await writeFile(path.join(out,"manifest.json"),JSON.stringify(manifest,null,2));
   const failures=captured.filter(item=>item.error);
   if(failures.length||rejectedApi)throw Error(`${failures.length} failed screen captures; ${rejectedApi} unexpected API requests. See manifest.json.`);

@@ -245,6 +245,16 @@ without a new explicit decision. Apply the same order to the Replit walkthrough.
 
 ## Adult profile visual alignment
 
+Do not render a "DEV Preview" top bar or screen-selection dropdown on any
+onboarding screen, including development preview routes.
+
+**Why:** The owner explicitly rejected these toolbars on the actual profile
+and questionnaire screens, not only in exported PDF screenshots.
+
+**How to apply:** Keep any internal state-seeding links separate from the
+visible UI. Do not restore developer navigation bars for walkthroughs or
+captures, and do not remove real onboarding content to eliminate a toolbar.
+
 The owner authorized matching the adult profile's three screens to the newer
 onboarding's visual style, not consolidating or reordering the adult journey.
 Keep its fields, validation, persistence and profile-to-questionnaire handoff.

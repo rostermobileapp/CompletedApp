@@ -212,19 +212,6 @@ export default function OnboardingQuestionnaire() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function selectPreviewScreen(nextScreen: Screen) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('preview', nextScreen);
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-    setScreen(nextScreen);
-    setState(prev => ({
-      ...prev,
-      role: prev.role || 'player',
-      pains: prev.pains.length > 0 ? prev.pains : PREVIEW_SAMPLE_PAINS,
-    }));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
   function goBack() {
     const idx = SCREEN_ORDER.indexOf(screen);
     if (idx > 0) goTo(SCREEN_ORDER[idx - 1]);
@@ -265,21 +252,6 @@ export default function OnboardingQuestionnaire() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col max-w-lg mx-auto">
-      {isPreviewMode && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-b border-amber-200 text-amber-950">
-          <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap">Dev preview</span>
-          <select
-            value={screen}
-            onChange={(event) => selectPreviewScreen(event.target.value as Screen)}
-            className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-gray-900"
-            aria-label="Preview onboarding screen"
-          >
-            {QUESTIONNAIRE_SCREENS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </div>
-      )}
       {/* Header with progress */}
       {screen !== 'welcome' && screen !== 'paywall' && (
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-4 pt-4 pb-3 border-b border-gray-100">
