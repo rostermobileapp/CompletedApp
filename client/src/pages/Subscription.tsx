@@ -1521,15 +1521,14 @@ function LeagueProActiveSeatNotice() {
     queryFn: async () => (await apiRequest("GET", "/api/user/league-pro-seats")).json(),
     enabled: !!coverage,
   });
-  const verificationWarning = coverageUnavailable ? (
+  if (coverageUnavailable) return (
     <p role="status" className="px-6 mb-4 text-sm text-muted-foreground">
-      Personal Player Pro could not be verified. Any verified league coverage still applies. Your account and subscription have not been changed.
+      Player Pro coverage could not be verified. Please try again; your account and subscription have not been changed.
     </p>
-  ) : null;
-  if (activeSeats.length === 0) return verificationWarning;
+  );
+  if (activeSeats.length === 0) return null;
   return (
     <div className="subscription-notice px-6 mb-4" data-testid="league-pro-active-seat-notice">
-      {verificationWarning}
       <div className="rounded-xl border border-primary/40 bg-primary/10 p-4">
         <div className="flex items-start gap-3">
           <Crown className="w-5 h-5 text-primary shrink-0 mt-0.5" />

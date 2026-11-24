@@ -106,3 +106,4 @@
 - [Independent website project](independent-website-export.md) — new project, not another artifact; copy/import verification precedes cleanup, publishing, and domain approval.
 - [Onboarding and HS boundaries](high-school-scope.md) — adult visual-only scope, age-first signup, isolated HS development, per-phase approval and child safety.
 - [Signup email verification](signup-email-verification-policy.md) — every new email/password account must enter a six-digit email code; provider enforcement and all signup paths must agree.
+- [HS team skins](hs-team-skins.md) — active-team roles choose the skin; adult behavior stays intact and hidden HS features must never start loading.
