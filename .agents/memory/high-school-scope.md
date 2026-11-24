@@ -209,6 +209,27 @@ confirmed email. New HS-only accounts are blocked from legacy adult APIs and
 sockets; completed adults adding staff intake retain unrelated adult access.
 Adding a family context to an existing completed adult remains blocked.
 
+## Existing adults must support family setup
+
+Existing adult-league/team users must be able to add parent responsibilities
+and set up children using their current account, without a second login or
+losing their adult teams, history, subscription or adult playing experience.
+Parent status is additive and the active verified team/profile controls the
+experience; it must not convert the account globally into a parent-only account.
+
+**Why:** On November 24, 2026, the owner explicitly said this needs to be an
+option for a user already part of an adult league and team. The earlier
+completed-adult enrollment block is an implementation gap, not intended
+product behavior.
+
+**How to apply:** Build a separately approved mixed-account family setup
+phase. Preserve parent/provider/device protections and prove adult API/socket
+authority for the approved adult session without allowing a child who knows
+the shared password to enter adult mode. Keep production and real-child
+activation outside that approval.
+
+## Earlier guarded onboarding limitations
+
 Staff requests use league approval for initial school authority and scoped
 AD/Head Coach approval thereafter. Player imports/claims remain restricted
 staging/intake, not active child profiles. Self-entry stops for protected staff
