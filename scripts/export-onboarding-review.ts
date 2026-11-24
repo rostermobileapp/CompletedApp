@@ -85,7 +85,7 @@ const bundled=await build({
       a.path.endsWith("queryClient")?fixtureQuery:
       a.path.endsWith("nativePurchases")?"export const setSubscriberAttributes=()=>{};":
       a.path.endsWith("signupAttributionBrowser")?`export async function loadSignupAttribution(){return{}};export function signupAttribution(){return{clear(){}}};export async function signupAttributionMetadata(){return{}};export function bindSignupAttributionUser(){};`:
-      `export const supabase={auth:{onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),getSession:async()=>({data:{session:null},error:null}),getUser:async()=>({data:{user:null},error:null}),signOut:async()=>({error:null})}};export async function clearStaleSession(){};`
+       `export async function requireSignupEmailConfirmation(){throw Error('Live signup forbidden in PDF capture')};export const supabase={auth:{onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),getSession:async()=>({data:{session:null},error:null}),getUser:async()=>({data:{user:null},error:null}),signOut:async()=>({error:null})}};export async function clearStaleSession(){};`
     }));
     b.onLoad({filter:/OnboardingQuestionnaire\.tsx$/},async a=>{
       let source=await readFile(a.path,"utf8");

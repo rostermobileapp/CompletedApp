@@ -15,6 +15,8 @@ import { useLocation } from 'wouter';
 import { isDevParentClient } from "@/lib/parentVerificationSession";
 import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
 import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
+import { signUpWithEmailVerification } from "@/lib/signupEmailVerification";
+import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 import "./onboarding-auth-light.css";
 
 interface AuthModalProps {
@@ -29,6 +31,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -41,41 +44,16 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
+        const signupEmail = email.trim();
+        await signUpWithEmailVerification({
+          email: signupEmail,
           password,
           ...(isDevParentClient ? { options: { data: { signup_age_answer: "adult" } } } : {}),
         });
 
-        if (error) throw error;
         setShowAge(false);
-
-        if (data.session) {
-          toast({
-            title: 'Welcome!',
-            description: 'Your account has been created. You are now signed in.',
-          });
-          onOpenChange(false);
-        } else {
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          if (signInError) {
-            toast({
-              title: 'Account created',
-              description: 'Your account was created. Please sign in.',
-            });
-            setIsSignUp(false);
-          } else {
-            toast({
-              title: 'Welcome!',
-              description: 'Your account has been created. You are now signed in.',
-            });
-            onOpenChange(false);
-          }
-        }
+        setPassword('');
+        setPendingEmail(signupEmail);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -92,6 +70,11 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         onOpenChange(false);
       }
     } catch (error: any) {
+      if (!isSignUp && error?.code === 'email_not_confirmed') {
+        setPendingEmail(email.trim());
+        setPassword('');
+        return;
+      }
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -101,6 +84,18 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
       setLoading(false);
     }
   };
+
+  if (pendingEmail) return (
+    <EmailVerificationModal open={open} required email={pendingEmail}
+      onOpenChange={() => {}}
+      onVerificationSuccess={() => {
+        setPendingEmail('');
+        setPassword('');
+        setEmail('');
+        setIsSignUp(false);
+        onOpenChange(false);
+      }}/>
+  );
 
   if (isDevParentClient && open && showAge) return (
     <Dialog open={open} onOpenChange={onOpenChange}>

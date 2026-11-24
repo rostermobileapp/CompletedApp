@@ -30,12 +30,13 @@ const bundle=await build({
     b.onResolve({filter:/^@\/(?:lib\/(?:supabase|queryClient|signupAttributionBrowser|appRouteEntry)|hooks\/use-toast|components\/EmailVerificationModal)$/},a=>({path:a.path,namespace:"fixture"}));
     b.onLoad({filter:/.*/,namespace:"fixture"},a=>({loader:"jsx",resolveDir:process.cwd(),contents:
       a.path==="image"?"export default 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';":
-      a.path.endsWith("supabase")?`export const supabase={auth:{
+      a.path.endsWith("supabase")?`export async function requireSignupEmailConfirmation(){}
+      export const supabase={auth:{
         async signUp(input){window.__calls.push({method:'signup',metadata:input.options?.data});
           if(window.__failSignup)return{data:{user:null,session:null},error:new Error('Synthetic signup error')};
           const user={id:'fixture-adult',identities:[{}],user_metadata:input.options?.data};
           sessionStorage.setItem('fixture-account',JSON.stringify(user));
-          return{data:{user,session:window.__verificationRequired?null:{user}},error:null};},
+          return{data:{user,session:null},error:null};},
         async signInWithPassword(){window.__calls.push({method:'signin'});
           return{data:{session:{user:JSON.parse(sessionStorage.getItem('fixture-account')||'{}')}},error:null};}
       }};`:
@@ -43,7 +44,7 @@ const bundle=await build({
       a.path.endsWith("signupAttributionBrowser")?`export async function signupAttributionMetadata(){return{fixture_attribution:'preserved'}};export function bindSignupAttributionUser(){};`:
       a.path.endsWith("appRouteEntry")?`export function loginDestination(){return '/'};`:
       a.path.endsWith("use-toast")?`export function useToast(){return{toast:v=>window.__toasts.push(v)}};`:
-      `import React from'react';export function EmailVerificationModal({open}){return open?<div>Existing email verification</div>:null;}`
+      `import React from'react';export function EmailVerificationModal({open,onVerificationSuccess}){return open?<div style={{position:'fixed',inset:0,zIndex:100,background:'white'}}>Existing email verification<button onClick={onVerificationSuccess}>Complete verification fixture</button></div>:null;}`
     }));
   }}]
 });
@@ -121,8 +122,12 @@ try{
       await page.getByTestId("input-email").waitFor();
       await page.evaluate(()=>(window as any).__failSignup=false);
       await page.getByTestId("button-submit").click();
+      await page.getByRole("button",{name:"Complete verification fixture"}).click();
       await page.getByRole("heading",{name:"Existing post-signup flow",exact:true}).waitFor();
-    }else await page.getByRole("dialog").waitFor({state:"hidden"});
+    }else{
+      await page.getByRole("button",{name:"Complete verification fixture"}).click();
+      await page.getByRole("dialog").waitFor({state:"hidden"});
+    }
     assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem("fixture-account")!).user_metadata.signup_age_answer),"adult");
     if(form==="login")assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem("fixture-account")!).user_metadata.fixture_attribution),"preserved");
     checks.push(form+"_adult_answer_saved_on_creation_without_changing_existing_handoff");

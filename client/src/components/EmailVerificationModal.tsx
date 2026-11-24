@@ -21,6 +21,7 @@ interface EmailVerificationModalProps {
   onOpenChange: (open: boolean) => void;
   email: string;
   onVerificationSuccess: () => void;
+  required?: boolean;
 }
 
 export function EmailVerificationModal({
@@ -28,6 +29,7 @@ export function EmailVerificationModal({
   onOpenChange,
   email,
   onVerificationSuccess,
+  required = false,
 }: EmailVerificationModalProps) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,7 @@ export function EmailVerificationModal({
   const { toast } = useToast();
 
   const handleVerify = async () => {
-    if (code.length !== 6) {
+    if (!/^\d{6}$/.test(code)) {
       toast({
         variant: 'destructive',
         title: 'Invalid code',
@@ -46,13 +48,17 @@ export function EmailVerificationModal({
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         email,
         token: code,
         type: 'signup',
       });
 
       if (error) throw error;
+      if (!data.session || !data.user?.email_confirmed_at
+        || data.user.email?.trim().toLowerCase() !== email.trim().toLowerCase()) {
+        throw new Error('Email verification did not establish the expected account. Please try again.');
+      }
 
       toast({
         title: 'Email verified!',
@@ -98,8 +104,12 @@ export function EmailVerificationModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent overlayClassName="onboarding-auth-backdrop" className="onboarding-light sm:max-w-md top-4 translate-y-0">
+    <Dialog open={open} onOpenChange={nextOpen => { if (!required || nextOpen) onOpenChange(nextOpen); }}>
+      <DialogContent overlayClassName="onboarding-auth-backdrop"
+        className={`onboarding-light sm:max-w-md top-4 translate-y-0${required ? ' [&>button]:hidden' : ''}`}
+        onEscapeKeyDown={event => { if (required) event.preventDefault(); }}
+        onPointerDownOutside={event => { if (required) event.preventDefault(); }}
+        onInteractOutside={event => { if (required) event.preventDefault(); }}>
         <DialogHeader>
           <DialogTitle>Verify your email</DialogTitle>
           <DialogDescription>
@@ -110,6 +120,7 @@ export function EmailVerificationModal({
         <div className="flex flex-col items-center space-y-6 py-4">
           <InputOTP
             maxLength={6}
+            pattern="^[0-9]*$"
             value={code}
             onChange={(value) => setCode(value)}
           >
@@ -126,7 +137,7 @@ export function EmailVerificationModal({
           <Button
             onClick={handleVerify}
             className="w-full"
-            disabled={loading || code.length !== 6}
+            disabled={loading || !/^\d{6}$/.test(code)}
           >
             {loading ? 'Verifying...' : 'Verify & Activate Account'}
           </Button>

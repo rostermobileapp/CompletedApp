@@ -15,6 +15,7 @@ import { signupAttributionMetadata, bindSignupAttributionUser } from '@/lib/sign
 import { isDevParentClient } from "@/lib/parentVerificationSession";
 import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
 import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
+import { signUpWithEmailVerification } from "@/lib/signupEmailVerification";
 
 const rosterLogo = '/roster-logo-transparent.png';
 
@@ -65,9 +66,9 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
     try {
       if (isSignUp) {
         const attribution = await signupAttributionMetadata();
-        console.log('[Signup] Attempting signup for:', email);
-        const { data, error } = await supabase.auth.signUp({
-          email,
+        const signupEmail = email.trim();
+        const user = await signUpWithEmailVerification({
+          email: signupEmail,
           password,
           options: {
             emailRedirectTo: undefined,
@@ -75,54 +76,16 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
           }
         });
         
-        console.log('[Signup] Response:', { 
-          hasUser: !!data.user, 
-          hasSession: !!data.session,
-          userId: data.user?.id,
-          sessionAccessToken: data.session?.access_token ? 'present' : 'missing',
-          error: error?.message 
-        });
-        
-        if (error) throw error;
-
-        if (data.user && data.user.identities && data.user.identities.length === 0) {
-          setShowAge(false);
-          setEmailTaken(true);
-          return;
-        }
-
-        if (data.user) {
-          try {
-            bindSignupAttributionUser(data.user.id);
-          } catch {
-            // Signup metadata already holds the context. Do not claim that a
-            // successfully created account failed because local storage did.
-            toast({ variant: 'destructive', title: 'Account created', description: 'Local referral storage is unavailable. Your signup context is saved to your account.' });
-          }
+        try {
+          bindSignupAttributionUser(user.id);
+        } catch {
+          // Signup metadata already holds the context even without local storage.
+          toast({ variant: 'destructive', title: 'Account created', description: 'Local referral storage is unavailable. Your signup context is saved to your account.' });
         }
         setShowAge(false);
-
-        if (data.user && !data.session) {
-          console.log('[Signup] User created but no session - showing verification modal for:', email);
-          console.log('[Signup] Setting showVerification to true');
-          setPendingEmail(email);
-          setShowVerification(true);
-          console.log('[Signup] Verification modal should now be visible');
-        } else if (data.session) {
-          console.log('[Signup] Session established, redirecting to home');
-          toast({
-            title: 'Welcome!',
-            description: 'Your account has been created.',
-          });
-          finishLogin(startedAt);
-        } else {
-          console.log('[Signup] No user or session returned');
-          toast({
-            title: 'Success!',
-            description: 'Your account has been created. You can now sign in.',
-          });
-          setIsSignUp(false);
-        }
+        setPassword('');
+        setPendingEmail(signupEmail);
+        setShowVerification(true);
       } else {
         const { error } = await retryTransientSignIn(() => supabase.auth.signInWithPassword({
           email,
@@ -139,6 +102,17 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
         finishLogin(startedAt);
       }
     } catch (error: unknown) {
+      if (!isSignUp && (error as { code?: string })?.code === 'email_not_confirmed') {
+        setPendingEmail(email.trim());
+        setPassword('');
+        setShowVerification(true);
+        return;
+      }
+      if (isSignUp && error instanceof Error && error.message.includes('already exists')) {
+        setShowAge(false);
+        setEmailTaken(true);
+        return;
+      }
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -402,6 +376,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
       </div>
       <EmailVerificationModal
         open={showVerification}
+        required
         onOpenChange={(isOpen) => {
           if (!isOpen) {
             setShowVerification(false);

@@ -104,3 +104,4 @@
 - [Signup attribution policy](signup-attribution-policy.md) — first valid referral, explicit confirmation, campaign/credit separation, and manual install fallback; preserve HPIB tracking.
 - [Independent website project](independent-website-export.md) — new project, not another artifact; copy/import verification precedes cleanup, publishing, and domain approval.
 - [Onboarding and HS boundaries](high-school-scope.md) — adult visual-only scope, age-first signup, isolated HS development, per-phase approval and child safety.
+- [Signup email verification](signup-email-verification-policy.md) — every new email/password account must enter a six-digit email code; provider enforcement and all signup paths must agree.
