@@ -207,7 +207,8 @@ Implemented in a separate private `hs_onboarding` DEV schema; authenticated HS
 mutations require server-owned synthetic fixture metadata and reserved-domain
 confirmed email. New HS-only accounts are blocked from legacy adult APIs and
 sockets; completed adults adding staff intake retain unrelated adult access.
-Adding a family context to an existing completed adult remains blocked.
+Primary onboarding and additive family setup are different journeys; never
+reset or repurpose a completed adult's original intake to enroll their children.
 
 ## Existing adults must support family setup
 
@@ -222,11 +223,22 @@ option for a user already part of an adult league and team. The earlier
 completed-adult enrollment block is an implementation gap, not intended
 product behavior.
 
-**How to apply:** Build a separately approved mixed-account family setup
-phase. Preserve parent/provider/device protections and prove adult API/socket
+**How to apply:** Use a separately approved additive, resumable family journey.
+Preserve parent/provider/device protections and prove adult API/socket
 authority for the approved adult session without allowing a child who knows
 the shared password to enter adult mode. Keep production and real-child
 activation outside that approval.
+
+Imported player identities stay immutable, but the parent's unsubmitted copy
+must be disposable even when its invitation is expired or revoked. Submitting
+one invitation must not prevent setting up a second child below the limit.
+
+**Why:** Identity protection must not permanently trap a parent in an unusable
+draft or incorrectly treat a submitted invitation as unfinished intake.
+
+**How to apply:** Require current parent authority and conflict checks for
+discarding. Preserve team-staged records, submitted requests and household
+counts while allowing the parent to start an ordinary unsubmitted draft.
 
 ## Earlier guarded onboarding limitations
 

@@ -60,11 +60,13 @@ export class StaffBase {
       [scope.programId, scope.teamId, actor.authId, event, target ?? null]);
   }
   protected async players(db: ParentTransaction, scope: StaffScope, program = false) {
+    const family = !!(await db.query("SELECT to_regclass('hs_onboarding.family_version') AS installed")).rows[0]?.installed;
     // Canonical child PLAYER memberships only. Disabled children can be rostered
     // but never receive an Auth identity, active session, RSVP or statistics.
     const rows = (await db.query(`SELECT DISTINCT c.id,r.details,c.parent_auth_id,
       t.id AS team_id,t.name AS team_name,
-      EXISTS(SELECT 1 FROM public.team_memberships pm WHERE pm.team_id=t.id AND pm.user_id=c.parent_auth_id::text
+      EXISTS(SELECT 1 FROM public.team_memberships pm WHERE pm.team_id=t.id
+        AND pm.user_id=${family ? "coalesce((SELECT adult_user_id FROM hs_onboarding.family_flows WHERE auth_id=c.parent_auth_id),c.parent_auth_id::text)" : "c.parent_auth_id::text"}
         AND pm.role='parent' AND pm.status='approved') AS guardian_linked,
       (r.consent_version=$3 AND r.consented_at IS NOT NULL) AS consented
       FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id

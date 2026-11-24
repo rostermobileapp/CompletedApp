@@ -25,7 +25,11 @@ export function registerHighSchoolYouthRoutes(
     }
   };
   const parent = (work: (req: Request, actor: OnboardingActor, grant?: string) => Promise<unknown>) =>
-    respond(async req => work(req, await authenticate(req), req.get(parentGrantHeader)));
+    respond(async req => {
+      const actor = await authenticate(req), grant = req.get(parentGrantHeader);
+      await service.requireParentAuthority(actor, grant);
+      return work(req, actor, grant);
+    });
   const base = "/api/high-school/onboarding";
   app.post(`${base}/hockey-type`, parent((req, actor) => service.hockeyType(actor, req.body)));
   app.post(`${base}/journey`, parent((req, actor, grant) => service.journey(actor, req.body, grant)));

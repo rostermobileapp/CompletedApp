@@ -166,6 +166,18 @@ try {
     await page.getByText("Adult query loaded").waitFor();
     assert.equal(await page.evaluate(() => (window as any).__life.sockets), 1);
     mark(`Mixed ${width}px: parent/manager/adult transitions; old request aborted, timers stopped, cache removed, adult remounted`);
+    // Route changes can precede selection observers by a commit. A school
+    // document with an old adult selection must never start adult providers.
+    await page.goto(`${origin}/high-school/home?initial=adult`);
+    await page.getByTestId("skin-team-recovery").waitFor();
+    assert.equal(await page.evaluate(() => (window as any).__life.mounts), 0);
+    const handoffStart = report.requests.length;
+    await page.getByRole("button", { name: "Use Northfield Varsity as Parent" }).click();
+    await page.getByTestId("skin-role-label").waitFor();
+    assert.match(await page.getByTestId("skin-role-label").innerText(), /Parent/);
+    assert.equal(await page.evaluate(() => (window as any).__life.mounts), 0);
+    assert.deepEqual(report.requests.slice(handoffStart).filter(forbidden), []);
+    mark(`School handoff ${width}px: stale adult selection never mounts adult providers; approved parent recovery works`);
     fixture = { actor: { id: "revoked-fixture", type: "adult" }, teams: teams("parent"), restricted: true };
     await page.goto(`${origin}/`);
     await page.getByTestId("skin-role-label").waitFor();

@@ -13,6 +13,7 @@ import { resetTeamRequestScope } from "@/lib/teamRequestScope";
 import { TeamSkinShell } from "./TeamSkinShell";
 import { TeamSkinPreview } from "./TeamSkinPreview";
 import ParentVerification from "@/pages/ParentVerification";
+import { FamilySetup } from "@/components/high-school-family/FamilySetup";
 
 function PendingSkin({ failed = false }: { failed?: boolean }) {
   return <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center" role="status">
@@ -21,7 +22,7 @@ function PendingSkin({ failed = false }: { failed?: boolean }) {
     {failed && <button onClick={() => window.location.reload()}>Try again</button>}
   </main>;
 }
-function RecoverTeam({ context, onChoose }: { context: SkinContext; onChoose: (id: string) => void }) {
+function RecoverTeam({ context, onChoose, onAccount }: { context: SkinContext; onChoose: (id: string) => void; onAccount?: () => void }) {
   return <main className="tss tss-denied" data-testid="skin-team-recovery">
     <section className="tss-denied-card">
       <h1>Choose an approved team</h1>
@@ -33,6 +34,7 @@ function RecoverTeam({ context, onChoose }: { context: SkinContext; onChoose: (i
           {team.name} — {ROLE_LABELS[team.role]}
         </button>)}
       </div>
+      {onAccount && <button className="tss-return-button" onClick={onAccount}>Back to my account</button>}
     </section>
   </main>;
 }
@@ -43,22 +45,25 @@ export function ResolvedSkinRuntime({ context, adult, entry }: {
   const selection = useDashboardSelection();
   const [path, navigate] = useLocation();
   const [readyScope, setReadyScope] = useState<string | null>(null);
+  const selectedType = selection.selectedType;
+  const selectedId = selection.selectedId;
   const team = context.actor.type === "child" ? context.teams.find(t => t.program_type === "high_school" && t.role === "player")
-    : selection.selectedType === "team"
-    ? context.teams.find(t => t.id === selection.selectedId)
+    : selectedType === "team"
+    ? context.teams.find(t => t.id === selectedId)
     : context.teams.find(t => t.program_type === "high_school");
   const hasAdultTeam = context.teams.some(t => t.program_type === "adult");
   // Preserve league/tournament navigation for actual adult contexts. A school-
   // only account cannot select a league/localStorage value to enter adult mode.
   const adultSelection = context.actor.type === "adult" &&
     ((!context.restricted && !context.teams.some(t => t.program_type === "high_school")) ||
-    (selection.selectedType === "team" ? team?.program_type === "adult" :
+    (selectedType === "team" ? team?.program_type === "adult" :
       hasAdultTeam || (!context.restricted && !context.teams.length)));
   let skin: ReturnType<typeof getSkin> | null = adultSelection ? "adult" : null;
   if (!adultSelection && team) {
     try { skin = getSkin(context.actor, team); } catch { /* fail closed */ }
   }
-  const scope = `${context.actor.type}:${context.actor.id}:${skin === "adult" ? "adult" : `${team?.id}:${team?.role}`}`;
+  const family = context.actor.type === "adult" && path === "/high-school/family";
+  const scope = `${context.actor.type}:${context.actor.id}:${family ? "family" : skin === "adult" ? "adult" : `${team?.id}:${team?.role}`}`;
   useLayoutEffect(() => {
     const clearPreviousSurface = () => {
       resetTeamRequestScope();
@@ -86,16 +91,33 @@ export function ResolvedSkinRuntime({ context, adult, entry }: {
     }
   }, [context.actor.type, adultSelection, team?.id, selection.selectedType]);
   const changeTeam = (id: string) => {
-    if (context.actor.type === "child" || !context.teams.some(t => t.id === id)) return;
+    const target = context.teams.find(t => t.id === id);
+    if (context.actor.type === "child" || !target) return;
     resetTeamRequestScope();
     selection.setTeamSelection(id);
-    navigate("/");
+    navigate(target.program_type === "adult" ? "/" : "/high-school/home");
   };
   // Clear the old cache before new child hooks may subscribe to it, not after
   // rendering the destination's queries during the same commit.
   if (readyScope !== scope) return <PendingSkin />;
-  if (context.actor.type === "adult" && selection.selectedType === "team" && !team && context.teams.length) {
+  if (family) return <FamilySetup onExit={() => {
+    const ownTeam = context.teams.find(t => t.program_type === "adult");
+    if (ownTeam) selection.setTeamSelection(ownTeam.id);
+    navigate(ownTeam || !context.teams.length ? "/profile" : "/high-school/home");
+  }} onTeamChange={id => {
+    resetTeamRequestScope();
+    selection.setTeamSelection(id);
+    navigate("/high-school/home");
+  }} />;
+  if (context.actor.type === "adult" && selectedType === "team" && !team && context.teams.length) {
     return <RecoverTeam context={context} onChoose={changeTeam} />;
+  }
+  // Storage observers and route observers can update in separate commits.
+  // A school URL must never mount the old adult providers during that handoff.
+  // A stable stale/deep-linked adult selection offers explicit approved-team
+  // recovery rather than loading excluded adult features in a school context.
+  if (skin === "adult" && path.startsWith("/high-school/")) {
+    return <RecoverTeam context={context} onChoose={changeTeam} onAccount={() => navigate("/profile")} />;
   }
   if (skin === "adult") return <TeamSkinFacts.Provider value={context}>{adult}</TeamSkinFacts.Provider>;
   if (!skin || !team) {

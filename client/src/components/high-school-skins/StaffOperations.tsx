@@ -14,6 +14,7 @@ import type {
 import { ROLE_LABELS } from "@shared/teamSkin";
 import { StaffLineupEditor } from "./StaffLineupEditor";
 import "./staff-operations.css";
+import { FamilyStaffReview } from "@/components/high-school-family/FamilyStaffReview";
 
 type Props = { actorId: string; teamId: string; role: StaffRole; onContextRefresh: () => void };
 type Request = { method: string; path: string; body?: unknown; refreshContext?: boolean };
@@ -191,7 +192,11 @@ export function StaffOperations({ actorId, teamId, role, onContextRefresh }: Pro
         lineup={event => setModal({ kind: "lineup", event })}
         report={event => setModal({ kind: "report", event })}
         importEvents={() => setModal({ kind: "event-import" })} />}
-      {activePage === "roster" && <RosterView roster={roster} staged={staged} onImport={() => setModal({ kind: "roster-import" })} />}
+      {activePage === "roster" && <>
+        {workspace.data?.capabilities.manageStaff && <FamilyStaffReview actorId={actorId} teamId={teamId}
+          onChanged={() => { void queryClient.invalidateQueries({ queryKey: workspaceKey }); onContextRefresh(); }} />}
+        <RosterView roster={roster} staged={staged} onImport={() => setModal({ kind: "roster-import" })} />
+      </>}
       {activePage === "chat" && <ChatView data={data} staffKey={staffKey} request={doRequest} pending={runRequest.isPending} />}
       {activePage === "more" && <MoreView actorId={actorId} data={data} role={role} canManage={canManage} canManageProgram={canManageProgram} canCreatePayment={canCreatePayment}
         pending={runRequest.isPending} request={doRequest} mapHref={mapHref}

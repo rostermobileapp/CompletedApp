@@ -97,6 +97,17 @@ hide the only team switcher and permanently lock out an authorized account.
 **How to apply:** Test both a selected membership disappearing and a different
 account inheriting a saved selection, including accounts with adult teams.
 
+A school URL must not mount adult providers while route and selection updates
+are catching up with one another.
+
+**Why:** Actual mixed-account navigation produced separate commits for the URL
+and saved selection. The final parent view was correct, but the intermediate
+adult mount had already requested trivia and badge data.
+
+**How to apply:** Check requests and mounts across the entire transition, not
+just the final screen. Require approved-team recovery rather than an adult
+fallback on school routes.
+
 Fundraisers are a payment-request type, not a separate permission or feature.
 Use the existing creation rules and 5% + 50¢ fee. A fundraiser adds a goal,
 lets payers choose an amount and continues accepting contributions past the

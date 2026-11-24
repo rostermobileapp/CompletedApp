@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
+import { parentVerificationSession } from '@/lib/parentVerificationSession';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -179,6 +180,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         websocket.send(JSON.stringify({
           type: 'authenticate',
           accessToken: session.access_token,
+          parentGrant: parentVerificationSession.headers(session.access_token)["x-parent-verification"],
         }));
       };
 

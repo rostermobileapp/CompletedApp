@@ -8,6 +8,7 @@ import { nanoid } from "nanoid";
 import { isLiveProjectPreview } from "./runtimePolicy";
 import { appDocumentHeaders, isAppDocument, isAppPreview, serveAppWebRouting } from "./appWebRouting";
 import { appDocumentHtml } from "../shared/appWebPolicy";
+import { isParentSecurityDevelopment } from "./highSchoolParentSecurity";
 
 const viteLogger = createLogger();
 
@@ -76,7 +77,8 @@ export async function setupVite(app: Express, server: Server) {
       );
       const page = await vite.transformIndexHtml(url, template);
       // Keep development-only visual routes; production has no preview bypass.
-      const known = isAppDocument(req.path) || /^\/(?:onboarding-preview|gerry-home-preview|trophy-case-preview|high-school\/(?:parent-verification|onboarding(?:-preview)?))$/.test(req.path);
+      const known = isAppDocument(req.path) || /^\/(?:onboarding-preview|gerry-home-preview|trophy-case-preview|high-school\/(?:parent-verification|onboarding(?:-preview)?))$/.test(req.path)
+        || (isParentSecurityDevelopment() && /^\/high-school\/(?:family|home|schedule|roster|chat|more|payments|team)$/.test(req.path));
       res.status(known ? 200 : 404).set(appDocumentHeaders(req))
         .end(appDocumentHtml(page, req.path, true));
     } catch (e) {

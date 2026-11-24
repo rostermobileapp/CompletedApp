@@ -681,6 +681,14 @@ export default function Profile() {
       </div>
       {/* Scrollable Content Section */}
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
+        {isDevParentClient && <section className="px-6 mb-3" aria-labelledby="profile-family-title" data-testid="profile-family">
+          <div className="rounded-xl border bg-card p-4">
+            <h2 id="profile-family-title" className="font-semibold mb-1">Family</h2>
+            <p className="text-sm text-muted-foreground mb-3">Set up your children without changing your adult teams or account.</p>
+            <button type="button" className="w-full rounded-xl border px-4 py-3 text-left text-sm font-medium"
+              onClick={() => navigate("/high-school/family")}>Add a child</button>
+          </div>
+        </section>}
         {isDevParentClient && devParentStatus?.enrolled && <div className="px-6 mb-3">
           <button className="w-full rounded-xl border px-4 py-3 text-left text-sm"
             onClick={() => navigate("/high-school/parent-verification")}>

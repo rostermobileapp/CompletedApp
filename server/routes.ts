@@ -24,7 +24,9 @@ import { normalizeEmail } from "./emailNormalization";
 import { saveOnboardingReferral, ReferralSaveError } from "./onboardingReferral";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
-import { setupAuth, isAuthenticated, supabase, getAuthenticatedDatabaseUser } from "./supabaseAuth";
+import { setupAuth, isAuthenticated, supabase, getAuthenticatedDatabaseUser, adultSocketAuthorized } from "./supabaseAuth";
+import { guardVerifiedAdultSocket } from "./verifiedAdultSocket";
+import { isParentSecurityDevelopment } from "./highSchoolParentSecurity";
 import { registerOrganizerCardPaymentRoutes } from "./organizerCardPaymentRoutes";
 import {
   assertOrganizerCardCollectionReady,
@@ -24416,21 +24418,31 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
 
   wss.on('connection', async (ws: WebSocket, req) => {
     let userId: string | null = null;
+    let stillAuthorized: (() => Promise<boolean>) | undefined;
+    let authenticating = false;
     
     ws.on('message', async (message: Buffer) => {
       try {
         const data = JSON.parse(message.toString());
+        if (userId && stillAuthorized && !await stillAuthorized()) return;
         
         switch (data.type) {
           case 'authenticate':
             // Verify the Supabase access token and use the mapped database user
             // identity. Never trust a client-supplied user ID.
-            if (userId) break;
+            if (userId || authenticating) break;
+            authenticating = true;
             const authenticatedUser = await getAuthenticatedDatabaseUser(
               typeof data.accessToken === 'string' ? data.accessToken : '',
+              typeof data.parentGrant === 'string' ? data.parentGrant : undefined,
             );
             userId = authenticatedUser?.id ?? null;
             if (userId) {
+              if (isParentSecurityDevelopment()) {
+                const token = data.accessToken as string;
+                const grant = typeof data.parentGrant === "string" ? data.parentGrant : undefined;
+                stillAuthorized = guardVerifiedAdultSocket(ws, () => adultSocketAuthorized(token, grant));
+              }
               const userConnections = activeConnections.get(userId) ?? new Set<WebSocket>();
               userConnections.add(ws);
               activeConnections.set(userId, userConnections);

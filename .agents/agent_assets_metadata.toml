@@ -287,3 +287,17 @@ mtime_ms = 1795553900121
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/f9e60d37-16fb-4dcb-b725-3fc42d2e6d61/af96eb13-0648-4034-ba91-32cfa528341a"
 storage_version_token = "1795554092956686"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "_A8KcmjAcJtdrGutvtCm9"
+uri = "file://generated-artifacts/high-school-family/family-phone-approved.jpg"
+type = "image"
+title = "Family setup — approved DEV request"
+description = "Signed-in phone capture using an owned synthetic account. Team approval is recorded; child sign-in and devices remain disabled."
+logical_id = "91ba2f4e-65fe-4a4f-bd6b-a08e3eb09fbc"
+content_hash = "sha256:38d07819a64388a9ec5c6db50ac1f0405c4953ffc5fc814eae0a47d5c73dc278"
+size = 52796
+mtime_ms = 1795556616607
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/91ba2f4e-65fe-4a4f-bd6b-a08e3eb09fbc/4a02abfc-4f2a-4386-b521-272b154022fd"
+storage_version_token = "1795556825759673"
+content_type = "image/jpeg"

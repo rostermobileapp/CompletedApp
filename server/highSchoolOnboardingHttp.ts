@@ -28,7 +28,7 @@ export function registerHighSchoolOnboarding(
       }
     };
   app.get(`${HS_ONBOARDING_API}/state`,handler((req,a)=>(state??service.state.bind(service))(a,req.get(parentGrantHeader)),true));
-  app.post(`${HS_ONBOARDING_API}/choose`,handler((req,a)=>service.choose(a,req.body),true));
+  app.post(`${HS_ONBOARDING_API}/choose`,handler((req,a)=>service.choose(a,req.body)));
   app.get(`${HS_ONBOARDING_API}/catalog`,handler((req,a)=>service.catalog(a,String(req.query.q??""))));
   app.post(`${HS_ONBOARDING_API}/draft`,handler((req,a)=>service.save(a,req.body,req.get(parentGrantHeader))));
   app.post(`${HS_ONBOARDING_API}/lookup`,handler((req,a)=>service.lookup(a,req.body?.invitation,req.body?.revision,req.get(parentGrantHeader))));

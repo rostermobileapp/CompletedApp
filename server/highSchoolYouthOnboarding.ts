@@ -12,6 +12,10 @@ export class HighSchoolYouthOnboarding {
   async installed() {
     return !!(await this.pool.query("SELECT to_regclass('hs_onboarding.youth_version') AS installed")).rows[0]?.installed;
   }
+  async requireParentAuthority(actor: OnboardingActor, grant?: string) {
+    if (await this.parent.enrolled(actor.authId) && !await this.parent.authorized(actor, grant))
+      throw new OnboardingError("PARENT_VERIFICATION_REQUIRED", 403);
+  }
   private async transaction<T>(fn: (tx: ParentTransaction) => Promise<T>) {
     const tx = await this.pool.connect();
     try {

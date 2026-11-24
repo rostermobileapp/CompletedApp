@@ -11,7 +11,12 @@ const fail = (code: string, status = 400): never => { throw new OnboardingError(
 const uuid = z.string().uuid();
 export class HighSchoolOnboarding {
   staffDecisions?: { installed(): Promise<boolean>; decide(actor: OnboardingActor, id: string, approve: boolean): Promise<unknown> };
-  constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity) {}
+  // Only trusted server composition selects this store. The public original
+  // onboarding routes always use the primary store.
+  private readonly flowTable: "hs_onboarding.flows" | "hs_onboarding.family_flows";
+  constructor(private pool: ParentSql, private parent: HighSchoolParentSecurity, family = false) {
+    this.flowTable = family ? "hs_onboarding.family_flows" : "hs_onboarding.flows";
+  }
   async installed() {
     return !!(await this.pool.query("SELECT to_regclass('hs_onboarding.version') AS installed")).rows[0]?.installed;
   }
@@ -44,7 +49,11 @@ export class HighSchoolOnboarding {
   }
   async state(actor: OnboardingActor, grant?: string) {
     await this.active(actor);
-    const row = (await this.pool.query("SELECT * FROM hs_onboarding.flows WHERE auth_id=$1", [actor.authId])).rows[0];
+    const row = (await this.pool.query(`SELECT * FROM ${this.flowTable} WHERE auth_id=$1`, [actor.authId])).rows[0];
+    if (await this.parent.enrolled(actor.authId) && !await this.parent.authorized(actor, grant)) {
+      return { active: !!row?.block_legacy, path: row?.path ?? null, revision: row?.revision ?? 0,
+        status: "parent_verification_required", fixtureOnly: true };
+    }
     if (!row) {
       return { active: !await this.completedAdult(actor), path: null, revision: 0, status: "choose", fixtureOnly: true };
     }
@@ -56,6 +65,7 @@ export class HighSchoolOnboarding {
     return { active,path:row.path,revision:row.revision,status:row.status,draft:{...draft,imported:!!invitationDigest},fixtureOnly:true };
   }
   async choose(actor: OnboardingActor, input: unknown) {
+    if (this.flowTable !== "hs_onboarding.flows") fail("USE_FAMILY_SETUP", 403);
     const data = hsChoosePath.parse(input);
     if (["staff","parent","league_admin"].includes(data.path)) this.fixture(actor);
     const youthInstalled = !!(await this.pool.query("SELECT to_regclass('hs_onboarding.youth_version') AS installed")).rows[0]?.installed;
@@ -90,7 +100,9 @@ export class HighSchoolOnboarding {
   }
   private async flow(tx: ParentTransaction, actor: OnboardingActor, kind: string, revision: number, grant?: string) {
     await this.active(actor,tx); this.fixture(actor);
-    const flow = (await tx.query("SELECT * FROM hs_onboarding.flows WHERE auth_id=$1 FOR UPDATE", [actor.authId])).rows[0];
+    // Serialize limits and claims across primary AND additive family journeys.
+    await tx.query("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", [actor.authId]);
+    const flow = (await tx.query(`SELECT * FROM ${this.flowTable} WHERE auth_id=$1 FOR UPDATE`, [actor.authId])).rows[0];
     if (!flow || flow.path!==kind) fail("WRONG_ONBOARDING_PATH",403);
     if (flow.revision!==revision) fail("DRAFT_CONFLICT",409);
     if (kind==="parent" && !await this.parent.authorized(actor,grant,tx)) throw new ParentSecurityError("PARENT_VERIFICATION_REQUIRED",403);
@@ -115,8 +127,11 @@ export class HighSchoolOnboarding {
         if (new Set(data.players.map(p=>p.id)).size!==data.players.length) fail("DUPLICATE_PLAYER");
         const names=data.players.map(p=>`${p.firstName.trim().toLowerCase()}|${p.lastName.trim().toLowerCase()}|${p.gradYear}`);
         if(new Set(names).size!==names.length) fail("DUPLICATE_PLAYER");
-        const existing=(await tx.query("SELECT player_key FROM hs_onboarding.player_requests WHERE auth_id=$1",[actor.authId])).rows;
-        if(new Set([...existing.map(p=>p.player_key),...data.players.map(p=>p.id)]).size>4) fail("HOUSEHOLD_LIMIT");
+        const existing=(await tx.query("SELECT player_key,details FROM hs_onboarding.player_requests WHERE auth_id=$1",[actor.authId])).rows;
+        if(new Set([...existing.map(p=>p.player_key),...data.players.map(p=>p.id)]).size>HS_MAX_FAMILY_PLAYERS) fail("HOUSEHOLD_LIMIT");
+        if (data.players.some(p => existing.some(e => e.player_key !== p.id &&
+          e.details?.firstName?.trim().toLowerCase() === p.firstName.trim().toLowerCase() &&
+          e.details?.lastName?.trim().toLowerCase() === p.lastName.trim().toLowerCase() && e.details?.gradYear === p.gradYear))) fail("DUPLICATE_PLAYER",409);
         // Import data is server-owned; clients may consent but cannot rename an
         // imported child or swap its identity after looking up an invitation.
         const staged=flow.draft?.invitationDigest ? (await this.invite(tx,actor,flow.draft.invitationDigest,"parent")).players : [];
@@ -124,7 +139,7 @@ export class HighSchoolOnboarding {
           const s=staged.find((s:any)=>s.id===p.id);
           return !s || p.firstName!==s.firstName || p.lastName!==s.lastName || p.gradYear!==s.gradYear || p.position!==s.position || p.jerseyNumber!==s.jerseyNumber;
         }))) fail("INVITATION_PLAYER_MISMATCH");
-        await tx.query(`UPDATE hs_onboarding.flows SET draft=$2,revision=revision+1,updated_at=now() WHERE auth_id=$1`,
+        await tx.query(`UPDATE ${this.flowTable} SET draft=$2,revision=revision+1,updated_at=now() WHERE auth_id=$1`,
           [actor.authId,{...flow.draft,players:data.players,guardianConfirmed:true,consentVersion:HS_CONSENT_VERSION,
             consentRecords:data.players.map(p=>({playerId:p.id,version:HS_CONSENT_VERSION,recordedAt:new Date().toISOString()}))}]);
         await this.event(tx,actor,"per_player_consent_draft_saved");
@@ -173,14 +188,17 @@ export class HighSchoolOnboarding {
     const text=z.string().regex(/^[A-Za-z0-9_-]{32,128}$/).parse(token);
     return this.tx(async tx=>{
       await this.active(actor,tx); this.fixture(actor);
-      const flow=(await tx.query("SELECT * FROM hs_onboarding.flows WHERE auth_id=$1 FOR UPDATE",[actor.authId])).rows[0];
+      await tx.query("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", [actor.authId]);
+      const flow=(await tx.query(`SELECT * FROM ${this.flowTable} WHERE auth_id=$1 FOR UPDATE`,[actor.authId])).rows[0];
       if(!flow || !["parent","staff"].includes(flow.path)) fail("WRONG_ONBOARDING_PATH",403);
       await this.flowForLookup(flow,actor,revision,grant,tx);
       const invite=await this.invite(tx,actor,parentDigest(text),flow.path);
       if(flow.path==="parent"){
         const owned=(await tx.query("SELECT auth_id FROM hs_onboarding.player_requests WHERE staged_id=ANY($1::uuid[])",[invite.staged_ids])).rows;
         if(owned.some(p=>p.auth_id!==actor.authId)) fail("PLAYER_ALREADY_CLAIMED",409);
-        await tx.query("UPDATE hs_onboarding.flows SET draft=$2,revision=revision+1 WHERE auth_id=$1",
+        const existing=(await tx.query("SELECT player_key FROM hs_onboarding.player_requests WHERE auth_id=$1",[actor.authId])).rows;
+        if(new Set([...existing.map(p=>p.player_key),...invite.players.map((p:any)=>p.id)]).size>HS_MAX_FAMILY_PLAYERS) fail("HOUSEHOLD_LIMIT");
+        await tx.query(`UPDATE ${this.flowTable} SET draft=$2,revision=revision+1 WHERE auth_id=$1`,
           [actor.authId,{invitationDigest:parentDigest(text),teamId:invite.team_id,players:invite.players.map((p:any)=>({...p,consent:false,photoConsent:false,publicNameConsent:false,consentVersion:HS_CONSENT_VERSION}))}]);
       } else {
         if(!["assistant_coach","team_manager","head_coach","athletic_director"].includes(invite.staff_role)) fail("INVALID_INVITATION",403);
@@ -226,17 +244,18 @@ export class HighSchoolOnboarding {
         teamId=team.id;
       }
       const existing=(await tx.query("SELECT player_key FROM hs_onboarding.player_requests WHERE auth_id=$1",[actor.authId])).rows;
-      if(new Set([...existing.map(p=>p.player_key),...payload.players.map(p=>p.id)]).size>4) fail("HOUSEHOLD_LIMIT");
+      if(new Set([...existing.map(p=>p.player_key),...payload.players.map(p=>p.id)]).size>HS_MAX_FAMILY_PLAYERS) fail("HOUSEHOLD_LIMIT");
       for(const player of payload.players){
         const consent=flow.draft.consentRecords?.find((c:any)=>c.playerId===player.id&&c.version===HS_CONSENT_VERSION);
         if(!consent?.recordedAt)fail("PLAYER_CONSENT_REQUIRED",403);
         const owned=(await tx.query("SELECT auth_id FROM hs_onboarding.player_requests WHERE staged_id=$1",[stagedIds.includes(player.id)?player.id:null])).rows[0];
         if(owned && owned.auth_id!==actor.authId) fail("PLAYER_ALREADY_CLAIMED",409);
+        if(existing.some(p=>p.player_key===player.id)) fail("PLAYER_ALREADY_SUBMITTED",409);
         await tx.query(`INSERT INTO hs_onboarding.player_requests(id,auth_id,team_id,staged_id,player_key,details,consent_version,consented_at)
           VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(auth_id,player_key) DO NOTHING`,
         [randomUUID(),actor.authId,teamId,stagedIds.includes(player.id)?player.id:null,player.id,player,HS_CONSENT_VERSION,consent.recordedAt]);
       }
-      await tx.query("UPDATE hs_onboarding.flows SET status=$2,draft=draft||$3::jsonb,revision=revision+1 WHERE auth_id=$1",
+      await tx.query(`UPDATE ${this.flowTable} SET status=$2,draft=draft||$3::jsonb,revision=revision+1 WHERE auth_id=$1`,
         [actor.authId,stagedIds.length?"coverage_pending":"waiting_staff_review",JSON.stringify({teamId})]);
       await this.event(tx,actor,"consented_players_submitted_without_activation");
     });

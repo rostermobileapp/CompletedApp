@@ -19,6 +19,9 @@ import { HighSchoolStaffEvents } from './highSchoolStaffEvents';
 import { HighSchoolStaffChat } from './highSchoolStaffChat';
 import { registerHighSchoolStaffRoutes } from './highSchoolStaffHttp';
 import { existingStaffPaymentEligibility } from './highSchoolStaffPaymentEligibility';
+import { HighSchoolFamilySetup, HighSchoolFamilyReview } from './highSchoolFamilySetup';
+import { registerHighSchoolFamilyRoutes } from './highSchoolFamilyHttp';
+import { proCoverage, hasPersonalPro } from './proCoverage';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -51,16 +54,30 @@ export async function isRetiredAccount(authId: string, email?: string): Promise<
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function getAuthenticatedDatabaseUser(accessToken: string) {
+async function verifiedAdultSocketUser(accessToken: string, parentGrant?: string) {
   if (!accessToken || accessToken.length < 10) return null;
   const { data: { user }, error } = await supabase.auth.getUser(accessToken);
   if (error || !user) return null;
-  // Family sockets remain disabled until child/profile-scoped socket auth exists.
-  // A shared password alone must never subscribe a child to the adult stream.
   const parent = parentSecurity();
-  if (parent && await parent.enrolled(user.id)) return null;
+  if (parent) {
+    try { await requireDevParentAuthority(parent, user.id, accessToken, parentIssuer(), parentGrant); }
+    catch { return null; }
+    // Revoked Auth sessions must not survive through a still-unexpired JWT.
+    try {
+      const actor = parentActorFromVerifiedToken(accessToken, user.id, parentIssuer());
+      await parent.status(actor, parentGrant);
+    } catch { return null; }
+  }
   if (await onboardingSecurity()?.blocksLegacy(user.id,user.email,!!user.email_confirmed_at)) return null;
   if (await isRetiredAccount(user.id, user.email)) return null;
+  return user;
+}
+export async function adultSocketAuthorized(accessToken: string, parentGrant?: string) {
+  try { return !!await verifiedAdultSocketUser(accessToken, parentGrant); } catch { return false; }
+}
+export async function getAuthenticatedDatabaseUser(accessToken: string, parentGrant?: string) {
+  const user = await verifiedAdultSocketUser(accessToken, parentGrant);
+  if (!user) return null;
   return storage.upsertUser({
     id: user.id,
     email: user.email || '',
@@ -107,6 +124,10 @@ export async function setupAuth(app: Express) {
     const staff = new HighSchoolStaffOperations(pool, existingStaffPaymentEligibility);
     onboarding.staffDecisions = staff;
     registerHighSchoolStaffRoutes(app,staff,new HighSchoolStaffEvents(pool),new HighSchoolStaffChat(pool),parent,authenticateOnboarding);
+    const family = new HighSchoolFamilySetup(pool, parent, async (id, leagueId) =>
+      await hasPersonalPro(id) ? "personal" : await proCoverage.hasProFor(id, { leagueId }) ? "league" : "uncovered");
+    family.intake.staffDecisions = staff;
+    registerHighSchoolFamilyRoutes(app, family, new HighSchoolFamilyReview(pool), parent, authenticateOnboarding);
   }
 }
 
