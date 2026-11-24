@@ -1,6 +1,6 @@
 ---
 name: Player Pro coverage policy
-description: Owner-requested payer-scoped Pro behavior for mixed adult/parent accounts; implementation requires approval.
+description: Owner-approved payer-scoped Pro behavior and protected boundaries for mixed adult/parent accounts.
 ---
 
 Personal Player Pro and Commissioner subscriptions are intended to cover the
@@ -22,3 +22,27 @@ This supersedes the older one-sponsor-across-all-HS-leagues policy.
 Keep parent/device verification, membership, child safety and administrative
 authority separate from payment coverage. This request does not approve code
 changes, billing changes, publication or real-family activation by itself.
+
+Preserve manual/complimentary and operational exceptions separately from proof
+of a purchased personal subscription. Coverage must not reset account roles,
+confer team/parent authority, or activate guarded child capabilities.
+
+**Why:** The approved implementation explicitly excludes role resets, removal
+of independent administrative access and real family activation.
+
+**How to apply:** Keep subscription availability independent of sign-in and
+free baseline access. Require separate approval for production rollout or
+reconciling historical grants.
+
+Ownership-only purchase records are not evidence of payment or expiry.
+Historical Apple identifiers can also appear in Google claim ownership
+backfills without a product or verified period; preserve their existing
+legacy access until separately approved reconciliation.
+
+**Why:** Ownership protection was backfilled across historical IAP identifiers,
+not only verified Google subscriptions. Treating row existence as expiry
+evidence wrongly removes grandfathered access.
+
+**How to apply:** Require purchase-state evidence before denying legacy
+coverage. Keep verified seats and free/support messaging independent of
+unrelated personal-provider availability.

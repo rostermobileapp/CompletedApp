@@ -12,8 +12,8 @@ interface HPIBBannerProps {
 }
 
 export function HPIBBanner({ placement }: HPIBBannerProps) {
-  const { hasRole } = usePermissions();
-  const isPaidUser = hasRole('player_pro');
+  const { hasPersonalProAccess } = usePermissions();
+  const isPaidUser = hasPersonalProAccess();
   const [location] = useLocation();
   const [utcHourSlot, setUtcHourSlot] = useState(() => getUtcHourSlot());
   const partnerBanner = getPartnerBannerForHour(utcHourSlot);

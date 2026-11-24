@@ -3,12 +3,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useQuery } from '@tanstack/react-query';
 import type { User } from '@shared/schema';
+import { hasAccountPro, hasProFor, type AccountPro, type ProContext, type ProCoverage } from "@shared/proCoverage";
+import { apiRequest } from "@/lib/queryClient";
 
 export type UserRole = 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier';
 export type SpecialPermission = 'admin' | 'stat_manager';
 
 interface PermissionContextType {
-  user: User | null;
+  user: (User & { accountPro: AccountPro | null }) | null;
   role: UserRole;
   specialPermissions: SpecialPermission[];
   isPrimaryCommissioner: boolean;
@@ -20,7 +22,10 @@ interface PermissionContextType {
   canManageUsers: () => boolean;
   canManageLeague: (leagueId?: string) => boolean;
   canEditStats: () => boolean;
-  canAccessPremiumFeatures: () => boolean;
+  canAccessPremiumFeatures: (context?: ProContext & { tournamentId?: string | null }) => boolean;
+  hasPersonalProAccess: () => boolean;
+  coverage: ProCoverage | null;
+  coverageUnavailable: boolean;
   hasStatManagerAccess: () => boolean;
   isCoCommissionerOfAnyLeague: () => boolean;
   /**
@@ -77,10 +82,16 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
   // Active League-Wide Player Pro seats for the user, scoped to the current
   // month. Each seat elevates premium access only for that specific league —
   // never globally, never for other leagues.
-  const { data: leagueProSeats = [] } = useQuery<{ leagueId: string }[]>({
-    queryKey: ['/api/user/league-pro-seats'],
-    enabled: !!authUser,
+  const { data: coverage, isLoading: coverageLoading, isError: coverageQueryUnavailable } = useQuery<ProCoverage>({
+    queryKey: ['/api/user/pro-coverage', user?.id, user?.updatedAt ?? null],
+    queryFn: async () => (await apiRequest("GET", "/api/user/pro-coverage")).json(),
+    enabled: !!authUser && !!user,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
   });
+  const coverageUnavailable = coverageQueryUnavailable ||
+    (coverage?.userId === user?.id && coverage?.personalVerificationUnavailable === true);
   
   const role: UserRole = user?.role || 'free_tier';
   const specialPermissions: SpecialPermission[] = user?.specialPermissions || [];
@@ -137,22 +148,24 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
 
   const hasLeagueProSeat = (leagueId: string): boolean => {
     if (!leagueId) return false;
-    return leagueProSeats.some((s) => s?.leagueId === leagueId);
+    return !!coverage && coverage.userId === user?.id && coverage.seats.some((s) => s?.leagueId === leagueId);
   };
 
-  // True only when the dashboard's active context is a league the user
-  // currently holds a paid Player Pro seat in. Mirrors the tournament
-  // elevation pattern — switching the dropdown to a different league should
-  // snap premium gates back on for an otherwise free-tier user.
-  const isActiveLeagueProSeatHolder = (): boolean => {
-    if (selectedType !== 'league' || !selectedId) return false;
-    return hasLeagueProSeat(selectedId);
+  // Account extras never inherit the dashboard's selected league/tournament.
+  const hasPersonalProAccess = (): boolean => {
+    return coverage?.userId === user?.id && hasAccountPro(coverage?.account);
   };
 
-  const canAccessPremiumFeatures = (): boolean => {
-    if (hasRole('player_pro')) return true;
-    if (isActiveTournamentParticipant()) return true;
-    return isActiveLeagueProSeatHolder();
+  const canAccessPremiumFeatures = (context?: ProContext & { tournamentId?: string | null }): boolean => {
+    if (!coverage || coverage.userId !== user?.id) return false;
+    if (context?.tournamentId) {
+      return hasPersonalProAccess() || tournamentParticipations.some(p => p.tournamentId === context.tournamentId);
+    }
+    if (context) return hasProFor(coverage, context);
+    if (selectedType === "tournament") return hasPersonalProAccess() || isActiveTournamentParticipant();
+    if (selectedType === "team" && selectedId) return hasProFor(coverage, { teamId: selectedId });
+    if (selectedType === "league" && selectedId) return hasProFor(coverage, { leagueId: selectedId });
+    return hasPersonalProAccess();
   };
 
   const hasStatManagerAccess = (): boolean => {
@@ -237,7 +250,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
 
   return (
     <PermissionContext.Provider value={{
-      user: user || null,
+      user: user ? { ...user, accountPro: coverage?.userId === user.id ? coverage.account : null } : null,
       role,
       specialPermissions,
       isPrimaryCommissioner,
@@ -249,6 +262,9 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       canManageLeague,
       canEditStats,
       canAccessPremiumFeatures,
+      hasPersonalProAccess,
+      coverage: coverage && coverage.userId === user?.id ? coverage : null,
+      coverageUnavailable,
       hasStatManagerAccess,
       isCoCommissionerOfAnyLeague,
       hasLeagueProSeat,
@@ -258,7 +274,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       canManageLeagueSpecific,
       canEditLeagueStats,
       getUserLeagueMembership,
-      isLoading: authLoading || userLoading || isMembershipsLoading
+      isLoading: authLoading || userLoading || isMembershipsLoading || coverageLoading
     }}>
       {children}
     </PermissionContext.Provider>

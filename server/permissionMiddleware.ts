@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
 import Stripe from "stripe";
+import { hasPersonalPro, proCoverage } from "./proCoverage";
 
 // Types matching the frontend permission system
 export type UserRole = 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier';
@@ -314,25 +315,26 @@ export const requireStatsManagement: RequestHandler = async (req, res, next) => 
 
 // Premium features access (player_pro or higher)
 export const requirePremiumFeatures: RequestHandler = async (req, res, next) => {
-  const user = req.userWithPermissions;
-  if (!user) {
-    return res.status(401).json({ message: "User permissions not loaded" });
-  }
+  try {
+    const user = req.userWithPermissions;
+    if (!user) {
+      return res.status(401).json({ message: "User permissions not loaded" });
+    }
 
-  const userRole = user.role || 'free_tier';
-  if (roleHierarchy[userRole] >= roleHierarchy['player_pro']) {
-    return next();
-  }
+    if (await hasPersonalPro(user.id)) return next();
 
-  res.status(403).json({ 
-    message: "Access denied. Premium features require Player Pro subscription or higher" 
-  });
+    res.status(403).json({
+      message: "Access denied. Premium features require Player Pro subscription or higher",
+    });
+  } catch {
+    res.status(503).json({ message: "Player Pro coverage could not be verified" });
+  }
 };
 
 /**
  * Premium-features access for a league-scoped endpoint. Allows the caller
  * through if either:
- *   - their global role is Player Pro or higher, OR
+ *   - they have verified personal coverage or a preserved independent grant, OR
  *   - they hold an active League-Wide Player Pro seat in the route's league
  *     (per-league access only — never elevates the global role).
  *
@@ -342,31 +344,21 @@ export const requirePremiumFeatures: RequestHandler = async (req, res, next) => 
  */
 export const requireLeaguePremiumFeatures = (paramName: string = 'id'): RequestHandler => {
   return async (req, res, next) => {
-    const user = req.userWithPermissions;
-    if (!user) {
-      return res.status(401).json({ message: "User permissions not loaded" });
+    try {
+      const user = req.userWithPermissions;
+      if (!user) {
+        return res.status(401).json({ message: "User permissions not loaded" });
+      }
+
+      const leagueId = (req.params as Record<string, string | undefined>)[paramName];
+      if (leagueId && await proCoverage.hasProFor(user.id, { leagueId })) return next();
+
+      res.status(403).json({
+        message: "Access denied. Premium features require Player Pro subscription or a league-provided Player Pro seat",
+      });
+    } catch {
+      res.status(503).json({ message: "Player Pro coverage could not be verified" });
     }
-
-    // Fee-exempt accounts (founder / demo) bypass all premium feature gates
-    if (user.feeExempt) return next();
-
-    // Global Pro short-circuit so we don't run a DB lookup for users that
-    // already have the entitlement.
-    const userRole = user.role || 'free_tier';
-    if (roleHierarchy[userRole] >= roleHierarchy['player_pro']) {
-      return next();
-    }
-
-    const leagueId = (req.params as Record<string, string | undefined>)[paramName];
-    if (leagueId) {
-      const { currentMonth } = await import('./leaguePro');
-      const hasSeat = await storage.userHasActiveLeagueProSeat(user.id, leagueId, currentMonth());
-      if (hasSeat) return next();
-    }
-
-    res.status(403).json({
-      message: "Access denied. Premium features require Player Pro subscription or a league-provided Player Pro seat",
-    });
   };
 };
 
@@ -378,9 +370,7 @@ export async function canAccessLeaguePremiumFeatures(
   user: UserWithPermissions,
   leagueId: string,
 ): Promise<boolean> {
-  if (canAccessPremiumFeatures(user)) return true;
-  const { currentMonth } = await import('./leaguePro');
-  return storage.userHasActiveLeagueProSeat(user.id, leagueId, currentMonth());
+  return proCoverage.hasProFor(user.id, { leagueId });
 }
 
 /**
@@ -418,9 +408,8 @@ export function canEditStats(user: UserWithPermissions): boolean {
          hasRole(user, 'commissioner');
 }
 
-export function canAccessPremiumFeatures(user: UserWithPermissions): boolean {
-  if (user.feeExempt) return true;
-  return hasRole(user, 'player_pro');
+export async function canAccessPremiumFeatures(user: UserWithPermissions): Promise<boolean> {
+  return hasPersonalPro(user.id);
 }
 
 /**

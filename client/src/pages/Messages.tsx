@@ -17,6 +17,7 @@ import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import { compressImage } from '@/lib/imageCompression';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { proConversationContext } from "@shared/proConversation";
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { useWebSocket } from '@/context/WebSocketContext';
@@ -631,7 +632,7 @@ function ConversationRail({
 
 export default function Messages() {
   const { user } = useAuth();
-  const { canAccessPremiumFeatures, hasRole } = usePermissions();
+  const { canAccessPremiumFeatures, hasPersonalProAccess } = usePermissions();
   const { data: dbUser } = useQuery<{ id: string; displayId?: string }>({
     queryKey: ['/api/user'],
     enabled: !!user,
@@ -645,7 +646,6 @@ export default function Messages() {
   const isDesktopWeb = useIsDesktopWeb();
 
   // Check if user is on free tier (no premium access)
-  const isFreeTier = !canAccessPremiumFeatures();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
   // Handle conversation ID from URL parameter (sync both ways: opening a thread
@@ -1936,7 +1936,7 @@ export default function Messages() {
           }
         }
 
-        const uploadUrlResponse = await apiRequest('POST', '/api/message-attachments/upload');
+        const uploadUrlResponse = await apiRequest('POST', '/api/message-attachments/upload', { conversationId: selectedConversation });
         const { uploadURL, path } = await uploadUrlResponse.json();
         
         const uploadResponse = await fetch(uploadURL, {
@@ -2181,6 +2181,8 @@ export default function Messages() {
   
   // Use cached conversation if available, otherwise use fetched data
   const currentConversation = cachedConversation || fetchedConversation;
+  const messageContext = proConversationContext(currentConversation);
+  const isFreeTier = !canAccessPremiumFeatures(messageContext);
   
   // Whether the current conversation includes the founder (U00001) as a participant.
   // Used to bypass the free-tier message gate so any user can reply to the founder.
@@ -2779,7 +2781,7 @@ export default function Messages() {
                 >
                   <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
-{(canAccessPremiumFeatures() || isFounder) ? (
+{(hasPersonalProAccess() || isFounder) ? (
                 <button 
                   className="text-primary" 
                   data-testid="button-new-message"

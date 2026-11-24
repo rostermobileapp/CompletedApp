@@ -1431,7 +1431,7 @@ export default function Announcements() {
   // User can post if they have Player Pro tier or higher (includes Commissioner tier)
   const canPost = isTournamentContext 
     ? isTournamentCommissioner
-    : canAccessPremiumFeatures();
+    : canAccessPremiumFeatures({ leagueId });
 
   // Fetch announcements - either tournament or league
   const { data, isLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
@@ -1506,7 +1506,7 @@ export default function Announcements() {
         tournamentId={isTournamentContext ? tournamentId : null}
         currentUserId={user?.id || ''}
         isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
-        canComment={canAccessPremiumFeatures()}
+        canComment={canAccessPremiumFeatures(isTournamentContext ? { tournamentId } : { leagueId })}
         onBack={() => setSelectedAnnouncement(null)}
       />
     );

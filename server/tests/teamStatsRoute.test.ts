@@ -28,14 +28,14 @@ async function getTeamStats(options: {
       getUser: async () => ({ id: options.viewerId, role: options.role ?? "player" }),
       getLeague: async () => ({ id: leagueId, commissionerId: options.commissionerId }),
       getUserTeams: async () => options.viewerTeams ?? [],
-      getActiveLeagueProSeatsForUser: async () => options.leagueProSeats ?? [],
     },
     db: { execute: async () => ({ rows: [] }) },
     getTeamRosterStats: async () => {
       statsReadCount += 1;
       return [{ userId: "opponent-player", goals: 3 }];
     },
-    currentMonth: () => "2026-10",
+    hasProFor: async (_id, context) => ["player_pro", "commissioner", "secondary_commissioner"].includes(options.role ?? "") ||
+      (options.leagueProSeats ?? []).some(seat => seat.leagueId === context.leagueId),
   });
 
   const server = app.listen(0);

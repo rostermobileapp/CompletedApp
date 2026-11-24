@@ -140,7 +140,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
   const isLeagueCommissionerOfActive = activeLeagueId
     ? canManageLeagueSpecific(activeLeagueId)
     : false;
-  const isPremium = canAccessPremiumFeatures();
+  const isPremium = canAccessPremiumFeatures(activeLeagueId ? { leagueId: activeLeagueId } : {});
   const canCreate = isPremium || isLeagueCommissionerOfActive;
 
   // If the user can't create, show paywall.

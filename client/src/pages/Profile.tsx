@@ -86,7 +86,7 @@ export default function Profile() {
     retry: false,
   });
   const { removeExternalId, displayId: nativeDisplayId } = useNativelyNotifications();
-  const { role, hasRole, canManageLeague, canAccessPremiumFeatures } = usePermissions();
+  const { role, hasRole, canManageLeague, hasPersonalProAccess } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -929,7 +929,7 @@ export default function Profile() {
       {/* Payment Methods */}
       <div className="px-6 mb-6">
         <div className="overflow-hidden rounded-xl">
-          <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
+          <FeatureLockOverlay isLocked={!hasPersonalProAccess()}>
             <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">

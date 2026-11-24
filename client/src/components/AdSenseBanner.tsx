@@ -1,10 +1,10 @@
-import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/context/SubscriptionContext';
 
 export function AdSenseBanner() {
-  const { user } = useAuth();
+  const { user, hasPersonalProAccess, isLoading } = usePermissions();
 
   // Only show for free tier users
-  if (!user || user.role !== 'free_tier') {
+  if (!user || isLoading || hasPersonalProAccess()) {
     return null;
   }
 

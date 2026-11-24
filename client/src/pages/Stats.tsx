@@ -35,10 +35,7 @@ export default function Stats() {
   const { closeWithSlideDown } = useSlideUpOverlay();
   
   // FREE TIER RESTRICTION: Block access to Stats page for free tier users
-  const isFreeTier = !canAccessPremiumFeatures();
-  
-  if (isFreeTier) {
-    return (
+  const lockedStats = (
       <div className="min-h-screen bg-background pb-20" data-page-content>
         <div className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">
@@ -75,7 +72,6 @@ export default function Stats() {
         </div>
       </div>
     );
-  }
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
   const [viewMode, setViewMode] = useState<'summary' | 'table' | 'stars'>('summary');
@@ -137,6 +133,9 @@ export default function Stats() {
     }
   }
 
+  const statsContext = isTournamentContext ? { tournamentId } : { leagueId };
+  const isFreeTier = !canAccessPremiumFeatures(statsContext);
+
   // Fetch tournament data when in tournament context
   const { data: tournament } = useQuery({
     queryKey: ['/api/tournaments', tournamentId],
@@ -145,13 +144,13 @@ export default function Stats() {
       if (!response.ok) return null;
       return response.json();
     },
-    enabled: !!tournamentId,
+    enabled: !!tournamentId && !isFreeTier,
   });
 
   // Fetch league seasons for filtering (only for leagues)
   const { data: seasons } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/seasons`],
-    enabled: !!leagueId && !isTournamentContext,
+    enabled: !!leagueId && !isTournamentContext && !isFreeTier,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -181,7 +180,7 @@ export default function Stats() {
       const res = await apiRequest('GET', `/api/leagues/${leagueId}/stats${query ? `?${query}` : ''}`);
       return res.json();
     },
-    enabled: !!leagueId && !isTournamentContext,
+    enabled: !!leagueId && !isTournamentContext && !isFreeTier,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -192,7 +191,7 @@ export default function Stats() {
       const res = await apiRequest('GET', `/api/tournaments/${tournamentId}/stats`);
       return res.json();
     },
-    enabled: !!tournamentId && isTournamentContext,
+    enabled: !!tournamentId && isTournamentContext && !isFreeTier,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -221,7 +220,7 @@ export default function Stats() {
       }
       return response.json();
     },
-    enabled: !!leagueId && !isTournamentContext,
+    enabled: !!leagueId && !isTournamentContext && !isFreeTier,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -231,14 +230,14 @@ export default function Stats() {
   // Fetch league memberships to get position and jersey number data (only for leagues)
   const { data: leagueMemberships } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/members`],
-    enabled: !!leagueId && !isTournamentContext,
+    enabled: !!leagueId && !isTournamentContext && !isFreeTier,
     staleTime: 5 * 60 * 1000,
   });
 
   // Fetch league teams to get team names (only for leagues)
   const { data: leagueTeams } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/teams`],
-    enabled: !!leagueId && !isTournamentContext,
+    enabled: !!leagueId && !isTournamentContext && !isFreeTier,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -250,7 +249,7 @@ export default function Stats() {
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: !!tournamentId && isTournamentContext,
+    enabled: !!tournamentId && isTournamentContext && !isFreeTier,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -444,6 +443,7 @@ export default function Stats() {
   };
 
   // Show error state only if neither league nor tournament is available
+  if (isFreeTier) return lockedStats;
   if (!leagueId && !tournamentId) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6" data-testid="no-league-state">
@@ -465,7 +465,7 @@ export default function Stats() {
   return (
     <>
     <div className="min-h-screen bg-white dark:bg-black text-[#212121] dark:text-white pb-24" data-testid="stats-page" data-page-content>
-      <FeatureLockOverlay isLocked={!canAccessPremiumFeatures() && !canEditStats()} className="min-h-screen flex flex-col">
+      <FeatureLockOverlay isLocked={isFreeTier && !canEditStats()} className="min-h-screen flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-50 bg-white/95 dark:bg-black/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
           <div className="px-4 pt-[4px] pb-[4px]">

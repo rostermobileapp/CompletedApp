@@ -27,12 +27,11 @@ export default function TeamView() {
   const [previewPlayer, setPreviewPlayer] = useState<PreviewPlayerState | null>(null);
   
   // Check if user is on free tier
-  const isFreeTier = !canAccessPremiumFeatures();
-
   const { data: team, isLoading: teamLoading } = useQuery({
     queryKey: ['/api/teams', teamId],
     enabled: !!teamId,
   });
+  const isFreeTier = !canAccessPremiumFeatures((team as any)?.leagueId ? { leagueId: (team as any).leagueId } : { teamId });
   
   // Fetch user's teams to check if this is their own team
   const { data: userTeams = [], isLoading: userTeamsLoading } = useQuery<any[]>({

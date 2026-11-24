@@ -149,7 +149,10 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
   const [availableTeams, setAvailableTeams] = useState<any[]>([]);
   const [showOnlyMyPhotos, setShowOnlyMyPhotos] = useState(false);
   const [showUserFilter, setShowUserFilter] = useState(false);
-  const { role, canAccessPremiumFeatures } = usePermissions();
+  const { role, canAccessPremiumFeatures, hasPersonalProAccess } = usePermissions();
+  const entityType = overlayEntityType || (tournamentParams ? 'tournament' : leagueParams ? 'league' : teamParams ? 'team' : null);
+  const entityId = overlayEntityId || tournamentParams?.id || leagueParams?.id || teamParams?.id;
+  const mediaContext = entityType === "league" ? { leagueId: entityId } : entityType === "team" ? { teamId: entityId } : { tournamentId: entityId };
 
   const { data: photoQuota, refetch: refetchQuota } = useQuery<{
     used: number;
@@ -159,15 +162,14 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
     allowed: boolean;
   }>({
     queryKey: ['/api/photos/quota'],
-    enabled: canAccessPremiumFeatures(),
+    enabled: hasPersonalProAccess(),
     staleTime: 30_000,
   });
   
   // FREE TIER RESTRICTION: Block access to Photos page for free tier users
-  const isFreeTier = !canAccessPremiumFeatures();
+  const isFreeTier = !canAccessPremiumFeatures(mediaContext);
   
-  if (isFreeTier) {
-    return (
+  const lockedGallery = (
       <div className="min-h-screen bg-background" data-page-content>
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
           <div className="flex items-center gap-4 px-4 py-3">
@@ -200,13 +202,9 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
         </div>
       </div>
     );
-  }
-
-  const entityType = overlayEntityType || (tournamentParams ? 'tournament' : leagueParams ? 'league' : teamParams ? 'team' : null);
-  const entityId = overlayEntityId || tournamentParams?.id || leagueParams?.id || teamParams?.id;
   
   // Check if user has paid access (not free tier) for league photos
-  const hasPaidAccess = role !== 'free_tier';
+  const hasPaidAccess = !isFreeTier;
 
   // Fetch current user
   const { data: currentUser } = useQuery<any>({
@@ -288,6 +286,7 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
     );
   }
 
+  if (isFreeTier) return lockedGallery;
   return (
     <div className="min-h-screen bg-background" data-page-content>
       {/* Header */}

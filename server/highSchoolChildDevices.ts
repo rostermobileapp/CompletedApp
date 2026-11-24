@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   HS_SETUP_CODE_ALPHABET, HS_SETUP_CODE_MAX_FAILURES, HS_SETUP_CODE_PATTERN, HS_SETUP_CODE_SECONDS,
 } from "../shared/highSchoolYouthOnboarding";
-import { HS_CONSENT_VERSION } from "../shared/highSchoolOnboarding";
+import { HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS } from "../shared/highSchoolOnboarding";
 import {
   HighSchoolParentSecurity, parentDigest, type ParentSql, type ParentTransaction,
 } from "./highSchoolParentSecurity";
@@ -212,6 +212,19 @@ export class HighSchoolChildDevices {
   }
   private chatScope = `((c.kind='family' AND c.parent_auth_id=$2 AND c.team_id IS NULL)
     OR(c.kind='team' AND c.team_id=$3 AND c.parent_auth_id IS NULL))`;
+  /** Coverage only; does not grant chat/payment/guardian capabilities or activate a child. */
+  async verifiedProParent(token: unknown, teamId: string) {
+    const session = await this.session(token);
+    if (session.child.team_id !== teamId) return null;
+    const result = await this.pool.query(`SELECT p.league_id,
+      (SELECT count(DISTINCT r.player_key)::int FROM hs_onboarding.player_requests r
+       WHERE r.auth_id=$2) AS family_players
+      FROM hs_onboarding.teams t JOIN hs_onboarding.programs p ON p.id=t.program_id
+      WHERE t.id=$1 AND p.status='approved'`, [teamId, session.parent_auth_id]);
+    const row = result.rows[0];
+    if (!row || row.family_players > HS_MAX_FAMILY_PLAYERS) return null;
+    return { parentId: session.parent_auth_id as string, teamId, leagueId: row.league_id as string };
+  }
   async ownSession(token: unknown) {
     const session = await this.session(token);
     const schedule = (await this.pool.query(`SELECT id,title,starts_at AS "startsAt",location

@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
-import { hasPaidTrophyCaseAccess } from "../shared/trophyCaseAccess";
+import { hasPersonalPro, proCoverage } from "./proCoverage";
+import { proConversationContext } from "../shared/proConversation";
 import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
 import { getSeasonPatchCounts } from "./seasonPatchStats";
@@ -1111,7 +1112,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     if (viewer.id === playerId) return true;
     if (leagueId
       ? await canAccessLeaguePremiumFeatures(viewer, leagueId)
-      : canAccessPremiumFeatures(viewer)) return true;
+      : await canAccessPremiumFeatures(viewer)) return true;
     const viewerTeams = await currentTeamIds(viewer.id, leagueId);
     if (!viewerTeams.size) return false;
     if (playerId.startsWith('placeholder:')) {
@@ -1224,7 +1225,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       res.setHeader('Cache-Control', 'no-store');
       const userId = currentUserId(req);
       const viewer = await storage.getUser(userId);
-      if (!hasPaidTrophyCaseAccess(viewer)) {
+      if (!viewer || !await hasPersonalPro(viewer.id)) {
         return res.status(403).json({
           code: "TROPHY_CASE_PREMIUM_REQUIRED",
           message: "Trophy Case access requires Player Pro or Commissioner access.",
@@ -1251,7 +1252,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     try {
       res.setHeader('Cache-Control', 'no-store');
       const viewer = await storage.getUser(currentUserId(req));
-      if (!hasPaidTrophyCaseAccess(viewer)) {
+      if (!viewer || !await hasPersonalPro(viewer.id)) {
         return res.status(403).json({
           code: "TROPHY_CASE_PREMIUM_REQUIRED",
           message: "Trophy Case access requires Player Pro or Commissioner access.",
@@ -2157,6 +2158,17 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get('/api/user/pro-coverage', isAuthenticated, async (req: any, res) => {
+    try {
+      const coverage = await proCoverage.snapshot(req.user.claims.sub);
+      if (!coverage) return res.status(404).json({ message: "Account not found" });
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json(coverage);
+    } catch {
+      res.status(503).json({ message: "Player Pro coverage could not be verified. Please try again." });
     }
   });
 
@@ -6317,6 +6329,21 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   // Message attachment upload URL
   app.post("/api/message-attachments/upload", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const conversationId = req.body?.conversationId;
+      if (conversationId) {
+        if (typeof conversationId !== "string" || !await messagingService.isUserInConversation(userId, conversationId)) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        const thread = await messagingService.getConversation(conversationId);
+        const members = await messagingService.getConversationParticipants(conversationId);
+        if (!members.some(p => (p as any).user?.displayId === "U00001") &&
+            !await proCoverage.hasProFor(userId, proConversationContext(thread))) {
+          return res.status(403).json({ message: "Player Pro is required for attachments." });
+        }
+      } else if (!await hasPersonalPro(userId)) {
+        return res.status(403).json({ message: "A covered conversation is required for attachments." });
+      }
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
       const { uploadURL, path } = await supabaseStorageService.getMessageAttachmentUploadURL();
@@ -6391,9 +6418,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       if (!uploaderUser || uploaderUser.length === 0) {
         return res.status(403).json({ error: "User not found" });
       }
-      const hasUploadAccess = uploaderUser[0].role === 'player_pro' ||
-                              uploaderUser[0].role === 'commissioner' ||
-                              uploaderUser[0].role === 'secondary_commissioner';
+      const hasUploadAccess = await hasPersonalPro(userId);
       if (!hasUploadAccess) {
         return res.status(403).json({ error: "Tournament photo uploads require a paid subscription" });
       }
@@ -6621,9 +6646,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
-      const hasAccess = user[0].role === 'player_pro' || 
-                        user[0].role === 'commissioner' || 
-                        user[0].role === 'secondary_commissioner';
+      const hasAccess = await proCoverage.hasProFor(userId, { leagueId });
 
       if (!hasAccess) {
         return res.status(403).json({ error: "League photos require a paid subscription" });
@@ -6717,9 +6740,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
-      const hasAccess = user[0].role === 'player_pro' || 
-                        user[0].role === 'commissioner' || 
-                        user[0].role === 'secondary_commissioner';
+      const hasAccess = await proCoverage.hasProFor(userId, { leagueId });
 
       if (!hasAccess) {
         return res.status(403).json({ error: "League photos require a paid subscription" });
@@ -6805,9 +6826,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
-      const hasAccess = user[0].role === 'player_pro' || 
-                        user[0].role === 'commissioner' || 
-                        user[0].role === 'secondary_commissioner';
+      const hasAccess = await proCoverage.hasProFor(userId, { leagueId });
 
       if (!hasAccess) {
         return res.status(403).json({ error: "League photos require a paid subscription" });
@@ -6860,9 +6879,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
-      const hasAccess = user[0].role === 'player_pro' || 
-                        user[0].role === 'commissioner' || 
-                        user[0].role === 'secondary_commissioner';
+      const hasAccess = await proCoverage.hasProFor(userId, { leagueId: photo.leagueId });
 
       if (!hasAccess) {
         return res.status(403).json({ error: "League photos require a paid subscription" });
@@ -6909,9 +6926,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
-      const hasAccess = user[0].role === 'player_pro' || 
-                        user[0].role === 'commissioner' || 
-                        user[0].role === 'secondary_commissioner';
+      const hasAccess = await proCoverage.hasProFor(userId, { leagueId });
 
       if (!hasAccess) {
         return res.status(403).json({ error: "League photos require a paid subscription" });
@@ -9212,7 +9227,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     storage,
     db,
     getTeamRosterStats,
-    currentMonth,
+    hasProFor: proCoverage.hasProFor,
   });
 
   app.get("/api/user/teams", isAuthenticated, async (req: any, res) => {
@@ -12047,7 +12062,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
 
       const canViewDetails = game.leagueId
         ? await canAccessLeaguePremiumFeatures(req.userWithPermissions, game.leagueId)
-        : canAccessPremiumFeatures(req.userWithPermissions);
+        : await canAccessPremiumFeatures(req.userWithPermissions);
       const asNumber = (value: unknown) => value == null ? null : Number(value);
       if (!canViewDetails) {
         // Keep the basic win-chance bar available, without exposing paid details.
@@ -17512,9 +17527,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const isCommissioner = league.commissionerId === userId;
-      const userRole = postingUser.role || 'free_tier';
-      const roleHierarchy: Record<string, number> = { free_tier: 0, player_pro: 1, secondary_commissioner: 2, commissioner: 3 };
-      const hasPlayerProOrHigher = (roleHierarchy[userRole] || 0) >= roleHierarchy['player_pro'];
+      const hasPlayerProOrHigher = await proCoverage.hasProFor(userId, { leagueId });
 
       if (!hasPlayerProOrHigher) {
         return res.status(403).json({ message: 'Player Pro or Commissioner tier required to post' });
@@ -17890,9 +17903,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
         return res.status(404).json({ message: 'User not found' });
       }
 
-      const userRole = commentUser.role || 'free_tier';
-      const roleHierarchy: Record<string, number> = { free_tier: 0, player_pro: 1, secondary_commissioner: 2, commissioner: 3 };
-      const hasPlayerProOrHigher = (roleHierarchy[userRole] || 0) >= roleHierarchy['player_pro'];
+      const hasPlayerProOrHigher = !!announcement && await proCoverage.hasProFor(userId, { leagueId: announcement.leagueId });
 
       if (!hasPlayerProOrHigher) {
         return res.status(403).json({ message: 'Player Pro or Commissioner tier required to comment' });
@@ -22461,6 +22472,10 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       if (!otherUser || otherUser.deletedAt) {
         return res.status(404).json({ message: 'User not found' });
       }
+      const sender = await storage.getUser(userId);
+      if (otherUser.displayId !== "U00001" && sender?.displayId !== "U00001" && !await hasPersonalPro(userId)) {
+        return res.status(403).json({ message: "Personal Player Pro is required for direct messages." });
+      }
 
       // Normalize the scope server-side so all callers behave consistently
       // and stale/inconsistent client tuples can't fragment DM threads:
@@ -22565,6 +22580,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       });
       
       const { title, leagueId, participantIds } = requestSchema.parse(req.body);
+      const supportMembers = await db.select({ id: users.id }).from(users).where(and(
+        inArray(users.id, [userId, ...participantIds]), eq(users.displayId, "U00001"),
+      )).limit(1);
+      if (supportMembers.length === 0 && !await hasPersonalPro(userId)) {
+        return res.status(403).json({ message: "Personal Player Pro is required for custom groups." });
+      }
       
       // Create custom group conversation
       const conversation = await messagingService.createCustomGroupChat(title, leagueId, userId, participantIds);
@@ -22788,6 +22809,14 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       if (!isParticipant) {
         return res.status(403).json({ message: 'Access denied' });
       }
+      const thread = await messagingService.getConversation(id);
+      const threadMembers = await messagingService.getConversationParticipants(id);
+      const support = threadMembers.some(p => (p as any).user?.displayId === "U00001");
+      const freeTeamChat = thread?.type === "team_group" && !!thread.teamId &&
+        (await storage.getUserTeams(userId)).some(team => team.id === thread.teamId);
+      if (!support && !freeTeamChat && !await proCoverage.hasProFor(userId, proConversationContext(thread))) {
+        return res.status(403).json({ message: "Player Pro is required for this conversation." });
+      }
       
       const messages = await messagingService.getConversationMessagesForUser(id, userId, limit, before);
       
@@ -22866,18 +22895,16 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
 
       // Free tier restriction: can only send messages in team_group conversations,
       // EXCEPT when the founder (U00001) is a participant — then any user may reply.
-      const senderUser = await storage.getUser(userId);
-      if (senderUser && (senderUser.role === 'free_tier' || !senderUser.role)) {
-        const conversation = await messagingService.getConversation(conversationId);
-        if (!conversation || conversation.type !== 'team_group') {
-          // Check whether founder is a participant — if so, bypass the gate
-          const participants = await messagingService.getConversationParticipants(conversationId);
-          const hasFounder = participants.some(
-            (p) => (p.user as any)?.displayId === 'U00001'
-          );
-          if (!hasFounder) {
-            return res.status(403).json({ message: 'A Player Pro subscription is required to reply in this conversation.' });
-          }
+      const conversation = await messagingService.getConversation(conversationId);
+      if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+      const accessParticipants = await messagingService.getConversationParticipants(conversationId);
+      const support = accessParticipants.some(p => (p as any).user?.displayId === "U00001");
+      const freeTeamChat = conversation.type === "team_group" && !!conversation.teamId &&
+        (await storage.getUserTeams(userId)).some(team => team.id === conversation.teamId);
+      const freeTeamText = freeTeamChat && messageType === "text" && !attachments?.length;
+      if (!support && !freeTeamText) {
+        if (!await proCoverage.hasProFor(userId, proConversationContext(conversation))) {
+          return res.status(403).json({ message: "Player Pro is required for this conversation or attachment." });
         }
       }
       
@@ -23667,6 +23694,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       // Only the message sender can add polls to their message
       if (message.senderId !== userId) {
         return res.status(403).json({ message: 'Only message sender can add polls' });
+      }
+      const thread = await messagingService.getConversation(message.conversationId);
+      const accessParticipants = await messagingService.getConversationParticipants(message.conversationId);
+      if (!accessParticipants.some(p => (p as any).user?.displayId === "U00001") &&
+          !await proCoverage.hasProFor(userId, proConversationContext(thread))) {
+        return res.status(403).json({ message: "Player Pro is required to create polls." });
       }
 
       const pollData = createChatPollRequestSchema.parse(req.body);

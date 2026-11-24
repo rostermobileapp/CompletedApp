@@ -3,6 +3,7 @@ import { pool } from "./db";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import { OrganizerCardPaymentError } from "./organizerCardPaymentMath";
 import { canCollectOrganizerCardPayments, canUseOrganizerCardPilot } from "./organizerCardPilot";
+import { hasPersonalPro } from "./proCoverage";
 import { readDirectAccount } from "./organizerDirectAccounts";
 
 export {
@@ -134,9 +135,10 @@ export async function hasOrganizerCardCollectionEntitlement(userId: string): Pro
   if (!user) return false;
   // Account-level Pro access qualifies regardless of billing source or fee
   // exemption, including roles granted manually in Supabase.
-  return canCollectOrganizerCardPayments({
+  const eligible = canCollectOrganizerCardPayments({
     displayId: user.display_id, role: user.role, feeExempt: user.fee_exempt,
   });
+  return eligible && (user.display_id === "U00001" || await hasPersonalPro(userId));
 }
 
 export async function assertOrganizerCardCollectionReady(userId: string): Promise<void> {

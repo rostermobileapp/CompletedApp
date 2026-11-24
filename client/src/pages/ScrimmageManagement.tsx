@@ -73,12 +73,12 @@ export default function ScrimmageManagement() {
     canManagePayments: true,
   });
   const [pendingTeamAssignment, setPendingTeamAssignment] = useState<Record<string, 'light' | 'dark' | null>>({});
-  const { hasRole, hasLeagueProSeat, user: permissionUser, isLoading: permissionsLoading } = usePermissions();
+  const { hasPersonalProAccess, hasLeagueProSeat, user: permissionUser, isLoading: permissionsLoading } = usePermissions();
   const [activeLeagueId] = useState<string | null>(() => {
     const selectedType = localStorage.getItem('dashboardSelectedType');
     return selectedType === 'league' ? localStorage.getItem('dashboardSelectedId') : null;
   });
-  const hasGlobalAccess = hasRole('player_pro') || !!permissionUser?.feeExempt;
+  const hasGlobalAccess = hasPersonalProAccess();
 
   const handleBack = () => {
     setPageTransitionDirection('down');

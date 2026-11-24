@@ -44,7 +44,7 @@ export function TeamLeadersCard({
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<'season' | 'playoffs'>('season');
 
-  const isLocked = !canAccessPremiumFeatures();
+  const isLocked = !canAccessPremiumFeatures({ leagueId: effectiveLeagueId });
 
   const { data: seasonStats, isLoading: seasonLoading } = useQuery<SkaterStat[]>({
     queryKey: [

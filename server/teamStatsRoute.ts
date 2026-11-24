@@ -2,25 +2,24 @@ import type { Express, Request, Response, RequestHandler } from "express";
 import { sql } from "drizzle-orm";
 
 type TeamStatsRouteDependencies = {
+  hasProFor: (userId: string, context: { leagueId: string }) => Promise<boolean>;
   storage: {
     getTeam: (teamId: string) => Promise<any>;
     getUserLeagueMembership: (userId: string, leagueId: string) => Promise<any>;
     getUser: (userId: string) => Promise<any>;
     getLeague: (leagueId: string) => Promise<any>;
     getUserTeams: (userId: string) => Promise<any[]>;
-    getActiveLeagueProSeatsForUser: (userId: string, month: string) => Promise<any[]>;
   };
   db: {
     execute: (query: any) => Promise<any>;
   };
   getTeamRosterStats: (teamId: string, leagueId: string) => Promise<any[]>;
-  currentMonth: () => string;
 };
 
 export function createTeamStatsHandler(
   dependencies: TeamStatsRouteDependencies,
 ): RequestHandler {
-  const { storage, db, getTeamRosterStats, currentMonth } = dependencies;
+  const { storage, db, getTeamRosterStats } = dependencies;
 
   return async (req: Request, res: Response) => {
     try {
@@ -32,29 +31,18 @@ export function createTeamStatsHandler(
         return res.status(404).json({ message: "Team or league not found" });
       }
 
-      const [viewerMembership, viewer, league, viewerTeams, leagueProSeats] = await Promise.all([
+      const [viewerMembership, viewer, league, viewerTeams] = await Promise.all([
         storage.getUserLeagueMembership(userId, team.leagueId),
         storage.getUser(userId),
         storage.getLeague(team.leagueId),
         storage.getUserTeams(userId),
-        storage.getActiveLeagueProSeatsForUser(userId, currentMonth()),
       ]);
       const isOwnTeam = viewerTeams.some((viewerTeam) => viewerTeam.id === teamId
         && viewerTeam.seasonIsActive !== false && !viewerTeam.isInCompletedTournament);
       const isLeagueCommissioner = league?.commissionerId === userId;
-      const hasGlobalPremiumAccess = viewer && (
-        viewer.role === "commissioner" ||
-        viewer.role === "secondary_commissioner" ||
-        viewer.specialPermissions?.includes("admin") ||
-        viewer.isPrimaryCommissioner ||
-        viewer.role === "player_pro" ||
-        viewer.feeExempt
-      );
-      const hasLeagueProSeat = leagueProSeats.some((seat) => seat.leagueId === team.leagueId);
-      const canViewOpponentStats =
-        isLeagueCommissioner ||
-        !!hasGlobalPremiumAccess ||
-        hasLeagueProSeat;
+      const canViewOpponentStats = isLeagueCommissioner ||
+        viewer?.specialPermissions?.includes("admin") ||
+        await dependencies.hasProFor(userId, { leagueId: team.leagueId });
       if (!isOwnTeam && !canViewOpponentStats) {
         return res.status(403).json({ message: "Premium access required to view opponent team stats" });
       }

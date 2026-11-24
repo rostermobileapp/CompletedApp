@@ -115,7 +115,7 @@ export default function CreateScrimmage() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { hasRole, hasLeagueProSeat, user: permissionUser, isLoading: permissionsLoading } = usePermissions();
+  const { hasPersonalProAccess, hasLeagueProSeat, user: permissionUser, isLoading: permissionsLoading } = usePermissions();
   const { user } = useAuth();
   const [goalieSearchTerm, setGoalieSearchTerm] = useState("");
   const [skaterSearchTerm, setSkaterSearchTerm] = useState("");
@@ -194,7 +194,7 @@ export default function CreateScrimmage() {
     if (dashType === 'league' && dashId) return dashId;
     return null;
   });
-  const hasGlobalScrimmageAccess = hasRole('player_pro') || !!permissionUser?.feeExempt;
+  const hasGlobalScrimmageAccess = hasPersonalProAccess();
   const hasSelectedLeagueProSeat = !!selectedLeagueId && hasLeagueProSeat(selectedLeagueId);
 
   // Fetch existing scrimmage data for edit mode

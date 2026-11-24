@@ -5,6 +5,7 @@ import { ParentSecurityError, isParentSecurityDevelopment } from "./highSchoolPa
 import { parentGrantHeader } from "./highSchoolParentHttp";
 import { HighSchoolYouthOnboarding } from "./highSchoolYouthOnboarding";
 import { HighSchoolChildDevices } from "./highSchoolChildDevices";
+import { proCoverage } from "./proCoverage";
 
 export function registerHighSchoolYouthRoutes(
   app: Express, service: HighSchoolYouthOnboarding, children: HighSchoolChildDevices,
@@ -43,6 +44,13 @@ export function registerHighSchoolYouthRoutes(
   app.post(`${child}/poll`, respond(req => children.poll(req.body)));
   const childToken = (req: Request) => req.get("authorization")?.replace(/^Bearer /, "");
   app.get(`${child}/session`, respond(req => children.ownSession(childToken(req))));
+  app.get(`${child}/coverage/:teamId`, respond(async req => {
+    // The registry/session resolver, not a parent ID from the request, chooses
+    // the payer. With real child activation disabled this still returns 503.
+    const proof = await children.verifiedProParent(childToken(req), req.params.teamId);
+    if (!proof) throw new OnboardingError("CHILD_ACCESS_UNAVAILABLE", 403);
+    return { teamId: proof.teamId, covered: await proCoverage.hasProFor(proof.parentId, { leagueId: proof.leagueId }) };
+  }));
   app.get(`${child}/chats/:id/messages`, respond(req => children.messages(childToken(req), req.params.id)));
   app.post(`${child}/chats/:id/messages`, respond(req => children.sendMessage(childToken(req), req.params.id, req.body)));
 }

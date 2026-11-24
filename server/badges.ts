@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { isTriviaDefinition, isTriviaUserEnabled } from "@shared/trivia";
-import { hasPaidTrophyCaseAccess } from "@shared/trophyCaseAccess";
+import { hasPersonalPro } from "./proCoverage";
 import { badgeAnnouncementPresentation } from "@shared/badgeAnnouncementPresentation";
 import {
   badgeAwards,
@@ -1171,7 +1171,7 @@ async function definitionsWithTiers(includeArchived = false) {
 async function maySeeTriviaBadges(userId: string): Promise<boolean> {
   const [viewer] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return !!viewer && isTriviaUserEnabled(viewer.displayId)
-    && hasPaidTrophyCaseAccess(viewer) && getTrophyCaseAccess(viewer.dateOfBirth) === "eligible";
+    && await hasPersonalPro(userId) && getTrophyCaseAccess(viewer.dateOfBirth) === "eligible";
 }
 
 function scopeKeyFor(definition: Pick<BadgeDefinition, "category">, context?: { leagueId?: string | null; seasonId?: string | null; teamId?: string | null }) {
@@ -1191,7 +1191,7 @@ async function broadcastEarnedEvent(userId: string, event: BadgeEarnedEvent, def
       role: users.role,
       isPrimaryCommissioner: users.isPrimaryCommissioner,
     }).from(users).where(eq(users.id, userId)).limit(1);
-    const presentation = badgeAnnouncementPresentation(definition, payload, hasPaidTrophyCaseAccess(viewer));
+    const presentation = badgeAnnouncementPresentation(definition, payload, await hasPersonalPro(userId));
     if (broadcastToUser(userId, {
       type: "badge_earned",
       eventId: event.id,
@@ -2443,7 +2443,7 @@ export async function getPendingBadgeEvents(userId: string) {
     role: users.role,
     isPrimaryCommissioner: users.isPrimaryCommissioner,
   }).from(users).where(eq(users.id, userId)).limit(1);
-  const canRevealArtwork = hasPaidTrophyCaseAccess(viewer);
+  const canRevealArtwork = await hasPersonalPro(userId);
   const presentEvent = (event: typeof events[number]) => ({
     ...event,
     ...badgeAnnouncementPresentation(

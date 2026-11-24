@@ -1,6 +1,7 @@
 import { hasOneGoalMargin } from "@shared/gameResultType";
 import { resolveTeamJerseyNumber } from "./teamJerseyNumber";
 import { leagueStatsPlayerEligible, leagueStatsTeamEligible } from "./leagueStatsEligibility";
+import { readActiveProSeats, readHasActiveProSeat } from "./proSeatReader";
 import {
   users,
   leagues,
@@ -976,6 +977,7 @@ export class DatabaseStorage implements IStorage {
         created_by as "createdBy",
         stripe_customer_id as "stripeCustomerId", 
         stripe_subscription_id as "stripeSubscriptionId",
+        iap_original_transaction_id as "iapOriginalTransactionId",
         venmo_username as "venmoUsername", 
         cashapp_username as "cashappUsername", 
         timezone,
@@ -4502,20 +4504,7 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     monthYM: string,
   ): Promise<(LeagueProSeat & { grant: LeagueProGrant; leagueName: string })[]> {
-    const rows = await db
-      .select()
-      .from(leagueProSeats)
-      .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
-      .innerJoin(leagues, eq(leagues.id, leagueProSeats.leagueId))
-      .where(
-        and(
-          eq(leagueProSeats.userId, userId),
-          eq(leagueProGrants.status, 'paid'),
-          lte(leagueProGrants.startMonth, monthYM),
-          gte(leagueProGrants.endMonth, monthYM),
-        )
-      );
-    return rows.map(r => ({ ...r.league_pro_seats, grant: r.league_pro_grants, leagueName: r.leagues.name }));
+    return readActiveProSeats(db, userId, monthYM);
   }
 
   async getUpcomingLeagueProSeatsForUser(
@@ -4545,6 +4534,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueProSeats.userId, userId),
           eq(leagueProGrants.status, 'paid'),
+          eq(leagueProGrants.leagueId, leagueProSeats.leagueId),
           gt(leagueProGrants.startMonth, monthYM),
         )
       )
@@ -4561,21 +4551,7 @@ export class DatabaseStorage implements IStorage {
     leagueId: string,
     monthYM: string,
   ): Promise<boolean> {
-    const [row] = await db
-      .select({ id: leagueProSeats.id })
-      .from(leagueProSeats)
-      .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
-      .where(
-        and(
-          eq(leagueProSeats.userId, userId),
-          eq(leagueProSeats.leagueId, leagueId),
-          eq(leagueProGrants.status, 'paid'),
-          lte(leagueProGrants.startMonth, monthYM),
-          gte(leagueProGrants.endMonth, monthYM),
-        )
-      )
-      .limit(1);
-    return Boolean(row);
+    return readHasActiveProSeat(db, userId, leagueId, monthYM);
   }
 
   async getActiveLeagueProSeatUserIds(leagueId: string, monthYM: string): Promise<string[]> {

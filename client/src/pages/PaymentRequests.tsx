@@ -20,7 +20,7 @@ export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const { openOverlay } = useSlideUpOverlay();
   const { selectedType, selectedTeamId, selectedLeagueId } = useDashboardSelection();
-  const { canAccessPremiumFeatures, hasRole, user, isLoading: permissionsLoading } = usePermissions();
+  const { canAccessPremiumFeatures, hasPersonalProAccess, user, isLoading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -233,7 +233,7 @@ export default function PaymentRequests() {
         </div>
 
         <OrganizerStripeSetupCard
-          eligible={hasRole('player_pro') || user?.displayId === 'U00001' || cardSetup?.eligible === true || cardSetup?.connected === true}
+          eligible={hasPersonalProAccess() || user?.displayId === 'U00001' || cardSetup?.eligible === true || cardSetup?.connected === true}
           ready={cardSetup?.ready === true}
           collectionEnabled={cardSetup?.enabled === true && cardSetup?.webhookReady === true}
           pending={connectCardAccount.isPending || unlinkCardAccount.isPending}
