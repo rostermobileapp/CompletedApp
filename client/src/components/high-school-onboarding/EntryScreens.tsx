@@ -1,4 +1,5 @@
 import { Check, Trophy } from "lucide-react";
+import { HS_MAX_FAMILY_PLAYERS } from "@shared/highSchoolOnboarding";
 import { ChoiceCard, ProgressChoiceIcon, ScreenFrame, StepHeader } from "./shared";
 
 export function SignupEntryScreen({ onSignup, onUnder18 }: { onSignup:()=>void; onUnder18:()=>void }) {
@@ -44,7 +45,7 @@ export function HighSchoolRoleScreen({ value,setValue,onBack,onContinue,busy,onR
 }) {
   const roles=[
     ["staff","Coach or school staff","Head coach, assistant, AD or team manager","staff"],
-    ["parent","Parent of a player","Set up your family and up to 4 players","parent"],
+    ["parent","Parent of a player",`Set up your family and up to ${HS_MAX_FAMILY_PLAYERS} players`,"parent"],
     ["league_admin","League admin","Run a league: schools, approvals, seats","league"],
   ] as const;
   return <ScreenFrame header={<StepHeader step={4} total={10} onBack={onBack}/>} action={<button className="hsy-primary" disabled={!value||busy} onClick={onContinue}>Continue</button>}>

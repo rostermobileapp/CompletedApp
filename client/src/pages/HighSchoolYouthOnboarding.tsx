@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { apiRequest } from "@/lib/queryClient";
-import { HS_CONSENT_VERSION, hsParentPlayersMatchSaved } from "@shared/highSchoolOnboarding";
+import { HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS, hsParentPlayersMatchSaved } from "@shared/highSchoolOnboarding";
 import { parentVerificationSession } from "@/lib/parentVerificationSession";
 import {
   AddPlayersScreen, ConsentScreen, FamilyPlanScreen, JoinTeamScreen, ParentAllSetScreen,
@@ -306,7 +306,7 @@ export default function HighSchoolYouthOnboarding({request=realRequest,authentic
     })}/>;
   }
   else if(view==="staff-wait")screen=<StaffWaitingScreen status={state?.status??"waiting_approval"} programName={programs.find(p=>p.id===programId)?.name} teamName={programs.find(p=>p.id===programId)?.teams?.find((t:any)=>t.id===teamId)?.name} roleName={roleNames[staffRole]??staffRole} onBack={()=>setView("staff-team")} busy={busy} onRefresh={()=>void run(refresh)}/>;
-  else if(view==="parent-add")screen=<AddPlayersScreen players={players} update={updatePlayer} add={()=>players.length<4&&setPlayers([...players,newPlayer()])} remove={id=>players.length>1&&setPlayers(players.filter(p=>p.id!==id))} onBack={()=>setView("profile")} onContinue={()=>void run(async()=>{setConsentIndex(0);await progress("parent_consent");setView("parent-consent");})} busy={busy}/>;
+  else if(view==="parent-add")screen=<AddPlayersScreen players={players} update={updatePlayer} add={()=>setPlayers(current=>current.length<HS_MAX_FAMILY_PLAYERS?[...current,newPlayer()]:current)} remove={id=>players.length>1&&setPlayers(players.filter(p=>p.id!==id))} onBack={()=>setView("profile")} onContinue={()=>void run(async()=>{setConsentIndex(0);await progress("parent_consent");setView("parent-consent");})} busy={busy}/>;
   else if(view==="parent-consent")screen=<ConsentScreen player={players[consentIndex]??players[0]} index={consentIndex} total={players.length} guardian={guardian} setGuardian={setGuardian} update={patch=>updatePlayer(players[consentIndex]?.id,patch)} onBack={()=>consentIndex?setConsentIndex(consentIndex-1):setView("parent-add")} onContinue={nextConsent} busy={busy}/>;
   else if(view==="parent-join")screen=<JoinTeamScreen players={players} entry={entry} setEntry={setEntry} onLookup={lookupInvitation} onJoin={joinTeam} onBack={()=>setView("parent-consent")} busy={busy} imported={imported||!!state?.draft?.imported} dirty={!state?.draft?.guardianConfirmed||!hsParentPlayersMatchSaved(players,state?.draft?.players)}/>;
   else if(view==="parent-plan")screen=<FamilyPlanScreen onBack={()=>setView("parent-join")} busy={busy} onContinue={()=>void run(async()=>{await loadChildren();await progress("parent_complete");setView("parent-done");})}/>;

@@ -265,7 +265,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-2"
+                <form onSubmit={handleSubmit} className="onboarding-light space-y-2"
                   aria-describedby={isDevParentClient && isSignUp ? "signup-purpose" : undefined}>
                   <div className="space-y-0.5">
                     <Label htmlFor="email" className="text-black text-sm">Email</Label>

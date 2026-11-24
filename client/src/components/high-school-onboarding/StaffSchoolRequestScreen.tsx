@@ -18,7 +18,7 @@ export function StaffSchoolRequestScreen({ value, update, leagues, busy, onBack,
       <h1>Add your school</h1>
       <p className="hsy-subtitle">Head coaches and athletic directors can request a school or co-op. A league review is required.</p>
       <Field label="School or co-op name" value={value.name} maxLength={80} onChange={name => update({ name })}/>
-      <Field label="Town" value={value.town} maxLength={80} onChange={town => update({ town })}/>
+      <Field label="City" value={value.town} maxLength={80} onChange={town => update({ town })}/>
       <HsyLabel>School league
         <select className="hsy-field" value={value.leagueId} onChange={event => update({ leagueId: event.target.value })}>
           <option value="">Choose a league</option>

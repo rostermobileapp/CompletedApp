@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { hsChoosePath, hsSaveDraft, hsTeamEntry, HS_CONSENT_VERSION } from "../shared/highSchoolOnboarding";
+import { hsChoosePath, hsSaveDraft, hsTeamEntry, HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS } from "../shared/highSchoolOnboarding";
 import { HighSchoolParentSecurity, ParentSecurityError, parentDigest, type ParentActor, type ParentSql, type ParentTransaction } from "./highSchoolParentSecurity";
 
 export class OnboardingError extends Error {
@@ -161,7 +161,7 @@ export class HighSchoolOnboarding {
     if(!creator.rows.length) fail("INVALID_INVITATION",403);
     const players=(await tx.query(`SELECT id,first_name AS "firstName",last_name AS "lastName",grad_year AS "gradYear",position,jersey_number AS "jerseyNumber"
       FROM hs_onboarding.staged_players WHERE id=ANY($1::uuid[]) AND team_id=$2 AND expires_at>now() ORDER BY id`,[row.staged_ids,row.team_id])).rows;
-    if(row.kind==="parent" && (!players.length || players.length!==row.staged_ids.length || players.length>4)) fail("INVALID_INVITATION",403);
+    if(row.kind==="parent" && (!players.length || players.length!==row.staged_ids.length || players.length>HS_MAX_FAMILY_PLAYERS)) fail("INVALID_INVITATION",403);
     return {...row,players};
   }
   async lookup(actor: OnboardingActor, token: unknown, revision: number, grant?: string) {

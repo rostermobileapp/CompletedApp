@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { HS_CONSENT_VERSION, hsChoosePath, hsParentPlayersMatchSaved } from "../../shared/highSchoolOnboarding";
+import { HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS, hsChoosePath, hsParentPlayersMatchSaved, hsSaveDraft } from "../../shared/highSchoolOnboarding";
 import {
   HS_SETUP_CODE_PATTERN, hsHockeyType, hsJourneyInput, hsLeagueDraftInput, validateHsLeagueDraft,
 } from "../../shared/highSchoolYouthOnboarding";
@@ -40,6 +40,20 @@ test("saved player comparison ignores database JSON key order but preserves cons
     assert.equal(hsParentPlayersMatchSaved([{...player,...changed}],[reordered]),false);
   }
   assert.equal(hsParentPlayersMatchSaved([player],[]),false);
+});
+test("family setup accepts two players and rejects a third without discarding anyone", () => {
+  assert.equal(HS_MAX_FAMILY_PLAYERS,2);
+  const players=Array.from({length:3},(_,index)=>({
+    id:id(index+30),firstName:"Example",lastName:"Player",gradYear:2028,position:"F",
+    jerseyNumber:"",consent:true,consentVersion:HS_CONSENT_VERSION,
+    photoConsent:false,publicNameConsent:false,
+  }));
+  const draft={kind:"parent",revision:0,guardianConfirmed:true,players:players.slice(0,2)};
+  assert.equal(hsSaveDraft.safeParse(draft).success,true);
+  assert.equal(hsSaveDraft.safeParse({...draft,players}).success,false);
+  assert.equal(hsParentPlayersMatchSaved(players.slice(0,2),players.slice(0,2)),true);
+  assert.equal(hsParentPlayersMatchSaved(players,players),false);
+  assert.equal(players.length,3,"validation must not truncate existing family drafts");
 });
 test("child setup codes exclude lookalikes and have exactly six characters", () => {
   for (let i = 0; i < 1000; i++) {

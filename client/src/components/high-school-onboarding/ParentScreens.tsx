@@ -1,5 +1,6 @@
 import { Check, Plus } from "lucide-react";
-import { HS_CONSENT_TEXT } from "@shared/highSchoolOnboarding";
+import { HS_CONSENT_TEXT, HS_MAX_FAMILY_PLAYERS } from "@shared/highSchoolOnboarding";
+import { useSubscriptionPrices } from "@/hooks/useSubscriptionPrices";
 import { ScreenFrame, StepHeader } from "./shared";
 
 export type ParentPlayer = {
@@ -11,10 +12,11 @@ export function AddPlayersScreen({ players, update, add, remove, onBack, onConti
   players: ParentPlayer[]; update: (id: string, patch: Partial<ParentPlayer>) => void; add: () => void; remove: (id: string) => void;
   onBack: () => void; onContinue: () => void; busy?: boolean;
 }) {
-  const valid = players.length > 0 && players.every(p => p.firstName.trim() && p.lastName.trim());
+  const valid = players.length > 0 && players.length <= HS_MAX_FAMILY_PLAYERS && players.every(p => p.firstName.trim() && p.lastName.trim());
   return <ScreenFrame header={<StepHeader step={1} total={4} onBack={onBack}/>} action={<button className="hsy-primary" disabled={!valid || busy} onClick={onContinue}>Continue</button>}>
-    <section className="hsy-content"><h1>Who are you setting up?</h1><p className="hsy-subtitle">Up to 4 players. We never ask for their email, phone, address or birthday.</p>
-      <div className="hsy-between hsy-card" style={{marginBottom:14}}><strong>Players</strong><div className="hsy-row"><button type="button" className="hsy-secondary" aria-label="Remove a player" disabled={players.length<=1} onClick={() => remove(players[players.length-1].id)}>−</button><strong style={{fontSize:20,width:20,textAlign:"center"}}>{players.length}</strong><button type="button" className="hsy-secondary" aria-label="Add a player" disabled={players.length>=4} onClick={add}><Plus size={20}/></button></div></div>
+    <section className="hsy-content"><h1>Who are you setting up?</h1><p className="hsy-subtitle">Up to {HS_MAX_FAMILY_PLAYERS} players. We never ask for their email, phone, address or birthday.</p>
+      {players.length > HS_MAX_FAMILY_PLAYERS && <p className="hsy-alert" role="alert">This plan covers up to {HS_MAX_FAMILY_PLAYERS} players. Remove extra players from this draft to continue.</p>}
+      <div className="hsy-between hsy-card" style={{marginBottom:14}}><strong>Players</strong><div className="hsy-row"><button type="button" className="hsy-secondary" aria-label="Remove a player" disabled={players.length<=1} onClick={() => remove(players[players.length-1].id)}>−</button><strong style={{fontSize:20,width:20,textAlign:"center"}}>{players.length}</strong><button type="button" className="hsy-secondary" aria-label="Add a player" disabled={players.length>=HS_MAX_FAMILY_PLAYERS} onClick={add}><Plus size={20}/></button></div></div>
       <div className="hsy-stack">{players.map((p, i) => <fieldset className="hsy-card selected" key={p.id} style={{padding:16,margin:0}}>
         <legend className="hsy-section-label" style={{padding:"0 4px",color:"#2563eb"}}>Player {i+1}</legend>
         <div className="hsy-grid2"><label className="hsy-label">First name<input className="hsy-field" maxLength={80} value={p.firstName} onChange={e=>update(p.id,{firstName:e.target.value,consent:false})}/></label><label className="hsy-label">Last name<input className="hsy-field" maxLength={80} value={p.lastName} onChange={e=>update(p.id,{lastName:e.target.value,consent:false})}/></label></div>
@@ -22,7 +24,7 @@ export function AddPlayersScreen({ players, update, add, remove, onBack, onConti
         <label className="hsy-label">Position</label><div className="hsy-inline-choice">{([["F","Forward"],["D","Defense"],["G","Goalie"]] as const).map(([id,label])=><button type="button" key={id} className={p.position===id?"active":""} onClick={()=>update(p.id,{position:id,consent:false})}>{label}</button>)}</div>
         {players.length>1&&<button type="button" className="hsy-link" style={{marginTop:12,border:0,background:"none",padding:0}} onClick={()=>remove(p.id)}>Remove player</button>}
       </fieldset>)}</div>
-      <button type="button" disabled={players.length>=4} className="hsy-secondary" style={{width:"100%",marginTop:12}} onClick={add}>Add another player</button>
+      <button type="button" disabled={players.length>=HS_MAX_FAMILY_PLAYERS} className="hsy-secondary" style={{width:"100%",marginTop:12}} onClick={add}>Add another player</button>
     </section>
   </ScreenFrame>;
 }
@@ -59,11 +61,12 @@ export function JoinTeamScreen({ players, entry, setEntry, onLookup, onJoin, onB
 }
 
 export function FamilyPlanScreen({ onBack, onContinue, busy }: { onBack:()=>void; onContinue:()=>void; busy?:boolean }) {
+  const { playerProMonthly, isLoading } = useSubscriptionPrices();
   return <ScreenFrame header={<StepHeader step={4} total={4} onBack={onBack}/>} action={<button className="hsy-primary" disabled={busy} onClick={onContinue}>Continue</button>}>
-    <section className="hsy-content"><h1>Your family plan</h1><p className="hsy-subtitle">One plan covers the whole household.</p>
+    <section className="hsy-content"><h1>Your family plan</h1><p className="hsy-subtitle">One plan covers your family and up to {HS_MAX_FAMILY_PLAYERS} players.</p>
       <div className="hsy-alert" style={{marginBottom:16}}>Your league hasn't added seats yet. If it does, coverage may be provided by the league.</div>
-      <div className="hsy-card selected"><div className="hsy-section-label">Family plan</div><h2 style={{fontSize:22,margin:"8px 0 0"}}>Player Pro</h2><p style={{color:"#64748b",margin:"2px 0 12px"}}>For parents of high school players</p><strong style={{fontSize:22}}>[Price]</strong><span style={{color:"#64748b"}}> / month</span>
-        <ul style={{paddingLeft:20,lineHeight:1.9}}><li>Covers parent accounts in your family</li><li>Up to 4 players, on any teams</li><li>Schedule changes with rink directions</li><li>Fee and payment tracking</li><li>Team and Parents chats</li></ul>
+      <div className="hsy-card selected"><div className="hsy-section-label">Family plan</div><h2 style={{fontSize:22,margin:"8px 0 0"}}>Player Pro</h2><p style={{color:"#64748b",margin:"2px 0 12px"}}>For parents of high school players</p><strong style={{fontSize:22}}>{playerProMonthly ?? (isLoading ? "Loading…" : "Price unavailable")}</strong>{playerProMonthly && <span style={{color:"#64748b"}}> / month</span>}
+        <ul style={{paddingLeft:20,lineHeight:1.9}}><li>Covers parent accounts in your family</li><li>Up to {HS_MAX_FAMILY_PLAYERS} players, on any teams</li><li>Schedule changes with rink directions</li><li>Fee and payment tracking</li><li>Team and Parents chats</li></ul>
       </div><p className="hsy-note" style={{textAlign:"center"}}>Players never need their own plan. No subscription or purchase is made during onboarding.</p>
     </section>
   </ScreenFrame>;

@@ -12,13 +12,21 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { screens, type ReviewSpec } from "./onboarding-review/catalog";
 import { renderReviewDocument } from "./onboarding-review/document";
+import { verifyOnboardingFixes } from "./onboarding-review/verify-fixes";
 
 const out=path.resolve(process.argv.find(argument=>argument.startsWith("--out-dir="))?.slice("--out-dir=".length)||"generated-artifacts/onboarding-review");
 const onlyIds=process.argv.find(argument=>argument.startsWith("--only="))?.slice("--only=".length).split(",");
 const captureOnly=process.argv.includes("--capture-only");
 const verifyLight=process.argv.includes("--verify-light");
+const verifyFixes=process.argv.includes("--verify-fixes");
+const pricesFile=process.argv.find(argument=>argument.startsWith("--prices-file="))?.slice("--prices-file=".length);
+const pricingSnapshot=pricesFile?JSON.parse(await readFile(pricesFile,"utf8")):null;
+const capturePrices=pricingSnapshot?.prices??{};
 const reviewScreens=onlyIds?screens.filter(screen=>onlyIds.includes(screen.id)):screens;
 if(onlyIds&&reviewScreens.length!==new Set(onlyIds).size)throw Error("Unknown screen ID in --only");
+if(reviewScreens.some(screen=>["Q19","Q20","F04"].includes(screen.id))&&!pricingSnapshot){
+  throw Error("Pricing screens require --prices-file=<verified-public-price-snapshot.json>; captures must not invent subscription amounts.");
+}
 await mkdir(path.join(out,"screens"),{recursive:true});
 const resumeArgument=process.argv.find(argument=>argument.startsWith("--resume-log="));
 const resumed=new Map<string,{heading:string;count:number}>();
@@ -63,7 +71,7 @@ const fixtureQuery=`
  export class ApiError extends Error {}
  export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false,refetchOnWindowFocus:false,
    queryFn:async({queryKey})=>queryKey[0]==='/api/user'?(new URLSearchParams(location.search).get('anonymous')==='1'?{}:{id:'pdf-fixture-adult',firstName:'',lastName:'',email:'review@example.invalid'}):
-   queryKey[0]==='/api/stripe/prices'?{}:[]}}});
+   queryKey[0]==='/api/stripe/prices'?(new URLSearchParams(location.search).get('pricesUnavailable')==='1'?{}:${JSON.stringify(capturePrices)}):[]}}});
  export const getImageUrl=value=>value;
  export async function getAuthHeaders(){return{}};
  export async function apiRequest(){window.__forbiddenApiCalls=(window.__forbiddenApiCalls||0)+1;throw Error('Live API forbidden in PDF capture')};
@@ -142,6 +150,7 @@ type Captured=ReviewSpec&{heading:string;images:string[];error?:string;pageError
 const captured:Captured[]=[];
 const lightChecks:{id:string;width:number;dark:boolean}[]=[];
 const previewToolbarChecks:string[]=[];
+const cleanupChecks:string[]=[];
 async function settle(page:Page){
   await page.waitForTimeout(950);
   await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(img=>img.decode().catch(()=>{})));});
@@ -180,6 +189,7 @@ try{
         throw Error("Developer preview toolbar must not be rendered");
       }
       previewToolbarChecks.push(spec.id);
+      if(verifyFixes)cleanupChecks.push(...await verifyOnboardingFixes(page,spec,capturePrices));
       if(verifyLight){
         if(spec.id==="E05"){
           const otp=page.locator("input[data-input-otp]");
@@ -288,7 +298,7 @@ try{
     captured.push(record);
     await writeFile(path.join(out,"capture-progress.json"),JSON.stringify(captured,null,2));
   }
-  const manifest={generatedAt:new Date().toISOString(),viewport:{width:390,height:844},source:"current workspace; synthetic offline component rendering",forbiddenApiAttempts:rejectedApi,externalNonFontRequestsBlocked:externalBlocked,lightChecks,previewToolbarChecks,screens:captured};
+  const manifest={generatedAt:new Date().toISOString(),viewport:{width:390,height:844},source:"current workspace; synthetic offline component rendering",pricingSource:pricingSnapshot?{source:pricingSnapshot.source,verifiedAt:pricingSnapshot.verifiedAt}:null,forbiddenApiAttempts:rejectedApi,externalNonFontRequestsBlocked:externalBlocked,lightChecks,previewToolbarChecks,cleanupChecks,screens:captured};
   await writeFile(path.join(out,"manifest.json"),JSON.stringify(manifest,null,2));
   const failures=captured.filter(item=>item.error);
   if(failures.length||rejectedApi)throw Error(`${failures.length} failed screen captures; ${rejectedApi} unexpected API requests. See manifest.json.`);

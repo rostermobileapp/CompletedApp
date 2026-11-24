@@ -16,6 +16,14 @@
   line-height: 1.45;
 }
 .hsy * { box-sizing: border-box; }
+.hsy { color-scheme:light; }
+/* Outrank app-wide typed-input styling without changing other app screens. */
+.hsy input.hsy-field,
+.hsy select.hsy-field,
+.hsy textarea.hsy-field,
+.hsy input.hsy-code-cell { background:#fff !important; color:var(--hsy-ink) !important; color-scheme:light; }
+.hsy .hsy-field::placeholder,
+.hsy .hsy-code-cell::placeholder { color:#94a3b8 !important; opacity:1; }
 .hsy button, .hsy a { min-height:44px; }
 .hsy .hsy-choice { height:auto; min-height:104px; white-space:normal; justify-content:flex-start; }
 .hsy .hsy-primary { min-height:52px; }

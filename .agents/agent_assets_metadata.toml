@@ -217,3 +217,17 @@ mtime_ms = 1795530113727
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/a71ee719-4636-41da-b1ae-2fae68a238e7/437591b5-490f-4654-91fe-df37d092dfe4"
 storage_version_token = "1795530144730264"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "pMyb4R7gu_dx74KFWveFw"
+uri = "file://generated-artifacts/onboarding-review/onboarding-review-small-fixes.pdf"
+type = "pdf"
+title = "Updated onboarding review"
+description = "30-page review of 72 screen states with the requested input, testimonial, pricing, City-label and two-player family fixes."
+logical_id = "c457d50f-c1d7-4671-87b3-6e612d34ea45"
+content_hash = "sha256:0bd452fac08c29a723d04b9f559903b8066268d1cfcc8af1a76e674cf5a03cb9"
+size = 4393439
+mtime_ms = 1795531599334
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/c457d50f-c1d7-4671-87b3-6e612d34ea45/d0aa4639-68a3-4793-97df-1cfa69a79f1b"
+storage_version_token = "1795531827903029"
+content_type = "application/pdf"

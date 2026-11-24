@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const HS_CONSENT_VERSION = "dev-draft-2026-11-19";
+export const HS_MAX_FAMILY_PLAYERS = 2;
 export const HS_CONSENT_TEXT = "Roster stores your player's name, graduation year, position and optional jersey number. Approved team staff, team parents and teammates may see team information; opponents see first name and last initial only. No child email, phone, address or date of birth is collected. Photos and public-name sharing are off unless separately selected. This DEV draft does not activate a player or grant team access.";
 export const HS_PATHS = ["player", "organizer", "staff", "parent", "league_admin"] as const;
 export const HS_STAFF_ROLES = ["head_coach", "assistant_coach", "athletic_director", "team_manager"] as const;
@@ -14,7 +15,7 @@ export const hsPlayerDraft = z.object({
 }).strict();
 /** Compare validated values, not incoming JSON key order (PostgreSQL JSONB reorders keys). */
 export function hsParentPlayersMatchSaved(local: unknown, saved: unknown): boolean {
-  const players = z.array(hsPlayerDraft).min(1).max(4);
+  const players = z.array(hsPlayerDraft).min(1).max(HS_MAX_FAMILY_PLAYERS);
   const left = players.safeParse(local), right = players.safeParse(saved);
   if (!left.success || !right.success || left.data.length !== right.data.length) return false;
   const byId = new Map(right.data.map(player => [player.id, JSON.stringify(player)]));
@@ -29,7 +30,7 @@ export const hsSaveDraft = z.discriminatedUnion("kind", [
     newSchool: z.object({ leagueId: z.string().uuid(), name: name, town: name }).strict().optional(),
   }).strict(),
   z.object({ kind: z.literal("parent"), revision: z.number().int().nonnegative(), guardianConfirmed: z.literal(true),
-    players: z.array(hsPlayerDraft).min(1).max(4),
+    players: z.array(hsPlayerDraft).min(1).max(HS_MAX_FAMILY_PLAYERS),
   }).strict(),
 ]);
 export const hsTeamEntry = z.object({

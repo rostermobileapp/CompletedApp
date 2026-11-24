@@ -245,6 +245,20 @@ without a new explicit decision. Apply the same order to the Replit walkthrough.
 
 ## Adult profile visual alignment
 
+Family plans use the Player Pro price and cover at most two players. The
+two-player limit also applies throughout family setup, not only the plan copy.
+
+**Why:** The owner explicitly requested Player Pro pricing for the family plan
+and selected "Limit family setup to two" when asked about the former four-player
+intake allowance.
+
+**How to apply:** Keep plan copy, add/remove controls, draft validation and
+invitation claims consistent. Reject oversized submissions without silently
+deleting or truncating existing player drafts. This does not activate billing.
+For isolated PDF captures, supply a verified, dated public-price snapshot:
+the capture harness stubs the price API, so a working live-price query alone
+does not establish that the exported PDF shows the correct amounts.
+
 Do not render a "DEV Preview" top bar or screen-selection dropdown on any
 onboarding screen, including development preview routes.
 

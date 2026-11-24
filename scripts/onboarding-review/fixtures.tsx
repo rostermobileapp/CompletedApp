@@ -69,6 +69,11 @@ export function ReviewScreen(){
   const spec=screens.find(screen=>screen.id===query.get("id"));
   if(!spec)return <h1>Unknown review screen</h1>;
   const extra:any={};
+  if(spec.component==="AddPlayersScreen"&&query.has("familySize")){
+    const count=Number(query.get("familySize"));
+    if(!Number.isInteger(count)||count<1||count>3)throw Error("Invalid synthetic family size");
+    extra.players=Array.from({length:count},(_,index)=>({...player,id:`00000000-0000-4000-8000-${String(index+81).padStart(12,"0")}`}));
+  }
   if(spec.component==="StaffWaitingScreen"&&spec.params?.status)extra.status=spec.params.status;
   if(spec.component==="ParentVerification"){
     extra.unavailable=spec.params?.guard==="unavailable";

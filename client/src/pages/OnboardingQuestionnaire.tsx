@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { loadSignupAttribution, signupAttribution } from '@/lib/signupAttributionBrowser';
 import { isDevParentClient } from "@/lib/parentVerificationSession";
 import { HockeyTypeScreen } from "@/components/high-school-onboarding/EntryScreens";
+import { useSubscriptionPrices } from "@/hooks/useSubscriptionPrices";
 
 const TOTAL_STEPS = isDevParentClient ? 10 : 9;
 
@@ -326,59 +327,32 @@ export default function OnboardingQuestionnaire() {
         {/* ── SOCIAL PROOF ─────────────────────────────── */}
         {screen === 'social_proof' && (
           <div className="pt-[4px]">
-            <div className="text-center mb-8">
+            <div className="text-center mb-5">
               <h2 className="text-2xl font-black mb-2 text-[#3c82f4]">What users are saying:</h2>
             </div>
 
-            <div className="space-y-4 mb-8">
-              {/* Real testimonial */}
-              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
-                <div className="flex gap-0.5 mb-3">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                </div>
-                <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "I've had different leagues use different apps and RosterHockey is the best BY FAR"
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">S</div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Scott C.</p>
-                    <p className="text-xs text-gray-400">Colorado</p>
+            <div className="space-y-3 mb-5">
+              {[
+                {name:"Scott C.",location:"Colorado",quote:"I've had different leagues use different apps and RosterHockey is the best BY FAR"},
+                {name:"James K.",location:"Ohio",quote:"The substitute player request system is the crown jewel of this app. This feature alone makes RosterHockey worth it if you are a Captain."},
+                {name:"Brian W.",location:"Ohio",quote:"As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... RosterHockey had us covered."},
+              ].map(review=>(
+                <div key={review.name} data-testid="onboarding-review-card" className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-4 border border-[#3c82f4]/20">
+                  <p className="text-sm text-gray-700 font-medium leading-snug mb-3">"{review.quote}"</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 shrink-0 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-xs font-bold">{review.name[0]}</div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p data-review-name className="text-sm font-semibold text-gray-900 whitespace-nowrap">{review.name}</p>
+                        <div data-review-stars role="img" aria-label="5 out of 5 stars" className="flex gap-0.5 shrink-0">
+                          {Array.from({length:5},(_,i)=><Star key={i} aria-hidden="true" className="w-3 h-3 fill-yellow-400 text-yellow-400"/>)}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400">{review.location}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
-                <div className="flex gap-0.5 mb-3">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                </div>
-                <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "The substitute player request system is the crown jewel of this app. This feature alone makes RosterHockey worth it if you are a Captain."
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">J</div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">James K.</p>
-                    <p className="text-xs text-gray-400">Ohio</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
-                <div className="flex gap-0.5 mb-3">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                </div>
-                <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... RosterHockey had us covered."
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">B</div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Brian W.</p>
-                    <p className="text-xs text-gray-400">Ohio</p>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
 
             <button
@@ -735,16 +709,9 @@ export default function OnboardingQuestionnaire() {
 }
 
 function PaywallScreen({ isAuthenticated, onSignUp }: { isAuthenticated: boolean; onSignUp: () => void }) {
-  const { data: stripePrices } = useQuery<{
-    player_pro_monthly?: { amount: number | null; currency: string | null };
-    commissioner_monthly?: { amount: number | null; currency: string | null };
-  }>({ queryKey: ['/api/stripe/prices'] });
-
-  const proAmount = stripePrices?.player_pro_monthly?.amount;
-  const proDisplay = proAmount != null ? `$${proAmount % 1 === 0 ? proAmount : proAmount.toFixed(2)}` : '~$6';
-
-  const commAmount = stripePrices?.commissioner_monthly?.amount;
-  const commDisplay = commAmount != null ? `$${commAmount % 1 === 0 ? commAmount : commAmount.toFixed(2)}` : '~$14';
+  const { playerProMonthly, commissionerMonthly, isLoading } = useSubscriptionPrices();
+  const proDisplay = playerProMonthly ?? (isLoading ? "Loading…" : "Price unavailable");
+  const commDisplay = commissionerMonthly ?? (isLoading ? "Loading…" : "Price unavailable");
 
   return (
     <div className="pt-8 pb-4">
