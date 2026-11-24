@@ -30,6 +30,18 @@ from parent login credentials and paid coverage. Staff-only identities must
 not enter HS player rosters, RSVPs or stats; preserve unrelated adult playing
 memberships.
 
+Child chat is limited to the approved Team group shared with coaches and
+teammates, and the child's own Family conversation with their parent. No
+coach/teammate direct messages, new conversations or custom groups.
+
+**Why:** The owner explicitly clarified these participants and restrictions
+when continuing from the skin foundation on November 24, 2026.
+
+**How to apply:** Enforce read/reply and room membership server-side, not just
+in the composer. Coach and teammate replies belong in the same approved Team
+thread; Family access never grants access to unrelated parents or staff rooms.
+Preserve disabled child activation until its separately approved phase.
+
 The owner approved Phase 1 with canonical nonproduction membership roles and
 team program types, not runtime role inference from onboarding drafts.
 Approved synthetic staff/parent/child records may be migrated; this does not
