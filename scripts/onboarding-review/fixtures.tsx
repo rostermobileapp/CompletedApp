@@ -38,7 +38,7 @@ const base:any={onBack:noop,onContinue:noop,busy:false,update:noop,onChange:noop
 const props:Record<string,any>={
   SignupFlowPreview:{onComplete:noop},
   AuthModal:{open:true},
-  EmailVerificationModal:{open:true,email:"parent@example.invalid"},
+  EmailVerificationModal:{open:true,email:"parent@example.invalid",required:true},
   HockeyTypeScreen:{value:"",setValue:noop},
   AdultRoleScreen:{value:"",setValue:noop},
   HighSchoolRoleScreen:{value:"",setValue:noop},

@@ -10,27 +10,28 @@ export async function renderReviewDocument(screens:Captured[]){
   const box=(id:string,label?:string)=>`<a class="flow-box" href="#${id}"><b>${id}</b><span>${esc(label||byId.get(id)?.heading||id)}</span></a>`;
   const line=(label:string,ids:string[])=>`<div class="flow-line"><div class="lane-label">${esc(label)}</div>${ids.map((id,index)=>(index?'<span class="arrow">→</span>':"")+box(id)).join("")}</div>`;
   const page=(title:string,subtitle:string,body:string,cls="")=>`<section class="pdf-page ${cls}"><header><div class="brand">ROSTERHOCKEY <span>ONBOARDING REVIEW</span></div><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></header>${body}</section>`;
-  pages.push(page("Every onboarding screen, in context","Updated review · Current workspace / isolated DEV · Captured at 390 × 844 · November 23, 2026",`
+  const reviewDate=new Intl.DateTimeFormat("en-US",{dateStyle:"long",timeZone:"America/New_York"}).format(new Date());
+  pages.push(page("Every onboarding screen, in context",`Updated review · Current workspace / isolated DEV · Captured at 390 × 844 · ${reviewDate}`,`
     <div class="cover-title">An updated visual inventory<br>of the current onboarding.</div>
     <div class="cover-grid">
       <div><h3>${screens.length} screen definitions</h3><p>Actual component renders, exact visible headings, lower-scroll continuations, branch arrows and linked screen references.</p></div>
-      <div><h3>Light onboarding design aligned</h3><p>Refreshed E03–E05 and V01–V09 to match the light onboarding and P01–P03. Fields, verification, saving and screen order remain unchanged.</p></div>
+      <div><h3>Developer toolbars removed</h3><p>Profile and questionnaire screens no longer render the DEV Preview bar or dropdown. Light backgrounds and normal navigation are preserved.</p></div>
       <div><h3>Potential repeats are marked</h3><p>The DEV intake and existing questionnaire both ask hockey type and role. Other similar questions belong to separate branches.</p></div>
       <div><h3>Blocked states are labelled</h3><p>Child activation, device approvals and password-success states use synthetic fixtures. They are not proof of live acceptance or enabled access.</p></div>
     </div>
     <div class="callout blue"><b>How to use this PDF</b><p>Start with the next three flow maps and the findings page. Then inspect the screenshot catalog. Screen IDs and “Next” links are clickable. A lower-scroll view is the same screen, not another onboarding step.</p></div>
-    <div class="legend"><span class="badge">CURRENT / DEV</span><span class="badge optional">OPTIONAL ENTRY</span><span class="badge conditional">CONDITIONAL EMAIL</span><span class="badge fixture">FIXTURE / BLOCKED</span><span class="badge loop">SELF-LOOP</span></div>
+    <div class="legend"><span class="badge">CURRENT / DEV</span><span class="badge optional">OPTIONAL ENTRY</span><span class="badge required">REQUIRED EMAIL</span><span class="badge fixture">FIXTURE / BLOCKED</span><span class="badge loop">SELF-LOOP</span></div>
     <p class="small">Scope: account entry, age gate, signup, existing adult profile and questionnaire, High School staff/parent/league setup, parent verification and restricted child UI. Retired legacy implementations have been removed. Routine field-validation permutations, loading skeletons, global app pages after onboarding, operating-system share sheets and third-party provider screens are not counted as distinct screens.</p>
     <p class="small">Capture method: isolated, read-only renders of current components with reserved-domain examples. API/Auth operations were blocked. Some screen-local state was seeded inside the capture bundle only; application files and live services were not modified.</p>
   `,"cover"));
   pages.push(page("1. Account entry and the adult handoff","Arrows describe current source/controller handoffs, not a completed live-provider registration.",`
     <h3>New account: age before credentials</h3>
-    ${line("YES",["E01","E02","H01"])}
-    ${line("EMAIL IF REQUIRED",["E02","E05","H01"])}
+    ${line("YES / NEW ACCOUNT",["E01","E02","E05","H01"])}
+    ${line("ALTERNATIVE SIGNUP",["E04","E05","H01"])}
     ${line("NO / UNDER 18",["E01","U01","U02"])}
     ${line("ADULT HOCKEY",["H01","H02","P01","P02","P03","Q01"])}
     <div class="callout red"><b>Potential repeat at the handoff</b><p>The new DEV intake contains hockey type ${link("H01")} and adult role ${link("H02")}. The existing adult profile then leads to the independent questionnaire, whose ${link("Q03")} and ${link("Q04")} ask those topics again. Review whether both selectors should remain on a single adult journey. Routing depends on saved account/flow completion state.</p></div>
-    <div class="callout"><b>Separate entrances, not additional sequential steps</b><p>${link("E00")} is an alternative High School entry; ${link("E03")} is existing-account sign-in; ${link("E04")} is the alternative signup dialog. The three existing adult profile screens are ${link("P01")} → ${link("P02")} → ${link("P03")}. Finishing the profile explicitly navigates to <code>/get-started</code>.</p></div>
+    <div class="callout"><b>Separate entrances, not additional sequential steps</b><p>${link("E00")} is an alternative High School entry; ${link("E03")} is existing-account sign-in; ${link("E04")} is the alternative signup dialog. Both updated signup paths require ${link("E05")}; live activation awaits review and publishing. The adult profile is ${link("P01")} → ${link("P02")} → ${link("P03")}, then <code>/get-started</code>.</p></div>
   `));
   pages.push(page("2. The existing /get-started questionnaire","Five adult roles have different challenge/solution content. The main forward route skips the standalone features screen.",`
     ${line("COMMON INTRO",["Q01","Q02","Q03","Q04"])}
@@ -41,7 +42,7 @@ export async function renderReviewDocument(screens:Captured[]){
     ${line("SCOREKEEPER",["Q04","QS1","QS2","Q17"])}
     ${line("FINISH",["Q17","Q18","Q19"])}
     <p class="small">For a visitor without an account, the paywall variant is ${link("Q20")}; its account CTA goes to sign-in/account entry at <code>/login</code>. The authenticated ${link("Q19")} instead returns to the app.</p>
-    <div class="callout red"><b>Confirmed source-level self-loop: ${link("Q16")}</b><p>“Here's what's waiting for you” has a “Looks good — let's go →” action that sets <code>join_play_features</code> again. No normal forward action currently enters this screen from the main chain. It can be reached through the DEV screen picker. This is shown separately—not incorrectly inserted between Solution and Preferences.</p></div>
+    <div class="callout red"><b>Confirmed source-level self-loop: ${link("Q16")}</b><p>“Here's what's waiting for you” has a “Looks good — let's go →” action that sets <code>join_play_features</code> again. No normal forward action currently enters this screen from the main chain. It can be reached through a development-only preview URL. This is shown separately—not incorrectly inserted between Solution and Preferences.</p></div>
   `));
   pages.push(page("3. High School / Youth branches","These are separate role journeys. Shared referral/profile screens are not intended to be repeated across all three branches.",`
     ${line("ENTRY",["H01","H03"])}
@@ -78,7 +79,7 @@ export async function renderReviewDocument(screens:Captured[]){
         const next=batch[column+1];
         const sequential=!!next&&((next.screen.id===screen.id&&next.index===index+1)||(index===screen.images.length-1&&screen.next?.includes(next.screen.id)));
         return `<article class="screen-card"${index===0?` id="${screen.id}"`:""}>
-          <div class="screen-label"><b>${screen.id}${index?` · lower view ${index+1}`:""}</b><span class="badge ${status}">${status==="current"?"CURRENT / DEV":status==="fixture"?"FIXTURE / BLOCKED":status==="conditional"?"CONDITIONAL EMAIL":status==="loop"?"SELF-LOOP":status.toUpperCase()}</span></div>
+          <div class="screen-label"><b>${screen.id}${index?` · lower view ${index+1}`:""}</b><span class="badge ${status}">${status==="current"?"CURRENT / DEV":status==="fixture"?"FIXTURE / BLOCKED":status==="required"?"REQUIRED EMAIL":status==="conditional"?"CONDITIONAL EMAIL":status==="loop"?"SELF-LOOP":status.toUpperCase()}</span></div>
           <h3>${esc(screen.heading)}</h3>
           <div class="phone"><img alt="${esc(screen.heading)}" src="data:image/jpeg;base64,${data}"></div>
           <p class="screen-note">${esc(index?"Continuation of the same screen; scrolled to show the remaining layout.":screen.note)}</p>

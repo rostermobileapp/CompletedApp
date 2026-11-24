@@ -203,3 +203,17 @@ mtime_ms = 1795474026252
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/b121365b-5852-4137-a9e3-f8b7375c790f/5fe6d0f4-2eac-4f9b-bbf3-34d146160011"
 storage_version_token = "1795474060049314"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "a9P_jkrqUtBAWHOJbDp3e"
+uri = "file://generated-artifacts/onboarding-review/onboarding-review-cleaned.pdf"
+type = "pdf"
+title = "Complete onboarding review — cleaned screens"
+description = "Fresh 31-page PDF with all 72 screen states, no developer preview bars, preserved light backgrounds, and updated E05 signup-flow notes."
+logical_id = "a71ee719-4636-41da-b1ae-2fae68a238e7"
+content_hash = "sha256:b6cda922025ab535eb7a9c5efdd442d07aee48e6ded0d67c8d0799a9efff5b2f"
+size = 4488991
+mtime_ms = 1795530113727
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/a71ee719-4636-41da-b1ae-2fae68a238e7/437591b5-490f-4654-91fe-df37d092dfe4"
+storage_version_token = "1795530144730264"
+content_type = "application/pdf"
