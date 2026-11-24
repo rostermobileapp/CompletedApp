@@ -16,6 +16,7 @@
 - [Demo client identity](demo-client-identity.md) — client-side user comparisons in Demo must use the copied POV ID, not the real Supabase session user ID.
 - [Scrimmage payment state locking](scrimmage-payment-state-locking.md) — invoice sends, paid admission, and roster finalization must share locks; generic invoices cannot accept scrimmage links.
 - [Payment tracking entitlement](payment-tracking-entitlement.md) — premium gates invoice creation, not viewing or confirming existing organizer-owned requests.
+- [Player Pro payer scope](player-pro-coverage-policy.md) — personal covers all approved teams; seats cover only the buying league; household limit two; audit/plan first.
 - [Placeholder user identity](placeholder-user-identity.md) — placeholder user accounts are identified by their @placeholder.roster email; users has no is_placeholder column.
 - [Scrimmage invite delivery leases](scrimmage-invite-delivery-leases.md) — mark sent only after full delivery; use owner-token heartbeats and revalidate before every side effect.
 - [Scrimmage change recipients](scrimmage-change-recipients.md) — notify delivered invitees plus approved players; persisted invite notifications preserve group recipients.

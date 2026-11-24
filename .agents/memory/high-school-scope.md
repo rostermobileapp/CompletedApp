@@ -182,17 +182,17 @@ invitations while retaining consent-before-activation.
 authorized guardian claim and consent. Verify the school's authority to supply
 the details separately; product approval does not establish a legal basis.
 
-One sponsoring league's seat covers a household across all High School leagues;
-other league pools must not consume duplicate seats for that household.
+League-paid seats are intended to cover only teams in the paying league.
+Personal subscriptions cover the parent's own approved teams and their
+household's eligible child teams, with the two-player limit retained.
 
-**Why:** The owner explicitly chose one sponsor across HS leagues rather than a
-separate household seat in each league.
+**Why:** On November 24, 2026, the owner supplied revised payer-scoped coverage
+requirements. These replace the earlier cross-HS-league household sponsorship
+rule; they do not authorize implementation or activation without approval.
 
-**How to apply:** Keep this coverage restricted to HS contexts, not unrelated
-adult leagues. League admins must approve sponsor selection and replacement,
-as explicitly chosen by the owner. Never automatically allocate another
-league's capacity. Without approved replacement or verified household Pro,
-block new joins; settle existing-access behavior before onboarding.
+**How to apply:** See [Player Pro coverage policy](player-pro-coverage-policy.md).
+Keep league administrators' authority and parent/child safety checks separate
+from entitlement. Never auto-purchase or allocate another league's seats.
 
 ## Approved guarded DEV onboarding phase (November 19, 2026)
 

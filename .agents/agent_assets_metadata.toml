@@ -231,3 +231,17 @@ mtime_ms = 1795531599334
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/c457d50f-c1d7-4671-87b3-6e612d34ea45/d0aa4639-68a3-4793-97df-1cfa69a79f1b"
 storage_version_token = "1795531827903029"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "I4SKl9gpIbc-0qrSRNmC6"
+uri = "file://generated-artifacts/pro-coverage-audit/player-pro-coverage-audit.html"
+type = "html"
+title = "Player Pro coverage audit and proposed rules"
+description = "Read-only findings, league-seat storage and lifecycle, feature classifications, live RLS and Edge Function review, acceptance matrix, and 482 source references across 65 files."
+logical_id = "22de20eb-c806-4545-94a5-e8507b6d4298"
+content_hash = "sha256:855d7a42b2c1f7f6915ed48b1768c74a4eccb524075f22d4d3c53fa7335d2cb2"
+size = 115832
+mtime_ms = 1795535802175
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/22de20eb-c806-4545-94a5-e8507b6d4298/c4570129-7567-4877-98b9-688890f6b845"
+storage_version_token = "1795535816045428"
+content_type = "text/html"
