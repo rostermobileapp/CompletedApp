@@ -30,6 +30,8 @@ test("lock, logout and malformed sessions remove authority and notify subscriber
     assert.equal(changes, 2);
     store.save(jwt("parent", "session"), grant, 600);
     assert.deepEqual(store.headers(), {});
+    assert.equal(changes, 3);
+    assert.deepEqual(store.headers("invalid"), {});
     assert.equal(changes, 4);
     assert.throws(() => store.save("invalid", grant, 600));
     assert.throws(() => store.save(jwt("parent", "session"), "invalid", 600));

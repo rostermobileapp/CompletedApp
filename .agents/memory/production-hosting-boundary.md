@@ -30,3 +30,16 @@ Check frontend/backend release compatibility before changing working feature cod
 **Why:** A newer mobile frontend displayed award-loading errors and unavailable predictions while the live Railway backend still lacked the awards endpoint and the newer prediction model. Successful Replit preview requests did not validate that live backend.
 
 **How to apply:** Check the actual production API for newly introduced routes and response contracts. A frontend-only release cannot enable features that require a newer Railway backend; do not hide that mismatch with synthetic stats or disabled-feature fallbacks.
+
+Backend-only releases must exclude unpublished frontend ancestors, not just
+unstaged frontend files.
+
+**Why:** Workspace checkpoint commits can already contain frontend work that the
+owner has not published through Vercel. Adding only backend files to a new commit
+does not remove those earlier frontend commits from its pushed history.
+
+**How to apply:** Compare local history with Railway's remote source branch
+before pushing. If frontend work is ahead locally, package the approved backend
+delta against the current remote tip and reconcile local history without losing
+workspace changes. Do not force-push, change hosting configuration, or include
+the frontend merely to trigger a backend release.

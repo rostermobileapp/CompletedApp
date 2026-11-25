@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useCallback, useSyncExternalStore, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { parentVerificationSession } from '@/lib/parentVerificationSession';
@@ -47,6 +47,7 @@ function invalidateRealtimeQueries() {
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const parentRevision = useSyncExternalStore(parentVerificationSession.subscribe, parentVerificationSession.snapshot, parentVerificationSession.snapshot);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -166,6 +167,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         reconnectTimeoutRef.current = setTimeout(connect, delay);
         return;
       }
+      let parentGrant: string | undefined;
+      try {
+        parentGrant = await parentVerificationSession.socketGrant(session.access_token);
+      } catch {
+        startFallbackPolling();
+        const delay = RECONNECT_DELAYS[Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)];
+        reconnectAttemptRef.current++;
+        reconnectTimeoutRef.current = setTimeout(connect, delay);
+        return;
+      }
+      if (connectionTokenRef.current !== currentToken) return;
       const websocket = new WebSocket(wsUrl);
 
       websocket.onopen = () => {
@@ -180,7 +192,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         websocket.send(JSON.stringify({
           type: 'authenticate',
           accessToken: session.access_token,
-          parentGrant: parentVerificationSession.headers(session.access_token)["x-parent-verification"],
+          parentGrant,
         }));
       };
 
@@ -381,7 +393,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         wsRef.current = null;
       }
     };
-  }, [userId]);
+  }, [userId, parentRevision]);
 
   return (
     <WebSocketContext.Provider value={{ send, subscribe, isConnected, onConnected }}>

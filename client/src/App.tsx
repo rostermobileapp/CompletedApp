@@ -267,7 +267,7 @@ export function Router() {
   }
   if (isDevParentClient && location === "/high-school/parent-verification") {
     if (authLoading || (isAuthenticated && parentStatus.isLoading)) return <LoadingScreen />;
-    return <ParentVerification authenticated={isAuthenticated} enrolled={parentStatus.data?.enrolled} unavailable={parentStatus.isError} />;
+    return <ParentVerification authenticated={isAuthenticated} enrolled={parentStatus.data?.enrolled} verified={parentStatus.data?.verified} unavailable={parentStatus.isError} />;
   }
   if (location === '/reset-password') {
     return <ResetPassword />;

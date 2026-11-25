@@ -258,7 +258,7 @@ if (isParentSecurityClient) {
   // Drop cached parent data immediately on expiry, lock or a new grant.
   parentVerificationSession.subscribe(() => queryClient.clear());
   supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT" || !session) parentVerificationSession.clear();
-    else parentVerificationSession.headers(session.access_token); // clears on identity/session switch
+    if (event === "SIGNED_OUT") parentVerificationSession.clear();
+    else if (session) parentVerificationSession.headers(session.access_token); // clears on identity/session switch
   });
 }

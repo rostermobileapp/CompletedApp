@@ -67,7 +67,7 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
   if (!user) return <>{entry}</>;
   if (status.isError) return <ParentVerification unavailable />;
   if (!status.data) return <main role="status" className="min-h-screen grid place-items-center">Checking account access…</main>;
-  if (protectedWithoutProof || verification) return <ParentVerification enrolled={status.data.enrolled} />;
+  if (protectedWithoutProof || verification) return <ParentVerification enrolled={status.data.enrolled} verified={status.data.verified} />;
   const backToAdult = async () => {
     try {
       const { teamIds } = await loadAdultTeams();

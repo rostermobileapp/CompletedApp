@@ -73,10 +73,31 @@ set up, the parent can manage that child without another verification code.
 having to enter a new verification code every time.
 
 **How to apply:** Improve continuity on a verified parent device without granting
-parent authority from the household's shared login. Obtain approval for the
-specific remembered-device duration and security changes before implementation.
+parent authority from the household's shared login. The owner selected a fixed
+30-day duration on November 25, 2026. Require initial email verification on a new
+parent device; sign-out, locking, revocation and child-mode entry end remembered
+access. Keep password changes separately verified and short-lived.
 An existing child profile alone is not evidence that the person using the
 shared login is the parent; preserve the parent-device and child-device boundary.
+
+Parent verification must always offer an exit, including midway through setup.
+
+**Why:** The owner was trapped on verification when reopening the app. Navigating
+an unverified shared login to the signed-in Home only repeats the security gate.
+
+**How to apply:** Verified parents return Home without losing their remembered
+approval. For locked shared logins, explicitly label the safe exit as signing out
+and returning Home; keep saved family setup and existing authorization checks.
+
+Keep the reusable remembered-device proof out of JavaScript-readable storage.
+
+**Why:** Parent and child can share provider credentials, and longer-lived parent
+approval must not become another transferable household-login field.
+
+**How to apply:** A same-origin HttpOnly device proof must still be checked against
+the authenticated account/session and revocation state. Retain compatibility with
+temporary proofs for clients and transports that cannot send the first-party
+cookie; do not break real-time updates when changing parent authentication.
 
 ## Authorized live family rollout (November 24, 2026)
 
