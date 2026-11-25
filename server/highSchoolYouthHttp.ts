@@ -42,6 +42,9 @@ export function registerHighSchoolYouthRoutes(
   // approval, canonical memberships and coverage for every production request.
   app.post(`${base}/device-codes`, parent((req, actor, grant) => children.createCode(actor, req.body, grant)));
   app.get(`${base}/device-requests`, parent((_req, actor, grant) => children.requests(actor, grant)));
+  app.get(`${base}/device-sessions`, parent((_req, actor, grant) => children.sessions(actor, grant)));
+  app.post(`${base}/children/:id/devices/:deviceId/revoke`, parent((req, actor, grant) =>
+    children.revokeSession(actor, req.params.id, req.params.deviceId, grant)));
   app.post(`${base}/device-requests/:id/decision`, parent((req, actor, grant) => children.decision(actor, req.params.id, req.body, grant)));
   app.post(`${base}/children/:id/revoke`, parent((req, actor, grant) => children.revoke(actor, req.params.id, grant)));
 

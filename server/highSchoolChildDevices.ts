@@ -197,6 +197,41 @@ export class HighSchoolChildDevices {
       AND c.enabled=true AND c.revoked_at IS NULL ORDER BY r.created_at LIMIT 20`, [actor.authId])).rows;
     return { requests, activationAvailable: true };
   }
+  async sessions(actor: OnboardingActor, grant?: string) {
+    await this.authority(actor, grant);
+    if (!this.activationAvailable) return { sessions: [], activationAvailable: false };
+    // request_id is a nonsecret, unique session handle. Never return token digests
+    // or pairing proofs. Match the same expiry/parent-session rules as child reads.
+    const sessions = (await this.pool.query(`SELECT s.request_id AS id,s.child_id AS "childId",
+      r.device_label AS "deviceLabel",s.expires_at AS "expiresAt"
+      FROM hs_onboarding.child_sessions s
+      JOIN hs_onboarding.device_requests r ON r.id=s.request_id
+        AND r.child_id=s.child_id AND r.parent_auth_id=s.parent_auth_id
+      JOIN hs_onboarding.children c ON c.id=s.child_id AND c.parent_auth_id=s.parent_auth_id
+      JOIN auth.sessions a ON a.id=s.approved_session_id AND a.user_id=s.parent_auth_id
+      WHERE s.parent_auth_id=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
+        AND c.enabled=true AND c.revoked_at IS NULL
+        AND(a.not_after IS NULL OR a.not_after>now())
+      ORDER BY s.created_at,s.request_id`, [actor.authId])).rows;
+    return { sessions, activationAvailable: true };
+  }
+  async revokeSession(actor: OnboardingActor, childId: string, sessionId: string, grant?: string) {
+    await this.authority(actor, grant); uuid.parse(childId); uuid.parse(sessionId);
+    return this.tx(async tx => {
+      // Serialize with pairing redemption and all-device revocation, and recheck
+      // parent authority after taking the lock. Coverage is not needed to sign out.
+      await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [actor.authId]);
+      await this.authority(actor, grant, tx);
+      const rows = (await tx.query(`UPDATE hs_onboarding.child_sessions s
+        SET revoked_at=coalesce(s.revoked_at,now())
+        WHERE s.request_id=$1 AND s.child_id=$2 AND s.parent_auth_id=$3
+          AND EXISTS(SELECT 1 FROM hs_onboarding.children c
+            WHERE c.id=s.child_id AND c.parent_auth_id=$3)
+        RETURNING s.request_id`, [sessionId, childId, actor.authId])).rows;
+      if (!rows.length) throw new OnboardingError("CHILD_DEVICE_UNAVAILABLE", 403);
+      return { revoked: true };
+    });
+  }
   async decision(actor: OnboardingActor, id: string, input: unknown, grant?: string) {
     await this.authority(actor, grant); this.ready(); uuid.parse(id);
     const { approve } = z.object({ approve: z.boolean() }).strict().parse(input);

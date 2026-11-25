@@ -197,6 +197,37 @@ test("a shared parent password without parent verification cannot issue or appro
   await assert.rejects(service.createCode(actor, { childId: id(3) }), (e: any) => e.code === "PARENT_VERIFICATION_REQUIRED");
   await assert.rejects(service.decision(actor, id(4), { approve: true }), (e: any) => e.code === "PARENT_VERIFICATION_REQUIRED");
 });
+test("device management preserves activation and production rollout gates", async () => {
+  const { db, calls } = fakePool(() => []);
+  const disabled = new HighSchoolChildDevices(db, approvedParent);
+  assert.deepEqual(await disabled.sessions(actor), { sessions: [], activationAvailable: false });
+  assert.equal(calls.length, 0);
+  const production = new HighSchoolChildDevices(db, approvedParent, true, { production: true });
+  await assert.rejects(production.sessions({ ...actor, productionTest: true }),
+    (e: any) => e.code === "ONBOARDING_TEST_ACCESS_DENIED");
+  await assert.rejects(production.revokeSession({ ...actor, productionTest: true }, id(3), id(4)),
+    (e: any) => e.code === "ONBOARDING_TEST_ACCESS_DENIED");
+  const enabled = new HighSchoolChildDevices(db, approvedParent, true);
+  for (const who of [{ ...actor, emailVerified: false }, { ...actor, fixture: false }]) {
+    await assert.rejects(enabled.sessions(who), (e: any) => e.code === "DEV_FIXTURE_REQUIRED");
+    await assert.rejects(enabled.revokeSession(who, id(3), id(4)), (e: any) => e.code === "DEV_FIXTURE_REQUIRED");
+  }
+  await assert.rejects(enabled.revokeSession(actor, "not-a-child-id", id(4)));
+  await assert.rejects(enabled.revokeSession(actor, id(3), "not-a-device-id"));
+  assert.equal(calls.some(sql => sql.startsWith("UPDATE")), false);
+});
+test("single-device revocation rechecks parent authority under the registry lock", async () => {
+  let checks = 0;
+  const parent = { authorized: async () => ++checks === 1 } as any;
+  const { db, calls } = fakePool(() => []);
+  const service = new HighSchoolChildDevices(db, parent, true);
+  await assert.rejects(service.revokeSession(actor, id(3), id(4)),
+    (e: any) => e.code === "PARENT_VERIFICATION_REQUIRED");
+  assert.equal(checks, 2);
+  assert.ok(calls.some(sql => sql.includes("FOR UPDATE")));
+  assert.ok(calls.includes("ROLLBACK"));
+  assert.equal(calls.some(sql => sql.startsWith("UPDATE")), false);
+});
 test("wrong pairing guesses are committed and increment both source and located code budgets", async () => {
   const { db, calls } = fakePool(sql => {
     if (sql.includes("window_started_at>")) return [{ failures: 0, recent: true }];

@@ -16,6 +16,10 @@ export function FamilyDevices({actorId}:{actorId:string}) {
     queryKey:["family-device-requests",actorId],
     queryFn:async()=>(await apiRequest("GET",`${base}/device-requests`)).json(),retry:false,refetchInterval:10_000,
   });
+  const sessions=useQuery<{sessions:Array<{id:string;childId:string;deviceLabel:string;expiresAt:string}>}>({
+    queryKey:["family-device-sessions",actorId],
+    queryFn:async()=>(await apiRequest("GET",`${base}/device-sessions`)).json(),retry:false,refetchInterval:10_000,
+  });
   const act=async(work:()=>Promise<void>)=>{
     setBusy(true);setError("");setNotice("");
     try{await work();}
@@ -26,12 +30,23 @@ export function FamilyDevices({actorId}:{actorId:string}) {
   return <section className="family-panel" style={{marginTop:18}} aria-label="Child device setup">
     <h2>Child device setup</h2>
     <p className="hsy-note">An approved team, guardian consent and Player Pro coverage are required. Each phone needs your approval.</p>
-    {(children.isLoading||requests.isLoading)&&<p role="status">Checking child devices…</p>}
-    {(children.isError||requests.isError)&&<p role="alert">Device access could not be checked. Verify your parent session and refresh.</p>}
+    {(children.isLoading||requests.isLoading||sessions.isLoading)&&<p role="status">Checking child devices…</p>}
+    {(children.isError||requests.isError||sessions.isError)&&<p role="alert">Device access could not be checked. Verify your parent session and refresh.</p>}
     {children.data?.children.length===0&&<p className="hsy-note">A child will appear here after team staff approves their request.</p>}
     {children.data?.children.map(child=><div className="hsy-card" key={child.id} style={{marginTop:12}} role="group" aria-label={`${child.firstName} ${child.lastName} device controls`}>
       <strong>{child.firstName} {child.lastName}</strong>
       {!child.canActivate&&<p className="hsy-note">Waiting for approved team membership and coverage.</p>}
+      <h3 style={{marginTop:12}}>Active devices</h3>
+      {sessions.isSuccess&&!sessions.data.sessions.some(session=>session.childId===child.id)&&<p className="hsy-note">No active devices.</p>}
+      {!sessions.isError&&sessions.data?.sessions.filter(session=>session.childId===child.id).map(session=><div className="hsy-card" key={session.id} style={{marginTop:8}}>
+        <strong>{session.deviceLabel}</strong>
+        <p className="hsy-note">Expires <time dateTime={session.expiresAt}>{new Date(session.expiresAt).toLocaleString()}</time></p>
+        <button className="hsy-secondary" disabled={busy} aria-label={`Sign out ${session.deviceLabel} for ${child.firstName}`} onClick={()=>void act(async()=>{
+          await apiRequest("POST",`${base}/children/${encodeURIComponent(child.id)}/devices/${encodeURIComponent(session.id)}/revoke`,{});
+          await sessions.refetch();
+          setNotice(`${session.deviceLabel} was signed out. Other devices are unchanged.`);
+        })}>Sign out this device</button>
+      </div>)}
       <div className="hsy-stack" style={{marginTop:10}}>
         <button className="hsy-primary" disabled={busy||!child.canActivate} aria-label={`Get setup code for ${child.firstName}`} onClick={()=>void act(async()=>{
           const response=await apiRequest("POST",`${base}/device-codes`,{childId:child.id});
@@ -39,8 +54,9 @@ export function FamilyDevices({actorId}:{actorId:string}) {
         })}>Get setup code</button>
         <button className="hsy-secondary" disabled={busy} aria-label={`Sign out ${child.firstName}'s devices`} onClick={()=>void act(async()=>{
           await apiRequest("POST",`${base}/children/${encodeURIComponent(child.id)}/revoke`,{});
+          await Promise.all([sessions.refetch(),requests.refetch()]);
           setCode(null);setNotice("This child's device sessions and pending setup codes were revoked.");
-        })}>Sign out child devices</button>
+        })}>Sign out all child devices</button>
       </div>
     </div>)}
     {code&&<div className="hsy-card tint" style={{marginTop:14}}>
