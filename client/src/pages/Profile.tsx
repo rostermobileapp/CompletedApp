@@ -693,7 +693,7 @@ export default function Profile() {
         </div>
       </div>
       {/* Scrollable Content Section */}
-      <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
+      <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-80' : 'pb-24'}`}>
         {onboardingTestAccess?.enabled&&<section className="px-6 mb-3">
           <button className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left font-semibold text-slate-900"
             onClick={()=>navigate("/high-school/testing")} data-testid="profile-onboarding-test">Production onboarding test ›</button>
