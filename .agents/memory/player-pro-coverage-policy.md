@@ -46,3 +46,16 @@ evidence wrongly removes grandfathered access.
 **How to apply:** Require purchase-state evidence before denying legacy
 coverage. Keep verified seats and free/support messaging independent of
 unrelated personal-provider availability.
+
+Owner-intended manual Player Pro grants must remain effective even for accounts
+with prior expired subscriptions. The owner identified a manually granted
+account without purchase history as the correct behavior, not an exception
+to remove.
+
+**Why:** The owner explicitly corrected the suggestion that direct manual
+grants should generally be treated as invalid billing overrides.
+
+**How to apply:** Preserve working manual grants. Distinguish deliberate grants
+from subscription-derived roles without treating every paid role as permanent;
+normal paid subscriptions must still expire. This clarification does not
+authorize a production data change or deployment by itself.
