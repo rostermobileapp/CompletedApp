@@ -252,7 +252,34 @@
   --family-ink:#0f172a;
   --family-muted:#64748b;
   --family-line:#e2e8f0;
+  --family-input:#cbd5e1;
+  --family-paper:#f8fafc;
+  --family-blue:#2563eb;
+  --family-blue-dark:#1d4ed8;
+  --family-soft:#eff6ff;
+  --hsy-blue:var(--family-blue);
+  --hsy-blue-dark:var(--family-blue-dark);
+  --hsy-ink:var(--family-ink);
+  --hsy-muted:var(--family-muted);
+  --hsy-border:var(--family-line);
   color:var(--family-ink);
+  color-scheme:light;
+  font-family:Inter, ui-sans-serif, system-ui, sans-serif;
+  line-height:1.45;
+}
+.family-staff-review *,
+.family-staff-review *::before,
+.family-staff-review *::after { box-sizing:border-box; }
+.family-staff-review :focus-visible {
+  outline:3px solid #2563eb66;
+  outline-offset:2px;
+}
+.family-staff-review input,
+.family-staff-review select,
+.family-staff-review textarea {
+  color-scheme:light;
+  background:#fff!important;
+  color:var(--family-ink)!important;
 }
 .family-staff-heading {
   display:flex;
@@ -261,7 +288,7 @@
   gap:14px;
   margin-bottom:16px;
 }
-.family-staff-heading h2 { margin:0; font-size:20px; letter-spacing:-.35px; }
+.family-staff-heading h1, .family-staff-heading h2 { margin:0; font-size:20px; line-height:1.2; letter-spacing:-.35px; font-weight:750; }
 .family-staff-heading p { margin:5px 0 0; color:var(--family-muted); font-size:14px; }
 .family-staff-list { display:grid; gap:10px; }
 .family-staff-card {
@@ -276,6 +303,29 @@
 .family-staff-actions .hsy-primary { min-height:44px; }
 .family-staff-actions .hsy-secondary { flex:1; }
 .family-staff-error { margin:0 0 12px; }
+.family-review-topline .family-quiet-button { min-height:44px!important; }
+.family-review-select { display:grid; gap:7px; margin-top:17px; }
+.family-review-select label { color:var(--family-ink); font-size:13px; font-weight:650; }
+.family-review-select select {
+  width:100%;
+  min-height:48px;
+  border:1px solid var(--family-input);
+  border-radius:12px;
+  padding:0 13px;
+  font:inherit;
+  outline:none;
+}
+.family-review-select select:focus { border-color:var(--family-blue); box-shadow:0 0 0 3px #2563eb20; }
+.family-review-state {
+  margin-top:16px;
+  padding:15px;
+  border:1px solid var(--family-line);
+  border-radius:12px;
+  color:var(--family-muted);
+  background:#fff;
+  font-size:14px;
+}
+.family-review-state[role="alert"] { color:#991b1b; border-color:#fecaca; background:#fef2f2; }
 @media (min-width:700px) {
   .family-setup {
     padding:24px 0;

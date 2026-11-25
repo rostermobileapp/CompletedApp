@@ -315,3 +315,17 @@ mtime_ms = 1795567345485
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/99bbfe97-2601-4ff2-ae32-7615e6c587c4/78199cc5-9851-4409-853c-45784cfd194f"
 storage_version_token = "1795567393232596"
 content_type = "image/png"
+
+[[outputs]]
+id = "t8e3fIdoB-SNl1LM8ZT2U"
+uri = "file://generated-artifacts/coach-theme/roster-390.png"
+type = "image"
+title = "Coach roster — matching theme"
+description = "Actual coach components rendered at phone width with isolated test data. Not a live account or production acceptance test."
+logical_id = "0082cda9-5c46-4431-a0d9-dc9030743ccf"
+content_hash = "sha256:3a40b77ebee1e19f32e748bed10b5aefc7f62c581862c5565045c6dc19a19ee5"
+size = 75509
+mtime_ms = 1795568780825
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/0082cda9-5c46-4431-a0d9-dc9030743ccf/2deb509e-e2fa-4850-bd9c-21a6de555c15"
+storage_version_token = "1795568854882411"
+content_type = "image/png"

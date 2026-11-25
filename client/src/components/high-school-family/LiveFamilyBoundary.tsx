@@ -95,19 +95,39 @@ function LiveFamilyRequests({ actorId, onExit }: { actorId: string; onExit: () =
     queryKey: ["family-staff-teams", actorId],
     queryFn: async () => (await apiRequest("GET", "/api/high-school/family/staff/teams")).json(), retry: false,
   });
-  return <main className="onboarding-light min-h-screen p-6" aria-label="Family request review">
-    <button onClick={onExit}>Back to my account</button>
-    <h1 className="text-xl font-semibold my-4">Review family requests</h1>
-    {teams.isError ? <p role="alert">Your review access could not be checked. No request has been changed.</p>
-      : !teams.data ? <p role="status">Checking team authority…</p> : !teams.data.teams.length
-        ? <p>No teams are available for you to review.</p>
-        : <><label htmlFor="family-review-team">Team</label>
-          <select id="family-review-team" className="border rounded-lg p-3 mx-3" value={teamId}
-            onChange={event => setTeamId(event.target.value)}>
-            <option value="">Choose a team</option>
-            {teams.data.teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
-          </select>
-          {teamId && <FamilyStaffReview key={teamId} actorId={actorId} teamId={teamId} onChanged={() => {}} />}
-        </>}
+  return <main className="hsy family-setup" aria-label="Family request review">
+    <div className="hsy-frame">
+      <header className="family-topline family-review-topline">
+        <div>
+          <span className="family-brand">RosterHockey</span>
+          <span className="family-brand-subtitle">Family request review</span>
+        </div>
+        <div className="family-top-actions">
+          <button className="family-quiet-button" onClick={onExit}>Back to my account</button>
+        </div>
+      </header>
+      <section className="hsy-content family-staff-review">
+        <div className="family-staff-heading">
+          <div>
+            <span className="family-kicker">Team access</span>
+            <h1>Review family requests</h1>
+            <p>Choose a team to review its pending family requests.</p>
+          </div>
+        </div>
+        {teams.isError ? <p className="family-review-state" role="alert">Your review access could not be checked. No request has been changed.</p>
+          : !teams.data ? <p className="family-review-state" role="status">Checking team authority…</p> : !teams.data.teams.length
+            ? <p className="family-review-state">No teams are available for you to review.</p>
+            : <><div className="family-review-select">
+              <label htmlFor="family-review-team">Team</label>
+              <select id="family-review-team" value={teamId}
+                onChange={event => setTeamId(event.target.value)}>
+                <option value="">Choose a team</option>
+                {teams.data.teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+              </select>
+            </div>
+            {teamId && <FamilyStaffReview key={teamId} actorId={actorId} teamId={teamId} onChanged={() => {}} />}
+          </>}
+      </section>
+    </div>
   </main>;
 }

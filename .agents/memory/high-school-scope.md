@@ -350,14 +350,15 @@ does not make adult profiles part of the High School authority or family model.
 
 ## Light onboarding auth and verification
 
-Family setup should use the existing light, blue-accented onboarding design,
-not a separate teal theme.
+Family setup and all coach/staff pages should use the existing light,
+blue-accented onboarding design, not separate teal themes or typefaces.
 
 **Why:** The owner flagged the live Family setup page as inconsistent with the
-design theme after approving the compact Family entry in Profile.
+design theme, then explicitly requested the same consistency on all coach pages.
 
-**How to apply:** Reuse onboarding typography, colors, controls and mobile width
-for family screens without changing global theme or family security behavior.
+**How to apply:** Reuse onboarding typography, colors and controls across family
+and staff screens without changing global theme or security behavior. Preserve
+practical dashboard widths for coach tools rather than forcing a phone-width frame.
 
 Keep signup/sign-in dialogs, signup email verification and every parent
 verification state in the same light design as the onboarding, even when the
