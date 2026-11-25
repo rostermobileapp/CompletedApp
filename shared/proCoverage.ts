@@ -2,7 +2,7 @@
 export type AccountPro = {
   personal: boolean;
   legacy: boolean;
-  source: "stripe" | "apple" | "google" | "legacy_grant" | "operational" | "none";
+  source: "stripe" | "apple" | "google" | "manual_override" | "legacy_grant" | "operational" | "none";
   validUntil?: string | null;
 };
 export type ProContext = { leagueId?: string | null; teamId?: string | null };

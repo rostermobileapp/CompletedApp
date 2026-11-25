@@ -122,6 +122,7 @@ test("guarded registry proves the parent/team, rejects over-limit families, and 
   const pool: any = {
     async query(sql: string) {
       calls.push(sql);
+      if (sql.includes("to_regclass('hs_onboarding.independent_child_version')")) return { rows: [{ ready: null }] };
       if (sql.includes("FROM hs_onboarding.child_sessions")) return { rows: [{ child_id: "child", parent_auth_id: "verified-parent" }] };
       if (sql.includes("FROM hs_onboarding.children")) return { rows: consent ? [{ id: "child", team_id: "school" }] : [] };
       if (sql.includes("SELECT p.league_id")) return { rows: [{ league_id: "HS", family_players: family }] };

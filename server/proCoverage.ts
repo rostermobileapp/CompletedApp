@@ -4,6 +4,7 @@ import { createProCoverageService, type ProAccount } from "./proCoverageService"
 import { currentMonth } from "./leaguePro";
 import { isVerifiedProductionRuntime } from "./runtimePolicy";
 import { resolvePersonalPro } from "./personalProCoverage";
+import { readManualProOverride } from "./manualProOverride";
 
 /** Read existing verified purchase records. Never mutate roles or purchases. */
 const stripeChecks = new Map<string, { signature: string; until: number; value: AccountPro }>();
@@ -12,6 +13,9 @@ async function personal(account: ProAccount): Promise<AccountPro> {
     return { personal: false, legacy: true, source: "operational" };
   }
   const { pool } = await import("./db");
+  if (await readManualProOverride(pool, account.id)) {
+    return { personal: false, legacy: true, source: "manual_override" };
+  }
   const result = await pool.query(
     `SELECT
        (SELECT json_build_object('expires',expires_at,'revoked',revoked_by_apple,'product',product_id)

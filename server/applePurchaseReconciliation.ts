@@ -206,7 +206,8 @@ export async function reconcileOne(
                 last_updated = NOW(), updated_at = NOW()
            WHERE id = $1 AND role IN ('free_tier', 'player_pro', 'commissioner')
              AND ($4 = TRUE OR NULLIF(stripe_subscription_id, '') IS NULL)
-             AND (iap_original_transaction_id IS NULL OR iap_original_transaction_id = $2 OR $5 = TRUE)`,
+             AND (iap_original_transaction_id IS NULL OR iap_original_transaction_id = $2 OR $5 = TRUE)
+           RETURNING role`,
         [link.user_id, link.original_transaction_id, effectiveRole,
           effectiveRole === 'commissioner' || matchedStripeBaseline, googleClaimForIapField],
       );
@@ -216,7 +217,8 @@ export async function reconcileOne(
           { status: 409 },
         );
       }
-      if (user.role !== effectiveRole) changedRole = effectiveRole;
+      const savedRole = result.rows[0]?.role ?? effectiveRole;
+      if (user.role !== savedRole) changedRole = savedRole;
     } else if (!appleRole && ownsAppleClaim &&
                !(legacyOperatorPro && user.role !== 'player_pro') &&
                ['player_pro', 'commissioner'].includes(user.role)) {
@@ -234,7 +236,8 @@ export async function reconcileOne(
                 last_updated = NOW(), updated_at = NOW()
              WHERE id = $1 AND role IN ('player_pro', 'commissioner')
                AND (NULLIF(stripe_subscription_id, '') IS NULL OR $4 = TRUE)
-               AND (iap_original_transaction_id IS NULL OR iap_original_transaction_id = $2 OR $5 = TRUE)`,
+               AND (iap_original_transaction_id IS NULL OR iap_original_transaction_id = $2 OR $5 = TRUE)
+           RETURNING role`,
         [link.user_id, link.original_transaction_id, effectiveRole,
           Boolean(current.role_before_apple ||
             (stripeBaseline && stripeBaselineSubscriptionId === user.stripe_subscription_id)),
@@ -246,7 +249,8 @@ export async function reconcileOne(
           { status: 409 },
         );
       }
-      if (user.role !== effectiveRole) changedRole = effectiveRole;
+      const savedRole = result.rows[0]?.role ?? effectiveRole;
+      if (user.role !== savedRole) changedRole = savedRole;
     }
     await client.query('COMMIT');
   } catch (error) {

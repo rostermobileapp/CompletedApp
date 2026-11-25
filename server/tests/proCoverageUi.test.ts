@@ -25,14 +25,14 @@ test("the real permission provider isolates account extras, team selection, tour
       spoof:p.canAccessPremiumFeatures({teamId:"adult",leagueId:"HS"}),
       tournament:p.canAccessPremiumFeatures({tournamentId:"CUP"}),role:p.role,unavailable:p.coverageUnavailable
     })}</pre>;}
-    export function render(userId,selectedType,selectedId,personal=false,coverageUserId=userId,allCovered=false,personalUnavailable=false){
+    export function render(userId,selectedType,selectedId,personal=false,coverageUserId=userId,allCovered=false,personalUnavailable=false,manual=false){
       state.auth={id:"real-auth"};state.selectedType=selectedType;state.selectedId=selectedId;
       const q=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0,queryFn:()=>{throw new Error("Unexpected request");}}}});
       q.setQueryData(["/api/user"],{id:userId,role:"free_tier"});
       q.setQueryData(["/api/user/league-memberships"],[]);
       q.setQueryData(["/api/user/tournament-participations"],[{tournamentId:"CUP"}]);
       q.setQueryData(["/api/user/pro-coverage",userId,null],{
-        userId:coverageUserId,account:{personal,legacy:false,source:personal?"apple":"none"},personalVerificationUnavailable:personalUnavailable,
+        userId:coverageUserId,account:{personal,legacy:manual,source:manual?"manual_override":personal?"apple":"none"},personalVerificationUnavailable:personalUnavailable,
         teams:[{id:"school",leagueId:"HS"},{id:"adult",leagueId:"ADULT"}],
         seats:[{leagueId:"HS",startMonth:"2026-11",endMonth:"2027-02"},...(allCovered?[{leagueId:"ADULT",startMonth:"2026-11",endMonth:"2027-02"}]:[])]
       });
@@ -69,12 +69,23 @@ test("the real permission provider isolates account extras, team selection, tour
   assert.doesNotMatch(render("copied-profile","league","HS",true).notice,/Your other teams are on the Free plan/);
   assert.doesNotMatch(render("copied-profile","league","HS",false,"copied-profile",true).notice,/Your other teams are on the Free plan/);
   assert.equal(stale.notice,"");
+  const manual=render("manual-profile","team","adult",false,"manual-profile",false,false,true);
+  assert.equal(manual.active,true);
+  assert.equal(manual.account,true);
+  assert.equal(manual.adult,true);
+  assert.equal(manual.hs,true);
+  assert.equal(manual.spoof,false);
+  // Coverage enables Pro, not administrative role escalation.
+  assert.equal(manual.role,"free_tier");
+  const wrongManual=render("new-profile","team","adult",false,"manual-profile",false,false,true);
+  assert.equal(wrongManual.active,false);
+  assert.equal(wrongManual.account,false);
   const outage=render("copied-profile","team","school",false,"copied-profile",false,true);
   assert.equal(outage.active,true);
   assert.equal(outage.account,false);
   assert.equal(outage.adult,false);
   assert.equal(outage.unavailable,true);
-  assert.match(outage.notice,/Personal Player Pro could not be verified/);
-  assert.match(outage.notice,/School covers your Player Pro on School teams/);
+  assert.match(outage.notice,/Player Pro coverage could not be verified/);
+  assert.match(outage.notice,/your account and subscription have not been changed/);
   assert.doesNotMatch(outage.notice,/Your other teams are on the Free plan/);
 });

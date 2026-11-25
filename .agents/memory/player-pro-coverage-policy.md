@@ -57,5 +57,19 @@ grants should generally be treated as invalid billing overrides.
 
 **How to apply:** Preserve working manual grants. Distinguish deliberate grants
 from subscription-derived roles without treating every paid role as permanent;
-normal paid subscriptions must still expire. This clarification does not
-authorize a production data change or deployment by itself.
+normal paid subscriptions must still expire. Production data changes and
+deployment still need their own scoped authorization.
+
+Explicit owner-controlled overrides, not edits to the shared role field, are
+the reliable manual-grant mechanism for accounts with billing history. Keep the
+non-complimentary billing tier separately so revoking the grant restores it.
+Do not automatically convert every existing paid role into a permanent grant.
+
+**Why:** The owner approved a separate trusted manual override after confirming
+that a displayed Player Pro role did not unlock features with expired purchase
+history. A role alone cannot distinguish an intentional grant from a stale
+subscription mirror.
+
+**How to apply:** Treat the override as an independent premium-access source
+and a Player Pro minimum during billing updates, never as purchase proof or
+administrative authority. Preserve prior working role-only legacy grants.
