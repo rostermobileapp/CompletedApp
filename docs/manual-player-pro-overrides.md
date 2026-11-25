@@ -88,6 +88,23 @@ the specifically owner-approved installation target.
   retains `public` after `pg_catalog`; the installer verifies that browser and
   provider roles cannot create objects there. The existing trigger was not changed.
 
-No Railway or Vercel release was performed. The updated backend must still be
-released before the live premium checks recognize explicit overrides. Signed-in
-production UI and real-device feature access have not been verified.
+At that checkpoint no Railway or Vercel release had been performed.
+
+## Approved Railway release — November 25, 2026
+
+The owner subsequently approved the backend release. Railway was already
+building the exact connected-branch revision, so no duplicate deployment,
+configuration change or Git push was triggered by the agent.
+
+- Revision: `9b1596ccdb2f5778bb58249c0fe458f14e71c631`.
+- Deployment: `601b7bdb-b218-4563-8f45-aec60c3369d2`.
+- Railway reported `SUCCESS` at `2026-11-25T15:54:20.456Z`.
+- The post-release backend root returned HTTP 200. An unauthenticated request
+  to `/api/user/pro-coverage` returned HTTP 401, preserving the session boundary.
+- Read-only production verification confirmed U00250 remained Player Pro with
+  an enabled explicit override, while U00061 remained Player Pro without one.
+
+The production storage, approved grant and matching backend are now installed.
+No Vercel changes were made. Signed-in production UI and real-device feature
+access have not been verified; deployment success and an unauthenticated check
+do not establish that end-to-end acceptance.
