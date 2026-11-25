@@ -12,9 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
-import { isDevParentClient } from "@/lib/parentVerificationSession";
 import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
-import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
+import { isAgeFirstSignupEnabled, signupAgeRestriction } from "@/lib/signupAgeRestriction";
 import { signUpWithEmailVerification } from "@/lib/signupEmailVerification";
 import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 import "./onboarding-auth-light.css";
@@ -37,7 +36,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if(isDevParentClient&&isSignUp&&adultConfirmed!==true){
+    if(isAgeFirstSignupEnabled&&isSignUp&&adultConfirmed!==true){
       setAdultConfirmed(null);setShowAge(true);return;
     }
     setLoading(true);
@@ -48,7 +47,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         await signUpWithEmailVerification({
           email: signupEmail,
           password,
-          ...(isDevParentClient ? { options: { data: { signup_age_answer: "adult" } } } : {}),
+          ...(isAgeFirstSignupEnabled ? { options: { data: { signup_age_answer: "adult" } } } : {}),
         });
 
         setShowAge(false);
@@ -66,7 +65,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
         });
-        if(isDevParentClient)signupAgeRestriction.allowAdult();
+        if(isAgeFirstSignupEnabled)signupAgeRestriction.allowAdult();
         onOpenChange(false);
       }
     } catch (error: any) {
@@ -97,7 +96,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
       }}/>
   );
 
-  if (isDevParentClient && open && showAge) return (
+  if (isAgeFirstSignupEnabled && open && showAge) return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent overlayClassName="onboarding-auth-backdrop" className="onboarding-light inset-0 h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto [&>button]:hidden"
         style={{inset:0,transform:"none",width:"100%",maxWidth:"none",height:"100dvh"}} disableAnimation>
@@ -117,8 +116,8 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent overlayClassName="onboarding-auth-backdrop" className="onboarding-light sm:max-w-md top-4 translate-y-0" disableAnimation={isDevParentClient}
-        style={isDevParentClient?{maxHeight:"calc(100dvh - 2rem)",overflowY:"auto"}:undefined} data-testid="modal-auth">
+      <DialogContent overlayClassName="onboarding-auth-backdrop" className="onboarding-light sm:max-w-md top-4 translate-y-0" disableAnimation={isAgeFirstSignupEnabled}
+        style={isAgeFirstSignupEnabled?{maxHeight:"calc(100dvh - 2rem)",overflowY:"auto"}:undefined} data-testid="modal-auth">
         <DialogHeader>
           <DialogTitle data-testid="text-auth-title">
             {isSignUp ? 'Create Account' : 'Sign In'}
@@ -187,7 +186,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
             <button
               type="button"
               onClick={() => {
-                if(!isSignUp&&isDevParentClient){setAdultConfirmed(null);setShowAge(true);}
+                if(!isSignUp&&isAgeFirstSignupEnabled){setEmail("");setPassword("");setAdultConfirmed(null);setShowAge(true);}
                 setIsSignUp(!isSignUp);
               }}
               className="text-primary hover:underline"

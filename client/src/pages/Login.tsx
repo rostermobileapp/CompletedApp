@@ -12,9 +12,8 @@ import { EmailVerificationModal } from '@/components/EmailVerificationModal';
 import { loginDestination } from '@/lib/appRouteEntry';
 import { isTransientAuthError, retryTransientSignIn } from '@/lib/authSessionController';
 import { signupAttributionMetadata, bindSignupAttributionUser } from '@/lib/signupAttributionBrowser';
-import { isDevParentClient } from "@/lib/parentVerificationSession";
 import { AgeConfirmationScreen } from "@/components/high-school-onboarding/AgeConfirmationScreen";
-import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
+import { isAgeFirstSignupEnabled, signupAgeRestriction } from "@/lib/signupAgeRestriction";
 import { signUpWithEmailVerification } from "@/lib/signupEmailVerification";
 
 const rosterLogo = '/roster-logo-transparent.png';
@@ -29,8 +28,8 @@ export function SignupFlowPreview({onComplete}:{onComplete:(adult:boolean)=>void
 }
 
 function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}={}) {
-  const [showForm, setShowForm] = useState(!!onPreviewSignup || (isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1"));
-  const [isSignUp, setIsSignUp] = useState(!!onPreviewSignup || (isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1"));
+  const [showForm, setShowForm] = useState(!!onPreviewSignup || (isAgeFirstSignupEnabled && new URLSearchParams(window.location.search).get("signup")==="1"));
+  const [isSignUp, setIsSignUp] = useState(!!onPreviewSignup || (isAgeFirstSignupEnabled && new URLSearchParams(window.location.search).get("signup")==="1"));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,7 +37,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
   const [showVerification, setShowVerification] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
   const [emailTaken, setEmailTaken] = useState(false);
-  const [showAge, setShowAge] = useState(!!onPreviewSignup || (isDevParentClient && new URLSearchParams(window.location.search).get("signup")==="1"));
+  const [showAge, setShowAge] = useState(!!onPreviewSignup || (isAgeFirstSignupEnabled && new URLSearchParams(window.location.search).get("signup")==="1"));
   const [ageAnswer, setAgeAnswer] = useState<boolean | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -54,7 +53,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
       toast({title:"Preview only",description:"Sign-in is not connected in this demo. Switch to Sign up to review the new screens."});
       return;
     }
-    if (isDevParentClient && isSignUp && ageAnswer !== true) {
+    if (isAgeFirstSignupEnabled && isSignUp && ageAnswer !== true) {
       setAgeAnswer(null);
       setShowAge(true);
       return;
@@ -72,7 +71,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
           password,
           options: {
             emailRedirectTo: undefined,
-            data: { ...attribution, ...(isDevParentClient ? { signup_age_answer: "adult" } : {}) },
+            data: { ...attribution, ...(isAgeFirstSignupEnabled ? { signup_age_answer: "adult" } : {}) },
           }
         });
         
@@ -94,7 +93,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
         
         if (error) throw error;
         
-        if (isDevParentClient) signupAgeRestriction.allowAdult();
+        if (isAgeFirstSignupEnabled) signupAgeRestriction.allowAdult();
         toast({
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
@@ -150,7 +149,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
     }
   };
 
-  if (isDevParentClient && showAge) return <AgeConfirmationScreen
+  if (isAgeFirstSignupEnabled && showAge) return <AgeConfirmationScreen
     value={ageAnswer} onChange={setAgeAnswer} busy={loading}
     onBack={() => { if (!loading) { setShowAge(false); setAgeAnswer(null); setShowForm(false); setIsSignUp(false); } }}
     onContinue={() => {
@@ -256,7 +255,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
                   />
                 </div>
 
-                {isDevParentClient && isSignUp && (
+                {isAgeFirstSignupEnabled && isSignUp && (
                   <div className="mb-4 text-center">
                     <h1 className="text-2xl font-bold leading-tight text-slate-900">Create your account</h1>
                     <p id="signup-purpose" className="mt-2 text-sm leading-relaxed text-slate-500">
@@ -266,7 +265,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
                 )}
 
                 <form onSubmit={handleSubmit} className="onboarding-light space-y-2"
-                  aria-describedby={isDevParentClient && isSignUp ? "signup-purpose" : undefined}>
+                  aria-describedby={isAgeFirstSignupEnabled && isSignUp ? "signup-purpose" : undefined}>
                   <div className="space-y-0.5">
                     <Label htmlFor="email" className="text-black text-sm">Email</Label>
                     <Input
@@ -345,7 +344,7 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
                     <button
                       type="button"
                       onClick={() => {
-                        if(!isSignUp&&isDevParentClient){setAgeAnswer(null);setShowAge(true);}
+                        if(!isSignUp&&isAgeFirstSignupEnabled){setEmail("");setPassword("");setAgeAnswer(null);setShowAge(true);}
                         setIsSignUp(!isSignUp);
                       }}
                       className="text-xs min-h-[36px] px-2 text-black"
@@ -359,10 +358,10 @@ function LoginScreen({onPreviewSignup}:{onPreviewSignup?:(adult:boolean)=>void}=
                       </span>
                     </button>
                   </div>
-                  {isDevParentClient && isSignUp && (
+                  {isAgeFirstSignupEnabled && isSignUp && (
                     <button
                       type="button"
-                      onClick={() => { setEmail(""); setPassword(""); if(onPreviewSignup)onPreviewSignup(false);else setLocation("/under-18"); }}
+                      onClick={() => { setEmail(""); setPassword(""); if(onPreviewSignup)onPreviewSignup(false);else { signupAgeRestriction.requireParent(); setLocation("/under-18"); } }}
                       className="block w-full min-h-11 px-2 text-center text-sm text-[#2563EB] underline-offset-4 hover:underline"
                     >
                       Under 18? A parent sets up your account.

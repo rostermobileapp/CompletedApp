@@ -111,7 +111,7 @@ import { isDevParentClient, parentVerificationSession } from "@/lib/parentVerifi
 import HighSchoolYouthOnboarding from "@/pages/HighSchoolYouthOnboarding";
 import HighSchoolYouthOnboardingPreview from "@/pages/HighSchoolYouthOnboardingPreview";
 import Under18Onboarding from "@/pages/Under18Onboarding";
-import { signupAgeRestriction } from "@/lib/signupAgeRestriction";
+import { isAgeFirstSignupEnabled, signupAgeRestriction } from "@/lib/signupAgeRestriction";
 import ParentVerification from "@/pages/ParentVerification";
 import { TeamSkinBoundary } from "@/components/high-school-skins/TeamSkinBoundary";
 import { familyAgeEligibility } from "@shared/familyEligibility";
@@ -151,8 +151,9 @@ export function Router() {
   const ageRestricted=useSyncExternalStore(signupAgeRestriction.subscribe,signupAgeRestriction.snapshot,()=>false);
   const isPreviewHome=isDevParentClient&&location==="/"&&!isAuthenticated&&!ageRestricted;
   const isOnboardingPreview=isPreviewHome||(isDevParentClient&&location==="/high-school/onboarding-preview");
-  const isStandaloneChildEntry=isDevParentClient&&["/under-18","/under-18/code"].includes(location);
-  const ageAllowsOnboarding=!isDevParentClient||!ageRestricted;
+  const isStandaloneChildEntry=isAgeFirstSignupEnabled&&["/under-18","/under-18/code"].includes(location);
+  // A returning, authenticated adult is never locked out by a pre-signup answer.
+  const ageAllowsOnboarding=!isAgeFirstSignupEnabled||!ageRestricted||(import.meta.env.PROD&&isAuthenticated);
   useEffect(() => applyCanonicalUrl(location, isAuthenticated && location === '/'), [location, isAuthenticated]);
 
   const isDesktopWeb = useIsDesktopWeb();
@@ -255,7 +256,7 @@ export function Router() {
   // Always render standalone pages regardless of auth state
   if(isOnboardingPreview)return <HighSchoolYouthOnboardingPreview startAtSignup={isPreviewHome}/>;
   if(isStandaloneChildEntry)return <Under18Onboarding/>;
-  if(!ageAllowsOnboarding&&location!=="/login")return <Under18Onboarding/>;
+  if(!ageAllowsOnboarding&&!["/login","/forgot-password","/reset-password"].includes(location))return <Under18Onboarding/>;
   if(isDevParentClient&&location==="/high-school/onboarding"){
     if(authLoading||(isAuthenticated&&parentStatus.isLoading))return <LoadingScreen/>;
     if(isAuthenticated&&(parentStatus.isError||(parentStatus.data?.enrolled&&!parentStatus.data.verified))){

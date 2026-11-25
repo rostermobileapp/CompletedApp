@@ -6,7 +6,7 @@ const output = path.resolve("dist/public");
 const template = await fs.readFile(path.join(output, "index.html"), "utf8");
 // Metadata only. Never renders a marketing page or initializes services at build time.
 await fs.writeFile(path.join(output, "index.html"), appDocumentHtml(template, "/"));
-const publicEntries = ["/login", "/app", "/get-started", "/forgot-password", "/reset-password",
+const publicEntries = ["/login", "/app", "/get-started", "/forgot-password", "/reset-password", "/under-18", "/under-18/code",
   "/privacy", "/privacy-policy", "/terms", "/terms-of-service", "/hpib",
   "/referral-program/apply", "/referral-program/verify", "/referral-program/portal",
   "/referral-program/portal/login", "/referral-program/portal/auth",

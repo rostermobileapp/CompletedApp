@@ -6,19 +6,22 @@ import { chromium } from "playwright-core";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const output=path.resolve("generated-artifacts/signup-age-screen");
+const production=process.argv.includes("--production");
+const output=path.resolve(`generated-artifacts/signup-age-screen${production?"-production":""}`);
 const checks:string[]=[];
 const errors:string[]=[];
 const bundle=await build({
   bundle:true,write:false,platform:"browser",format:"iife",jsx:"automatic",
   loader:{".css":"empty",".png":"dataurl"},alias:{"@assets":path.resolve("attached_assets")},
-  define:{"process.env.NODE_ENV":'"development"',"import.meta.env.DEV":"true","import.meta.env.VITE_ISOLATED_DEVELOPMENT":'"true"'},
+  define:{"process.env.NODE_ENV":JSON.stringify(production?"production":"development"),
+    "import.meta.env.DEV":String(!production),"import.meta.env.PROD":String(production),
+    "import.meta.env.VITE_ISOLATED_DEVELOPMENT":JSON.stringify(production?"false":"true")},
   stdin:{resolveDir:process.cwd(),loader:"tsx",contents:`
     import React,{useState}from'react';import{createRoot}from'react-dom/client';import{useLocation}from'wouter';
     import Login from'./client/src/pages/Login';import{AuthModal}from'./client/src/components/AuthModal';
     import Under18 from'./client/src/pages/Under18Onboarding';
     function Harness(){const[location]=useLocation();const[open,setOpen]=useState(true);
-      if(location==='/under-18')return <Under18/>;
+      if(location==='/under-18'||location==='/under-18/code')return <Under18/>;
       if(location==='/')return <h1>Existing post-signup flow</h1>;
       if(location==='/modal')return <AuthModal open={open} onOpenChange={setOpen}/>;
       return <Login/>;}
@@ -68,6 +71,7 @@ try{
     if(form==="modal")await page.getByTestId("button-toggle-mode").click();
     assert.equal(await page.getByText("I am 18 or older",{exact:true}).count(),0);
     await page.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
+    if(production&&form==="login")await page.screenshot({path:output+"-age.png",fullPage:true});
     assert.equal(await page.getByTestId("input-email").count(),0);
     assert.equal(await page.getByTestId("input-password").count(),0);
     assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);
@@ -83,6 +87,11 @@ try{
     await page.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
     assert.equal(await page.getByTestId("input-email").count(),0);
     await page.getByRole("button",{name:"Yes, I'm 18 or older",exact:true}).click();
+    await page.waitForFunction(()=>{
+      const option=document.querySelector(".is-selected");
+      return option&&getComputedStyle(option).borderTopColor==="rgb(37, 99, 235)"
+        &&getComputedStyle(option).backgroundColor==="rgb(239, 246, 255)";
+    });
     const geometry=await page.evaluate(()=>{
       const option=document.querySelector(".is-selected") as HTMLElement;
       const title=document.querySelector("#age-confirmation-title") as HTMLElement;
@@ -102,6 +111,16 @@ try{
     await page.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>(window as any).__calls.length),0);
     assert.equal(await page.evaluate(()=>sessionStorage.getItem("fixture-account")),null);
+    if(production){
+      assert.equal(await page.getByRole("button",{name:"I have a code from my parent"}).count(),0);
+      await page.reload();
+      await page.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
+      await page.goto(origin+"/under-18/code?challengeId=synthetic");
+      await page.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
+      assert.equal(await page.locator("input").count(),0);
+      assert.equal(await page.evaluate(()=>(window as any).__calls.length),0);
+      checks.push(form+"_production_direct_code_route_has_no_pairing_or_account_creation");
+    }
     checks.push(form+"_age_precedes_credentials_and_no_never_requests_them");
     await page.goto(origin+(form==="login"?"/login?signup=1":"/modal"));
     if(form==="modal")await page.getByTestId("button-toggle-mode").click();
@@ -147,7 +166,7 @@ try{
 }finally{
   await browser.close();await new Promise<void>(r=>server.close(()=>r()));
   await mkdir(output,{recursive:true});
-  const report={scope:"Actual Login/AuthModal with synthetic provider; not live/native acceptance",checks,browserErrors:errors,realRegistrations:0};
+  const report={scope:`Actual Login/AuthModal with ${production?"production":"development"} flags and synthetic provider; not live/native acceptance`,checks,browserErrors:errors,realRegistrations:0};
   await writeFile(path.join(output,"result.json"),JSON.stringify(report,null,2));
   console.log(JSON.stringify(report,null,2));
 }

@@ -1,4 +1,8 @@
 /** Only a navigation restriction, never authentication or proof of age. No credentials are stored. */
+// Release signup's age-first entry independently of guarded school onboarding.
+export const isAgeFirstSignupEnabled = import.meta.env?.PROD === true
+  || (import.meta.env?.DEV === true && import.meta.env?.VITE_ISOLATED_DEVELOPMENT === "true");
+
 export function createSignupAgeRestriction(storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">) {
   const key = "roster-dev-signup-parent-required";
   let restricted = false;

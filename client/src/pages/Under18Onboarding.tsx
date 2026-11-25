@@ -16,6 +16,7 @@ const realRequest:RequestFn=async(method,path,body)=>{
   return response.json();
 };
 const API="/api/high-school/child-device";
+const production=import.meta.env?.PROD===true;
 const cleanCode=(value:string)=>value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g,"").slice(0,6);
 
 export default function Under18Onboarding({ request=realRequest,initialView,challengeId:challengeIdProp }: {request?:RequestFn;initialView?:"share"|"code";challengeId?:string}) {
@@ -32,7 +33,7 @@ export default function Under18Onboarding({ request=realRequest,initialView,chal
   },[request,session?.token]);
   const challengeId=challengeIdProp??(typeof window!=="undefined"?new URLSearchParams(window.location.search).get("challengeId")??"":"");
   useEffect(()=>{
-    if(view!=="waiting"||!waiting)return;
+    if(production||view!=="waiting"||!waiting)return;
     let cancelled=false;
     const poll=async()=>{
       try{
@@ -66,7 +67,11 @@ export default function Under18Onboarding({ request=realRequest,initialView,chal
     finally{setBusy(false);}
   };
 
-  if(view==="share")return <Under18ShareScreen onCode={()=>setView("entry")} onBack={()=>window.location.assign("/login?signup=1")}/>;
+  // Production offers parent guidance only, even on direct /code links.
+  // Never promote the DEV pairing/session flow with the age-first signup.
+  if(production||view==="share")return <Under18ShareScreen
+    onCode={production?undefined:()=>setView("entry")}
+    onBack={()=>window.location.assign("/login?signup=1")}/>;
   if(view==="approved"&&session)return <ChildProfileScreen data={session.data} request={childRequest}/>;
   return <ScreenFrame action={view==="entry"?<button className="hsy-primary" disabled={code.length!==6||busy||!challengeId} onClick={()=>void start()}>{busy?"Checking…":"Continue"}</button>:view==="waiting"?<button className="hsy-secondary" style={{width:"100%"}} onClick={()=>{setView("entry");setWaiting(null);setCode("");}}>Cancel</button>:<button className="hsy-primary" onClick={()=>{setView("entry");setWaiting(null);setCode("");setError("");}}>Try another code</button>}>
     <section className="hsy-content" style={{paddingTop:36}}>

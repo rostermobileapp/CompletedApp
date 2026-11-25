@@ -11,7 +11,8 @@ import { chromium, type Page } from "playwright-core";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const output = path.resolve("generated-artifacts/high-school-onboarding-router");
+const production=process.argv.includes("--production-age");
+const output = path.resolve(`generated-artifacts/high-school-onboarding-router${production?"-production-age":""}`);
 const appPath = path.resolve("client/src/App.tsx");
 const source = await readFile(appPath, "utf8");
 assert.ok(!source.includes('legacy-onboarding-preview'),"The retired preview route must not be restored.");
@@ -43,8 +44,9 @@ export async function clearStaleSession(){window.__setFixtureSession(null);}
 `;
 const bundle = await build({
   bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", loader: { ".png": "dataurl", ".css": "empty" },
-  define: { "process.env.NODE_ENV": '"development"', "import.meta.env.DEV": "true",
-    "import.meta.env.VITE_ISOLATED_DEVELOPMENT": '"true"', "import.meta.env.VITE_API_BASE_URL": '""' },
+  define: { "process.env.NODE_ENV": JSON.stringify(production?"production":"development"),
+    "import.meta.env.DEV": String(!production), "import.meta.env.PROD": String(production),
+    "import.meta.env.VITE_ISOLATED_DEVELOPMENT": JSON.stringify(!production?"true":"false"), "import.meta.env.VITE_API_BASE_URL": '""' },
   stdin: { resolveDir: process.cwd(), loader: "tsx", contents: `
     import React from 'react';import{createRoot}from'react-dom/client';
     import{QueryClientProvider}from'@tanstack/react-query';
@@ -208,6 +210,32 @@ async function verifyParent(page: Page) {
   assert.equal(await page.getByLabel("First name", { exact: true }).inputValue(), "RouterFixtureChild");
 }
 try {
+  if(production){
+    for(const visit of ["/under-18","/under-18/code?challengeId=fixture","/roster"]){
+      await runCase("production-parent-"+visit,{guest:true,ageRestricted:true},visit,async(p,f)=>{
+        await p.getByRole("heading",{name:"Players under 18 join through a parent",exact:true}).waitFor();
+        assert.equal(await p.locator("input").count(),0);
+        assert.equal(await p.getByRole("button",{name:"I have a code from my parent"}).count(),0);
+        assert.equal(f.calls.length,0);
+      });
+    }
+    mark("production_under18_and_direct_code_links_offer_parent_guidance_without_any_api_or_auth_calls");
+    for(const [visit,pageName] of [["/forgot-password","ForgotPassword"],["/reset-password","ResetPassword"],["/login","Login"]]){
+      await runCase("production-recovery-"+pageName,{guest:true,ageRestricted:true},visit,async(p,f)=>{
+        await p.locator(`[data-router-page="${pageName}"]`).waitFor();
+        assert.equal(f.calls.length,0);
+      });
+    }
+    mark("production_age_answer_preserves_existing_signin_and_password_recovery");
+    for(const completed of [false,true]){
+      await runCase("production-adult-"+completed,{completed,active:false,ageRestricted:true},"/roster",async(p,f)=>{
+        await p.locator(`[data-router-page="${completed?"Roster":"Onboarding"}"]`).waitFor();
+        assert.ok(f.calls.some(c=>c.path==="/user"));
+        assert.ok(!f.calls.some(c=>c.path.startsWith("/high-school/")));
+      });
+    }
+    mark("production_authenticated_adults_keep_existing_profile_and_roster_without_school_onboarding_queries");
+  }else{
   await runCase("preview-home",{guest:true},"/",async(p,f)=>{
     await p.getByRole("heading",{name:"Are you 18 or older?",exact:true}).waitFor();
     assert.equal(await p.getByTestId("input-email").count(),0);
@@ -350,6 +378,7 @@ try {
     assert.equal(await p.getByLabel("First name", { exact: true }).count(), 0); noLegacyRequests(f);
   });
   mark("same_account_new_session_and_signout_remove_parent_authority_in_router");
+  }
   assert.equal(report.externalRequests, 0); report.outcome = "passed";
 } catch (e: any) {
   report.outcome = "failed";

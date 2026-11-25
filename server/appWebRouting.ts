@@ -37,6 +37,7 @@ export function serveAppWebRouting(app: Express, publicDir?: string) {
 // Explicit APP document routes, not a catch-all for arbitrary/API/static paths.
 const clientRoutes = [
   /^\/$/,
+  /^\/under-18(?:\/code)?$/,
   /^\/(?:app|login|get-started|reset-password|forgot-password|hpib|demo|privacy|privacy-policy|terms|terms-of-service)$/,
   /^\/(?:league-tournament-search|league-search|team-search|tournament-search|tournaments|tournaments\/create|facilities|facility-memberships|create-league|create-team|create-scrimmage|scrimmage-management|invite-groups|league-management|league-list|calendar|announcements|substitute-confirmations|stats|stats-management|scorekeeper|create-payment-request|calendar-events\/create|roster|subscription|subscriptions|settings\/billing|trophy-case|trophy-case\/earned-patches|admin\/badges|admin\/referrals|admin\/stripe|admin\/metrics|admin\/organizer-card-payments)$/,
   /^\/invite-groups\/(?:new|[^/]+)$/,
