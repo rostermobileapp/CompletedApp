@@ -217,3 +217,47 @@ application code; it did not publish a Railway or Vercel release. The updated
 backend and frontend must both be released before claiming child login is live.
 Signed-in live UI, real-inbox approval and two-physical-device/native acceptance
 were not verified by the offline checks.
+
+## Railway release preparation — November 25, 2026
+
+A fresh, read-only Railway inspection supersedes the earlier unconfirmed-release
+status for the backend only:
+
+- Project `Roster`, production service `CompletedApp`, follows
+  `rostermobileapp/CompletedApp`, branch `10_1_2026`.
+- Railway reports successful deployment
+  `9fa83e74-370c-4819-985e-58ee115a853e`, from commit
+  `c89271d63b069b6d1a173e043fc9195d3aad78a9`. This contains the earlier
+  restricted onboarding implementation, not the new individual-device controls.
+- The individual-device controls are merged locally at
+  `1dc46d79e2dd80e63158f4826ddafb04b3f2b9dd`. A fresh GitHub branch lookup
+  still returned `c89271d63b069b6d1a173e043fc9195d3aad78a9`.
+- No Railway changes are staged. The existing Railpack configuration, repository,
+  branch, region, domains and production variables were left unchanged.
+- Required variable names are present, including `NODE_ENV`,
+  `FAMILY_SETUP_ENABLED`, database/Supabase configuration and Resend
+  configuration. Railway's connection returns names only, so values and
+  real-inbox delivery were **not** verified. Before release, confirm
+  `NODE_ENV=production` and `FAMILY_SETUP_ENABLED=1` through the owner's
+  Railway settings. Neither preview-isolation variable was listed.
+- A read-only unauthenticated request to the actual Railway
+  `/api/high-school/family/state` endpoint returned HTTP 401
+  `INVALID_SESSION`. This proves route presence and that this request was
+  denied, not signed-in availability or complete security acceptance.
+
+Release-candidate verification passed 57 focused checks (production pairing,
+youth onboarding, parent mail adapter, staff/team-skin regression and the device
+controls browser fixture), followed by five real disposable-local-PostgreSQL
+device-isolation checks. The latter initially could not connect because its
+local test server was stopped; after starting that isolated server, all five
+passed and the server was stopped. The production backend esbuild bundle and
+Node syntax check passed into ignored verification output. No hosted database
+was used by these tests, and no real email was sent.
+
+**Next release action:** After explicit publishing approval, sync the merged
+code to the connected GitHub branch and observe Railway's new deployment.
+Pushing may deploy automatically; redeploying the existing build alone does
+not include the local changes. Release the compatible Vercel frontend as well,
+then verify real-inbox approval, two-device pairing and selective revocation.
+This preparation performed no push, Railway configuration write, deployment,
+account change or database migration. Signed-in/native acceptance remains open.
