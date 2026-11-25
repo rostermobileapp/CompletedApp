@@ -5,14 +5,17 @@ description: Owner-supplied High School product constraints and phase-by-phase a
 
 ## Child profiles before team connection
 
-The owner now requires birth year alongside graduation year and wants a child
-profile/device set up before joining a team. Collect the year only, not a full
+The owner requires birth year, makes graduation year optional, and wants a child
+profile/device set up before joining a team. The child's phone needs only the
+setup code, never a separate setup link. Collect the year only, not a full
 date of birth. A later invitation through the parent's account must populate the
 same child's existing phone session, not create a second child or require pairing
 again.
 
 **Why:** During restricted production testing, the owner explicitly identified
 team-first activation as the wrong product flow and requested independent setup.
+The owner subsequently confirmed a missing birth year had blocked consent and
+explicitly requested optional graduation and code-only phone setup.
 This supersedes the earlier requirement that approved team membership and
 coverage precede all child pairing, not the restricted rollout or child-safety
 requirements.
@@ -21,6 +24,8 @@ requirements.
 approval for baseline profile access. Continue to require canonical approved
 membership and payer-scoped coverage for team schedules/chats, and revalidate
 them on reads. Preserve stable household identity through invitation claims.
+When graduation is unspecified, match only exact, unique household names; reject
+ambiguous matches in either direction rather than combining children.
 Keep the selected-account rollout and two-player limit, and obtain specific
 approval before applying additional production schema changes.
 
@@ -51,12 +56,24 @@ production test, not in a public rollout for every Family account.
 test scope. It does not remove parent verification, consent, canonical team
 approval, coverage or child-only authority requirements.
 
-**How to apply:** Pair with a nonsecret challenge link and a separately entered
-setup code, followed by verified-parent approval. Keep child capabilities
+**How to apply:** Pair with the setup code alone, followed by verified-parent
+approval; a separate setup link is no longer required. Keep child capabilities
 separate from shared provider credentials and discard parent authority when
 entering child mode. A shared password or UI flag never authorizes activation.
 Verify production storage, released backend/frontend and real-device behavior
 separately; implementation or local tests alone do not establish live readiness.
+
+## Parent verification usability
+
+Avoid requiring another emailed parent verification code on every ordinary
+return to child setup.
+
+**Why:** The owner explicitly objected to repeated parent-screen timeouts and
+having to enter a new verification code every time.
+
+**How to apply:** Improve continuity on a verified parent device without granting
+parent authority from the household's shared login. Obtain approval for the
+specific remembered-device duration and security changes before implementation.
 
 ## Authorized live family rollout (November 24, 2026)
 
@@ -109,7 +126,7 @@ requirement. Its claimed adult profile ordering differs from current routing.
 **How to apply:** Resolve the ordering conflict before changing adult routing.
 Rebuild with existing components, not pasted reference HTML. Child-device setup
 codes use six alphanumeric characters excluding 0/O and 1/I, ten-minute expiry,
-one use, five wrong attempts, and approval on an approved parent phone before
+one use, failed-attempt limits, and approval on an approved parent phone before
 any child access. Keep these separate from parent email-verification codes.
 Child sessions remain restricted to their own profile, schedule and authorized
 Team/Family chats; no parent access, payments or coach messaging. HS League Plan
@@ -123,10 +140,13 @@ five-wrong-attempts-per-code guarantee.
 identifies the challenge only through the secret being guessed. A separate
 challenge reference changes that protocol and needs owner approval.
 
-**How to apply:** Keep activation blocked until the pairing protocol and
-shared-credential/provider boundary have explicit acceptance. Distinguish
-synthetic UI/service checks from native or real-provider evidence, and never
-put the secret setup code in a URL.
+**How to apply:** The owner explicitly chose code-only entry on November 25,
+2026. Retain the five-failure server-derived source throttle and failure caps on
+located challenges, but do not claim that unknown-code guesses count against a
+particular child's code. Code redemption only requests verified-parent approval;
+it never grants a child session directly. Preserve the shared-credential/provider
+boundary. Distinguish synthetic UI/service checks from native or real-provider
+evidence, and never put the secret setup code in a URL.
 
 High School behavior is opt-in by `teams.program_type = 'high_school'`; existing
 adult/beer-league teams must retain their behavior, including for adults who

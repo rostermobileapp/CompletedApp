@@ -26,7 +26,6 @@ export function FamilyDevices({actorId}:{actorId:string}) {
     catch{setError("Device setup could not be completed. Check parent verification, team approval and Player Pro coverage, then retry.");}
     finally{setBusy(false);}
   };
-  const link=code?`${window.location.origin}/under-18/code?challengeId=${encodeURIComponent(code.challengeId)}`:"";
   return <section className="family-panel" style={{marginTop:18}} aria-label="Child device setup">
     <h2>Child device setup</h2>
     <p className="hsy-note">Save your child’s details and guardian consent, then approve their phone. You can connect a team later; team information requires approved membership and coverage.</p>
@@ -61,9 +60,8 @@ export function FamilyDevices({actorId}:{actorId:string}) {
     </div>)}
     {code&&<div className="hsy-card tint" style={{marginTop:14}}>
       <strong>Setup code</strong><p style={{fontSize:28,letterSpacing:5,fontWeight:750}} aria-label={`Child setup code: ${code.code}`}>{code.code}</p>
-      <p className="hsy-note">Expires <time dateTime={code.expiresAt}>{new Date(code.expiresAt).toLocaleTimeString()}</time>. Share the setup link, then give your child this code separately. You will still approve their phone here.</p>
-      <label className="hsy-label">Secure setup link<input className="hsy-field" readOnly value={link} onFocus={event=>event.currentTarget.select()}/></label>
-      <button className="hsy-secondary" style={{width:"100%",marginTop:10}} onClick={()=>void act(async()=>{await navigator.clipboard.writeText(link);setNotice("Setup link copied. The code is not included in the link.");})}>Copy setup link</button>
+      <p className="hsy-note">Expires <time dateTime={code.expiresAt}>{new Date(code.expiresAt).toLocaleTimeString()}</time>. On the child’s phone, open RosterHockey, choose “I have a code from my parent” and enter this code. No setup link is needed. You will still approve their phone here.</p>
+      <button className="hsy-secondary" style={{width:"100%",marginTop:10}} onClick={()=>void act(async()=>{await navigator.clipboard.writeText(code.code);setNotice("Setup code copied. You must still approve the child’s phone.");})}>Copy setup code</button>
     </div>}
     {requests.data?.requests.map(request=><div className="hsy-card tint" key={request.id} style={{marginTop:14}}>
       <strong>Approve {request.firstName}'s phone?</strong><p className="hsy-note">{request.deviceLabel}</p>

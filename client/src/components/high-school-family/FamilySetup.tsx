@@ -8,6 +8,7 @@ import { parentVerificationSession } from "@/lib/parentVerificationSession";
 import { teamRequestSignal } from "@/lib/teamRequestScope";
 import { ApiError } from "@/lib/queryClient";
 import { FAMILY_API, familyRequest, type FamilyRequestFn } from "@/lib/familySetupApi";
+import { familyConsentProblems } from "@/lib/familyConsentValidation";
 import "@/components/high-school-onboarding/onboarding.css";
 import "./family-setup.css";
 
@@ -74,7 +75,6 @@ function freshPlayer(): FamilyPlayer {
     id: crypto.randomUUID(),
     firstName: "",
     lastName: "",
-    gradYear: new Date().getFullYear() + 4,
     position: "F",
     jerseyNumber: "",
     consent: false,
@@ -138,6 +138,7 @@ export function FamilySetup({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [consentSubmitState, setConsentSubmitState] = useState<"idle" | "invalid" | "saved" | "failed">("idle");
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [authorityFailure, setAuthorityFailure] = useState<AuthorityFailure>("");
@@ -308,16 +309,13 @@ export function FamilySetup({
   }, [state?.players, state?.requests, submittedKeys]);
   const localNewCount = draftPlayers.filter(player => !state?.players.some(saved => saved.id === player.id)).length;
   const totalChildren = knownChildren + localNewCount;
-  const detailsValid = draftPlayers.length > 0 && draftPlayers.every(player =>
-    player.firstName.trim().length > 0 && player.lastName.trim().length > 0
-      && Number.isInteger(player.birthYear) && player.birthYear! >= 1900 && player.birthYear! <= new Date().getFullYear(),
-  );
-  const canSaveConsent = detailsValid && draftPlayers.every(player => player.consent) && guardian;
+  const consentProblems = familyConsentProblems(draftPlayers, guardian);
   const hasSavedConsent = savedDraftPlayers.length > 0
     && state?.guardianConfirmed === true
     && savedDraftPlayers.every(player => player.consent);
 
   const changePlayer = (id: string, patch: Partial<FamilyPlayer>) => {
+    setConsentSubmitState("idle");
     setPlayers(current => current.map(player => player.id === id
       ? { ...player, ...patch, ...(Object.keys(patch).some(key => key !== "consent") ? { consent: false } : {}) }
       : player));
@@ -338,17 +336,27 @@ export function FamilySetup({
     "Draft saved. Guardian confirmation and child consent must be completed again before joining.",
   );
 
-  const saveConsent = () => runMutation(
-    "consent",
-    "consent",
-    {
-      revision: state?.revision,
-      players: draftPlayers.map(player => ({ ...player, consent: true })),
-      guardianConfirmed: true,
-    },
-    "Child privacy choices saved. Team access still depends on team approval.",
-    ["family-device-children"],
-  );
+  const saveConsent = async () => {
+    if (busyRef.current) return;
+    setConsentSubmitState("idle");
+    if (consentProblems.length) {
+      setNotice("");
+      setConsentSubmitState("invalid");
+      return;
+    }
+    const saved = await runMutation(
+      "consent",
+      "consent",
+      {
+        revision: state?.revision,
+        players: draftPlayers,
+        guardianConfirmed: guardian,
+      },
+      "Child privacy choices saved. Team access still depends on team approval.",
+      ["family-device-children"],
+    );
+    setConsentSubmitState(saved ? "saved" : "failed");
+  };
 
   const discardDraft = async () => {
     if (!state || !savedDraftPlayers.length || busyRef.current) return;
@@ -591,14 +599,15 @@ export function FamilySetup({
             </label>
           </div>
           <div className="family-grid-two hsy-grid2" style={{ marginTop: 12 }}>
-            <label className="family-field-label">Birth year
+            <label className="family-field-label">Birth year (required)
               <select className="hsy-field" aria-label="Birth year" value={player.birthYear ?? ""} disabled={busy !== ""} onChange={event => changePlayer(player.id, { birthYear: event.target.value ? Number(event.target.value) : undefined })}>
                 <option value="">Choose birth year</option>
                 {Array.from({ length: 101 }, (_, index) => new Date().getFullYear() - index).map(year => <option key={year} value={year}>{year}</option>)}
               </select>
             </label>
-            <label className="family-field-label">Graduation year
-              <select className="hsy-field" value={player.gradYear} disabled={busy !== ""} onChange={event => changePlayer(player.id, { gradYear: Number(event.target.value) })}>
+            <label className="family-field-label">Graduation year (optional)
+              <select className="hsy-field" aria-label="Graduation year" value={player.gradYear ?? ""} disabled={busy !== ""} onChange={event => changePlayer(player.id, { gradYear: event.target.value ? Number(event.target.value) : undefined })}>
+                <option value="">Not specified</option>
                 {Array.from({ length: 15 }, (_, index) => 2026 + index).map(year => <option key={year} value={year}>{year}</option>)}
               </select>
             </label>
@@ -627,7 +636,7 @@ export function FamilySetup({
         <div className="family-privacy-copy">{HS_CONSENT_TEXT}</div>
         {consentPlayers.map((player, index) => <div className="family-consent-list" key={`consent-${player.id}`}>
           <strong>{player.firstName.trim() || `Player ${index + 1}`} · privacy choices</strong>
-          {state.imported&&<label className="family-field-label">Birth year
+          {state.imported&&<label className="family-field-label">Birth year (required)
             <select className="hsy-field" aria-label="Birth year" value={player.birthYear??""} disabled={busy!==""} onChange={event=>changePlayer(player.id,{birthYear:event.target.value?Number(event.target.value):undefined})}>
               <option value="">Choose birth year</option>
               {Array.from({length:101},(_,i)=>new Date().getFullYear()-i).map(year=><option key={year} value={year}>{year}</option>)}
@@ -635,14 +644,26 @@ export function FamilySetup({
           </label>}
           <label className="hsy-toggle"><input type="checkbox" disabled={busy !== ""} checked={player.photoConsent} onChange={event => changePlayer(player.id, { photoConsent: event.target.checked })} />Allow this player’s photo to be shown to their team</label>
           <label className="hsy-toggle"><input type="checkbox" disabled={busy !== ""} checked={player.publicNameConsent} onChange={event => changePlayer(player.id, { publicNameConsent: event.target.checked })} />Allow this player’s name in public results</label>
-          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== ""} checked={player.consent} onChange={event => setPlayers(current => current.map(item => item.id === player.id ? { ...item, consent: event.target.checked } : item))} />I am this player’s parent or legal guardian, and I agree to the privacy terms.</label>
+          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== ""} checked={player.consent} onChange={event => {
+            const checked = event.target.checked;
+            setConsentSubmitState("idle");
+            setPlayers(current => current.map(item => item.id === player.id ? { ...item, consent: checked, consentVersion: HS_CONSENT_VERSION } : item));
+          }} />I am this player’s parent or legal guardian, and I agree to the privacy terms.</label>
         </div>)}
         <label className="hsy-toggle" style={{ marginTop: 14, padding: 12, border: "1px solid var(--family-line)", borderRadius: 12 }}>
-          <input type="checkbox" disabled={busy !== ""} checked={guardian} onChange={event => setGuardian(event.target.checked)} />
+          <input type="checkbox" disabled={busy !== ""} checked={guardian} onChange={event => { setConsentSubmitState("idle"); setGuardian(event.target.checked); }} />
           I am the authorized adult guardian for these players.
         </label>
-        <button className="family-quiet-button" style={{ paddingLeft: 0, marginTop: 8 }} disabled={busy !== "" || !canSaveConsent} onClick={() => void saveConsent()}>
-          Save child consent
+        <div id="family-consent-feedback" data-testid="family-consent-feedback" aria-live="polite">
+          {consentSubmitState === "invalid" && <div className="hsy-error" role="alert">
+            <strong>Complete these items to save child consent:</strong>
+            <ul>{consentProblems.map(problem => <li key={problem}>{problem}</li>)}</ul>
+          </div>}
+          {consentSubmitState === "failed" && <p className="hsy-error" role="alert">{error || "We couldn’t confirm the consent save. Your entries are still here; refresh your setup status before trying again."}</p>}
+          {consentSubmitState === "saved" && <p className="hsy-success" role="status">Consent saved. You can now set up your child’s phone below.</p>}
+        </div>
+        <button type="button" className="hsy-primary" style={{ marginTop: 8 }} disabled={busy !== ""} aria-describedby="family-consent-feedback" onClick={() => void saveConsent()}>
+          {busy === "consent" ? "Saving child consent…" : "Save child consent"}
         </button>
       </div>}
 
@@ -680,7 +701,7 @@ export function FamilySetup({
             <span className="family-request-name">{player.firstName.trim() || `Player ${index + 1}`} {player.lastName.trim()}</span>
             <span className="family-status draft">Draft</span>
           </div>
-          <div className="family-meta-row">{player.gradYear} · {player.position === "F" ? "Forward" : player.position === "D" ? "Defense" : "Goalie"}</div>
+          <div className="family-meta-row">{player.gradYear ? `${player.gradYear} · ` : ""}{player.position === "F" ? "Forward" : player.position === "D" ? "Defense" : "Goalie"}</div>
           <div className="family-device-state"><span>Device access</span><strong>{devicePanel ? "Manage below" : "Disabled"}</strong></div>
         </article>)}
         {requests.length === 0 && draftRows.length === 0 && <div className="family-empty" style={{ marginTop: 11 }}>
@@ -743,7 +764,7 @@ function FamilyRequestCard({ request, busy, onViewTeam, deviceTesting=false }: {
       <span className={`family-status ${statusClass}`}>{statusLabel(request.status)}</span>
     </div>
     <div className="family-meta-row">
-      <span>{request.details.gradYear} · {request.details.position === "F" ? "Forward" : request.details.position === "D" ? "Defense" : "Goalie"}</span>
+      <span>{request.details.gradYear ? `${request.details.gradYear} · ` : ""}{request.details.position === "F" ? "Forward" : request.details.position === "D" ? "Defense" : "Goalie"}</span>
       <span>{request.teamName}</span>
     </div>
     <div className="family-request-bottom">

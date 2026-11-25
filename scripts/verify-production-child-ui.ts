@@ -17,9 +17,9 @@ const bundle=await build({
     import Under18 from './client/src/pages/Under18Onboarding';
     window.fixtureRequests=[];
     const request=async(method,url,body)=>{
-      window.fixtureRequests.push({method,url});
+      window.fixtureRequests.push({method,url,body});
       if(url.endsWith('/start')){
-        if(body.challengeId!=='${challenge}'||body.code!=='K7P2QX')throw Error('Unexpected fixture input');
+        if((body.challengeId&&body.challengeId!=='${challenge}')||body.code!=='K7P2QX')throw Error('Unexpected fixture input');
         return{requestId:'10000000-0000-4000-8000-000000000007',requestToken:'a'.repeat(43),status:'waiting'};
       }
       if(url.endsWith('/poll'))return{status:new URLSearchParams(location.search).get('decision')||'approved',sessionToken:'hs_child_'+'b'.repeat(43)};
@@ -35,8 +35,12 @@ const server=createServer((req,res)=>{
   res.setHeader("Content-Type",js?"text/javascript; charset=utf-8":"text/html; charset=utf-8");
   res.end(js?bundle.outputFiles[0].text:`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><div id="root"></div><script src="/bundle.js"></script>`);
 });
-await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
+await new Promise<void>(resolve=>server.listen(process.argv.includes("--serve")?3003:0,"127.0.0.1",resolve));
 const origin=`http://127.0.0.1:${(server.address() as any).port}`;
+if(process.argv.includes("--serve")){
+  console.log(`Isolated child code fixture: ${origin}/under-18/code`);
+  await new Promise(()=>{});
+}
 const browser=await chromium.launch({executablePath:"/repl/tools/bin/chromium",headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]});
 let checks=0;
 try{
@@ -48,25 +52,23 @@ try{
     await page.goto(`${origin}/under-18`);
     await page.getByRole("button",{name:"I have a code from my parent"}).click();
     await page.getByRole("heading",{name:"Enter your parent's code"}).waitFor();
+    assert.equal(await page.getByRole("textbox",{name:"Parent's setup link",exact:true}).count(),0);
+    assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);checks++;
     for(const [i,char] of [..."K7P2QX"].entries())
       await page.getByRole("textbox",{name:`Code character ${i+1}`,exact:true}).fill(char);
-    assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);
+    assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isEnabled(),true);
     assert.equal(await page.evaluate("window.fixtureRequests.length"),0);checks++;
-    for(const invalid of ["not a link",`${origin}/login?challengeId=${challenge}`,`${origin}/under-18/code?challengeId=invalid`,`javascript:alert(1)`]){
-      await page.getByRole("textbox",{name:"Parent's setup link",exact:true}).fill(invalid);
-      assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);
-    }
-    assert.equal(await page.evaluate("window.fixtureRequests.length"),0);checks++;
-    await page.getByRole("textbox",{name:"Parent's setup link",exact:true}).fill(`${origin}/under-18/code?challengeId=${challenge}`);
     await page.getByRole("button",{name:"Continue",exact:true}).click();
     await page.getByRole("heading",{name:"Waiting for your parent"}).waitFor();
     await page.getByRole("heading",{name:"You're in, Synthetic Player",exact:true}).waitFor({timeout:10000});
+    const codeOnly=await page.evaluate("window.fixtureRequests.find(call=>call.url.endsWith('/start')).body") as any;
+    assert.equal(codeOnly.code,"K7P2QX");assert.equal("challengeId" in codeOnly,false);checks++;
     assert.ok(!page.url().includes("K7P2QX"));checks++;
     await page.goto(`${origin}/under-18/code`);
-    await page.getByRole("textbox",{name:"Parent's setup link",exact:true}).waitFor();
+    await page.getByRole("heading",{name:"Enter your parent's code"}).waitFor();
     assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);checks++;
-    for(const decision of ["approved","denied","expired"]){
-      await page.goto(`${origin}/under-18/code?challengeId=${challenge}&decision=${decision}`);
+    for(const [decision,useLink] of [["approved",false],["denied",false],["expired",false],["approved",true]] as const){
+      await page.goto(`${origin}/under-18/code?decision=${decision}${useLink?`&challengeId=${challenge}`:""}`);
       for(const [i,char] of [..."K7P2QX"].entries())
         await page.getByRole("textbox",{name:`Code character ${i+1}`,exact:true}).fill(char);
       await page.getByRole("button",{name:"Continue",exact:true}).click();

@@ -11,7 +11,7 @@ type StaffRequest = {
   id: string;
   firstName: string;
   lastName: string;
-  gradYear: number;
+  gradYear?: number;
   position: "F" | "D" | "G";
   status: string;
   teamName: string;
@@ -208,7 +208,7 @@ export function FamilyStaffReview({ actorId, teamId, onChanged }: FamilyStaffRev
           <h3>{item.firstName} {item.lastName}</h3>
           <span className="family-status pending">Waiting for review</span>
         </div>
-        <p>{item.gradYear} · {positionName(item.position)} · {item.teamName}</p>
+        <p>{item.gradYear ? `${item.gradYear} · ` : ""}{positionName(item.position)} · {item.teamName}</p>
         <div className="family-staff-actions">
           <button className="hsy-secondary" disabled={!!busyId} onClick={() => void decide(item.id, false)}>
             {busyId === item.id ? "Updating…" : "Decline"}
