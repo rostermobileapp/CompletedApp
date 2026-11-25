@@ -17,7 +17,7 @@ import { NotificationPreferencesModal } from '@/components/NotificationPreferenc
 import { supabase } from '@/lib/supabase';
 import { isParentSecurityClient } from '@/lib/parentVerificationSession';
 import { familyAgeEligibility } from '@shared/familyEligibility';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
@@ -693,18 +693,23 @@ export default function Profile() {
       {/* Scrollable Content Section */}
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
         {(familyAvailability?.enabled || devParentStatus?.enrolled) && <section className="px-6 mb-3" aria-labelledby="profile-family-title" data-testid="profile-family">
-          <div className="rounded-xl border bg-card p-4">
-            <h2 id="profile-family-title" className="font-semibold mb-1">Family</h2>
-            <p className="text-sm text-muted-foreground mb-3">Set up your children without changing your adult teams or account.</p>
-            {familyAgeEligibility((user as any)?.dateOfBirth).eligible
-              ? <button type="button" className="w-full rounded-xl border px-4 py-3 text-left text-sm font-medium"
-                onClick={() => navigate("/high-school/family")}>Add a child</button>
-              : <p className="text-sm text-muted-foreground">
+          {familyAgeEligibility((user as any)?.dateOfBirth).eligible
+            ? <button type="button"
+                className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => navigate("/high-school/family")}>
+                <span id="profile-family-title" className="font-semibold">Family</span>
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  Add a child <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </span>
+              </button>
+            : <div className="rounded-xl border bg-card px-4 py-3">
+                <h2 id="profile-family-title" className="text-sm font-semibold">Family</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
                 {(user as any)?.dateOfBirth
-                  ? "Family setup is available to accounts aged 21 or older based on their recorded date of birth."
-                  : "Add your date of birth in your profile below to check family setup eligibility."}
-              </p>}
-          </div>
+                  ? "Available to ages 21+ based on your date of birth."
+                  : "Add your date of birth below to check eligibility."}
+                </p>
+              </div>}
         </section>}
         {import.meta.env.PROD && !!familyReviewTeams?.teams.length && <div className="px-6 mb-3">
           <button className="w-full rounded-xl border px-4 py-3 text-left text-sm"
