@@ -15,6 +15,7 @@ import { TeamSkinPreview } from "./TeamSkinPreview";
 import ParentVerification from "@/pages/ParentVerification";
 import { FamilySetup } from "@/components/high-school-family/FamilySetup";
 import { LiveFamilyBoundary } from "@/components/high-school-family/LiveFamilyBoundary";
+import { ProductionChildSession } from "@/components/high-school-onboarding/ProductionChildSession";
 
 function PendingSkin({ failed = false }: { failed?: boolean }) {
   return <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center" role="status">
@@ -174,11 +175,20 @@ function ChildDiscovery({ token, entry }: { token: string; entry: ReactNode }) {
   if (!query.data || query.data.actor.type !== "child") return <PendingSkin />;
   return <ResolvedSkinRuntime context={query.data} adult={null} entry={entry} />;
 }
+export function ProductionSchoolRuntime({children,entry}:{children:ReactNode;entry:ReactNode}) {
+  return <AdultDiscovery adult={children} entry={entry}/>;
+}
 function IsolatedBoundary({ children, entry }: { children: ReactNode; entry: ReactNode }) {
   const token = useSyncExternalStore(childSkinSession.subscribe, childSkinSession.snapshot);
   return token ? <ChildDiscovery token={token} entry={entry} /> : <AdultDiscovery adult={children} entry={entry} />;
 }
 export function TeamSkinBoundary({ children, entry }: { children: ReactNode; entry: ReactNode }) {
+  const childToken=useSyncExternalStore(childSkinSession.subscribe,childSkinSession.snapshot);
+  const [path]=useLocation();
+  if(import.meta.env.PROD&&childToken)return <ProductionChildSession token={childToken}/>;
+  // Pairing is independent of any remembered shared provider login. It must
+  // neither inherit parent authority nor ask the child for a parent email code.
+  if(import.meta.env.PROD&&path.startsWith("/under-18"))return <>{entry}</>;
   if (import.meta.env.PROD) return <LiveFamilyBoundary entry={entry}>{children}</LiveFamilyBoundary>;
   if (!isDevParentClient) return <>{children}</>;
   return <IsolatedBoundary entry={entry}>{children}</IsolatedBoundary>;

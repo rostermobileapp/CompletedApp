@@ -8,6 +8,7 @@ import {
   HighSchoolParentSecurity, parentDigest, type ParentSql, type ParentTransaction,
 } from "./highSchoolParentSecurity";
 import { OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
+import { requireProductionOnboardingTester } from "./productionOnboardingTests";
 
 const uuid = z.string().uuid();
 const requestProof = z.object({
@@ -25,15 +26,16 @@ const equalDigest = (a: string, b: string) => {
 /**
  * Separate child capabilities, never Supabase parent tokens.
  *
- * The application intentionally constructs this with activationAvailable=false.
- * Only a test harness may enable it, with operator-created synthetic fixtures.
- * Passing a UI flag, code or parent password cannot enable the missing foundation.
+ * Production activation is restricted to the server-owned rollout and requires
+ * protected parent authority, approved membership and payer-scoped coverage.
+ * DEV still defaults to disabled. Client flags never activate a child.
  */
 export class HighSchoolChildDevices {
   constructor(
     private pool: ParentSql,
     private parent: HighSchoolParentSecurity,
     private activationAvailable = false,
+    private options: { production?: boolean; coverage?: (parentId: string, leagueId: string) => Promise<boolean> } = {},
   ) {}
   private ready() {
     if (!this.activationAvailable) throw new OnboardingError("CHILD_ACTIVATION_PENDING", 503);
@@ -44,22 +46,44 @@ export class HighSchoolChildDevices {
     catch (e) { await tx.query("ROLLBACK"); throw e; } finally { tx.release(); }
   }
   private fixture(actor: OnboardingActor) {
+    // productionTest is populated only by the authenticated server rollout gate.
+    if (actor.productionTest && actor.emailVerified) return;
     if (!actor.fixture || !actor.emailVerified || !actor.email.endsWith("@example.com")) {
       throw new OnboardingError("DEV_FIXTURE_REQUIRED", 403);
     }
   }
   private async authority(actor: OnboardingActor, grant?: string, tx?: ParentTransaction) {
+    if(this.options.production)await requireProductionOnboardingTester(tx??this.pool,actor);
     this.fixture(actor);
     if (!await this.parent.authorized(actor, grant, tx)) throw new OnboardingError("PARENT_VERIFICATION_REQUIRED", 403);
   }
-  private async child(db: Pick<ParentSql, "query">, id: string, parentId?: string) {
+  private async child(db: Pick<ParentSql, "query">, id: string, parentId?: string, allowDisabled=false) {
     // All identifiers are canonical server-owned records; intake is not access.
     const row = (await db.query(`SELECT c.*,r.team_id FROM hs_onboarding.children c
       JOIN hs_onboarding.player_requests r ON r.id=c.player_request_id AND r.auth_id=c.parent_auth_id
-      WHERE c.id=$1 AND c.enabled=true AND c.revoked_at IS NULL AND r.status='approved'
+      WHERE c.id=$1 AND (c.enabled=true OR $4::boolean) AND c.revoked_at IS NULL AND r.status='approved'
       AND r.consent_version=$2 AND r.consented_at IS NOT NULL
-      AND($3::uuid IS NULL OR c.parent_auth_id=$3::uuid)`, [id, HS_CONSENT_VERSION, parentId ?? null])).rows[0];
+      AND($3::uuid IS NULL OR c.parent_auth_id=$3::uuid)`, [id, HS_CONSENT_VERSION, parentId ?? null,allowDisabled])).rows[0];
     if (!row) throw new OnboardingError("CHILD_ACCESS_UNAVAILABLE", 403);
+    if(this.options.production){
+      const allowed=(await db.query("SELECT hs_onboarding.production_child_parent_allowed($1) AS allowed",[row.parent_auth_id])).rows[0]?.allowed;
+      if(!allowed)throw new OnboardingError("CHILD_ACCESS_UNAVAILABLE",403);
+      const total=(await db.query(`SELECT count(DISTINCT player_key)::int AS n FROM hs_onboarding.player_requests
+        WHERE auth_id=$1 AND status='approved'`,[row.parent_auth_id])).rows[0]?.n;
+      if(!total||total>HS_MAX_FAMILY_PLAYERS)throw new OnboardingError("FAMILY_PLAYER_LIMIT",403);
+      const memberships=(await db.query(`SELECT DISTINCT t.id,p.league_id FROM public.team_memberships m
+        JOIN public.teams t ON t.id=m.team_id AND t.program_type='high_school'
+        JOIN hs_onboarding.programs p ON p.id=t.program_id AND p.status='approved'
+        JOIN hs_onboarding.teams source ON source.id::text=t.id AND source.program_id=p.id
+        WHERE m.child_profile_id=$1 AND m.user_id IS NULL AND m.role='player' AND m.status='approved'
+          AND EXISTS(SELECT 1 FROM public.team_memberships parent WHERE parent.team_id=t.id
+            AND parent.user_id=$2::text AND parent.child_profile_id IS NULL
+            AND parent.role='parent' AND parent.status='approved')`,[id,row.parent_auth_id])).rows;
+      const covered=[];
+      for(const team of memberships)if(await this.options.coverage?.(row.parent_auth_id,team.league_id))covered.push(team.id);
+      if(!covered.length)throw new OnboardingError("APPROVED_TEAM_AND_COVERAGE_REQUIRED",403);
+      row.teamIds=covered;
+    }
     return row;
   }
   async children(actor: OnboardingActor, grant?: string) {
@@ -72,6 +96,10 @@ export class HighSchoolChildDevices {
       LEFT JOIN hs_onboarding.children c ON c.player_request_id=r.id AND c.parent_auth_id=r.auth_id AND c.revoked_at IS NULL
       WHERE r.auth_id=$1 ORDER BY r.consented_at,r.id LIMIT 4`, [actor.authId,this.activationAvailable,HS_CONSENT_VERSION])).rows;
     // Deliberately do not claim that a consented intake has been activated.
+    if(this.options.production)for(const row of rows){
+      try{await this.child(this.pool,row.id,actor.authId,true);row.canActivate=true;}
+      catch{row.canActivate=false;}
+    }
     return { children: rows, activationAvailable: this.activationAvailable };
   }
   async createCode(actor: OnboardingActor, input: unknown, grant?: string) {
@@ -82,7 +110,18 @@ export class HighSchoolChildDevices {
       // Same parent registry lock serializes issue/approve/revoke operations.
       await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [actor.authId]);
       await this.authority(actor, grant, tx);
-      await this.child(tx, childId, actor.authId);
+      const child=await this.child(tx, childId, actor.authId,!!this.options.production);
+      if(this.options.production){
+        await tx.query("UPDATE hs_onboarding.children SET enabled=true WHERE id=$1 AND parent_auth_id=$2",[childId,actor.authId]);
+        await tx.query(`INSERT INTO hs_onboarding.child_chats(id,kind,name,parent_auth_id)
+          VALUES($1,'family','Family',$2) ON CONFLICT(parent_auth_id) WHERE kind='family' DO NOTHING`,[randomUUID(),actor.authId]);
+        for(const teamId of child.teamIds)await tx.query(`INSERT INTO hs_onboarding.child_chats(id,kind,name,team_id)
+          VALUES($1,'team','Team',$2) ON CONFLICT(team_id,kind) WHERE team_id IS NOT NULL DO NOTHING`,[randomUUID(),teamId]);
+        await tx.query(`INSERT INTO hs_onboarding.child_chat_members(chat_id,child_id)
+          SELECT id,$1 FROM hs_onboarding.child_chats WHERE(kind='family' AND parent_auth_id=$2)
+            OR(kind='team' AND team_id=ANY($3::uuid[]) AND parent_auth_id IS NULL)
+          ON CONFLICT DO NOTHING`,[childId,actor.authId,child.teamIds]);
+      }
       const recent = (await tx.query(`SELECT count(*)::int AS total FROM hs_onboarding.device_codes
         WHERE parent_auth_id=$1 AND created_at>now()-interval '1 hour'`, [actor.authId])).rows[0]?.total ?? 0;
       if (recent >= 20) throw new OnboardingError("CODE_RATE_LIMIT", 429);
@@ -105,6 +144,9 @@ export class HighSchoolChildDevices {
       deviceLabel: z.string().trim().min(1).max(80).default("Player's phone"),
       challengeId: uuid.optional(),
     }).strict().parse(input);
+    // A separate, nonsecret challenge link attributes ALL wrong guesses to
+    // this challenge; an IP throttle alone cannot enforce its five-guess limit.
+    if(this.options.production&&!data.challengeId)throw new OnboardingError("SECURE_SETUP_LINK_REQUIRED",400);
     const code = data.code.trim().toUpperCase();
     // Request body cannot choose its throttle identity. Caller supplies peer data.
     const sourceDigest = parentDigest(`child-pairing:${source}`);
@@ -211,11 +253,11 @@ export class HighSchoolChildDevices {
     return { ...row, child };
   }
   private chatScope = `((c.kind='family' AND c.parent_auth_id=$2 AND c.team_id IS NULL)
-    OR(c.kind='team' AND c.team_id=$3 AND c.parent_auth_id IS NULL))`;
+    OR(c.kind='team' AND c.team_id=ANY($3::uuid[]) AND c.parent_auth_id IS NULL))`;
   /** Coverage only; does not grant chat/payment/guardian capabilities or activate a child. */
   async verifiedProParent(token: unknown, teamId: string) {
     const session = await this.session(token);
-    if (session.child.team_id !== teamId) return null;
+    if (!(session.child.teamIds??[session.child.team_id]).includes(teamId)) return null;
     const result = await this.pool.query(`SELECT p.league_id,
       (SELECT count(DISTINCT r.player_key)::int FROM hs_onboarding.player_requests r
        WHERE r.auth_id=$2) AS family_players
@@ -231,11 +273,14 @@ export class HighSchoolChildDevices {
   }
   async ownSession(token: unknown) {
     const session = await this.session(token);
-    const schedule = (await this.pool.query(`SELECT id,title,starts_at AS "startsAt",location
+    let schedule = (await this.pool.query(`SELECT id,title,starts_at AS "startsAt",location
       FROM hs_onboarding.child_events WHERE child_id=$1 ORDER BY starts_at LIMIT 100`, [session.child_id])).rows;
+    if(this.options.production)schedule=(await this.pool.query(`SELECT id,title,starts_at AS "startsAt",rink AS location
+      FROM hs_onboarding.staff_events WHERE team_id=ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY starts_at LIMIT 100`,
+    [session.child.teamIds])).rows;
     const chats = (await this.pool.query(`SELECT c.id,c.name,c.kind FROM hs_onboarding.child_chats c
       JOIN hs_onboarding.child_chat_members m ON m.chat_id=c.id WHERE m.child_id=$1
-      AND ${this.chatScope} ORDER BY c.name`, [session.child_id, session.parent_auth_id, session.child.team_id])).rows;
+       AND ${this.chatScope} ORDER BY c.name`, [session.child_id, session.parent_auth_id, session.child.teamIds??[session.child.team_id]])).rows;
     return { child: { id: session.child_id, firstName: session.child.first_name, lastName: session.child.last_name }, schedule, chats };
   }
   async messages(token: unknown, chatId: string) {
@@ -244,7 +289,7 @@ export class HighSchoolChildDevices {
     const allowed = (await this.pool.query(`SELECT c.id FROM hs_onboarding.child_chats c
       JOIN hs_onboarding.child_chat_members m ON m.chat_id=c.id
       WHERE m.child_id=$1 AND c.id=$4 AND ${this.chatScope}`,
-    [session.child_id, session.parent_auth_id, session.child.team_id, chatId])).rows.length;
+    [session.child_id, session.parent_auth_id, session.child.teamIds??[session.child.team_id], chatId])).rows.length;
     if (!allowed) throw new OnboardingError("CHILD_CHAT_FORBIDDEN", 403);
     const sharedStaff = !!(await this.pool.query("SELECT to_regclass('hs_onboarding.staff_version') AS installed")).rows[0]?.installed;
     if (sharedStaff) await this.canonicalChatMember(this.pool, session, chatId);
@@ -276,7 +321,7 @@ export class HighSchoolChildDevices {
         SELECT $5,c.id,$1,$6 FROM hs_onboarding.child_chats c
         JOIN hs_onboarding.child_chat_members m ON m.chat_id=c.id
         WHERE m.child_id=$1 AND c.id=$4 AND ${this.chatScope} RETURNING id`,
-      [session.child_id, session.parent_auth_id, session.child.team_id, chatId, randomUUID(), body]);
+       [session.child_id, session.parent_auth_id, session.child.teamIds??[session.child.team_id], chatId, randomUUID(), body]);
       if (!inserted.rows.length) throw new OnboardingError("CHILD_CHAT_FORBIDDEN", 403);
       return { saved: true, id: inserted.rows[0].id };
     });
@@ -286,13 +331,13 @@ export class HighSchoolChildDevices {
       JOIN hs_onboarding.child_chat_members cm ON cm.chat_id=c.id AND cm.child_id=$2
       WHERE c.id=$1 AND(
         (c.kind='family' AND c.parent_auth_id=$3 AND c.team_id IS NULL)
-        OR(c.kind='team' AND c.parent_auth_id IS NULL AND c.team_id=$4
+         OR(c.kind='team' AND c.parent_auth_id IS NULL AND c.team_id=ANY($4::uuid[])
           AND EXISTS(SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
             WHERE m.child_profile_id=$2 AND m.user_id IS NULL AND m.role='player' AND m.status='approved'
             AND t.id=c.team_id::text AND t.program_type='high_school')
           AND EXISTS(SELECT 1 FROM public.team_memberships m WHERE m.user_id=$3::text
             AND m.team_id=c.team_id::text AND m.role='parent' AND m.status='approved')))` ,
-    [chatId, session.child_id, session.parent_auth_id, session.child.team_id])).rows.length;
+     [chatId, session.child_id, session.parent_auth_id, session.child.teamIds??[session.child.team_id]])).rows.length;
     if (!allowed) throw new OnboardingError("CHILD_CHAT_FORBIDDEN", 403);
   }
   async revoke(actor: OnboardingActor, childId: string, grant?: string) {
@@ -300,7 +345,10 @@ export class HighSchoolChildDevices {
     return this.tx(async tx => {
       await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [actor.authId]);
       await this.authority(actor, grant, tx);
-      await this.child(tx, childId, actor.authId);
+      // A parent must still be able to revoke a phone after coverage or team
+      // membership has ended; those conditions already deny child reads.
+      if(!(await tx.query("SELECT 1 FROM hs_onboarding.children WHERE id=$1 AND parent_auth_id=$2",
+        [childId,actor.authId])).rows.length)throw new OnboardingError("CHILD_ACCESS_UNAVAILABLE",403);
       await tx.query("UPDATE hs_onboarding.child_sessions SET revoked_at=now() WHERE child_id=$1", [childId]);
       await tx.query("UPDATE hs_onboarding.device_codes SET consumed_at=coalesce(consumed_at,now()) WHERE child_id=$1", [childId]);
       await tx.query("UPDATE hs_onboarding.device_requests SET status='denied' WHERE child_id=$1 AND status IN('waiting','approved')", [childId]);

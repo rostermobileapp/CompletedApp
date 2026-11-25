@@ -8,10 +8,11 @@ import type { TeamSkinService } from "./teamSkinService";
 export function registerTeamSkinRoutes(
   app: Express, service: TeamSkinService, parent: HighSchoolParentSecurity,
   children: HighSchoolChildDevices, authenticate: (req: Request) => Promise<OnboardingActor>,
+  allowProduction = false,
 ) {
   app.get("/api/high-school/skin-context", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    if (!isParentSecurityDevelopment()) { res.sendStatus(404); return; }
+    if (!isParentSecurityDevelopment() && !allowProduction) { res.sendStatus(404); return; }
     try {
       const actor = await authenticate(req);
       if (await parent.enrolled(actor.authId) && !await parent.authorized(actor, req.get(parentGrantHeader))) {
@@ -25,7 +26,7 @@ export function registerTeamSkinRoutes(
   });
   app.get("/api/high-school/child-device/skin-context", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    if (!isParentSecurityDevelopment()) { res.sendStatus(404); return; }
+    if (!isParentSecurityDevelopment() && !allowProduction) { res.sendStatus(404); return; }
     try {
       // This retains the disabled-by-default activation, parent-session,
       // consent, device, registry and expiry checks. No parent Auth fallback.

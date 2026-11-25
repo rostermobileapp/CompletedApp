@@ -17,6 +17,7 @@ import { NotificationPreferencesModal } from '@/components/NotificationPreferenc
 import { supabase } from '@/lib/supabase';
 import { isParentSecurityClient } from '@/lib/parentVerificationSession';
 import { familyAgeEligibility } from '@shared/familyEligibility';
+import { useProductionOnboardingAccess } from "@/hooks/useProductionOnboardingAccess";
 import { ArrowLeft, ChevronRight, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -91,6 +92,7 @@ export default function Profile() {
     queryFn: async () => (await apiRequest("GET", "/api/high-school/family/availability")).json(),
     enabled: isParentSecurityClient && !!supabaseUser, retry: false, staleTime: 30_000,
   });
+  const {data:onboardingTestAccess}=useProductionOnboardingAccess();
   const { data: familyReviewTeams } = useQuery<{ teams: { id: string; name: string }[] }>({
     queryKey: ["family-staff-teams", supabaseUser?.id],
     queryFn: async () => (await apiRequest("GET", "/api/high-school/family/staff/teams")).json(),
@@ -692,6 +694,10 @@ export default function Profile() {
       </div>
       {/* Scrollable Content Section */}
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
+        {onboardingTestAccess?.enabled&&<section className="px-6 mb-3">
+          <button className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left font-semibold text-slate-900"
+            onClick={()=>navigate("/high-school/testing")} data-testid="profile-onboarding-test">Production onboarding test ›</button>
+        </section>}
         {(familyAvailability?.enabled || devParentStatus?.enrolled) && <section className="px-6 mb-3" aria-labelledby="profile-family-title" data-testid="profile-family">
           {familyAgeEligibility((user as any)?.dateOfBirth).eligible
             ? <button type="button"

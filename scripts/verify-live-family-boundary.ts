@@ -23,6 +23,7 @@ const mocks: Record<string, string> = {
       if(method!=='GET')window.mutations.push(url);
       if(url.endsWith('/status')) return new Response(JSON.stringify({enrolled:f.enrolled,verified:f.verified}));
       if(url.endsWith('/availability')) return new Response(JSON.stringify({enabled:!new URLSearchParams(location.search).has('off')}));
+      if(url.endsWith('/test-access')) return new Response(JSON.stringify({enabled:false}));
       if(url.endsWith('/adult-team-ids')) return new Response(JSON.stringify({teamIds:['owned-adult']}));
       if(url.endsWith('/staff/teams')) return new Response(JSON.stringify({teams:[{id:'owned-review',name:'Owned review team'}]}));
       throw new Error('Unexpected fixture request');
@@ -34,6 +35,8 @@ const mocks: Record<string, string> = {
   "@/pages/ForgotPassword": `export default function Forgot(){return <h1>Recovery request route</h1>}`,
   "./FamilySetup": `export function FamilySetup(){return <h1>Owned private child fixture</h1>}`,
   "./FamilyStaffReview": `export function FamilyStaffReview({teamId}){return <p>Reviewing {teamId}</p>}`,
+  "@/components/high-school-skins/TeamSkinBoundary": `export function ProductionSchoolRuntime(){return <h1>School runtime</h1>}`,
+  "@/pages/HighSchoolYouthOnboarding": `export default function Onboarding(){return <h1>School onboarding</h1>}`,
 };
 const result = await build({
   stdin: { contents: `

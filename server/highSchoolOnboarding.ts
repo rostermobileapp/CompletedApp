@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { hsChoosePath, hsSaveDraft, hsTeamEntry, HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS } from "../shared/highSchoolOnboarding";
 import { HighSchoolParentSecurity, ParentSecurityError, parentDigest, type ParentActor, type ParentSql, type ParentTransaction } from "./highSchoolParentSecurity";
+import { requireProductionOnboardingTester } from "./productionOnboardingTests";
 
 export class OnboardingError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
 }
-export type OnboardingActor = ParentActor & { email: string; emailVerified: boolean; fixture: boolean };
+export type OnboardingActor = ParentActor & { email: string; emailVerified: boolean; fixture: boolean; productionTest?: boolean };
 const fail = (code: string, status = 400): never => { throw new OnboardingError(code, status); };
 const uuid = z.string().uuid();
 export class HighSchoolOnboarding {
@@ -28,10 +29,12 @@ export class HighSchoolOnboarding {
     catch (e) { await tx.query("ROLLBACK"); throw e; } finally { tx.release(); }
   }
   private fixture(actor: OnboardingActor) {
+    if (actor.productionTest && actor.emailVerified) return;
     if (this.liveFamily && this.flowTable === "hs_onboarding.family_flows" && actor.emailVerified) return;
     if (!actor.fixture || !actor.emailVerified || !actor.email.endsWith("@example.com")) fail("DEV_FIXTURE_REQUIRED", 403);
   }
   private async active(actor: OnboardingActor, tx: Pick<ParentSql, "query"> = this.pool) {
+    if (actor.productionTest) await requireProductionOnboardingTester(tx, actor);
     const session = await tx.query("SELECT 1 FROM auth.sessions WHERE id=$1 AND user_id=$2 AND (not_after IS NULL OR not_after>now())", [actor.sessionId, actor.authId]);
     if (!session.rows.length) fail("INVALID_SESSION", 401);
     if (this.flowTable === "hs_onboarding.family_flows") {

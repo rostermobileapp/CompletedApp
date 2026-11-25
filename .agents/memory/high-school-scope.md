@@ -17,7 +17,25 @@ accounts. This is not approval for a public school-feature rollout.
 claims or a visible-link check. Preserve existing adult accounts and canonical
 staff authority; do not reset onboarding or grant roles to make a test pass.
 Obtain specific approval before installing additional production schema/Auth
-changes. Child login and device activation remain disabled.
+changes. The later child-activation authorization below supersedes the
+earlier disabled-child scope for the restricted production test only.
+
+## Restricted production child activation authorization
+
+The owner explicitly corrected the disabled-child scope: “No... Activate
+child login and device activation.” Include both in the selected-account
+production test, not in a public rollout for every Family account.
+
+**Why:** The earlier restriction no longer reflects the owner's requested
+test scope. It does not remove parent verification, consent, canonical team
+approval, coverage or child-only authority requirements.
+
+**How to apply:** Pair with a nonsecret challenge link and a separately entered
+setup code, followed by verified-parent approval. Keep child capabilities
+separate from shared provider credentials and discard parent authority when
+entering child mode. A shared password or UI flag never authorizes activation.
+Verify production storage, released backend/frontend and real-device behavior
+separately; implementation or local tests alone do not establish live readiness.
 
 ## Authorized live family rollout (November 24, 2026)
 
@@ -25,7 +43,9 @@ The owner now wants family setup in the live app for “Every account that has a
 age of 21+ per DOB.” Use recorded DOB, not paid plan, account role, existing adult
 team membership or completed adult onboarding. Missing/invalid DOB must not
 silently qualify. Shared credentials and parent/provider protection remain;
-child sign-in and device activation remain disabled.
+child sign-in and device activation were excluded from that broader rollout.
+The subsequent selected-account activation approval does not extend to all
+eligible Family accounts.
 
 **Why:** This explicit request supersedes the earlier production prohibition
 for the family rollout only. It does not approve unrelated High School phases.

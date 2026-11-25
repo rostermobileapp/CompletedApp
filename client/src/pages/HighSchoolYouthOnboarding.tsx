@@ -32,8 +32,8 @@ const roleNames:Record<string,string>={head_coach:"Head Coach",assistant_coach:"
 function newPlayer():ParentPlayer{return{id:crypto.randomUUID(),firstName:"",lastName:"",gradYear:new Date().getFullYear()+1,position:"F",jerseyNumber:"",consent:false,consentVersion:HS_CONSENT_VERSION,photoConsent:false,publicNameConsent:false};}
 const blankLeague=():LeagueDraft=>({details:{name:"",state:"",season:""},schools:[],schedule:[],invitations:[]});
 
-export default function HighSchoolYouthOnboarding({request=realRequest,authenticated=true,preview=false,onChange,onAdult}:{
-  request?:RequestFn;authenticated?:boolean;preview?:boolean;onChange?:()=>void;onAdult?:(role?:string)=>void;
+export default function HighSchoolYouthOnboarding({request=realRequest,authenticated=true,preview=false,onChange,onAdult,onParent}:{
+  request?:RequestFn;authenticated?:boolean;preview?:boolean;onChange?:()=>void;onAdult?:(role?:string)=>void;onParent?:()=>void;
 }) {
   const [state,setState]=useState<any>(); const [view,setView]=useState<View>(authenticated?"hockey":"signup");
   const [hockey,setHockey]=useState<Hockey>(""); const [adultRole,setAdultRole]=useState("");
@@ -121,7 +121,7 @@ export default function HighSchoolYouthOnboarding({request=realRequest,authentic
           else setView(!profileSaved?(referralSaved?"profile":"referral"):"league-details");
         } else if(res.path==="player"||res.path==="organizer")setView("adult-role");
         else setView(type==="adult"?"adult-role":type==="high_school_youth"?"hs-role":"hockey");
-      }catch{if(live){setError("DEV onboarding is unavailable. Your saved data remains private. Try again.");setView("hockey");}}
+      }catch{if(live){setError("Onboarding is unavailable. Your saved data remains private. Try again.");setView("hockey");}}
       finally{if(live)setLoading(false);}
     })();
     return()=>{live=false;};
@@ -178,6 +178,9 @@ export default function HighSchoolYouthOnboarding({request=realRequest,authentic
   });
   const chooseHs=()=>void run(async()=>{
     if(!hsRole)return;
+    // Existing live adults use additive, email-protected Family setup. Never
+    // convert their primary account into the original DEV-only parent flow.
+    if(hsRole==="parent"&&onParent){onParent();return;}
     const current=latestState.current;
     if(current?.path!==hsRole)await request("POST",`${API}/choose`,{path:hsRole});
     const next=await refresh();

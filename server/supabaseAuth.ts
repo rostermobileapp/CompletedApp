@@ -24,6 +24,7 @@ import { existingStaffPaymentEligibility } from './highSchoolStaffPaymentEligibi
 import { HighSchoolFamilySetup, HighSchoolFamilyReview } from './highSchoolFamilySetup';
 import { registerHighSchoolFamilyRoutes } from './highSchoolFamilyHttp';
 import { proCoverage, hasPersonalPro } from './proCoverage';
+import { registerProductionOnboardingTests } from "./registerProductionOnboardingTests";
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -126,6 +127,8 @@ export async function setupAuth(app: Express) {
       true, productionFamilyEnrollmentEnabled());
       registerHighSchoolFamilyRoutes(app, family, new HighSchoolFamilyReview(pool, undefined, undefined, true),
         parent, authenticateOnboarding, true);
+      await registerProductionOnboardingTests(app,pool,parent,authenticateOnboarding,
+        id=>storage.getUserTeams(id),(id,leagueId)=>proCoverage.hasProFor(id,{leagueId}));
       return;
     }
     if(!await onboarding.installed()) throw new Error("Explicit DEV onboarding installation is required.");

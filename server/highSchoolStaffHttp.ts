@@ -10,11 +10,11 @@ import { importText, previewEvents, previewRoster } from "./highSchoolStaffImpor
 
 export function registerHighSchoolStaffRoutes(app: Express, staff: HighSchoolStaffOperations,
   events: HighSchoolStaffEvents, chat: HighSchoolStaffChat, parent: HighSchoolParentSecurity,
-  authenticate: (req: Request) => Promise<OnboardingActor>) {
+  authenticate: (req: Request) => Promise<OnboardingActor>, allowProduction = false) {
   const base = "/api/high-school/staff/teams/:teamId";
   const handle = (work: (req: Request, actor: OnboardingActor) => Promise<unknown>): RequestHandler => async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store"); res.setHeader("Pragma", "no-cache");
-    if (!isParentSecurityDevelopment()) { res.sendStatus(404); return; }
+    if (!isParentSecurityDevelopment() && !allowProduction) { res.sendStatus(404); return; }
     try {
       const actor = await authenticate(req);
       if (await parent.enrolled(actor.authId) && !await parent.authorized(actor, req.get(parentGrantHeader)))

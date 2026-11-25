@@ -1,4 +1,5 @@
 /** Child-only transport. Never reads or forwards a parent/provider session. */
+import { parentVerificationSession } from "./parentVerificationSession";
 export async function requestChildSession(token: string, method: string, url: string, body?: unknown, signal?: AbortSignal) {
   if (!/^hs_child_[A-Za-z0-9_-]{43}$/.test(token) ||
       !/^\/api\/high-school\/child-device\/(?:session|skin-context|chats\/[0-9a-f-]+\/messages)$/i.test(url)) {
@@ -21,9 +22,11 @@ export async function requestChildSession(token: string, method: string, url: st
   return response.json();
 }
 
-// Memory only. A child capability is never a parent session or a persisted
-// role/profile preference; refreshing cannot recover parent authority.
-let childToken: string | null = null;
+// Child-only capability, scoped to this tab and server expiry. Parent
+// verification is NEVER persisted or inherited by a child session.
+const tokenKey="roster-child-session";
+const childStorage=(()=>{try{return typeof window!=="undefined"?window.sessionStorage:undefined;}catch{return undefined;}})();
+let childToken: string | null = (()=>{try{const token=childStorage?.getItem(tokenKey);return token&&/^hs_child_[A-Za-z0-9_-]{43}$/.test(token)?token:null;}catch{return null;}})();
 let revision = 0;
 const listeners = new Set<() => void>();
 export const childSkinSession = {
@@ -32,7 +35,9 @@ export const childSkinSession = {
   subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
   save(token: string) {
     if (!/^hs_child_[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("Invalid child session");
+    parentVerificationSession.clear();
+    try{childStorage?.setItem(tokenKey,token);}catch{/* Memory-only if tab storage is unavailable. */}
     childToken = token; revision++; listeners.forEach(fn => fn());
   },
-  clear() { childToken = null; revision++; listeners.forEach(fn => fn()); },
+  clear() { childToken = null;try{childStorage?.removeItem(tokenKey);}catch{/* Memory-only. */} revision++; listeners.forEach(fn => fn()); },
 };

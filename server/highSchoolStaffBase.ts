@@ -3,6 +3,7 @@ import { OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
 import { staffRoles, type StaffRole } from "../shared/highSchoolStaff";
 import { HS_CONSENT_VERSION } from "../shared/highSchoolOnboarding";
 import { z } from "zod";
+import { requireProductionOnboardingTester } from "./productionOnboardingTests";
 
 export const staffFail = (code: string, status = 400): never => { throw new OnboardingError(code, status); };
 export type StaffScope = { teamId: string; programId: string; leagueId: string; role: StaffRole };
@@ -23,6 +24,7 @@ export class StaffBase {
     catch (error) { await db.query("ROLLBACK"); throw error; } finally { db.release(); }
   }
   protected async active(db: ParentTransaction, actor: OnboardingActor) {
+    if (actor.productionTest) await requireProductionOnboardingTester(db, actor);
     if (!actor.emailVerified || (!this.live && (!actor.fixture || !actor.email.endsWith("@example.com")))) staffFail("DEV_FIXTURE_REQUIRED", 403);
     const row = await db.query(`SELECT 1 FROM auth.sessions s JOIN auth.users u ON u.id=s.user_id
       WHERE s.id=$1 AND s.user_id=$2 AND(s.not_after IS NULL OR s.not_after>now())

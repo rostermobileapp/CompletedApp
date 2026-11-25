@@ -29,6 +29,7 @@
     { "source": "/get-started", "destination": "/get-started/index.html" },
     { "source": "/under-18", "destination": "/under-18/index.html" },
     { "source": "/under-18/code", "destination": "/under-18/code/index.html" },
+    { "source": "/high-school/:path*", "destination": "/index.html" },
     { "source": "/reset-password", "destination": "/reset-password/index.html" },
     { "source": "/forgot-password", "destination": "/forgot-password/index.html" },
     { "source": "/hpib", "destination": "/hpib/index.html" },

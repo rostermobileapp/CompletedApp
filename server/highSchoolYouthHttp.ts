@@ -10,11 +10,12 @@ import { proCoverage } from "./proCoverage";
 export function registerHighSchoolYouthRoutes(
   app: Express, service: HighSchoolYouthOnboarding, children: HighSchoolChildDevices,
   authenticate: (req: Request) => Promise<OnboardingActor>,
+  allowProduction = false,
 ) {
   const respond = (work: (req: Request) => Promise<unknown>): RequestHandler => async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Pragma", "no-cache");
-    if (!isParentSecurityDevelopment()) { res.sendStatus(404); return; }
+    if (!isParentSecurityDevelopment() && !allowProduction) { res.sendStatus(404); return; }
     try {
       if (!await service.installed()) throw new OnboardingError("DEV_YOUTH_INSTALL_REQUIRED", 503);
       res.json(await work(req));
@@ -37,6 +38,8 @@ export function registerHighSchoolYouthRoutes(
   app.get(`${base}/league-draft`, parent((_req, actor, grant) => service.leagueDraft(actor, grant)));
   app.post(`${base}/league-draft`, parent((req, actor, grant) => service.saveLeagueDraft(actor, req.body, grant)));
   app.get(`${base}/children`, parent((_req, actor, grant) => children.children(actor, grant)));
+  // The child service independently verifies the selected parent, challenge,
+  // approval, canonical memberships and coverage for every production request.
   app.post(`${base}/device-codes`, parent((req, actor, grant) => children.createCode(actor, req.body, grant)));
   app.get(`${base}/device-requests`, parent((_req, actor, grant) => children.requests(actor, grant)));
   app.post(`${base}/device-requests/:id/decision`, parent((req, actor, grant) => children.decision(actor, req.params.id, req.body, grant)));
@@ -50,7 +53,7 @@ export function registerHighSchoolYouthRoutes(
   app.get(`${child}/session`, respond(req => children.ownSession(childToken(req))));
   app.get(`${child}/coverage/:teamId`, respond(async req => {
     // The registry/session resolver, not a parent ID from the request, chooses
-    // the payer. With real child activation disabled this still returns 503.
+    // the payer. Coverage never grants parent authority.
     const proof = await children.verifiedProParent(childToken(req), req.params.teamId);
     if (!proof) throw new OnboardingError("CHILD_ACCESS_UNAVAILABLE", 403);
     return { teamId: proof.teamId, covered: await proCoverage.hasProFor(proof.parentId, { leagueId: proof.leagueId }) };

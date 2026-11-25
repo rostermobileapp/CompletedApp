@@ -25,7 +25,7 @@ export function Under18ShareScreen({ onCode, onBack }: {onCode?:()=>void;onBack:
         <button className="hsy-choice" onClick={()=>void share()}><span className="hsy-choice-icon"><Share2 size={24}/></span><span className="hsy-choice-copy"><strong>Share with a parent</strong><small>Send them a link to set up Roster and add you</small></span></button>
       </div>
       {notice&&<div role="status" className="hsy-card tint" style={{marginTop:16}}><p className="hsy-note" style={{margin:"0 0 8px"}}>{notice}</p>{fallback&&<div className="hsy-row"><input className="hsy-field" aria-label="Signup link to copy" readOnly value={signupLink} onFocus={e=>e.currentTarget.select()}/><button className="hsy-secondary" onClick={()=>void copy()}><Copy size={17}/></button></div>}</div>}
-      <p className="hsy-footer-note">{onCode?"A parent must set up and approve your access.":"A parent can set up Family from their eligible account. Child sign-in and phone activation are not available yet."}</p>
+      <p className="hsy-footer-note">{onCode?"A parent must set up and approve your access.":"Your parent needs to share a secure setup link and a separate code, then approve your phone. Device setup is currently limited to participating test families."}</p>
     </section>
   </ScreenFrame>;
 }

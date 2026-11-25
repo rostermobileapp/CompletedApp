@@ -1,6 +1,7 @@
 import { hsHockeyType, hsJourneyInput, hsLeagueDraftInput, validateHsLeagueDraft } from "../shared/highSchoolYouthOnboarding";
 import { HighSchoolOnboarding, OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
 import { HighSchoolParentSecurity, type ParentSql, type ParentTransaction } from "./highSchoolParentSecurity";
+import { requireProductionOnboardingTester } from "./productionOnboardingTests";
 
 /** Additive, private DEV draft services. Never creates adult billing entitlements. */
 export class HighSchoolYouthOnboarding {
@@ -23,12 +24,14 @@ export class HighSchoolYouthOnboarding {
     } catch (e) { await tx.query("ROLLBACK"); throw e; } finally { tx.release(); }
   }
   private async active(actor: OnboardingActor, db: Pick<ParentSql, "query"> = this.pool) {
+    if (actor.productionTest) await requireProductionOnboardingTester(db, actor);
     if (!(await db.query(
       "SELECT 1 FROM auth.sessions WHERE id=$1 AND user_id=$2 AND (not_after IS NULL OR not_after>now())",
       [actor.sessionId, actor.authId],
     )).rows.length) throw new OnboardingError("INVALID_SESSION", 401);
   }
   private fixture(actor: OnboardingActor) {
+    if (actor.productionTest && actor.emailVerified) return;
     if (!actor.fixture || !actor.emailVerified || !actor.email.endsWith("@example.com")) {
       throw new OnboardingError("DEV_FIXTURE_REQUIRED", 403);
     }

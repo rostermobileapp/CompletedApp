@@ -5,8 +5,10 @@
 The owner requested live family setup for **every account with a recorded DOB
 showing age 21 or older**, independent of plan, role, team membership or completed
 adult onboarding. The owner subsequently authorized the protected production
-storage, canonical membership and Auth rollout. This does not authorize child login,
-device activation or unrelated High School features.
+storage, canonical membership and Auth rollout. The initial authorization did
+not include child login or device activation; the later restricted-test
+authorization at the end of this document supersedes that exclusion only for
+the selected production test accounts.
 
 The age rule reads the existing public account's DOB through its verified Auth
 identity or existing verified-email mapping. Missing, malformed, impossible and
@@ -163,6 +165,55 @@ verified. Simulated delivery and identity-refresh SQL are not those checks.
    changes. Replit Publish does not migrate the external Supabase database.
    Confirm the actual live release before describing the feature as live.
 
-**Current status:** Protected production database foundation installed and
+**Status at that checkpoint:** Protected production database foundation installed and
 verified; no accounts enrolled. Matching application release and live acceptance
 remain outstanding. Family is **not yet enabled for live users**.
+
+## Restricted production onboarding and child activation — November 24, 2026
+
+The owner authorized private production test storage and explicitly requested
+child login and device activation, restricted to U00001, U00002 and U00250.
+Existing adult onboarding, account identity, teams and subscriptions must remain
+intact. The selected-account test is not a public High School launch.
+
+The separate installer `scripts/install-onboarding-production-tests.ts` applied
+the additive manifest to the verified external production Supabase database.
+Its final readiness check confirmed:
+
+- Private onboarding, staff-event/chat and pairing/session storage was installed.
+- All onboarding tables retained RLS and denied browser-role direct SELECT.
+- Existing Family Auth guards and restrictive public-table policies remained intact.
+- The blanket disabled-child constraint was replaced by a protected,
+  selected-parent-only constraint. No existing child profile was enabled.
+- No account was reset, no staff role was granted, and no fixture was seeded.
+
+The matching application implementation:
+
+- Exposes the production-test entry only after server verification of the
+  canonical selected account and current Auth session.
+- Uses additive Family setup for completed adults, rather than resetting their
+  primary onboarding or bypassing recorded-DOB eligibility.
+- Requires a separate nonsecret challenge link, six-character setup code,
+  approved canonical child/parent membership, current guardian consent,
+  payer-scoped coverage and verified-parent approval.
+- Commits failed-code budgets; enforces challenge lockout, expiry and one-use
+  redemption; issues a separate child-only capability, never a parent Auth JWT.
+- Revalidates access on child reads. Parent revocation remains available even
+  after coverage or team access ends.
+- Limits children to their covered-team schedules and approved Team/Family chats.
+  Child mode discards in-memory parent verification and uses tab-scoped storage
+  bounded by server expiry. No parent/payment/DM capability is granted.
+- Does not enable test purchases, automatic notification delivery or public
+  staff enrollment. Canonical league authority still controls staff approval.
+
+Verification included 44 focused child/youth unit checks, six staff/skin
+regression checks, production-mode browser approval/denial/expiry at 390px and
+1440px, ordinary adult/Family isolation, routing and the production build.
+Repository-wide TypeScript still reports unrelated existing diagnostics.
+Browser adapters did not contact real providers or send real email.
+
+**Release boundary:** This change installed production storage and prepared
+application code; it did not publish a Railway or Vercel release. The updated
+backend and frontend must both be released before claiming child login is live.
+Signed-in live UI, real-inbox approval and two-physical-device/native acceptance
+were not verified by the offline checks.

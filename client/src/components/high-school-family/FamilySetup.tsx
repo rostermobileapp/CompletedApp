@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, LockKeyhole, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
 import { HS_CONSENT_TEXT, HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS } from "@shared/highSchoolOnboarding";
@@ -12,6 +12,7 @@ import "@/components/high-school-onboarding/onboarding.css";
 import "./family-setup.css";
 
 type FamilySetupProps = {
+  devicePanel?:ReactNode;
   request?: FamilyRequestFn;
   onExit: () => void;
   onTeamChange: (teamId: string) => void;
@@ -118,6 +119,7 @@ export function FamilySetup({
   onExit,
   onTeamChange,
   teamAccessAvailable = true,
+  devicePanel,
 }: FamilySetupProps) {
   const queryClient = useQueryClient();
   const verificationRevision = useSyncExternalStore(
@@ -668,9 +670,10 @@ export function FamilySetup({
         {requests.length === 0 && draftRows.length === 0 && <div className="family-empty" style={{ marginTop: 11 }}>
           <strong>No team requests yet</strong><p>Child profiles are created only after a team approves a request.</p>
         </div>}
-        {requests.map(item => <FamilyRequestCard key={item.id} request={item} busy={busy === `team-${item.teamId}`}
+        {requests.map(item => <FamilyRequestCard key={item.id} request={item} busy={busy === `team-${item.teamId}`} deviceTesting={!!devicePanel}
           onViewTeam={teamAccessAvailable ? () => void viewTeam(item.teamId) : undefined} />)}
       </section>
+      {devicePanel}
 
       {mayCreateNew && <div className="family-panel soft" style={{ marginTop: 15 }}>
         <div className="hsy-between">
@@ -681,7 +684,9 @@ export function FamilySetup({
 
       <div className="family-panel soft" style={{ marginTop: 18 }}>
         <div className="family-kicker">What happens next</div>
-        <p className="hsy-note" style={{ marginBottom: 0 }}>Team approval is separate from coverage. A successful request never activates a child login or device; device access is disabled.</p>
+        <p className="hsy-note" style={{ marginBottom: 0 }}>{devicePanel
+          ?"Team approval is separate from coverage. Pairing requires both, plus your verified approval for each child's phone."
+          :"Team approval is separate from coverage. A successful request never activates a child login or device; device access is disabled."}</p>
       </div>
     </section>;
   };
@@ -708,10 +713,11 @@ export function FamilySetup({
   </main>;
 }
 
-function FamilyRequestCard({ request, busy, onViewTeam }: {
+function FamilyRequestCard({ request, busy, onViewTeam, deviceTesting=false }: {
   request: FamilyRequest;
   busy: boolean;
   onViewTeam?: () => void;
+  deviceTesting?:boolean;
 }) {
   const statusClass = request.status === "approved" ? "approved" : request.status === "denied" ? "denied" : "pending";
   const name = `${request.details.firstName} ${request.details.lastName}`.trim();
@@ -728,7 +734,7 @@ function FamilyRequestCard({ request, busy, onViewTeam }: {
       <span className="family-coverage"><strong>Coverage</strong><br />{coverageLabel(request.coverage)}</span>
         {request.status === "approved" && onViewTeam && <button className="family-team-link" disabled={busy} onClick={onViewTeam}>{busy ? "Opening team…" : "View team"}</button>}
     </div>
-    <div className="family-device-state"><span>Child sign-in and device access</span><strong>Disabled</strong></div>
+    <div className="family-device-state"><span>Child sign-in and device access</span><strong>{deviceTesting?"Managed in device setup":"Disabled"}</strong></div>
   </article>;
 }
 

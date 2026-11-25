@@ -151,7 +151,9 @@ export class HighSchoolStaffOperations extends StaffBase {
     const row = (await db.query(`SELECT r.*,p.league_id,p.status AS program_status FROM hs_onboarding.staff_requests r
       JOIN hs_onboarding.programs p ON p.id=r.program_id WHERE r.id=$1 FOR UPDATE OF r`, [id])).rows[0];
     if (!row || row.auth_id === actor.authId || (scope && row.program_id !== scope.programId)) staffFail("APPROVAL_FORBIDDEN", 403);
-    const league = !!(await db.query("SELECT 1 FROM hs_onboarding.league_approvers WHERE auth_id=$1 AND league_id=$2", [actor.authId, row.league_id])).rows.length;
+    const league = !!(await db.query(actor.productionTest
+      ?"SELECT 1 FROM public.leagues WHERE commissioner_id=$1::text AND id=$2::text"
+      :"SELECT 1 FROM hs_onboarding.league_approvers WHERE auth_id=$1 AND league_id=$2", [actor.authId, row.league_id])).rows.length;
     const authorities = (await db.query(`SELECT m.role,m.team_id FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
       WHERE m.user_id=$1 AND m.status='approved' AND m.child_profile_id IS NULL
       AND t.program_type='high_school' AND t.program_id=$2`, [actor.authId, row.program_id])).rows;
@@ -160,8 +162,11 @@ export class HighSchoolStaffOperations extends StaffBase {
     if (row.program_status !== "approved" && !league) staffFail("LEAGUE_APPROVAL_REQUIRED", 403);
     if (row.status !== "pending") staffFail("DECISION_ALREADY_RECORDED", 409);
     if (!staffRoles.includes(row.role)) staffFail("INVALID_STAFF_ROLE");
-    if (approve && !(await db.query(`SELECT 1 FROM auth.users WHERE id=$1 AND email_confirmed_at IS NOT NULL
-      AND lower(email) LIKE '%@example.com' AND raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true'`, [row.auth_id])).rows.length) staffFail("DEV_FIXTURE_REQUIRED", 403);
+    if (approve && !(await db.query(`SELECT 1 FROM auth.users a WHERE a.id=$1 AND a.email_confirmed_at IS NOT NULL
+      AND ((lower(a.email) LIKE '%@example.com' AND a.raw_app_meta_data->>'synthetic_high_school_onboarding_dev'='true')
+        OR ($2::boolean AND EXISTS(SELECT 1 FROM public.users u WHERE u.id=a.id::text AND u.deleted_at IS NULL
+          AND u.display_id=ANY($3::text[]))))`, [row.auth_id, !!actor.productionTest,
+        ["U00001", "U00002", "U00250"]])).rows.length) staffFail("STAFF_RECIPIENT_NOT_ELIGIBLE", 403);
     await db.query("UPDATE hs_onboarding.staff_requests SET status=$2,decided_by=$3 WHERE id=$1", [id, approve ? "approved" : "denied", actor.authId]);
     if (approve) {
       if (league) await db.query("UPDATE hs_onboarding.programs SET status='approved',approved_by=$2 WHERE id=$1", [row.program_id, actor.authId]);

@@ -317,7 +317,7 @@ try {
     assert.equal(await p.getByRole("button", { name: "Email a verification code", exact: true }).count(), 0);
   });
   await runCase("state-down", { stateError: true, cachedAdult: true }, "/roster", async (p, f) => {
-    await p.getByRole("alert").filter({ hasText: "DEV onboarding is unavailable" }).waitFor();
+    await p.getByRole("alert").filter({ hasText: "Onboarding is unavailable" }).waitFor();
     noLegacyRequests(f); assert.deepEqual((await inspection(p)).legacyPageMounts, []);
   });
   mark("verification_or_onboarding_service_failure_keeps_existing_routes_closed");

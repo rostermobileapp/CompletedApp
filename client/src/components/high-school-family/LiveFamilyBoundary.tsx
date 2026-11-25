@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { lazy, Suspense, useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,9 +11,16 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import { FamilySetup } from "./FamilySetup";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 import { FamilyStaffReview } from "./FamilyStaffReview";
+import { useProductionOnboardingAccess } from "@/hooks/useProductionOnboardingAccess";
+import HighSchoolYouthOnboarding from "@/pages/HighSchoolYouthOnboarding";
+import { ProductionOnboardingTest } from "@/components/high-school-onboarding/ProductionOnboardingTest";
+import { FamilyDevices } from "./FamilyDevices";
 
-/** Live family/parent verification only. No school dashboards, child discovery,
- * primary HS onboarding, or DEV preview is promoted by this boundary. */
+const SchoolRuntime=lazy(()=>import("@/components/high-school-skins/TeamSkinBoundary")
+  .then(module=>({default:module.ProductionSchoolRuntime})));
+
+/** Keep the ordinary live Family boundary intact; load school onboarding and
+ * dashboards only after the separate server-owned test gate accepts the user. */
 export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; entry: ReactNode }) {
   const { user, isLoading } = useAuth();
   const [path, navigate] = useLocation();
@@ -32,11 +39,13 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
   const verification = path === "/high-school/parent-verification";
   const review = path === "/high-school/family-review";
   const ready = !isLoading && !!user && !!status.data && !status.isError && !protectedWithoutProof;
+  const testRoute=/^\/high-school\/(?:testing|onboarding(?:\/approvals)?|home|schedule|roster|chat|more|payments|team)$/.test(path);
+  const testAccess=useProductionOnboardingAccess(ready&&(testRoute||family)&&!recovery);
   const loadAdultTeams = async () => (await apiRequest("GET", "/api/high-school/family/adult-team-ids")).json() as Promise<{ teamIds: string[] }>;
   const adultTeams = useQuery<{ teamIds: string[] }>({
     queryKey: ["family-adult-team-ids", user?.id],
     queryFn: loadAdultTeams,
-    enabled: ready && status.data?.enrolled === true && !family && !verification && !review && !recovery && selection.selectedType === "team",
+    enabled: ready && status.data?.enrolled === true && !family && !verification && !review && !recovery && !testRoute && selection.selectedType === "team",
     staleTime: 0, retry: false,
   });
   const scope = `${user?.id ?? "signed-out"}:${revision}:${recovery ? "recovery" : family ? "family" : review ? "review" : verification ? "verification" : ready ? "adult" : "locked"}:${status.data?.enrolled ? `${selection.selectedType}:${selection.selectedId}` : ""}`;
@@ -45,7 +54,7 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
     // A family/authority transition unmounts all adult polling and sockets.
     resetTeamRequestScope();
     const predicate = (q: { queryKey: readonly unknown[] }) =>
-      !["live-parent-status", "family-availability", "family-adult-team-ids"].includes(String(q.queryKey[0]));
+      !["live-parent-status", "family-availability", "family-adult-team-ids","production-onboarding-access"].includes(String(q.queryKey[0]));
     void queryClient.cancelQueries({ predicate });
     queryClient.removeQueries({ predicate });
     setCleanScope(scope);
@@ -68,8 +77,20 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
   };
   if (family) return <>{exitError && <p role="alert">{exitError}</p>}
     <FamilySetup onExit={() => void backToAdult()} onTeamChange={() => navigate("/high-school/family")}
+      devicePanel={testAccess.data?.enabled?<FamilyDevices actorId={user.id}/>:undefined}
       teamAccessAvailable={false} /></>;
   if (review) return <LiveFamilyRequests actorId={user.id} onExit={() => void backToAdult()} />;
+  if(testRoute){
+    if(testAccess.isLoading)return <main role="status">Checking production test access…</main>;
+    if(!testAccess.data?.enabled)return <main className="p-6 text-center"><h1>This production test is not available for your account</h1><button onClick={()=>navigate("/profile")}>Back to my account</button></main>;
+    if(path==="/high-school/testing"||path==="/high-school/onboarding/approvals")
+      return <ProductionOnboardingTest actorId={user.id} approvals={path.endsWith("/approvals")}/>;
+    if(path==="/high-school/onboarding")return <HighSchoolYouthOnboarding key={user.id}
+      onAdult={()=>navigate("/profile")} onParent={()=>navigate("/high-school/family")}/>;
+    return <Suspense fallback={<main role="status">Loading school team…</main>}>
+      <SchoolRuntime entry={entry}>{children}</SchoolRuntime>
+    </Suspense>;
+  }
   if (status.data.enrolled && selection.selectedType === "team") {
     if (!adultTeams.data && !adultTeams.isError) return <main role="status">Checking adult team access…</main>;
     if (adultTeams.isError || !adultTeams.data?.teamIds.includes(selection.selectedId ?? "")) {
