@@ -8,6 +8,15 @@ The Roster live app's production errors and daily trivia sender are visible in R
 The public APP frontend is served through Vercel; Railway serves its API/backend
 runtime. Check both hosts when verifying a release.
 
+The owner handles all GitHub pushes for this project.
+
+**Why:** The owner explicitly clarified, "I will always push to github."
+
+**How to apply:** Prepare and verify changes locally, then report that they are
+ready for the owner's push. Do not offer to push or interpret a backend-release
+request as permission to push commits. Railway release checks can follow the
+owner's push when requested.
+
 **Why:** Live readiness checks showed Vercel frontend responses and a separately
 versioned Railway backend. Updating one does not prove the other is current.
 
