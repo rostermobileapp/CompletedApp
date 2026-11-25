@@ -330,3 +330,25 @@ No Railway or Vercel release, Git push, account activation, subscription change
 or real-device pairing was performed as part of this database-only approval.
 The matching backend/frontend releases are still required before treating
 independent child setup as live and ready for phone testing.
+
+### Approved Railway backend release
+
+The owner subsequently authorized the Railway backend release. A fresh
+inspection found the exact intended revision already building from the connected
+GitHub branch, so no duplicate deployment, push or configuration change was
+triggered.
+
+- Revision: `f5b82d8c14e959b5c36615e715695bf46c1d1660`, including the independent
+  child-profile implementation.
+- Production deployment: `9aba339c-a8c1-470f-baec-cfaa8fe78729`.
+- Railway reported `SUCCESS` at `2026-11-25T14:35:42.514Z`.
+- Post-release API checks returned HTTP 200 for the backend root, HTTP 401
+  `INVALID_SESSION` for unauthenticated family state, and HTTP 401
+  `INVALID_CHILD_SESSION` for an unauthenticated child session.
+- The deployment-scoped runtime log sample contained no matched critical
+  exception signals. This is not an exhaustive application-health audit.
+
+The production database and matching Railway backend are now installed.
+The agent made no Vercel changes. The matching Vercel frontend and signed-in
+real-phone pairing/invitation acceptance remain unverified; the Railway API
+host is not the authoritative public frontend.
