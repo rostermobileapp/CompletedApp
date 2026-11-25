@@ -329,3 +329,31 @@ mtime_ms = 1795568780825
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/0082cda9-5c46-4431-a0d9-dc9030743ccf/2deb509e-e2fa-4850-bd9c-21a6de555c15"
 storage_version_token = "1795568854882411"
 content_type = "image/png"
+
+[[outputs]]
+id = "yhR9ZVI_PVqWfSOcTGEUQ"
+uri = "file://generated-artifacts/account-home/child-preview.jpg"
+type = "image"
+title = "Updated child Home"
+description = "Actual child Home component with synthetic no-team data at phone size. Not a live-account capture."
+logical_id = "07fd8185-db74-4e1d-a568-026012f95d33"
+content_hash = "sha256:2d9532ae996192d992e507653584fe549e07e1998f50a266ab9e26a105b0cf55"
+size = 35398
+mtime_ms = 1795644795573
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/07fd8185-db74-4e1d-a568-026012f95d33/3a170c92-9cfa-4b2f-997a-feff26c24fd9"
+storage_version_token = "1795644913761062"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "DXHmPlnGv70IYmzwuqZVc"
+uri = "file://generated-artifacts/account-home/coach-home.png"
+type = "image"
+title = "Updated coach Home"
+description = "Actual coach Home with synthetic approved team and schedule data. The same presentation components serve normal Home."
+logical_id = "5e3982ac-f2c9-4a5c-9006-f5946f54a60e"
+content_hash = "sha256:06dd7443a110d88c7d236cafd8263d78850865bd795242f16b00509750187d6a"
+size = 61521
+mtime_ms = 1795644723848
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/5e3982ac-f2c9-4a5c-9006-f5946f54a60e/b917ab8b-1300-4a4d-958f-5b0959ab9e2d"
+storage_version_token = "1795644914462544"
+content_type = "image/png"

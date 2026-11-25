@@ -27,7 +27,8 @@ export async function createStaffFixture(dispatch?: StaffDispatch) {
         raw_app_meta_data jsonb,raw_user_meta_data jsonb DEFAULT '{}');
       CREATE TABLE auth.sessions(id uuid PRIMARY KEY,user_id uuid REFERENCES auth.users(id),not_after timestamptz);
       CREATE TABLE hs_parent_security.accounts(auth_id uuid PRIMARY KEY,parent_email text);
-      CREATE TABLE public.users(id varchar PRIMARY KEY,email text UNIQUE,first_name text,last_name text,role text DEFAULT 'free_tier');
+      CREATE TABLE public.users(id varchar PRIMARY KEY,email text UNIQUE,first_name text,last_name text,role text DEFAULT 'free_tier',
+        deleted_at timestamptz,display_id varchar);
       CREATE TABLE public.teams(id varchar PRIMARY KEY,name text NOT NULL);
       CREATE TABLE public.team_memberships(id varchar PRIMARY KEY DEFAULT gen_random_uuid(),user_id varchar NOT NULL REFERENCES public.users(id),
         team_id varchar REFERENCES public.teams(id),status text DEFAULT 'pending',is_captain boolean DEFAULT false);

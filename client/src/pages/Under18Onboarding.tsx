@@ -71,7 +71,8 @@ export default function Under18Onboarding({ request=realRequest,initialView,chal
   if(view==="share")return <Under18ShareScreen
     onCode={()=>setView("entry")}
     onBack={()=>window.location.assign("/login?signup=1")}/>;
-  if(view==="approved"&&session)return <ChildProfileScreen data={session.data} request={childRequest}/>;
+  if(view==="approved"&&session)return <ChildProfileScreen data={session.data} request={childRequest}
+    onSignOut={()=>{childSkinSession.clear();setSession(null);setView("entry");setWaiting(null);setCode("");}}/>;
   return <ScreenFrame action={view==="entry"?<button className="hsy-primary" disabled={code.length!==6||busy} onClick={()=>void start()}>{busy?"Checking…":"Continue"}</button>:view==="waiting"?<button className="hsy-secondary" style={{width:"100%"}} onClick={()=>{setView("entry");setWaiting(null);setCode("");}}>Cancel</button>:<button className="hsy-primary" onClick={()=>{setView("entry");setWaiting(null);setCode("");setError("");}}>Try another code</button>}>
     <section className="hsy-content" style={{paddingTop:36}}>
       {view==="entry"?<>

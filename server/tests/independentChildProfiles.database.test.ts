@@ -22,7 +22,7 @@ test("a consented child pairs before a team and the same phone receives a later 
   let token="",deviceId="";
   try {
     await pool.query(`ALTER TABLE public.users ADD COLUMN onboarding_completed boolean DEFAULT false,
-      ADD COLUMN date_of_birth varchar,ADD COLUMN display_id text,ADD COLUMN deleted_at timestamptz;
+      ADD COLUMN date_of_birth varchar,ADD COLUMN IF NOT EXISTS display_id text,ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
       ALTER TABLE auth.users ADD COLUMN deleted_at timestamptz;
       ALTER TABLE hs_parent_security.accounts ADD COLUMN activated_at timestamptz DEFAULT now();
       CREATE TABLE public.account_user_merges(source_user_id text);
@@ -131,6 +131,9 @@ test("a consented child pairs before a team and the same phone receives a later 
       let data=await devices.ownSession(token);
       assert.equal(data.teamStatus,"connected");assert.equal(data.schedule.length,1);
       assert.equal(data.schedule[0].title,"Approved practice");
+      assert.equal(data.schedule[0].teamId,ids.varsity);
+      assert.equal(data.schedule[0].status,"scheduled");
+      assert.equal(data.schedule.some((event:any)=>event.teamId===ids.jv),false);
       assert.equal(data.chats.filter((c:any)=>c.kind==="team").length,1);
       const teamChat=data.chats.find((c:any)=>c.kind==="team")!.id;
       covered=false;data=await devices.ownSession(token);

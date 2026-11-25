@@ -5,7 +5,7 @@ import { build } from "esbuild";
 import express from "express";
 import { WebSocketServer } from "ws";
 import { chromium } from "playwright-core";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import type { SkinContext, SkinTeam, TeamRole } from "../shared/teamSkin";
 
 const out = "generated-artifacts/high-school-team-skins";
@@ -20,7 +20,8 @@ const teams = (role: TeamRole): SkinTeam[] => [
 let fixture: SkinContext;
 const bundle = await build({
   bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic",
-  loader: { ".css": "empty" }, define: {
+  alias: { "@assets": `${process.cwd()}/attached_assets` },
+  loader: { ".css": "empty", ".png": "dataurl" }, define: {
     "process.env.NODE_ENV": '"development"',
     "import.meta.env": JSON.stringify({ DEV: true, VITE_ISOLATED_DEVELOPMENT: "true" }),
   },
@@ -88,11 +89,14 @@ app.get(["/api/adult-fixture", "/api/trivia-fixture"], (_req, res) => res.json({
 app.get("/api/user", (_req, res) => res.json({ id: fixture.actor.id }));
 app.use("/api", (_req, res) => res.status(403).json({ code: "NO_OTHER_APIS_IN_FIXTURE" }));
 app.get("/page.js", (_req, res) => res.type("js").send(bundle.outputFiles[0].text));
-app.get("/page.css", async (_req, res) => res.type("css").send(await readFile(
-  "client/src/components/high-school-skins/team-skin-shell.css", "utf8")));
+app.get("/page.css", async (_req, res) => {
+  const compiled=(await readdir("dist/public/assets")).find(name=>/^index-.*\.css$/.test(name))!;
+  res.type("css").send(await readFile(`dist/public/assets/${compiled}`,"utf8")
+    +await readFile("client/src/components/high-school-skins/team-skin-shell.css","utf8"));
+});
 app.get("*", (req, res) => res.type("html").send(`<!doctype html><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/page.css">
-  <div id="root"></div><script>window.__fixture=${JSON.stringify(fixture)};
+  <div id="root"></div><script>sessionStorage.removeItem('roster-child-session');window.__fixture=${JSON.stringify(fixture)};
   localStorage.setItem('dashboardSelectedType','team');localStorage.setItem('dashboardSelectedId',${JSON.stringify(req.query.initial ?? "varsity")});
   </script><script src="/page.js"></script>`));
 const server = app.listen(0, "127.0.0.1"); await new Promise<void>(resolve => server.on("listening", resolve));
@@ -108,6 +112,7 @@ try {
   for (const width of [390, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1000 } });
     const page = await context.newPage();
+    page.setDefaultTimeout(8_000);
     page.on("pageerror", e => report.errors.push(e.message));
     await page.route("**/*", r => new URL(r.request().url()).origin === origin ? r.continue() : r.abort());
     for (const role of roles) {
@@ -117,11 +122,16 @@ try {
       await page.goto(`${origin}${role === "player" ? "/under-18/code" : "/"}`);
       await page.getByTestId("skin-role-label").waitFor();
       if (role === "player") assert.equal(new URL(page.url()).pathname, "/high-school/home");
-      const tabs = await page.locator('[data-testid^="skin-tab-"]').allTextContents();
-      assert.deepEqual(tabs.map(t => t.trim()), role === "parent"
-        ? ["Home", "Schedule", "Chat", "Payments", "Family"]
-        : role === "player" ? ["Home", "Schedule", "Chat", "Team"] : ["Home", "Schedule", "Roster", "Chat", "More"]);
-      await page.getByTestId("skin-tab-schedule").click();
+      if(role==="parent"||role==="player") {
+        const tabs = await page.locator('[data-testid^="skin-tab-"]').allTextContents();
+        assert.deepEqual(tabs.map(t => t.trim()), role === "parent"
+          ? ["Home", "Schedule", "Chat", "Payments", "Family"] : ["Home", "Schedule", "Chat", "Team"]);
+        await page.getByTestId("skin-tab-schedule").click();
+      } else {
+        assert.equal(await page.getByTestId("bottom-navigation").innerText(),"My Team\nMessages\nHome\nPayments\nProfile");
+        await page.getByTestId("button-hamburger-menu").click();
+        await page.getByRole("button",{name:"Schedule",exact:true}).click();
+      }
       assert.equal(await page.getByTestId("skin-route-denied").count(), 0);
       await page.evaluate(() => (window as any).navigate("/trophy-case"));
       await page.getByTestId("skin-route-denied").waitFor();
@@ -162,7 +172,8 @@ try {
     assert.equal((await page.evaluate(() => (window as any).cacheKeys())).some((k: string[]) => k[0] === "/api/adult-fixture"), false);
     await page.getByLabel("Choose active team").selectOption("jv");
     assert.match(await page.getByTestId("skin-role-label").innerText(), /Team Manager/);
-    await page.getByLabel("Choose active team").selectOption("adult");
+    await page.getByLabel("Choose active team").click();
+    await page.getByRole("button", {name:/^Adult team/}).click();
     await page.getByText("Adult query loaded").waitFor();
     assert.equal(await page.evaluate(() => (window as any).__life.sockets), 1);
     mark(`Mixed ${width}px: parent/manager/adult transitions; old request aborted, timers stopped, cache removed, adult remounted`);
@@ -205,6 +216,9 @@ try {
   }
   assert.deepEqual(report.errors, []);
   console.log(JSON.stringify({ scope: report.scope, checks: report.checks, browserErrors: report.errors }, null, 2));
+} catch(error) {
+  console.error(error);
+  throw error;
 } finally {
   await writeFile(`${out}/report.json`, JSON.stringify(report, null, 2));
   await browser.close();

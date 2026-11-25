@@ -15,8 +15,8 @@ and asked for planning first with approval before implementation.
 not change global account roles to choose a skin, or apply an HS skin to an
 unrelated adult team. Make the current team and role visible in the header.
 
-All HS skins must avoid loading patches, achievements, Trophy Case, Daily
-Trivia, streaks, odds, beer counters and beer statistics. Children additionally
+All HS skins must avoid loading feature data for patches, achievements, Trophy
+Case, Daily Trivia, streaks, odds, beer counters and beer statistics. Children additionally
 cannot reach payments, billing, settings, account changes, DMs or arbitrary
 groups; their profile is view-only and chats are Team/Family only.
 
@@ -29,6 +29,22 @@ overlays and direct routes as well as menus. Keep child authority separate
 from parent login credentials and paid coverage. Staff-only identities must
 not enter HS player rosters, RSVPs or stats; preserve unrelated adult playing
 memberships.
+
+Child and coach Home must look exactly like the normal account Home, not like
+a separate onboarding-success page or a separately designed staff dashboard.
+The owner will review role-specific screens and button restrictions separately.
+The normal Home's static shortcut labels/artwork can therefore be shown without
+enabling their feature loaders or granting additional permissions.
+
+**Why:** On November 25, 2026, the owner rejected the child's “You're in” page
+and supplied the normal dark Home as the exact reference for children and coaches.
+
+**How to apply:** Reuse normal-account presentation components, not the adult
+runtime or copied data hooks. Keep header, selector, cards, schedule and bottom
+navigation consistent, with approved role-specific data and honest empty states.
+Preserve existing security and unavailable-feature boundaries until the owner
+explicitly changes them. Do not invent games, standings, odds or alerts to make
+the screens look populated.
 
 Staff management is not AD-only. Head coaches approve or decline assistants
 and managers for their own team; ADs manage staff across their approved

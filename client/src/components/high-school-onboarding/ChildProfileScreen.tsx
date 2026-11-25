@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check } from "lucide-react";
-import { HsyButton, HsyInput, ScreenFrame, type RequestFn } from "./shared";
+import type { MainScreenId } from "@/lib/mainNavRoutes";
+import { ScopedAccountFrame, ScopedHomeFeed, ScopedHomeNotice, ScopedPageHeading, type ScopedHomeEvent } from "@/components/dashboard/ScopedAccountHome";
+import type { RequestFn } from "./shared";
 
 type ChildData = {
   child: { firstName: string; lastName?: string;birthYear?:number;gradYear?:number };
   teamStatus?: "awaiting_team" | "coverage_pending" | "connected";
   teams?: Array<{id:string;name:string}>;
-  schedule?: Array<{ id: string; title?: string; startsAt?: string; location?: string }>;
+  schedule?: ScopedHomeEvent[];
   chats?: Array<{ id: string; name: string; kind?: "team" | "family" }>;
 };
 type ChildMessage = { id: string; sender: string; body: string; createdAt: string };
 
-export function ChildProfileScreen({ data, request, autoRefresh=true }: { data: ChildData; request: RequestFn; autoRefresh?:boolean }) {
+export function ChildProfileScreen({ data, request, autoRefresh=true, onSignOut }: {
+  data: ChildData; request: RequestFn; autoRefresh?:boolean; onSignOut?: () => void;
+}) {
   const [current,setCurrent]=useState(data);
   const [refreshError,setRefreshError]=useState("");
   useEffect(()=>setCurrent(data),[data]);
@@ -21,6 +24,15 @@ export function ChildProfileScreen({ data, request, autoRefresh=true }: { data: 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [page, setPage] = useState<MainScreenId | "schedule">("home");
+  const [teamId, setTeamId] = useState<string>();
+  const [notice, setNotice] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => {
+    if (selectedChat && !current.chats?.some(chat => chat.id === selectedChat.id)) {
+      setSelectedChat(undefined); setMessages([]); setBody("");
+    }
+  }, [current, selectedChat]);
   useEffect(()=>{
     if(!autoRefresh)return;
     let live=true,pending=false;
@@ -75,52 +87,76 @@ export function ChildProfileScreen({ data, request, autoRefresh=true }: { data: 
     } catch (error) { setError((error as Error).message); }
     finally { setSending(false); }
   };
-  return <ScreenFrame>
-    <section className="hsy-content" style={{ paddingTop: 44 }}>
-      <div className="hsy-success" style={{ display: "inline-flex", padding: 12, marginBottom: 18 }}><Check size={24}/></div>
-      <h1 className="hsy-title-success">You're in, {current.child.firstName}</h1>
-      <p className="hsy-subtitle">Your parent approved this session. It opens only your approved player profile.</p>
-      {current.child.birthYear&&<p className="hsy-note">Birth year: {current.child.birthYear}{current.child.gradYear?` · Graduation year: ${current.child.gradYear}`:""}</p>}
-      {refreshError&&<p role="alert" className="hsy-error">{refreshError}</p>}
-      {current.teamStatus==="awaiting_team"&&<div className="hsy-card tint" role="status">
-        <strong>Ready for your team</strong><p className="hsy-note">Your profile is set up. Ask your parent to accept your team invitation in their account. Approved team information will appear here automatically—no new setup code is needed.</p>
-      </div>}
-      {current.teamStatus==="coverage_pending"&&<div className="hsy-card tint" role="status">
-        <strong>Your team is connected</strong><p className="hsy-note">Your parent needs to check Player Pro or league coverage before team information is available. You do not need to pair this phone again.</p>
-      </div>}
-      {!!current.teams?.length&&<div className="hsy-card" style={{marginBottom:16}}><strong>Your teams</strong>{current.teams.map(team=><p className="hsy-note" key={team.id}>{team.name}</p>)}</div>}
-      <div className="hsy-card"><strong>Team schedule</strong>
-        {current.schedule?.length ? current.schedule.map(event => <div className="hsy-list-row" key={event.id}>
-          <span><strong>{event.title ?? "Team event"}</strong>
-            <small style={{ display: "block", color: "#64748b" }}>
-              {event.startsAt && <time dateTime={event.startsAt}>{new Date(event.startsAt).toLocaleString()}</time>}
-              {event.location ? ` · ${event.location}` : ""}
-            </small>
-          </span>
-        </div>) : <p className="hsy-note">No schedule items yet.</p>}
+  const teams = current.teams ?? [];
+  const activeTeam = teams.find(team => team.id === teamId) ?? teams[0];
+  const events = (current.schedule ?? []).filter(event => !event.teamId || event.teamId === activeTeam?.id);
+  const navigate = (next: MainScreenId) => {
+    if (next === "payments") { setNotice("Payments are not available from this player session."); return; }
+    setSelectedChat(undefined); setPage(next);
+  };
+  const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try { setCurrent(await request("GET", "/api/high-school/child-device/session")); setRefreshError(""); }
+    catch {
+      setCurrent(previous => ({...previous,teams:[],schedule:[],chats:[]}));
+      setSelectedChat(undefined); setMessages([]); setBody("");
+      setRefreshError("Access could not be refreshed. Check your connection or ask your parent to verify this phone.");
+    } finally { setRefreshing(false); }
+  };
+  const teamStatus = current.teamStatus === "awaiting_team" ? <div role="status">
+    <strong className="text-sm">Ready for your team</strong>
+    <p className="text-sm text-muted-foreground mt-1">Ask your parent to accept your team invitation. Your approved team will appear automatically.</p>
+  </div> : current.teamStatus === "coverage_pending" ? <div role="status">
+    <strong className="text-sm">Your team is connected</strong>
+    <p className="text-sm text-muted-foreground mt-1">Your parent needs to check Player Pro or league coverage before team information is available.</p>
+  </div> : undefined;
+  const actionClass = "rounded-lg border px-4 py-3 text-sm font-medium hover:bg-muted/50 disabled:opacity-50";
+  return <ScopedAccountFrame name={current.child.firstName} teams={teams.map(team => ({...team,role:"Player"}))} selectedTeamId={activeTeam?.id}
+    onTeamChange={setTeamId} activeId={page === "schedule" ? "home" : page}
+    onNavigate={navigate} onRefresh={() => void refresh()} refreshing={refreshing} onSignOut={onSignOut}>
+    {refreshError && <p role="alert" className="px-6 py-3 text-sm text-destructive">{refreshError}</p>}
+    {(page === "home" || page === "schedule") && <ScopedHomeFeed events={events} teamName={activeTeam?.name}
+      onUnavailable={feature => setNotice(`${feature} is not available in this player session yet.`)}
+      onAlerts={() => setNotice("There are no player alerts to show.")} onAll={() => setPage("schedule")}
+      onAdd={() => setNotice("Only authorized team staff can add schedule items.")}
+      fullSchedule={page === "schedule"} status={teamStatus} />}
+    {page === "teams" && <ScopedPageHeading title="My Team">
+      {teams.length ? <div className="space-y-3">{teams.map(team =>
+        <button key={team.id} className={`${actionClass} block w-full text-left`} onClick={() => {setTeamId(team.id);setPage("home");}}>{team.name}</button>
+      )}</div> : teamStatus ?? <p className="text-sm text-muted-foreground">No approved team is available.</p>}
+    </ScopedPageHeading>}
+    {page === "profile" && <ScopedPageHeading title="Profile">
+      <div className="rounded-xl hairline elev-rest p-4 bg-[#e2e2e2] dark:bg-[#212121] space-y-2">
+        <h2 className="font-semibold">{current.child.firstName} {current.child.lastName}</h2>
+        {current.child.birthYear && <p className="text-sm text-muted-foreground">Birth year: {current.child.birthYear}</p>}
+        {current.child.gradYear && <p className="text-sm text-muted-foreground">Graduation year: {current.child.gradYear}</p>}
+        <p className="text-sm text-muted-foreground">Your parent manages your player details.</p>
       </div>
-      <div className="hsy-card" style={{ marginTop: 16 }}><strong>Approved chats</strong>
-        {current.chats?.length ? current.chats.map(chat => <HsyButton className="hsy-secondary" key={chat.id} style={{ width: "100%", marginTop: 12 }} onClick={() => setSelectedChat(chat)}>
-          {chat.name}
-        </HsyButton>) : <p className="hsy-note">No chats are available.</p>}
-      </div>
-      {selectedChat && <section className="hsy-card" style={{ marginTop: 16 }} aria-label="Approved player chat">
-        <div className="hsy-between"><strong>{selectedChat.name}</strong><HsyButton className="hsy-secondary" onClick={() => setSelectedChat(undefined)}>Close chat</HsyButton></div>
-        {loading && <p role="status">Loading messages…</p>}
-        {error && <p role="alert" className="hsy-error">{error}</p>}
-        <div aria-live="polite">{messages.map(message => <div key={message.id} className="hsy-card tint" style={{ marginTop: 12 }}>
-          <strong>{message.sender}</strong><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.body}</p>
-        </div>)}</div>
-        {!loading && !messages.length && !error && <p className="hsy-note">No messages yet.</p>}
-        <form onSubmit={event => { event.preventDefault(); void send(); }} className="hsy-stack" style={{ marginTop: 14 }}>
-          <label className="hsy-label">Message this approved chat
-            <HsyInput value={body} maxLength={1000} onChange={event => setBody(event.target.value)}/>
-          </label>
-          <HsyButton type="submit" className="hsy-primary" disabled={!body.trim() || sending}>{sending ? "Sending…" : "Send message"}</HsyButton>
-          <HsyButton className="hsy-secondary" disabled={sending} onClick={() => void load().catch(error => setError(error.message))}>Refresh messages</HsyButton>
-        </form>
-      </section>}
-      <p className="hsy-footer-note">No parent controls, payments, coach messaging or unapproved groups are available from this player session.</p>
-    </section>
-  </ScreenFrame>;
+    </ScopedPageHeading>}
+    {page === "messages" && <ScopedPageHeading title="Messages">
+      {!selectedChat ? <div className="space-y-3">{current.chats?.length ? current.chats.map(chat =>
+        <button className={`${actionClass} block w-full text-left`} key={chat.id} onClick={() => setSelectedChat(chat)}>{chat.name}</button>
+      ) : <p className="text-sm text-muted-foreground">No chats are available.</p>}</div> :
+        <section aria-label="Approved player chat" className="space-y-3">
+          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">{selectedChat.name}</h2>
+            <button className={actionClass} onClick={() => setSelectedChat(undefined)}>Close chat</button></div>
+          {loading && <p role="status">Loading messages…</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <div aria-live="polite" className="space-y-3">{messages.map(message =>
+            <div key={message.id} className="rounded-xl border p-3">
+              <strong className="text-sm">{message.sender}</strong><p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+            </div>)}</div>
+          {!loading && !messages.length && !error && <p className="text-sm text-muted-foreground">No messages yet.</p>}
+          <form onSubmit={event => {event.preventDefault();void send();}} className="space-y-3">
+            <label className="block text-sm">Message this approved chat
+              <input className="w-full rounded-lg border bg-background px-3 py-3 mt-2" value={body} maxLength={1000} onChange={event => setBody(event.target.value)}/>
+            </label>
+            <button type="submit" className={`${actionClass} bg-primary text-primary-foreground`} disabled={!body.trim() || sending}>{sending ? "Sending…" : "Send message"}</button>
+            <button type="button" className={`${actionClass} ml-2`} disabled={sending} onClick={() => void load().catch(error => setError(error.message))}>Refresh messages</button>
+          </form>
+        </section>}
+    </ScopedPageHeading>}
+    {notice && <ScopedHomeNotice title="Player access" onClose={() => setNotice("")}>{notice}</ScopedHomeNotice>}
+  </ScopedAccountFrame>;
 }

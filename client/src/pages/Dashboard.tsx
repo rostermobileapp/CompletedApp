@@ -9,7 +9,7 @@ import { usePermissions } from '@/context/SubscriptionContext';
 import { useTeamSkinFacts, skinTeamLabel } from '@/context/TeamSkinFacts';
 import { notifyDashboardSelectionChange, DASHBOARD_SELECTION_CHANGE_EVENT } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, BrickWall, BarChart3, Award, ChevronDown, ChevronRight, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, BarChart3, Award, ChevronDown, ChevronRight, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -32,8 +32,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
-import lightModeLogo from '@assets/Light_Mode_Logo_1768322748282.png';
-import darkModeLogo from '@assets/Dark_Mode_Logo_1770738054930.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import PastSeasonsModal from '@/components/PastSeasonsModal';
 import { useTheme } from '@/context/ThemeContext';
@@ -51,6 +49,7 @@ import StatsPage from '@/pages/Stats';
 import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
 import { TeamAwardHolderStrip } from '@/components/team-awards/TeamAwardHolders';
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
+import { HomeHeader, HomeScheduleToolbar, HomeShortcutCards } from '@/components/dashboard/HomePresentation';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
 import { ScheduledGamePrediction } from '@/components/ScheduledGamePrediction';
 
@@ -2558,59 +2557,31 @@ function DashboardMobile() {
   return (
     <>
       <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
-        {/* Header */}
-        <div className="sticky top-0 z-50 bg-background p-3 flex items-center pr-[16px] mb-[0px] pt-[0px] pb-[0px] mt-[4px] pl-[4px]">
-            <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
-              <div className="flex items-center gap-2">
-                <img 
-                  src={theme === 'dark' ? darkModeLogo : lightModeLogo}
-                  alt="RosterHockey logo"
-                  className="h-[50px] pl-[12px] pr-[12px]"
-                  data-testid="img-roster-logo"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <TeamAwardHolderStrip playerId={(userProfile as any)?.id ? String((userProfile as any).id) : undefined} />
-                <button 
-                  onClick={() => navigate('/profile')}
-                  className={`w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden ${(userProfile as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}
-                  data-testid="button-profile"
-                >
-                  {(userProfile as any)?.profileImageUrl ? (
-                    <img 
-                      src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
-                      alt="Profile"
-                      className="w-full h-full object-cover bg-transparent"
-                    />
-                  ) : (
-                    <span className="text-primary-foreground text-lg font-semibold">
-                      {(userProfile as any)?.firstName?.[0] || 'U'}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={async () => {
-                    setIsRefreshing(true);
-                    await queryClient.invalidateQueries();
-                    setTimeout(() => setIsRefreshing(false), 600);
-                  }}
-                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                  data-testid="button-refresh-home"
-                  disabled={isRefreshing}
-                >
-                  <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </button>
-                <button
-                  onClick={() => setShowHamburgerMenu(true)}
-                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-                  data-testid="button-hamburger-menu"
-                >
-                  <Menu className="w-8 h-8 text-foreground" />
-                </button>
-                <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
-              </div>
-            </div>
-          </div>
+        <HomeHeader
+          dark={theme === 'dark'}
+          avatarHasImage={!!(userProfile as any)?.profileImageUrl}
+          avatar={(userProfile as any)?.profileImageUrl ? (
+            <img
+              src={getImageUrl((userProfile as any).profileImageUrl) || ''}
+              alt="Profile"
+              className="w-full h-full object-cover bg-transparent"
+            />
+          ) : (
+            <span className="text-primary-foreground text-lg font-semibold">
+              {(userProfile as any)?.firstName?.[0] || 'U'}
+            </span>
+          )}
+          onProfile={() => navigate('/profile')}
+          onRefresh={async () => {
+            setIsRefreshing(true);
+            await queryClient.invalidateQueries();
+            setTimeout(() => setIsRefreshing(false), 600);
+          }}
+          refreshing={isRefreshing}
+          onMenu={() => setShowHamburgerMenu(true)}
+          extra={<TeamAwardHolderStrip playerId={(userProfile as any)?.id ? String((userProfile as any).id) : undefined} />}
+        />
+        <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
         {/* Team/League/Tournament Selection Dropdown */}
         {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0) || hasPastSeasons) && (
           <div className="px-6 mt-[4px] mb-[8px]">
@@ -2873,87 +2844,39 @@ function DashboardMobile() {
         {/* 4-Card Section — hidden while a pre-window tournament countdown
             is active so the player only sees the timer below. */}
         {!isTournamentCountdownActive && (
-        <div className="px-6 mb-[8px]">
-          <div className="grid grid-cols-4 gap-3">
-            {/* Announcements Card */}
-            <div 
-              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
-              data-testid="card-announcements"
-              onClick={() => openOverlay('/announcements', <Announcements />)}
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <BrickWall className="w-8 h-8 text-blue-500 mb-[10px]" />
-                <p className="text-xs font-medium text-center">Wall</p>
-              </div>
-              {selectedType === 'tournament' && selectedId ? (
-                <AnnouncementBadge tournamentId={selectedId} />
-              ) : (
-                effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />
-              )}
-            </div>
+        <HomeShortcutCards
+          onWall={() => openOverlay('/announcements', <Announcements />)}
+          onPhotos={() => {
+            let entityType: 'tournament' | 'league' | 'team' | null = null;
+            let entityId: string | null = null;
+            let route: string | null = null;
 
-            {/* Photos Card - Always clickable, paywall shown on MediaGalleryPage if needed */}
-            <div 
-              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
-              data-testid="card-photos"
-              onClick={() => {
-                let entityType: 'tournament' | 'league' | 'team' | null = null;
-                let entityId: string | null = null;
-                let route: string | null = null;
-                
-                if (selectedType === 'tournament' && selectedId) {
-                  entityType = 'tournament';
-                  entityId = selectedId;
-                  route = `/media/tournament/${selectedId}`;
-                } else if (effectiveLeagueId) {
-                  entityType = 'league';
-                  entityId = effectiveLeagueId;
-                  route = `/media/league/${effectiveLeagueId}`;
-                } else if (selectedType === 'team' && selectedId) {
-                  entityType = 'team';
-                  entityId = selectedId;
-                  route = `/media/team/${selectedId}`;
-                }
-                
-                if (route && entityType && entityId) {
-                  openOverlay(route, <MediaGalleryPage overlayEntityType={entityType} overlayEntityId={entityId} />);
-                }
-              }}
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <Camera className="w-8 h-8 text-blue-500 mb-[10px]" />
-                <p className="text-xs font-medium">Photos</p>
-              </div>
-            </div>
+            if (selectedType === 'tournament' && selectedId) {
+              entityType = 'tournament';
+              entityId = selectedId;
+              route = `/media/tournament/${selectedId}`;
+            } else if (effectiveLeagueId) {
+              entityType = 'league';
+              entityId = effectiveLeagueId;
+              route = `/media/league/${effectiveLeagueId}`;
+            } else if (selectedType === 'team' && selectedId) {
+              entityType = 'team';
+              entityId = selectedId;
+              route = `/media/team/${selectedId}`;
+            }
 
-            {/* Stats Card */}
-            <button
-              type="button"
-              className="w-full text-left rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              data-testid="card-stats"
-              onClick={() => setShowStatsChoice(true)}
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <BarChart3 className="w-8 h-8 text-blue-500 mb-[10px]" />
-                <p className="text-xs font-medium">Stats</p>
-              </div>
-            </button>
-
-            {/* Standings Card */}
-            <div 
-              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
-              data-testid="card-standings"
-              onClick={() => {
-                setShowStandingsModal(true);
-              }}
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <Award className="w-8 h-8 text-blue-500 mb-[10px]" />
-                <p className="text-xs font-medium">Standings</p>
-              </div>
-            </div>
-          </div>
-        </div>
+            if (route && entityType && entityId) {
+              openOverlay(route, <MediaGalleryPage overlayEntityType={entityType} overlayEntityId={entityId} />);
+            }
+          }}
+          onStats={() => setShowStatsChoice(true)}
+          onStandings={() => setShowStandingsModal(true)}
+          wallBadge={selectedType === 'tournament' && selectedId ? (
+            <AnnouncementBadge tournamentId={selectedId} />
+          ) : (
+            effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />
+          )}
+        />
         )}
         {/* Tournament-focused section when tournament is selected */}
         {selectedType === 'tournament' && selectedTournament && !primaryTeam && (
@@ -3097,59 +3020,12 @@ function DashboardMobile() {
         <div className="px-6 mt-0 mb-[8px]">
           {/* Keep a single header row, with the section title left and view
               controls right aligned. */}
-          <div className="flex min-h-[58px] items-center justify-between mb-[4px] whitespace-nowrap">
-            <div className="flex shrink-0 items-center gap-2">
-              <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
-              <Button
-                onClick={() => setShowAddEventDialog(true)}
-                className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
-                data-testid="button-add-event"
-              >
-                <Plus className="w-[12.8px] h-[12.8px]" />
-              </Button>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <div
-                className="grid w-[106px] shrink-0 grid-cols-2 items-center rounded-md p-0.5 bg-muted text-[11px] sm:w-[140px] sm:text-xs"
-                role="tablist"
-                aria-label="Schedule view"
-              >
-                <button
-                  type="button"
-                  onClick={() => setScheduleView('list')}
-                  className={`px-1 py-0.5 rounded transition-colors text-center ${
-                    scheduleView === 'list'
-                      ? 'bg-blue-500 text-white shadow-sm'
-                      : 'text-muted-foreground'
-                  }`}
-                  aria-pressed={scheduleView === 'list'}
-                  data-testid="mobile-schedule-toggle-list"
-                >
-                  List
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScheduleView('calendar')}
-                  className={`px-1 py-0.5 rounded transition-colors text-center ${
-                    scheduleView === 'calendar'
-                      ? 'bg-blue-500 text-white shadow-sm'
-                      : 'text-muted-foreground'
-                  }`}
-                  aria-pressed={scheduleView === 'calendar'}
-                  data-testid="mobile-schedule-toggle-calendar"
-                >
-                  Calendar
-                </button>
-              </div>
-              <button
-                onClick={() => navigate('/calendar')}
-                className="text-primary text-xs sm:text-sm"
-                data-testid="button-view-all-games"
-              >
-                View All
-              </button>
-            </div>
-          </div>
+          <HomeScheduleToolbar
+            view={scheduleView}
+            onViewChange={setScheduleView}
+            onViewAll={() => navigate('/calendar')}
+            onAdd={() => setShowAddEventDialog(true)}
+          />
           
           {gamesLoading || invitesLoading || requestsLoading || remindersLoading || visibleTournamentsLoading ? (
             <div className="bg-card rounded-xl hairline elev-rest p-4 animate-pulse" data-testid="loading-upcoming-games">

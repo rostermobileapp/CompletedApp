@@ -26,7 +26,7 @@ export function parentHomeFixture(root: string): Plugin {
     setup(builder) {
       builder.onResolve({ filter: /^@\/|^\.\// }, args => {
         if (!sources.includes(args.importer)) return;
-        if (/pages\/(?:Dashboard|ParentVerification)$|components\/SwipeableMainScreens$|lib\/(?:appRouteEntry|mobileScreenResume|parentVerificationSession|signupAgeRestriction|queryClient|supabase)$|hooks\/useAuth$/.test(args.path)) return;
+        if (/pages\/(?:Dashboard|ParentVerification)$|components\/(?:SwipeableMainScreens|dashboard\/HomePresentation)$|lib\/(?:appRouteEntry|mobileScreenResume|parentVerificationSession|signupAgeRestriction|queryClient|supabase)$|hooks\/useAuth$/.test(args.path)) return;
         if (args.importer.endsWith("/Dashboard.tsx") && /components\/ui\//.test(args.path)) return;
         return { path: args.path, namespace: "home-peripheral" };
       });

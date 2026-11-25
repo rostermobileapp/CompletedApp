@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright-core";
 
@@ -14,8 +14,8 @@ const mocks:Record<string,string>={
   "./queryClient":`export class ApiError extends Error{};export const apiRequest=()=>{throw Error("Unexpected real API")}`,
 };
 const bundle=await build({
-  bundle:true,write:false,format:"iife",jsx:"automatic",loader:{".css":"empty"},
-  alias:{"@":path.join(root,"client/src"),"@shared":path.join(root,"shared")},
+  bundle:true,write:false,format:"iife",jsx:"automatic",loader:{".css":"empty",".png":"dataurl"},
+  alias:{"@":path.join(root,"client/src"),"@shared":path.join(root,"shared"),"@assets":path.join(root,"attached_assets")},
   define:{"import.meta.env":JSON.stringify({PROD:true,DEV:false}),"process.env.NODE_ENV":'"production"'},
   plugins:[{name:"isolated-family-api",setup(b){
     b.onResolve({filter:/.*/},args=>Object.hasOwn(mocks,args.path)?{path:args.path,namespace:"fixture"}:undefined);
@@ -55,7 +55,9 @@ const bundle=await build({
     </QueryClientProvider>);
   `},
 });
+const compiledCss=(await readdir("dist/public/assets")).find(name=>/^index-.*\.css$/.test(name))!;
 const css=(await Promise.all([
+  readFile(`dist/public/assets/${compiledCss}`,"utf8"),
   readFile("client/src/components/high-school-onboarding/onboarding.css","utf8"),
   readFile("client/src/components/high-school-family/family-setup.css","utf8"),
 ])).join("\n");
@@ -139,8 +141,10 @@ try{
     await page.getByText("Ready for your team",{exact:true}).waitFor();
     await page.evaluate("window.fixture.connected=true;window.dispatchEvent(new Event('focus'))");
     await page.getByText("Approved practice",{exact:true}).waitFor();
+    await page.getByTestId("nav-messages").click();
     await page.getByRole("button",{name:"My team chat",exact:true}).waitFor();checks++;
     await page.evaluate("window.fixture.covered=false;window.dispatchEvent(new Event('focus'))");
+    await page.getByTestId("nav-home").click();
     await page.getByText("Your team is connected",{exact:true}).waitFor();
     assert.equal(await page.getByText("Approved practice",{exact:true}).count(),0);
     assert.equal(await page.getByRole("button",{name:"My team chat",exact:true}).count(),0);checks++;

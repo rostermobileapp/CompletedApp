@@ -334,7 +334,8 @@ export class HighSchoolChildDevices {
     if(this.options.production)await this.syncChats(this.pool,session.child_id,session.parent_auth_id,session.child.teamIds);
     let schedule = (await this.pool.query(`SELECT id,title,starts_at AS "startsAt",location
       FROM hs_onboarding.child_events WHERE child_id=$1 ORDER BY starts_at LIMIT 100`, [session.child_id])).rows;
-    if(this.options.production)schedule=(await this.pool.query(`SELECT id,title,starts_at AS "startsAt",rink AS location
+    if(this.options.production)schedule=(await this.pool.query(`SELECT id,title,starts_at AS "startsAt",rink AS location,
+      team_id AS "teamId",opponent,status
       FROM hs_onboarding.staff_events WHERE team_id=ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY starts_at LIMIT 100`,
     [session.child.teamIds])).rows;
     const chats = (await this.pool.query(`SELECT c.id,c.name,c.kind FROM hs_onboarding.child_chats c

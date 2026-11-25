@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowUpRight,
@@ -24,6 +24,7 @@ import {
 } from "@shared/teamSkin";
 import { queryClient } from "@/lib/queryClient";
 import { StaffOperations } from "./StaffOperations";
+import { ScopedAccountFrame, ScopedHomeNotice } from "@/components/dashboard/ScopedAccountHome";
 import "./team-skin-shell.css";
 
 type TeamSkinShellProps = {
@@ -46,6 +47,7 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 
 export function TeamSkinShell({ context, activeTeam, onTeamChange, operational = false }: TeamSkinShellProps) {
   const [location, navigate] = useLocation();
+  const [profileOpen, setProfileOpen] = useState(false);
   const childMode = context.actor.type === "child";
 
   const authorizedTeams = useMemo(
@@ -106,6 +108,36 @@ export function TeamSkinShell({ context, activeTeam, onTeamChange, operational =
   const staffOperational = operational &&
     context.actor.type === "adult" &&
     ["head_coach", "assistant_coach", "team_manager", "athletic_director"].includes(safeTeam.role);
+
+  // Use the same normal-account Home presentation, but never its adult hooks,
+  // billing queries, trivia, achievements loaders or prefetch providers.
+  if (allowed && staffOperational && (location === "/" || location === "/high-school/home")) {
+    return <div data-testid="team-skin-shell">
+      <ScopedAccountFrame name={roleLabel} selectedTeamId={safeTeam.id}
+        teams={authorizedTeams.map(team => ({id:team.id,name:team.name,role:ROLE_LABELS[team.role]}))}
+        onTeamChange={onTeamChange} activeId="home"
+        onNavigate={id => {
+          if (id === "profile") { setProfileOpen(true); return; }
+          navigate(({home:"/high-school/home",teams:"/high-school/roster",messages:"/high-school/chat",payments:"/high-school/more"})[id]);
+        }}
+        onRefresh={() => {
+          void queryClient.invalidateQueries({queryKey:["hs-staff",context.actor.id,safeTeam.id]});
+          void queryClient.invalidateQueries({queryKey:["team-skin-context"]});
+        }}
+        menu={<>
+          <button onClick={() => navigate("/high-school/schedule")}>Schedule</button>
+          <button onClick={() => navigate("/high-school/more")}>Team tools</button>
+        </>}>
+        <StaffOperations actorId={context.actor.id} teamId={safeTeam.id}
+          role={safeTeam.role as "head_coach" | "assistant_coach" | "team_manager" | "athletic_director"}
+          onContextRefresh={() => {void queryClient.invalidateQueries({queryKey:["team-skin-context"]});}} />
+        {profileOpen && <ScopedHomeNotice title="Profile" onClose={() => setProfileOpen(false)}>
+          <p>{roleLabel} · {safeTeam.name}</p>
+          <p className="mt-2">Your approved team role has not changed. Account editing is not available from this team view.</p>
+        </ScopedHomeNotice>}
+      </ScopedAccountFrame>
+    </div>;
+  }
 
   return (
     <main className="tss" data-testid="team-skin-shell">

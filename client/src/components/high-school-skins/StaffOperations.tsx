@@ -15,6 +15,7 @@ import { ROLE_LABELS } from "@shared/teamSkin";
 import { StaffLineupEditor } from "./StaffLineupEditor";
 import "./staff-operations.css";
 import { FamilyStaffReview } from "@/components/high-school-family/FamilyStaffReview";
+import { ScopedHomeFeed, ScopedHomeNotice } from "@/components/dashboard/ScopedAccountHome";
 
 type Props = { actorId: string; teamId: string; role: StaffRole; onContextRefresh: () => void };
 type Request = { method: string; path: string; body?: unknown; refreshContext?: boolean };
@@ -121,6 +122,8 @@ export function StaffOperations({ actorId, teamId, role, onContextRefresh }: Pro
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [modal, modalSetter] = useState<ModalState | null>(null);
   const [pendingNotifications, setPendingNotifications] = useState(0);
+  const [homeNotice, setHomeNotice] = useState("");
+  const [homeEvent, setHomeEvent] = useState<StaffEvent>();
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -172,19 +175,21 @@ export function StaffOperations({ actorId, teamId, role, onContextRefresh }: Pro
   const canCreatePayment = data.capabilities.createPayments;
   const mapHref = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
-  return <div className="tss-staff">
-      <div className="staff-topline">
+  return <div className={activePage === "home" ? "scoped-staff-home" : "tss-staff"}>
+      {activePage !== "home" && <div className="staff-topline">
         <div><span className="staff-overline">{isAD ? "Program operations" : `${ROLE_LABELS[role]} · team operations`}</span>
           <h2>{({ home: "Ready for what’s next.", schedule: "Schedule", roster: "Roster", chat: "Team conversations", more: "Program tools" } as Record<string, string>)[activePage]}</h2>
           <p>{isAD ? `${data.team.programName} · authorized program view` : `${data.team.name} · ${roster.length} active roster members`}</p>
         </div>
         {activePage === "schedule" && <button className="staff-btn-primary" type="button" onClick={() => setModal({ kind: "event", event: null })}><Plus size={15} /> Add event</button>}
         {activePage === "roster" && <button className="staff-btn-primary" type="button" onClick={() => setModal({ kind: "roster-import" })}><FileUp size={15} /> Import roster</button>}
-      </div>
+      </div>}
       {notice && <div className={`staff-alert ${notice.type}`} role={notice.type === "error" ? "alert" : "status"}>{notice.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}{notice.text}</div>}
-      {activePage === "home" && <HomeView data={data} nextGame={nextGame} roster={roster} gaps={gaps} readyCount={readyCount} mapHref={mapHref}
-        lineupError={homeLineupQuery.isError ? errorMessage(homeLineupQuery.error) : null} retryLineup={() => void homeLineupQuery.refetch()} lineupLoading={homeLineupQuery.isPending}
-        openLineup={event => setModal({ kind: "lineup", event })} go={navigate} />}
+      {activePage === "home" && <ScopedHomeFeed events={data.events.map(event => ({...event,location:event.rink}))}
+        teamName={data.team.name} onUnavailable={feature => setHomeNotice(`${feature} is not available in this team view yet.`)}
+        onAlerts={() => navigate("/high-school/more")} alerts={gaps.length + data.approvals.length}
+        onAll={() => navigate("/high-school/schedule")} onAdd={() => setModal({kind:"event",event:null})}
+        onEvent={event => setHomeEvent(data.events.find(item => item.id === event.id))} />}
       {activePage === "schedule" && <ScheduleView events={data.events} pending={runRequest.isPending}
         add={() => setModal({ kind: "event", event: null })}
         edit={event => setModal({ kind: "event", event })}
@@ -205,8 +210,16 @@ export function StaffOperations({ actorId, teamId, role, onContextRefresh }: Pro
           const result = await doRequest({ method: "POST", path: `${base(teamId)}/dispatch/retry`, body: {} }) as { notification?: { pending?: number } };
           if (mounted.current && typeof result?.notification?.pending === "number") setPendingNotifications(result.notification.pending);
         }} />}
-    {modal && <StaffModal key={`${modal.kind}:${modal.event?.id ?? ""}`} modal={modal} close={() => setModal(null)} data={data} teamId={teamId}
-      request={doRequest} pending={runRequest.isPending} onSuccess={setModalNotice} staffKey={staffKey} />}
+    {modal && <div className="tss-staff"><StaffModal key={`${modal.kind}:${modal.event?.id ?? ""}`} modal={modal} close={() => setModal(null)} data={data} teamId={teamId}
+      request={doRequest} pending={runRequest.isPending} onSuccess={setModalNotice} staffKey={staffKey} /></div>}
+    {homeNotice && <ScopedHomeNotice title="Team access" onClose={() => setHomeNotice("")}>{homeNotice}</ScopedHomeNotice>}
+    {homeEvent && <ScopedHomeNotice title={homeEvent.opponent ? `vs ${homeEvent.opponent}` : homeEvent.title} onClose={() => setHomeEvent(undefined)}>
+      <p>{dateLabel(homeEvent.startsAt, {weekday:"long",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</p>
+      <p className="mt-2">{homeEvent.rink || data.team.rink || "Rink not set"}</p>
+      {nextGame?.id === homeEvent.id && <p className="mt-2">{homeLineupQuery.isFetching ? "Checking lineup…" : `${readyCount} lineup entries saved`}</p>}
+      {homeLineupQuery.isError && nextGame?.id === homeEvent.id && <p className="text-destructive mt-2">Lineup could not be loaded.</p>}
+      <button className="staff-btn-primary mt-4" onClick={() => {setModal({kind:"lineup",event:homeEvent});setHomeEvent(undefined);}}>Set lineup</button>
+    </ScopedHomeNotice>}
   </div>;
 
   function setModal(value: ModalState | null) { modalSetter(value); }

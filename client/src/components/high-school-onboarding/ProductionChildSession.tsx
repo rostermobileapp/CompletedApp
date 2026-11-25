@@ -24,12 +24,5 @@ export function ProductionChildSession({token}:{token:string}) {
     </div>
   </section></div></main>;
   if(!session.data)return <main className="hsy" role="status" aria-live="polite">Checking player access…</main>;
-  return <>
-    <div className="hsy" style={{minHeight:0,padding:"12px 20px 0"}}>
-      <div style={{width:"min(100%, 430px)",margin:"0 auto",display:"flex",justifyContent:"flex-end"}}>
-        <button className="hsy-secondary" onClick={leave}>Sign out of player session</button>
-      </div>
-    </div>
-    <ChildProfileScreen data={session.data} request={request} autoRefresh={false}/>
-  </>;
+  return <ChildProfileScreen data={session.data} request={request} autoRefresh={false} onSignOut={leave}/>;
 }

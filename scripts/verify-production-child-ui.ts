@@ -5,12 +5,12 @@ import { build } from "esbuild";
 import { createServer } from "node:http";
 import { chromium } from "playwright-core";
 import path from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 
 const root=process.cwd(),challenge="10000000-0000-4000-8000-000000000004";
 const bundle=await build({
   bundle:true,write:false,platform:"browser",format:"iife",jsx:"automatic",
-  alias:{"@":path.join(root,"client/src")},loader:{".css":"empty"},
+  alias:{"@":path.join(root,"client/src"),"@assets":path.join(root,"attached_assets")},loader:{".css":"empty",".png":"dataurl"},
   define:{"import.meta.env":JSON.stringify({PROD:true,DEV:false}),"process.env.NODE_ENV":'"production"'},
   stdin:{resolveDir:root,loader:"tsx",contents:`
     import React from 'react';import{createRoot}from'react-dom/client';
@@ -29,7 +29,9 @@ const bundle=await build({
     createRoot(document.getElementById('root')).render(<Under18 request={request}/>);
   `},
 });
-const css=await readFile("client/src/components/high-school-onboarding/onboarding.css","utf8");
+const compiledCss=(await readdir("dist/public/assets")).find(name=>/^index-.*\.css$/.test(name))!;
+const css=await readFile(`dist/public/assets/${compiledCss}`,"utf8")
+  +await readFile("client/src/components/high-school-onboarding/onboarding.css","utf8");
 const server=createServer((req,res)=>{
   const js=req.url?.startsWith("/bundle.js");
   res.setHeader("Content-Type",js?"text/javascript; charset=utf-8":"text/html; charset=utf-8");
@@ -60,7 +62,7 @@ try{
     assert.equal(await page.evaluate("window.fixtureRequests.length"),0);checks++;
     await page.getByRole("button",{name:"Continue",exact:true}).click();
     await page.getByRole("heading",{name:"Waiting for your parent"}).waitFor();
-    await page.getByRole("heading",{name:"You're in, Synthetic Player",exact:true}).waitFor({timeout:10000});
+    await page.getByTestId("scoped-account-home").waitFor({timeout:10000});
     const codeOnly=await page.evaluate("window.fixtureRequests.find(call=>call.url.endsWith('/start')).body") as any;
     assert.equal(codeOnly.code,"K7P2QX");assert.equal("challengeId" in codeOnly,false);checks++;
     assert.ok(!page.url().includes("K7P2QX"));checks++;
@@ -73,8 +75,8 @@ try{
         await page.getByRole("textbox",{name:`Code character ${i+1}`,exact:true}).fill(char);
       await page.getByRole("button",{name:"Continue",exact:true}).click();
       await page.getByRole("heading",{name:"Waiting for your parent"}).waitFor();
-      const heading=decision==="approved"?"You're in, Synthetic Player":decision==="denied"?"Your parent didn't approve this phone":"This request expired";
-      await page.getByRole("heading",{name:heading,exact:true}).waitFor({timeout:10000});
+      if(decision==="approved")await page.getByTestId("scoped-account-home").waitFor({timeout:10000});
+      else await page.getByRole("heading",{name:decision==="denied"?"Your parent didn't approve this phone":"This request expired",exact:true}).waitFor({timeout:10000});
       const calls=await page.evaluate("window.fixtureRequests") as Array<{method:string;url:string}>;
       assert.ok(calls.some(call=>call.url.endsWith("/poll")));
       assert.equal(calls.some(call=>call.url.endsWith("/session")),decision==="approved");
