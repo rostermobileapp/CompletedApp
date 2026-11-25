@@ -34,8 +34,8 @@ const bundle = await build({
   alias: { "@": path.join(root, "client/src") }, loader: { ".css": "empty" },
   define: { "import.meta.env": JSON.stringify({ PROD: true, DEV: false }), "process.env.NODE_ENV": '"production"' },
   plugins: [parentHomeFixture(root), { name: "isolated-auth-and-transport", setup(build) {
-    build.onResolve({ filter: /(?:hooks\/useAuth|hooks\/useDashboardSelection|hooks\/useProductionOnboardingAccess|lib\/teamRequestScope)$/ }, args => ({ path: args.path, namespace: "boundary-fixture" }));
-    build.onResolve({ filter: /(?:\/|^)(?:FamilySetup|FamilyDevices|FamilyStaffReview|ProductionOnboardingTest|HighSchoolYouthOnboarding|ResetPassword|ForgotPassword|TeamSkinBoundary)$/ }, args => ({ path: args.path, namespace: "boundary-fixture" }));
+    build.onResolve({ filter: /(?:hooks\/useAuth|hooks\/useDashboardSelection|hooks\/useProductionOnboardingAccess)$/ }, args => ({ path: args.path, namespace: "boundary-fixture" }));
+    build.onResolve({ filter: /(?:\/|^)(?:FamilyDevices|FamilyStaffReview|ProductionOnboardingTest|HighSchoolYouthOnboarding|ResetPassword|ForgotPassword|TeamSkinBoundary)$/ }, args => ({ path: args.path, namespace: "boundary-fixture" }));
     build.onLoad({ filter: /.*/, namespace: "boundary-fixture" }, args => ({ loader: "tsx", resolveDir: root, contents:
       args.path.endsWith("useAuth") ? `export const useAuth=()=>({user:window.fixtureSessionEnded?null:{id:${JSON.stringify(actor.authId)}},isAuthenticated:!window.fixtureSessionEnded,isLoading:false});` :
       args.path.endsWith("useDashboardSelection") ? `import{useState}from'react';export const useDashboardSelection=()=>{const[s,set]=useState(()=>({selectedType:localStorage.getItem('dashboardSelectedType'),selectedId:localStorage.getItem('dashboardSelectedId')}));return{...s,clearSelection:()=>{localStorage.removeItem('dashboardSelectedType');localStorage.removeItem('dashboardSelectedId');set({selectedType:null,selectedId:null})}}};` :
@@ -193,7 +193,53 @@ try {
    await realHome();
    assert.equal(await page.evaluate("window.fixtureSignOutCalls"), 0); checks++;
    await page.unroute("**/api/high-school/parent-verification/status");
-   await page.evaluate("sessionStorage.removeItem('boundary-mode')");
+    // Submit through the real boundary, not just a standalone verification page:
+    // saving device authority invalidates status and may remount that page.
+    await pool.query("DELETE FROM hs_parent_security.challenges WHERE auth_id=$1", [actor.authId]);
+    mail.length = 0;
+    await page.goto(`${verificationUrl}?mode=boundary`);
+    await page.getByRole("button", { name: "Email a verification code", exact: true }).click();
+    await page.getByLabel("Four-digit email code").waitFor();
+    await page.getByLabel("Four-digit email code").fill(mail.at(-1)!);
+    // A denied submission must retain the current challenge rather than making
+    // the parent request a second email (which has a separate resend limit).
+    await page.route("**/api/high-school/parent-verification/verify", route => route.fulfill({
+      status:429,contentType:"application/json",body:'{"code":"CODE_RATE_LIMIT"}',
+    }));
+    await page.getByRole("button", { name: "Verify email code", exact: true }).click();
+    await page.getByRole("alert").filter({hasText:"Too many requests."}).waitFor();
+    assert.equal(await page.getByLabel("Four-digit email code").inputValue(), mail.at(-1));
+    assert.equal(mail.length, 1); checks++;
+    await page.unroute("**/api/high-school/parent-verification/verify");
+    await page.getByRole("button", { name: "Verify email code", exact: true }).click();
+    await page.getByRole("button", { name: "Continue to family setup", exact: true }).waitFor({timeout:5000});
+    assert.equal((await familyState()).data.verified, true);
+    assert.equal(mail.length, 1);
+    assert.equal(await page.getByRole("button", { name: "Email a verification code", exact: true }).count(), 0);
+    // The server's verified status also survives a full page load. A separate
+    // password-change code must remain mandatory despite parent approval.
+    await page.reload();
+    await page.getByRole("button", { name: "Continue to family setup", exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Email a verification code", exact: true }).count(), 0);
+    await page.getByRole("button", { name: "Change password", exact: true }).click();
+    await page.getByRole("button", { name: "Email a verification code", exact: true }).waitFor();
+    assert.equal(await page.getByLabel("New shared password", {exact:true}).count(), 0);
+    await page.getByRole("button", { name: "Parent controls", exact: true }).click();
+    assert.equal(mail.length, 1); checks++;
+    await page.getByRole("button", { name: "Continue to family setup", exact: true }).click();
+    await page.getByRole("heading", { name: "Your family, your pace", exact: true }).waitFor();
+    assert.equal(new URL(page.url()).pathname, "/high-school/family"); checks++;
+    await page.getByRole("button", {name:"Back to my account",exact:true}).click();
+    // No adult teams in this synthetic fixture: its exit returns to Profile.
+    await page.waitForURL("**/profile");
+    await page.goto(`${origin}/high-school/family?mode=boundary`);
+    await page.getByRole("heading", { name: "Your family, your pace", exact: true }).waitFor();
+    assert.equal(mail.length, 1); checks++;
+    await page.evaluate(async () => {
+      await fetch("/api/high-school/parent-verification/revoke", {method:"POST",headers:{Authorization:"Bearer "+(window as any).fixtureAccessToken}});
+      (window as any).fixture.store.clear();
+    });
+    await page.evaluate("sessionStorage.removeItem('boundary-mode')");
   await pool.query("DELETE FROM hs_parent_security.challenges WHERE auth_id=$1", [actor.authId]); mail.length = 0;
   await page.goto(verificationUrl);
   assert.equal((await familyState()).data.verified, false); checks++;

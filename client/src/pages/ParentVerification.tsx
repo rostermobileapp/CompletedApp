@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { apiRequest, getAuthHeaders, ApiError } from "@/lib/queryClient";
 import { parentVerificationSession } from "@/lib/parentVerificationSession";
 import { forgetMobileScreen } from "@/lib/mobileScreenResume";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { PARENT_CODE_DIGITS } from "@shared/highSchoolParentCodePolicy";
 import "@/components/onboarding-auth-light.css";
 
@@ -41,7 +41,10 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
   const [resendAt, setResendAt] = useState(0);
   const [tick, setTick] = useState(Date.now());
   const [finished, setFinished] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
+  // Saving a grant refreshes the account boundary and can remount this page.
+  // Restore the server-checked result instead of asking for a second code.
+  const [unlocked, setUnlocked] = useState(verified);
+  useEffect(() => { setUnlocked(verified); }, [verified]);
   useEffect(() => {
     const timer = window.setInterval(() => setTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -124,6 +127,7 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
     navigate("/", { replace: true });
   };
   const working = busy || leaving;
+  const parentApproved = purpose === "parent_action" && unlocked;
   const button = "rounded-lg border px-4 py-3 text-sm font-medium disabled:opacity-50";
   const input = "w-full rounded-lg border bg-background px-3 py-3";
   return <main className="onboarding-light parent-verification-light min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-10">
@@ -146,9 +150,9 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
             <button className={button} disabled={working} aria-pressed={purpose === "password_change"} onClick={() => selectPurpose("password_change")}>Change password</button>
           </div>
           <p className="text-xs text-muted-foreground">{purpose === "password_change" ? "Password changes always require a separate, one-use email code." : "Remember this parent-only device for 30 days. Shared sign-in alone never unlocks parent controls. Sign out or lock parent controls to end its approval."}</p>
-          {!passwordGrant && <button className={`${button} w-full bg-primary text-primary-foreground`} onClick={request}
+          {!passwordGrant && !parentApproved && <button className={`${button} w-full bg-primary text-primary-foreground`} onClick={request}
             disabled={working || tick < resendAt}>{tick < resendAt ? `Request another code in ${Math.ceil((resendAt - tick) / 1000)}s` : "Email a verification code"}</button>}
-          {challenge && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void verify(); }}>
+          {challenge && !parentApproved && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void verify(); }}>
             <label className="block text-sm" htmlFor="parent-email-code">Four-digit email code</label>
             <input id="parent-email-code" className={input} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, PARENT_CODE_DIGITS))}
               inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{4}" maxLength={PARENT_CODE_DIGITS} required disabled={working} />
@@ -164,9 +168,11 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
             <button className={`${button} w-full bg-primary text-primary-foreground`} disabled={working} type="submit">Change shared password</button>
           </form>}
           <button className={`${button} w-full`} disabled={working} onClick={lock}>Lock parent controls</button>
-          {unlocked && <Link href="/" className={`${button} block text-center`}>Continue to the app</Link>}
+          {parentApproved && <button type="button" disabled={working} onClick={() => navigate("/high-school/family")}
+            className={`${button} block w-full text-center bg-primary text-primary-foreground`}>Continue to family setup</button>}
         </>}
       {message && <p role="status" className="text-sm">{message}</p>}
+      {!message && parentApproved && <p role="status" className="text-sm">This parent device is verified. Continue to family setup to manage your children.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <p className="text-xs text-muted-foreground">No child profiles or production family accounts are enabled by this DEV test.</p>
     </section>
