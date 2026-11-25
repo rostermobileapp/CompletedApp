@@ -13,7 +13,6 @@ import { resetTeamRequestScope } from "@/lib/teamRequestScope";
 import { TeamSkinShell } from "./TeamSkinShell";
 import { TeamSkinPreview } from "./TeamSkinPreview";
 import ParentVerification from "@/pages/ParentVerification";
-import { ParentAccountHome } from "@/components/high-school-family/ParentAccountHome";
 import { FamilySetup } from "@/components/high-school-family/FamilySetup";
 import { LiveFamilyBoundary } from "@/components/high-school-family/LiveFamilyBoundary";
 import { ProductionChildSession } from "@/components/high-school-onboarding/ProductionChildSession";
@@ -159,7 +158,7 @@ function AdultDiscovery({ adult, entry }: { adult: ReactNode; entry: ReactNode }
   if (!user) return <>{entry}</>;
   if (query.isError) {
     if ((path === "/" || path === "/app") &&
-      (query.error as { data?: { code?: string } }).data?.code === "PARENT_VERIFICATION_REQUIRED") return <ParentAccountHome />;
+      (query.error as { data?: { code?: string } }).data?.code === "PARENT_VERIFICATION_REQUIRED") return <>{adult}</>;
     if ((query.error as { data?: { code?: string } }).data?.code === "PARENT_VERIFICATION_REQUIRED") {
       return <ParentVerification />;
     }

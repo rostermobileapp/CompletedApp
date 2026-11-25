@@ -87,9 +87,12 @@ Parent verification must always offer an exit, including midway through setup.
 
 **How to apply:** Always offer Back to Home without signing out, clearing device
 approval or changing saved family setup, including when verification is locked or
-unavailable. Home must not immediately reopen the verification gate. Keep private
-parent/adult data protected server-side; a signed-in Home without parent approval
-must not confer authority or mount protected account queries.
+unavailable. Home means the actual existing app dashboard, not a replacement
+Family landing page; the owner explicitly rejected that substitute. Do not
+immediately reopen the verification gate. Normal authenticated account reads
+must work without parent proof, while family/child controls and mutations retain
+their server-side verification. Preserve active-session and canonical membership
+checks; navigation never grants parent authority.
 
 Keep the reusable remembered-device proof out of JavaScript-readable storage.
 

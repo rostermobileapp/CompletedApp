@@ -15,7 +15,6 @@ import { useProductionOnboardingAccess } from "@/hooks/useProductionOnboardingAc
 import HighSchoolYouthOnboarding from "@/pages/HighSchoolYouthOnboarding";
 import { ProductionOnboardingTest } from "@/components/high-school-onboarding/ProductionOnboardingTest";
 import { FamilyDevices } from "./FamilyDevices";
-import { ParentAccountHome } from "./ParentAccountHome";
 
 const SchoolRuntime=lazy(()=>import("@/components/high-school-skins/TeamSkinBoundary")
   .then(module=>({default:module.ProductionSchoolRuntime})));
@@ -39,9 +38,11 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
   const family = path === "/high-school/family";
   const verification = path === "/high-school/parent-verification";
   const review = path === "/high-school/family-review";
-  const ready = !isLoading && !!user && !!status.data && !status.isError && !protectedWithoutProof;
+  const ready = !isLoading && !!user && !!status.data && !status.isError;
   const testRoute=/^\/high-school\/(?:testing|onboarding(?:\/approvals)?|home|schedule|roster|chat|more|payments|team)$/.test(path);
-  const testAccess=useProductionOnboardingAccess(ready&&(testRoute||family)&&!recovery);
+  const testAccess=useProductionOnboardingAccess(ready&&!protectedWithoutProof&&(testRoute||family)&&!recovery);
+  const parentSurface = family || verification || review || testRoute || path.startsWith("/high-school/");
+  const home = path === "/" || path === "/app";
   const loadAdultTeams = async () => (await apiRequest("GET", "/api/high-school/family/adult-team-ids")).json() as Promise<{ teamIds: string[] }>;
   const adultTeams = useQuery<{ teamIds: string[] }>({
     queryKey: ["family-adult-team-ids", user?.id],
@@ -49,6 +50,13 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
     enabled: ready && status.data?.enrolled === true && !family && !verification && !review && !recovery && !testRoute && selection.selectedType === "team",
     staleTime: 0, retry: false,
   });
+  const invalidHomeTeam = home && status.data?.enrolled && selection.selectedType === "team"
+    && !!adultTeams.data && !adultTeams.data.teamIds.includes(selection.selectedId ?? "");
+  useLayoutEffect(() => {
+    // A remembered school-team selection must not trap Home in the recovery
+    // page or mount that team's legacy dashboard. Keep valid adult selections.
+    if (invalidHomeTeam) selection.clearSelection();
+  }, [invalidHomeTeam, selection.clearSelection]);
   const scope = `${user?.id ?? "signed-out"}:${revision}:${recovery ? "recovery" : family ? "family" : review ? "review" : verification ? "verification" : ready ? "adult" : "locked"}:${status.data?.enrolled ? `${selection.selectedType}:${selection.selectedId}` : ""}`;
   const [cleanScope, setCleanScope] = useState("");
   useLayoutEffect(() => {
@@ -66,11 +74,9 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
   if (path === "/forgot-password") return <ForgotPassword />;
   if (isLoading) return <main role="status" className="min-h-screen grid place-items-center">Checking account access…</main>;
   if (!user) return <>{entry}</>;
-  // Home does not confer parent authority or mount protected account queries.
-  if ((path === "/" || path === "/app") && (status.isError || protectedWithoutProof)) return <ParentAccountHome />;
-  if (status.isError) return <ParentVerification unavailable />;
+  if (status.isError) return parentSurface ? <ParentVerification unavailable /> : <>{children}</>;
   if (!status.data) return <main role="status" className="min-h-screen grid place-items-center">Checking account access…</main>;
-  if (protectedWithoutProof || verification) return <ParentVerification enrolled={status.data.enrolled} verified={status.data.verified} />;
+  if ((parentSurface && protectedWithoutProof) || verification) return <ParentVerification enrolled={status.data.enrolled} verified={status.data.verified} />;
   const backToAdult = async () => {
     try {
       const { teamIds } = await loadAdultTeams();
@@ -95,6 +101,7 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
     </Suspense>;
   }
   if (status.data.enrolled && selection.selectedType === "team") {
+    if (invalidHomeTeam) return <main role="status">Returning to Home…</main>;
     if (!adultTeams.data && !adultTeams.isError) return <main role="status">Checking adult team access…</main>;
     if (adultTeams.isError || !adultTeams.data?.teamIds.includes(selection.selectedId ?? "")) {
       return <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">

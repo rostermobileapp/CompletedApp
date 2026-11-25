@@ -2,7 +2,7 @@
  * loopback SQL. Auth/mail adapters are synthetic; never a live-device claim. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import express from "express";
 import cookieParser from "cookie-parser";
@@ -10,10 +10,11 @@ import { build } from "esbuild";
 import { chromium } from "playwright-core";
 import { createStaffFixture } from "../server/tests/helpers/highSchoolStaffFixture";
 import { HighSchoolParentSecurity, ParentSecurityError, parentDigest } from "../server/highSchoolParentSecurity";
-import { registerParentVerificationRoutes, PARENT_API, parentDeviceCookie, parentGrantHeader } from "../server/highSchoolParentHttp";
+import { registerParentVerificationRoutes, PARENT_API, parentDeviceCookie, parentGrantHeader, requireDevParentAuthority } from "../server/highSchoolParentHttp";
 import { HighSchoolFamilySetup, HighSchoolFamilyReview } from "../server/highSchoolFamilySetup";
 import { registerHighSchoolFamilyRoutes } from "../server/highSchoolFamilyHttp";
 import { PARENT_DEVICE_SECONDS } from "../shared/highSchoolParentCodePolicy";
+import { parentHomeFixture } from "./helpers/parentHomeFixture";
 
 // Only this disposable process uses these flags; no workspace configuration
 // or provider credentials are read or changed.
@@ -24,27 +25,29 @@ const f = await createStaffFixture(), { pool, actors } = f, actor = actors.paren
 const mail: string[] = [];
 const parent = new HighSchoolParentSecurity(pool, async value => { mail.push(value.code); });
 const family = new HighSchoolFamilySetup(pool, parent, async () => "personal");
-const jwt = (value: typeof actor) => `fixture.${Buffer.from(JSON.stringify({ sub: value.authId, session_id: value.sessionId })).toString("base64url")}.fixture`;
-const accessToken = jwt(actor), otherToken = jwt(actors.otherParent);
+const issuer = "https://synthetic-parent-home.example/auth/v1";
+const validJwt = (value: typeof actor) => `fixture.${Buffer.from(JSON.stringify({ sub: value.authId, session_id: value.sessionId, iss: issuer, aud: "authenticated", exp: Math.floor(Date.now()/1000)+3600 })).toString("base64url")}.fixture`;
+const accessToken = validJwt(actor), otherToken = validJwt(actors.otherParent);
 const root = process.cwd();
 const bundle = await build({
   bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic",
   alias: { "@": path.join(root, "client/src") }, loader: { ".css": "empty" },
   define: { "import.meta.env": JSON.stringify({ PROD: true, DEV: false }), "process.env.NODE_ENV": '"production"' },
-  plugins: [{ name: "isolated-auth-and-transport", setup(build) {
+  plugins: [parentHomeFixture(root), { name: "isolated-auth-and-transport", setup(build) {
     build.onResolve({ filter: /(?:hooks\/useAuth|hooks\/useDashboardSelection|hooks\/useProductionOnboardingAccess|lib\/teamRequestScope)$/ }, args => ({ path: args.path, namespace: "boundary-fixture" }));
     build.onResolve({ filter: /(?:\/|^)(?:FamilySetup|FamilyDevices|FamilyStaffReview|ProductionOnboardingTest|HighSchoolYouthOnboarding|ResetPassword|ForgotPassword|TeamSkinBoundary)$/ }, args => ({ path: args.path, namespace: "boundary-fixture" }));
-    build.onLoad({ filter: /.*/, namespace: "boundary-fixture" }, args => ({ loader: "tsx", contents:
-      args.path.endsWith("useAuth") ? `export const useAuth=()=>({user:window.fixtureSessionEnded?null:{id:${JSON.stringify(actor.authId)}},isLoading:false});` :
-      args.path.endsWith("useDashboardSelection") ? `export const useDashboardSelection=()=>({selectedType:null,selectedId:null});` :
+    build.onLoad({ filter: /.*/, namespace: "boundary-fixture" }, args => ({ loader: "tsx", resolveDir: root, contents:
+      args.path.endsWith("useAuth") ? `export const useAuth=()=>({user:window.fixtureSessionEnded?null:{id:${JSON.stringify(actor.authId)}},isAuthenticated:!window.fixtureSessionEnded,isLoading:false});` :
+      args.path.endsWith("useDashboardSelection") ? `import{useState}from'react';export const useDashboardSelection=()=>{const[s,set]=useState(()=>({selectedType:localStorage.getItem('dashboardSelectedType'),selectedId:localStorage.getItem('dashboardSelectedId')}));return{...s,clearSelection:()=>{localStorage.removeItem('dashboardSelectedType');localStorage.removeItem('dashboardSelectedId');set({selectedType:null,selectedId:null})}}};` :
       args.path.endsWith("useProductionOnboardingAccess") ? `export const useProductionOnboardingAccess=()=>({data:{enabled:false},isLoading:false});` :
       args.path.endsWith("teamRequestScope") ? `export const resetTeamRequestScope=()=>{};` :
       `const Empty=()=>null;export default Empty;export const FamilySetup=Empty,FamilyDevices=Empty,FamilyStaffReview=Empty,ProductionOnboardingTest=Empty,ProductionSchoolRuntime=Empty;`
     }));
-    build.onResolve({ filter: /^@\/lib\/(?:queryClient|supabase)$/ }, args => ({ path: args.path, namespace: "fixture" }));
+    build.onResolve({ filter: /^(?:@\/lib\/|\.\/(?:lib\/)?)(?:queryClient|supabase)$/ }, args => ({ path: args.path.endsWith("supabase") ? "@/lib/supabase" : "@/lib/queryClient", namespace: "fixture" }));
     build.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ loader: "ts", resolveDir: root, contents: args.path.endsWith("supabase")
       ? `export const supabase={auth:{getSession:async()=>({data:{session:window.fixtureSessionEnded?null:{access_token:window.fixtureAccessToken}}}),signOut:async()=>{if(window.fixtureSignOutError)return{error:new Error('Synthetic sign-out failure')};window.fixtureSignOutCalls++;window.fixtureSessionEnded=true;return{error:null}}}};`
-       : `import{QueryClient}from'@tanstack/react-query';export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false}}});export class ApiError extends Error{};
+       : `import{QueryClient}from'@tanstack/react-query';export const queryClient=new QueryClient({defaultOptions:{queries:{retry:false,queryFn:async({queryKey})=>(await apiRequest('GET',queryKey.filter(x=>x!==undefined&&x!==null).join('/'))).json()}}});export class ApiError extends Error{};
+          export const getImageUrl=x=>x;
          export const getAuthHeaders=async()=>({Authorization:'Bearer '+window.fixtureAccessToken,...window.fixture.store.headers(window.fixtureAccessToken)});
          export async function apiRequest(method,url,body){const r=await fetch(url,{method,headers:{...await getAuthHeaders(),'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});if(!r.ok){const e=new ApiError('Fixture request failed');e.data=await r.json();throw e;}return r;}` }));
   } }],
@@ -52,6 +55,7 @@ const bundle = await build({
     import React from 'react';import{createRoot}from'react-dom/client';import{useLocation}from'wouter';
     import ParentVerification from './client/src/pages/ParentVerification';
     import{LiveFamilyBoundary}from'./client/src/components/high-school-family/LiveFamilyBoundary';
+    import{Router}from'./client/src/App';
     import{QueryClientProvider}from'@tanstack/react-query';import{queryClient}from'@/lib/queryClient';
     import{parentVerificationSession as store,parentDeviceMetadataKey}from './client/src/lib/parentVerificationSession';
     import{childSkinSession}from './client/src/lib/highSchoolChildSession';
@@ -61,7 +65,7 @@ const bundle = await build({
     const fixtureMode=new URLSearchParams(window.location.search).get('mode')||sessionStorage.getItem('boundary-mode');
     if(fixtureMode==='boundary')sessionStorage.setItem('boundary-mode',fixtureMode);
     function FixtureApp({status}){const[path]=useLocation();const mode=fixtureMode;
-      if(mode?.startsWith('boundary'))return <QueryClientProvider client={queryClient}><LiveFamilyBoundary entry={<main>Sign in</main>}><main><h1>Verified account Home</h1></main></LiveFamilyBoundary></QueryClientProvider>;
+      if(mode?.startsWith('boundary'))return <QueryClientProvider client={queryClient}><LiveFamilyBoundary entry={<main>Sign in</main>}><Router/></LiveFamilyBoundary></QueryClientProvider>;
       if(path==='/')return <main><h1>Home</h1></main>;
       return <ParentVerification verified={status.verified} enrolled={mode==='not-enrolled'?false:status.enrolled}
         authenticated={mode!=='signed-out'} unavailable={mode==='unavailable'}/>;}
@@ -78,11 +82,28 @@ const authenticate = async (req: express.Request) => {
 };
 registerParentVerificationRoutes(app, parent, authenticate);
 registerHighSchoolFamilyRoutes(app, family, new HighSchoolFamilyReview(pool), parent, authenticate);
+// Synthetic ordinary account data, behind the SAME parent/read policy invoked
+// by isAuthenticated. Family data above continues through its real SQL guards.
+app.get("/api/*", async (req, res, next) => {
+  if (req.path.startsWith("/api/high-school/")) { next(); return; }
+  try {
+    const a = await authenticate(req);
+    await requireDevParentAuthority(parent, a.authId, req.get("authorization")!.slice(7), issuer, req.get(parentGrantHeader), "account_read");
+    if (req.path === "/api/user") return res.json({ id:a.authId,firstName:"Parent",lastName:"Fixture",onboardingCompleted:true,role:"free_tier" });
+    if (req.path === "/api/user/notification-counts") return res.json({leagues:{},teams:{},tournaments:{}});
+    if (/count/.test(req.path)) return res.json({count:0});
+    res.json([]);
+  } catch (error) { res.status(error instanceof ParentSecurityError ? error.status : 503).json({code:(error as any).code}); }
+});
 app.get("/api/high-school/child-device/fixture-proof", (req, res) => {
   res.json({ inheritedParentHeader: !!req.get(parentGrantHeader) });
 });
 app.get("/bundle.js", (_req, res) => { res.type("text/javascript").send(bundle.outputFiles[0].text); });
-app.get("*", (_req, res) => { res.type("html").send(`<!doctype html><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;font:16px system-ui}button,input{font:inherit;padding:12px}button{cursor:pointer}main{padding:28px}section{max-width:480px;margin:auto}p{line-height:1.5}</style><div id="root"></div><script src="/bundle.js"></script>`); });
+app.get("/fixture.css", async (_req, res) => {
+  const file = (await readdir("dist/public/assets").catch(() => [])).find(name => /^index-.*\.css$/.test(name));
+  res.type("text/css").send(file ? await readFile(path.join("dist/public/assets",file),"utf8") : "");
+});
+app.get("*", (_req, res) => { res.type("html").send(`<!doctype html><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/bundle.js"></script>`); });
 let server: ReturnType<typeof app.listen> | undefined;
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 let checks = 0;
@@ -107,7 +128,7 @@ try {
   browser = await chromium.launch({ executablePath: "/repl/tools/bin/chromium", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage(), errors: string[] = [];
-  page.on("pageerror", error => errors.push(error.message));
+  page.on("pageerror", error => { errors.push(error.message); console.error("Browser fixture:", error.stack); });
   const familyState = () => page.evaluate(async () => {
     const r = await fetch("/api/high-school/family/state", { headers: { Authorization: "Bearer " + (window as any).fixtureAccessToken,
       ...(window as any).fixture.store.headers((window as any).fixtureAccessToken) } });
@@ -133,26 +154,43 @@ try {
     await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
      assert.equal(await page.evaluate("window.fixtureSignOutCalls"), 0); checks++;
   }
-   // Actual production boundary: locked login can leave, reload Home, and
-   // reopen Family without granting private access or ever signing out.
+   // Real production boundary, Router, swipe container and mobile Dashboard:
+   // assert actual schedule UI, not a substitute labelled "Home".
+   const realHome = async () => {
+     await page.getByTestId("text-schedule-title").waitFor();
+     assert.equal(await page.getByText("Your saved family setup has not changed.", {exact:false}).count(), 0);
+     assert.equal(await page.evaluate("window.fixtureSignOutCalls"), 0);
+   };
    await page.goto(`${verificationUrl}?mode=boundary`);
    await page.getByRole("button", { name: "Back to Home", exact: true }).click();
-   await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+   await realHome();
    assert.equal(await page.evaluate("window.fixtureSessionEnded"), false);
    assert.equal(await page.evaluate("window.fixtureSignOutCalls"), 0);
    assert.equal((await familyState()).data.verified, false); checks++;
+   const ordinaryRead = await page.evaluate(async () => {
+     const headers={Authorization:"Bearer "+(window as any).fixtureAccessToken};
+     const user=await fetch("/api/user",{headers});
+     const teams=await fetch("/api/high-school/family/adult-team-ids",{headers});
+     const privateChange=await fetch("/api/high-school/family/draft",{method:"POST",headers:{...headers,"Content-Type":"application/json"},body:JSON.stringify({revision:0,players:[]})});
+     return {user:user.status,teams:teams.status,privateChange:privateChange.status};
+   });
+   assert.deepEqual(ordinaryRead,{user:200,teams:200,privateChange:403}); checks++;
    await page.reload();
-   await page.getByRole("heading", { name: "Home", exact: true }).waitFor(); checks++;
-   await page.getByRole("link", { name: "Open Family", exact: true }).click();
+   await realHome(); checks++;
+   await page.evaluate("localStorage.setItem('dashboardSelectedType','team');localStorage.setItem('dashboardSelectedId','stale-school-team')");
+   await page.goto(`${origin}/?mode=boundary`);
+   await realHome();
+   assert.notEqual(await page.evaluate("localStorage.getItem('dashboardSelectedId')"),"stale-school-team"); checks++;
+   await page.evaluate("window.history.pushState(null,'','/high-school/family')");
    await page.getByRole("heading", { name: "Verify you're the parent", exact: true }).waitFor();
    await page.getByRole("button", { name: "Back to Home", exact: true }).click();
-   await page.getByRole("heading", { name: "Home", exact: true }).waitFor(); checks++;
+   await realHome(); checks++;
    await page.goto(`${origin}/app?mode=boundary`);
-   await page.getByRole("heading", { name: "Home", exact: true }).waitFor(); checks++;
+   await realHome(); checks++;
    await page.route("**/api/high-school/parent-verification/status", route => route.fulfill({status:503,contentType:"application/json",body:'{"code":"UNAVAILABLE"}'}));
    await page.goto(`${verificationUrl}?mode=boundary`);
    await page.getByRole("button", { name: "Back to Home", exact: true }).click();
-   await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+   await realHome();
    assert.equal(await page.evaluate("window.fixtureSignOutCalls"), 0); checks++;
    await page.unroute("**/api/high-school/parent-verification/status");
    await page.evaluate("sessionStorage.removeItem('boundary-mode')");

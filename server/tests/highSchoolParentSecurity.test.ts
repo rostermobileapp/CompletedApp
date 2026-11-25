@@ -38,6 +38,30 @@ test("the verified-token adapter binds subject, issuer, audience, expiry and ses
     (error: any) => error.code === "INVALID_SESSION");
   assert.throws(() => parentActorFromVerifiedToken("invalid", actor.authId, issuer));
 });
+test("normal account reads validate the active login without granting parent authority", async () => {
+  const queries: string[] = [];
+  const pool = { query: async (sql: string) => {
+    queries.push(sql);
+    if (sql.includes("FROM hs_parent_security.accounts") || sql.includes("FROM auth.sessions")) return {rows:[{}]};
+    return {rows:[]};
+  }} as unknown as ParentSql;
+  const security = new HighSchoolParentSecurity(pool);
+  await requireDevParentAuthority(security, actor.authId, token(payload()), issuer, undefined, "account_read");
+  assert.ok(queries.some(sql => sql.includes("FROM auth.sessions")));
+  assert.equal(queries.some(sql => sql.includes("INSERT") || sql.includes("UPDATE")), false);
+  // The read exception is opt-in by server code; all default callers still
+  // require a grant, including mutations and real-time message transports.
+  await assert.rejects(() => requireDevParentAuthority(security, actor.authId, token(payload()), issuer),
+    (error: any) => error.code === "PARENT_VERIFICATION_REQUIRED");
+});
+test("account reads reject revoked sessions and invalid tokens even without parent controls", async () => {
+  const pool = {query:async(sql:string)=>({rows:sql.includes("FROM hs_parent_security.accounts")?[{}]:[]})} as unknown as ParentSql;
+  const security = new HighSchoolParentSecurity(pool);
+  await assert.rejects(() => requireDevParentAuthority(security, actor.authId, token(payload()), issuer, undefined, "account_read"),
+    (error:any)=>error.code==="INVALID_SESSION");
+  await assert.rejects(() => requireDevParentAuthority(security, actor.authId, token({...payload(),sub:"wrong-account"}), issuer, undefined, "account_read"),
+    (error:any)=>error.code==="INVALID_SESSION");
+});
 test("password policy rejects bcrypt truncation rather than accepting two equivalent passwords", () => {
   assert.equal(validParentPassword("ValidDevPassword1!"), true);
   for (const value of ["short1!", "longwithoutuppercase1!", "LongWithoutNumbers!", "A1!" + "z".repeat(70), "A1!" + "猫".repeat(24), undefined, {}]) {

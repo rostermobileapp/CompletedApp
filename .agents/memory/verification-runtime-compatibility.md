@@ -24,6 +24,10 @@ Isolated bundled tests must mock unexecuted dynamic application-entry imports to
 **Why:** The bundler resolves dependencies before tree-shaking. An unused dynamic entry import pulled in the full application and caused misleading mock-export errors; missing mock resolution context also prevented legitimate imports from resolving.
 
 **How to apply:** Isolate the full import graph before executing a fixture, including dynamic startup paths, and provide mock resolve directories. Match connection and query interfaces accurately, and replace external clients and credentials with test-only values.
+Intercept both aliased and relative imports of shared runtime modules; otherwise
+one source can load the real Auth client while another uses the synthetic one.
+For Home navigation checks, render the actual router, primary-screen container
+and dashboard and assert its Schedule UI, not a substitute heading named Home.
 
 For direct headless Chromium/CDP checks of native Enter activation, enable focus emulation and send rawKeyDown, a char event with carriage-return text, then keyUp.
 

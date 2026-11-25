@@ -27,7 +27,13 @@ export function registerHighSchoolFamilyRoutes(app: Express, family: HighSchoolF
   app.get(`${base}/availability`, handle(async (_r, actor) => ({
     enabled: family.enrollmentEnabled || await parent.enrolled(actor.authId),
   }), true));
-  app.get(`${base}/adult-team-ids`, handle((_r, a) => family.adultTeamIds(a)));
+  // Returning to the existing adult app must not require parent email proof.
+  // Still validate the server-side Auth session and return only canonical adult
+  // team IDs, never children or school-team authority.
+  app.get(`${base}/adult-team-ids`, handle(async (_r, a) => {
+    await parent.status(a);
+    return family.adultTeamIds(a);
+  }, true));
   app.get(`${base}/state`, handle((_r, a, g) => family.state(a, g), true));
   app.post(`${base}/begin`, handle((_r, a) => family.begin(a), true));
   app.post(`${base}/draft`, handle((r, a, g) => family.draft(a, r.body, g)));

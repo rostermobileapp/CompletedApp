@@ -195,13 +195,14 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     if(await onboardingSecurity()?.blocksLegacy(user.id,user.email,!!user.email_confirmed_at)){
       return res.status(403).json({code:"HS_ONBOARDING_PENDING",message:"Finish the guarded DEV onboarding flow before using adult APIs."});
     }
-    // Fail closed for EVERY existing authenticated adult API, reads included.
-    // No child-facing routes are enabled by this foundation; do not create a
-    // client-controlled role/profile exception here.
+    // Normal Home and app reads use the existing authenticated account.
+    // Mutations retain the parent proof; Family/child routes have independent
+    // guards and never inherit this read-only distinction.
     const parent = parentSecurity();
     if (parent) {
       try {
-        await requireDevParentAuthority(parent, user.id, token, parentIssuer(), req.get(parentGrantHeader));
+        await requireDevParentAuthority(parent, user.id, token, parentIssuer(), req.get(parentGrantHeader),
+          req.method === "GET" || req.method === "HEAD" ? "account_read" : "parent_action");
       } catch (error) { return parentErrorResponse(res, error); }
     }
     if (await isRetiredAccount(user.id, user.email)) {
