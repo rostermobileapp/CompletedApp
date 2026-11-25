@@ -66,7 +66,8 @@ separately; implementation or local tests alone do not establish live readiness.
 ## Parent verification usability
 
 Avoid requiring another emailed parent verification code on every ordinary
-return to child setup.
+return to child setup. The owner also requires that, once a child is already
+set up, the parent can manage that child without another verification code.
 
 **Why:** The owner explicitly objected to repeated parent-screen timeouts and
 having to enter a new verification code every time.
@@ -74,6 +75,8 @@ having to enter a new verification code every time.
 **How to apply:** Improve continuity on a verified parent device without granting
 parent authority from the household's shared login. Obtain approval for the
 specific remembered-device duration and security changes before implementation.
+An existing child profile alone is not evidence that the person using the
+shared login is the parent; preserve the parent-device and child-device boundary.
 
 ## Authorized live family rollout (November 24, 2026)
 
