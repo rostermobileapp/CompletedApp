@@ -16,7 +16,7 @@ test("a consented child pairs before a team and the same phone receives a later 
   const family=new HighSchoolFamilySetup(pool,parent,async()=>covered?"personal":"uncovered",true);
   const devices=new HighSchoolChildDevices(pool,parent,true,{production:true,coverage:async()=>covered});
   const review=new HighSchoolFamilyReview(pool,undefined,undefined,true);
-  const child={id:randomUUID(),firstName:"Casey",lastName:"Fixture",birthYear:2012,gradYear:2030,
+  const child={id:randomUUID(),firstName:"Casey",lastName:"Fixture",birthYear:2012,
     position:"F" as const,jerseyNumber:"8",consent:true as const,consentVersion:HS_CONSENT_VERSION,
     photoConsent:false,publicNameConsent:false};
   let token="",deviceId="";
@@ -59,6 +59,7 @@ test("a consented child pairs before a team and the same phone receives a later 
       const row=(await pool.query("SELECT * FROM hs_onboarding.children WHERE id=$1",[child.id])).rows[0];
       assert.equal(row.player_request_id,null);assert.equal(row.enabled,false);
       assert.equal(row.profile_details.birthYear,2012);
+      assert.equal("gradYear" in row.profile_details,false);
       assert.equal("dateOfBirth" in row.profile_details,false);
       const list=await devices.children(actor);
       assert.equal(list.children.find((c:any)=>c.id===child.id)?.canActivate,true);
@@ -67,7 +68,7 @@ test("a consented child pairs before a team and the same phone receives a later 
     });
     await t.test("parent approval pairs the phone before membership or coverage exists",async()=>{
       const code=await devices.createCode(actor,{childId:child.id});
-      const pending=await devices.start({challengeId:code.challengeId,code:code.code},"fixture-source");
+      const pending=await devices.start({code:code.code},"fixture-source");
       deviceId=pending.requestId!;
       await devices.decision(actor,deviceId,{approve:true});
       const approved=await devices.poll({requestId:deviceId,requestToken:pending.requestToken});
@@ -75,6 +76,7 @@ test("a consented child pairs before a team and the same phone receives a later 
       const data=await devices.ownSession(token);
       assert.equal(data.teamStatus,"awaiting_team");assert.deepEqual(data.schedule,[]);
       assert.equal(data.chats.length,1);assert.equal(data.chats[0].kind,"family");
+      await assert.rejects(()=>devices.start({code:code.code},"second-fixture-source"),(e:any)=>e.code==="INVALID_OR_EXPIRED_CODE");
       await assert.rejects(()=>devices.createCode({...actors.otherParent,productionTest:true},{childId:child.id}));
       verified=false;await assert.rejects(()=>devices.createCode(actor,{childId:child.id}));verified=true;
     });
@@ -83,6 +85,20 @@ test("a consented child pairs before a team and the same phone receives a later 
       await family.consent(actor,{revision:1,guardianConfirmed:true,players:[child,second]});
       const third={...child,id:randomUUID(),firstName:"Alex"};
       await assert.rejects(()=>family.consent(actor,{revision:2,guardianConfirmed:true,players:[third]}),(e:any)=>e.code==="HOUSEHOLD_LIMIT");
+    });
+    await t.test("a missing graduation year never merges two same-name invitation entries",async()=>{
+      const stagedIds=[randomUUID(),randomUUID()],ambiguousInvitation=randomBytes(32).toString("base64url");
+      for(const [index,id] of stagedIds.entries()){
+        await pool.query(`INSERT INTO hs_onboarding.staged_players(id,team_id,source_key,first_name,last_name,grad_year,position,jersey_number)
+          VALUES($1,$2,$3,'Casey','Fixture',$4,'F','8')`,[id,ids.varsity,`ambiguous-${index}`,2030+index]);
+      }
+      await pool.query(`INSERT INTO hs_onboarding.invitations(token_digest,team_id,kind,recipient_email,staged_ids,created_by)
+        VALUES($1,$2,'parent',$3,$4,$5)`,[parentDigest(ambiguousInvitation),ids.varsity,actor.email,stagedIds,actors.head.authId]);
+      const before=await family.state(actor);
+      await assert.rejects(()=>family.intake.lookup(actor,ambiguousInvitation,before.revision),(e:any)=>e.code==="CHILD_IDENTITY_MISMATCH");
+      const after=await family.state(actor);
+      assert.deepEqual(after.players,before.players);assert.equal(after.revision,before.revision);
+      assert.equal((await devices.ownSession(token)).child.firstName,child.firstName);
     });
     const stagedId=randomUUID(),invitation=randomBytes(32).toString("base64url");
     await pool.query(`INSERT INTO hs_onboarding.staged_players(id,team_id,source_key,first_name,last_name,grad_year,position,jersey_number)
@@ -93,6 +109,7 @@ test("a consented child pairs before a team and the same phone receives a later 
       await family.intake.lookup(actor,invitation,2);
       const state=await family.state(actor);
       assert.equal(state.players[0].id,child.id);assert.equal(state.players[0].birthYear,2012);
+      assert.equal(state.players[0].gradYear,2030);
       assert.equal(state.players[0].consent,false);
       await family.consent(actor,{revision:state.revision,guardianConfirmed:true,players:[{...state.players[0],consent:true}]});
       const consented=await family.state(actor);

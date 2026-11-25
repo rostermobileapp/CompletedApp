@@ -145,7 +145,7 @@ test("the production package preserves adults, stages email enrollment and close
       await pool.query("INSERT INTO hs_onboarding.teams VALUES($1,$2,'Varsity',$3)", [team, program, parentDigest("SAFE1234")]);
       await pool.query("INSERT INTO public.teams VALUES($1,'Varsity','high_school',$2)", [team, program]);
       await pool.query("INSERT INTO public.team_memberships VALUES($1,$2,$3,'approved',false,'head_coach',NULL)", [randomUUID(), head.authId, team]);
-      const player = { id: randomUUID(), firstName: "Child", lastName: "Synthetic", gradYear: 2030, position: "D",
+      const player = { id: randomUUID(), firstName: "Child", lastName: "Synthetic", birthYear: 2012, gradYear: 2030, position: "D",
         jerseyNumber: "", consent: true, consentVersion: HS_CONSENT_VERSION, photoConsent: false, publicNameConsent: false };
       await family.draft(actor, { revision: 0, players: [player] }, grant);
       await family.consent(actor, { revision: 1, players: [player], guardianConfirmed: true }, grant);

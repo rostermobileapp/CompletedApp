@@ -166,9 +166,10 @@ export class HighSchoolChildDevices {
       deviceLabel: z.string().trim().min(1).max(80).default("Player's phone"),
       challengeId: uuid.optional(),
     }).strict().parse(input);
-    // A separate, nonsecret challenge link attributes ALL wrong guesses to
-    // this challenge; an IP throttle alone cannot enforce its five-guess limit.
-    if(this.options.production&&!data.challengeId)throw new OnboardingError("SECURE_SETUP_LINK_REQUIRED",400);
+    // Code-only entry uses the unique stored digest. Existing challenge links
+    // remain compatible, but are no longer required. Unknown-code guesses are
+    // charged to the server-derived source; known challenges retain their cap.
+    // A correct code creates only a waiting request, never a child session.
     const code = data.code.trim().toUpperCase();
     // Request body cannot choose its throttle identity. Caller supplies peer data.
     const sourceDigest = parentDigest(`child-pairing:${source}`);

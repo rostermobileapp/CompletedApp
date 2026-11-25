@@ -14,7 +14,7 @@ import { TeamSkinService } from "../teamSkinService";
 import { HS_CONSENT_VERSION } from "../../shared/highSchoolOnboarding";
 import { guardVerifiedAdultSocket } from "../verifiedAdultSocket";
 
-const player = (firstName = "Casey") => ({ id: randomUUID(), firstName, lastName: "Synthetic", gradYear: 2028,
+const player = (firstName = "Casey") => ({ id: randomUUID(), firstName, lastName: "Synthetic", birthYear: 2012, gradYear: 2028,
   position: "D", jerseyNumber: "8", consent: true, consentVersion: HS_CONSENT_VERSION, photoConsent: false, publicNameConsent: false });
 const reject = (fn: () => Promise<unknown>, code: string) => assert.rejects(fn, (e: any) => e.code === code);
 

@@ -137,6 +137,7 @@ export class HighSchoolOnboarding {
       const flow=await this.flow(tx,actor,data.kind,data.revision,grant);
       if (flow.status!=="draft") fail("REQUEST_ALREADY_SUBMITTED",409);
       if (data.kind==="parent") {
+        if (data.players.some(p => p.birthYear === undefined)) fail("BIRTH_YEAR_REQUIRED");
         if (new Set(data.players.map(p=>p.id)).size!==data.players.length) fail("DUPLICATE_PLAYER");
         const names=data.players.map(p=>`${p.firstName.trim().toLowerCase()}|${p.lastName.trim().toLowerCase()}|${p.gradYear}`);
         if(new Set(names).size!==names.length) fail("DUPLICATE_PLAYER");
@@ -222,13 +223,17 @@ export class HighSchoolOnboarding {
           const matches=profiles.filter(c=>{
             const saved=c.profile_details;
             return saved.firstName.trim().toLowerCase()===p.firstName.trim().toLowerCase()
-              && saved.lastName.trim().toLowerCase()===p.lastName.trim().toLowerCase() && saved.gradYear===p.gradYear;
+              && saved.lastName.trim().toLowerCase()===p.lastName.trim().toLowerCase()
+              && (saved.gradYear === undefined || saved.gradYear === p.gradYear);
           });
           if(matches.length>1)fail("CHILD_IDENTITY_MISMATCH",409);
           const saved=matches[0]?.profile_details;
           if(saved)playerLinks.push({stagedId:p.id,playerId:saved.id});
           return {...p,id:saved?.id??p.id,...(saved?.birthYear?{birthYear:saved.birthYear}:{})};
         });
+        // An unspecified graduation year must not let two same-name roster
+        // entries both claim the same household child.
+        if (new Set(invitedPlayers.map((p:any)=>p.id)).size !== invitedPlayers.length) fail("CHILD_IDENTITY_MISMATCH",409);
         const householdKeys=profiles.map(c=>c.profile_details.id);
         if(new Set([...existing.map(p=>p.player_key),...householdKeys,...invitedPlayers.map((p:any)=>p.id)]).size>HS_MAX_FAMILY_PLAYERS) fail("HOUSEHOLD_LIMIT");
         await tx.query(`UPDATE ${this.flowTable} SET draft=$2,revision=revision+1 WHERE auth_id=$1`,

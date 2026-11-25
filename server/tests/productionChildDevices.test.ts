@@ -8,7 +8,7 @@ import { parentVerificationSession } from "../../client/src/lib/parentVerificati
 const id=(n:number)=>`10000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
 const actor={authId:id(1),sessionId:id(2),email:"fixture@example.com",emailVerified:true,fixture:false,productionTest:true};
 const parent={authorized:async()=>true} as any;
-function fixture(overrides:{tester?:boolean;parent?:boolean;covered?:boolean;member?:boolean;allowed?:boolean;failures?:number;requestStatus?:string;session?:boolean}={}){
+function fixture(overrides:{tester?:boolean;parent?:boolean;covered?:boolean;member?:boolean;allowed?:boolean;failures?:number;sourceFailures?:number;consumed?:boolean;expired?:boolean;requestStatus?:string;session?:boolean}={}){
   const calls:Array<{sql:string;args:any[]}>=[];
   const query=async(sql:string,args:any[]=[])=>{
     calls.push({sql,args});let rows:any[]=[];
@@ -17,11 +17,11 @@ function fixture(overrides:{tester?:boolean;parent?:boolean;covered?:boolean;mem
     else if(sql.includes("count(DISTINCT player_key)"))rows=[{n:1}];
     else if(sql.includes("SELECT DISTINCT t.id,p.league_id"))rows=overrides.member===false?[]:[{id:id(5),league_id:id(6)}];
     else if(sql.includes("SELECT c.*,r.team_id"))rows=[{id:id(3),parent_auth_id:actor.authId,team_id:id(5),first_name:"Synthetic",last_name:"Player"}];
-    else if(sql.includes("window_started_at>"))rows=[{failures:0,recent:true}];
+    else if(sql.includes("window_started_at>"))rows=[{failures:overrides.sourceFailures??0,recent:true}];
     else if(sql.startsWith("SELECT parent_auth_id FROM hs_onboarding.device_codes"))rows=[{parent_auth_id:actor.authId}];
     else if(sql.includes("FROM hs_onboarding.device_codes")&&sql.includes("FOR UPDATE"))rows=[{
       id:id(4),child_id:id(3),parent_auth_id:actor.authId,code_digest:parentDigest("K7P2QX"),failures:overrides.failures??0,
-      unexpired:true,expires_at:new Date(Date.now()+600000)}];
+      unexpired:!overrides.expired,consumed_at:overrides.consumed?new Date():null,expires_at:new Date(Date.now()+600000)}];
     else if(sql.startsWith("SELECT parent_auth_id FROM hs_onboarding.device_requests"))rows=[{parent_auth_id:actor.authId}];
     else if(sql.includes("FROM hs_onboarding.device_requests")&&sql.includes("FOR UPDATE"))rows=[{
       id:id(7),child_id:id(3),parent_auth_id:actor.authId,approved_session_id:actor.sessionId,
@@ -39,9 +39,24 @@ function fixture(overrides:{tester?:boolean;parent?:boolean;covered?:boolean;mem
   return {service,calls};
 }
 const rejects=(work:Promise<unknown>,code:string)=>assert.rejects(work,(error:any)=>error.code===code);
-test("production pairing requires the separate challenge before touching storage",async()=>{
+test("production pairing accepts only a code and locates its unique digest without granting a session",async()=>{
   const {service,calls}=fixture();
-  await rejects(service.start({code:"K7P2QX"},"fixture"),"SECURE_SETUP_LINK_REQUIRED");assert.equal(calls.length,0);
+  const result=await service.start({code:"K7P2QX"},"fixture");
+  assert.equal(result.status,"waiting");
+  assert.equal("sessionToken" in result,false);
+  assert.ok(calls.some(c=>c.sql.includes("WHERE code_digest=$1")&&c.args[0]===parentDigest("K7P2QX")));
+  assert.ok(!calls.some(c=>c.sql.includes("INSERT INTO hs_onboarding.child_sessions")));
+});
+test("code-only entry retains server-derived source throttling",async()=>{
+  const {service,calls}=fixture({sourceFailures:5});
+  await rejects(service.start({code:"K7P2QX"},"fixture"),"CODE_RATE_LIMIT");
+  assert.ok(!calls.some(c=>c.sql.includes("FROM hs_onboarding.device_codes")));
+});
+for(const state of ["expired","consumed"] as const)test(`code-only entry rejects an ${state} code`,async()=>{
+  const {service,calls}=fixture({[state]:true});
+  await rejects(service.start({code:"K7P2QX"},"fixture"),"INVALID_OR_EXPIRED_CODE");
+  assert.ok(calls.some(c=>c.sql==="COMMIT"));
+  assert.ok(!calls.some(c=>c.sql.includes("INSERT INTO hs_onboarding.device_requests")));
 });
 test("production activation cannot be granted by fixture or productionTest input alone",async()=>{
   const {service,calls}=fixture({tester:false});
@@ -69,7 +84,7 @@ test("an approved and covered parent's setup action enables only the selected ch
 test("five challenge failures remain locked across different source identifiers",async()=>{
   const {service,calls}=fixture({failures:5});
   for(const source of ["synthetic-a","synthetic-b"])
-    await rejects(service.start({challengeId:id(4),code:"K7P2QX"},source),"INVALID_OR_EXPIRED_CODE");
+    await rejects(service.start({code:"K7P2QX"},source),"INVALID_OR_EXPIRED_CODE");
   assert.ok(!calls.some(c=>c.sql.startsWith("INSERT INTO hs_onboarding.device_requests")));
 });
 test("a valid production code grants only a waiting request",async()=>{
