@@ -90,7 +90,7 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
   const changePassword = () => run(async () => {
     if (password !== confirm) { setError("The passwords do not match."); return; }
     if (!passwordGrant || passwordGrant.until <= Date.now()) throw { code: "PASSWORD_VERIFICATION_REQUIRED" };
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}${API}/password`, {
+    const response = await fetch(`${API}/password`, {
       method: "POST", redirect: "error",
       headers: { ...await getAuthHeaders(), "Content-Type": "application/json", "x-parent-verification": passwordGrant.value },
       body: JSON.stringify({ password }),

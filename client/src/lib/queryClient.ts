@@ -2,6 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase, clearStaleSession } from "./supabase";
 import { isParentSecurityClient, parentVerificationSession } from "./parentVerificationSession";
 import { teamRequestSignal } from "./teamRequestScope";
+import { apiRequestUrl } from "./apiRequestUrl";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 const DEMO_ACTIVE_KEY = 'roster.demo.active';
@@ -183,8 +184,8 @@ export async function apiRequest(
   signal?: AbortSignal,
 ): Promise<Response> {
   const scopeSignal = signal ?? (isParentSecurityClient ? teamRequestSignal() : undefined);
-  const fullUrl = `${API_BASE_URL}${url}`;
   const authHeaders = await getAuthHeaders(url);
+  const fullUrl = apiRequestUrl(url, API_BASE_URL, authHeaders);
   const headers = {
     ...authHeaders,
     ...(data ? { "Content-Type": "application/json" } : {}),
@@ -208,8 +209,8 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey, signal }) => {
     const requestPath = String(queryKey.join("/"));
-    const fullUrl = `${API_BASE_URL}${requestPath}`;
     const authHeaders = await getAuthHeaders(requestPath);
+    const fullUrl = apiRequestUrl(requestPath, API_BASE_URL, authHeaders);
     
     const res = await fetch(fullUrl, {
       headers: authHeaders,
