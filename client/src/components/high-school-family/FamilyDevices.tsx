@@ -10,7 +10,7 @@ export function FamilyDevices({actorId}:{actorId:string}) {
   const [notice,setNotice]=useState("");
   const children=useQuery<{children:Array<{id:string;firstName:string;lastName:string;canActivate?:boolean}>}>({
     queryKey:["family-device-children",actorId],
-    queryFn:async()=>(await apiRequest("GET",`${base}/children`)).json(),retry:false,
+    queryFn:async()=>(await apiRequest("GET",`${base}/children`)).json(),retry:false,refetchInterval:10_000,
   });
   const requests=useQuery<{requests:Array<{id:string;firstName:string;deviceLabel:string}>}>({
     queryKey:["family-device-requests",actorId],
@@ -29,13 +29,13 @@ export function FamilyDevices({actorId}:{actorId:string}) {
   const link=code?`${window.location.origin}/under-18/code?challengeId=${encodeURIComponent(code.challengeId)}`:"";
   return <section className="family-panel" style={{marginTop:18}} aria-label="Child device setup">
     <h2>Child device setup</h2>
-    <p className="hsy-note">An approved team, guardian consent and Player Pro coverage are required. Each phone needs your approval.</p>
+    <p className="hsy-note">Save your child’s details and guardian consent, then approve their phone. You can connect a team later; team information requires approved membership and coverage.</p>
     {(children.isLoading||requests.isLoading||sessions.isLoading)&&<p role="status">Checking child devices…</p>}
     {(children.isError||requests.isError||sessions.isError)&&<p role="alert">Device access could not be checked. Verify your parent session and refresh.</p>}
-    {children.data?.children.length===0&&<p className="hsy-note">A child will appear here after team staff approves their request.</p>}
+    {children.data?.children.length===0&&<p className="hsy-note">Your child will appear here after you save their details and guardian consent. No team is needed to begin setup.</p>}
     {children.data?.children.map(child=><div className="hsy-card" key={child.id} style={{marginTop:12}} role="group" aria-label={`${child.firstName} ${child.lastName} device controls`}>
       <strong>{child.firstName} {child.lastName}</strong>
-      {!child.canActivate&&<p className="hsy-note">Waiting for approved team membership and coverage.</p>}
+      {!child.canActivate&&<p className="hsy-note">Finish saving child details and consent, or refresh parent verification to enable setup.</p>}
       <h3 style={{marginTop:12}}>Active devices</h3>
       {sessions.isSuccess&&!sessions.data.sessions.some(session=>session.childId===child.id)&&<p className="hsy-note">No active devices.</p>}
       {!sessions.isError&&sessions.data?.sessions.filter(session=>session.childId===child.id).map(session=><div className="hsy-card" key={session.id} style={{marginTop:8}}>

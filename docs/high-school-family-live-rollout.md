@@ -261,3 +261,53 @@ not include the local changes. Release the compatible Vercel frontend as well,
 then verify real-inbox approval, two-device pairing and selective revocation.
 This preparation performed no push, Railway configuration write, deployment,
 account change or database migration. Signed-in/native acceptance remains open.
+
+## Independent child setup revision — November 25, 2026
+
+The owner requested birth year alongside graduation year, usable privacy
+checkboxes, and profile/device setup before team connection. This revises the
+earlier team-first activation rule for the restricted test; it does not launch
+the feature publicly.
+
+The revision prepares:
+
+- Year-only birth-year entry and validation; no full child birthday is collected.
+- Editable privacy choices while details are unsaved, with one explicit consent
+  submission saving the current details and guardian choices together.
+- Consent-backed independent child profiles, retaining the two-player household
+  limit, selected-parent rollout and separate parent-approved child capabilities.
+- Empty-team baseline access; team schedules and Team chats still require
+  canonical approved parent/child memberships and league-scoped coverage.
+- Exact, unique household identity matching for invitation claims so the
+  existing child ID and phone session survive staff approval. Ambiguous matches
+  fail rather than merging children or households.
+- Refresh of the child's phone into newly approved team information. Removing
+  membership or coverage hides team data without converting the child capability
+  into an adult session.
+
+The new, separate migration is
+`scripts/production/high-school-independent-children.sql`, applied only through
+`scripts/install-independent-child-profiles.ts` after specific owner approval.
+It adds private consent/profile metadata to the existing child registry,
+permits a consented child profile without an initial team-request link, and
+installs a private version marker. It preserves the restricted enabled-parent
+constraint, existing rows and original installation manifests. It creates no
+profiles and enables no devices automatically. **It has not been applied to
+production.** Application releases and real-phone acceptance remain separate.
+
+Verification of this revision passed:
+
+- Eight checks in the new disposable-database lifecycle suite, including pre-team
+  consent/pairing, exact invitation linking, stable phone sessions, coverage and
+  membership loss, household limits, revocation and browser-role denial.
+- Seventeen existing disposable-database device/family checks before the new
+  fixture-specific production setup was completed.
+- Fifty-seven focused regression checks, fourteen production pairing browser
+  checks and ten new family-consent/child-refresh browser checks at 390px/1440px.
+- Full production frontend/backend build and backend syntax validation.
+- Read-only external production preflight: original protections verified,
+  new migration absent, zero changes applied.
+
+The repository-wide type check retained 224 existing diagnostics, with no
+diagnostics matching the changed feature files. Browser checks used isolated
+API adapters rather than real inboxes or physical devices. No app was published.

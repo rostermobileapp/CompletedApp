@@ -3,6 +3,7 @@ import { z } from "zod";
 import { hsChoosePath, hsSaveDraft, hsTeamEntry, HS_CONSENT_VERSION, HS_MAX_FAMILY_PLAYERS } from "../shared/highSchoolOnboarding";
 import { HighSchoolParentSecurity, ParentSecurityError, parentDigest, type ParentActor, type ParentSql, type ParentTransaction } from "./highSchoolParentSecurity";
 import { requireProductionOnboardingTester } from "./productionOnboardingTests";
+import { independentChildSetupInstalled, saveIndependentChildProfiles } from "./highSchoolFamilyProfiles";
 
 export class OnboardingError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
@@ -148,9 +149,11 @@ export class HighSchoolOnboarding {
         // imported child or swap its identity after looking up an invitation.
         const staged=flow.draft?.invitationDigest ? (await this.invite(tx,actor,flow.draft.invitationDigest,"parent")).players : [];
         if(staged.length && (data.players.length!==staged.length || data.players.some(p=>{
-          const s=staged.find((s:any)=>s.id===p.id);
+          const stagedId=flow.draft?.playerLinks?.find((link:any)=>link.playerId===p.id)?.stagedId??p.id;
+          const s=staged.find((s:any)=>s.id===stagedId);
           return !s || p.firstName!==s.firstName || p.lastName!==s.lastName || p.gradYear!==s.gradYear || p.position!==s.position || p.jerseyNumber!==s.jerseyNumber;
         }))) fail("INVITATION_PLAYER_MISMATCH");
+        await saveIndependentChildProfiles(tx, actor, data.players, this.liveFamily || !!actor.productionTest);
         await tx.query(`UPDATE ${this.flowTable} SET draft=$2,revision=revision+1,updated_at=now() WHERE auth_id=$1`,
           [actor.authId,{...flow.draft,players:data.players,guardianConfirmed:true,consentVersion:HS_CONSENT_VERSION,
             consentRecords:data.players.map(p=>({playerId:p.id,version:HS_CONSENT_VERSION,recordedAt:new Date().toISOString()}))}]);
@@ -209,9 +212,27 @@ export class HighSchoolOnboarding {
         const owned=(await tx.query("SELECT auth_id FROM hs_onboarding.player_requests WHERE staged_id=ANY($1::uuid[])",[invite.staged_ids])).rows;
         if(owned.some(p=>p.auth_id!==actor.authId)) fail("PLAYER_ALREADY_CLAIMED",409);
         const existing=(await tx.query("SELECT player_key FROM hs_onboarding.player_requests WHERE auth_id=$1",[actor.authId])).rows;
-        if(new Set([...existing.map(p=>p.player_key),...invite.players.map((p:any)=>p.id)]).size>HS_MAX_FAMILY_PLAYERS) fail("HOUSEHOLD_LIMIT");
+        // Resolve only exact, unique household identities. The invitation stays
+        // server-owned; no client-supplied child IDs or fuzzy name merges.
+        const profiles=await independentChildSetupInstalled(tx)
+          ? (await tx.query(`SELECT id,profile_details FROM hs_onboarding.children
+            WHERE parent_auth_id=$1 AND revoked_at IS NULL AND profile_details IS NOT NULL`,[actor.authId])).rows : [];
+        const playerLinks:Array<{stagedId:string;playerId:string}>=[];
+        const invitedPlayers=invite.players.map((p:any)=>{
+          const matches=profiles.filter(c=>{
+            const saved=c.profile_details;
+            return saved.firstName.trim().toLowerCase()===p.firstName.trim().toLowerCase()
+              && saved.lastName.trim().toLowerCase()===p.lastName.trim().toLowerCase() && saved.gradYear===p.gradYear;
+          });
+          if(matches.length>1)fail("CHILD_IDENTITY_MISMATCH",409);
+          const saved=matches[0]?.profile_details;
+          if(saved)playerLinks.push({stagedId:p.id,playerId:saved.id});
+          return {...p,id:saved?.id??p.id,...(saved?.birthYear?{birthYear:saved.birthYear}:{})};
+        });
+        const householdKeys=profiles.map(c=>c.profile_details.id);
+        if(new Set([...existing.map(p=>p.player_key),...householdKeys,...invitedPlayers.map((p:any)=>p.id)]).size>HS_MAX_FAMILY_PLAYERS) fail("HOUSEHOLD_LIMIT");
         await tx.query(`UPDATE ${this.flowTable} SET draft=$2,revision=revision+1 WHERE auth_id=$1`,
-          [actor.authId,{invitationDigest:parentDigest(text),teamId:invite.team_id,players:invite.players.map((p:any)=>({...p,consent:false,photoConsent:false,publicNameConsent:false,consentVersion:HS_CONSENT_VERSION}))}]);
+          [actor.authId,{invitationDigest:parentDigest(text),teamId:invite.team_id,playerLinks,players:invitedPlayers.map((p:any)=>({...p,consent:false,photoConsent:false,publicNameConsent:false,consentVersion:HS_CONSENT_VERSION}))}]);
       } else {
         if(!["assistant_coach","team_manager","head_coach","athletic_director"].includes(invite.staff_role)) fail("INVALID_INVITATION",403);
         const canonical = this.staffDecisions && await this.staffDecisions.installed();
@@ -247,7 +268,10 @@ export class HighSchoolOnboarding {
         if(flow.draft.invitationDigest!==digest) fail("LOOK_UP_INVITATION_FIRST");
         const invitation=await this.invite(tx,actor,digest,"parent");
         teamId=invitation.team_id;stagedIds=invitation.staged_ids;
-        if(payload.players.length!==stagedIds.length || payload.players.some(p=>!stagedIds.includes(p.id))) fail("INVITATION_PLAYER_MISMATCH");
+        if(payload.players.length!==stagedIds.length || payload.players.some(p=>{
+          const stagedId=flow.draft.playerLinks?.find((link:any)=>link.playerId===p.id)?.stagedId??p.id;
+          return !stagedIds.includes(stagedId);
+        })) fail("INVITATION_PLAYER_MISMATCH");
       } else {
         if(flow.draft.invitationDigest) fail("INVITATION_REQUIRED");
         const team=(await tx.query(`SELECT t.id FROM hs_onboarding.teams t JOIN hs_onboarding.programs p ON p.id=t.program_id
@@ -258,14 +282,15 @@ export class HighSchoolOnboarding {
       const existing=(await tx.query("SELECT player_key FROM hs_onboarding.player_requests WHERE auth_id=$1",[actor.authId])).rows;
       if(new Set([...existing.map(p=>p.player_key),...payload.players.map(p=>p.id)]).size>HS_MAX_FAMILY_PLAYERS) fail("HOUSEHOLD_LIMIT");
       for(const player of payload.players){
+        const stagedId=flow.draft.playerLinks?.find((link:any)=>link.playerId===player.id)?.stagedId??player.id;
         const consent=flow.draft.consentRecords?.find((c:any)=>c.playerId===player.id&&c.version===HS_CONSENT_VERSION);
         if(!consent?.recordedAt)fail("PLAYER_CONSENT_REQUIRED",403);
-        const owned=(await tx.query("SELECT auth_id FROM hs_onboarding.player_requests WHERE staged_id=$1",[stagedIds.includes(player.id)?player.id:null])).rows[0];
+        const owned=(await tx.query("SELECT auth_id FROM hs_onboarding.player_requests WHERE staged_id=$1",[stagedIds.includes(stagedId)?stagedId:null])).rows[0];
         if(owned && owned.auth_id!==actor.authId) fail("PLAYER_ALREADY_CLAIMED",409);
         if(existing.some(p=>p.player_key===player.id)) fail("PLAYER_ALREADY_SUBMITTED",409);
         await tx.query(`INSERT INTO hs_onboarding.player_requests(id,auth_id,team_id,staged_id,player_key,details,consent_version,consented_at)
           VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(auth_id,player_key) DO NOTHING`,
-        [randomUUID(),actor.authId,teamId,stagedIds.includes(player.id)?player.id:null,player.id,player,HS_CONSENT_VERSION,consent.recordedAt]);
+        [randomUUID(),actor.authId,teamId,stagedIds.includes(stagedId)?stagedId:null,player.id,player,HS_CONSENT_VERSION,consent.recordedAt]);
       }
       await tx.query(`UPDATE ${this.flowTable} SET status=$2,draft=draft||$3::jsonb,revision=revision+1 WHERE auth_id=$1`,
         [actor.authId,stagedIds.length?"coverage_pending":"waiting_staff_review",JSON.stringify({teamId})]);

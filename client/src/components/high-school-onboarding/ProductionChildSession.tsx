@@ -30,6 +30,6 @@ export function ProductionChildSession({token}:{token:string}) {
         <button className="hsy-secondary" onClick={leave}>Sign out of player session</button>
       </div>
     </div>
-    <ChildProfileScreen data={session.data} request={request}/>
+    <ChildProfileScreen data={session.data} request={request} autoRefresh={false}/>
   </>;
 }

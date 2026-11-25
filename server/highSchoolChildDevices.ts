@@ -9,6 +9,7 @@ import {
 } from "./highSchoolParentSecurity";
 import { OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
 import { requireProductionOnboardingTester } from "./productionOnboardingTests";
+import { independentChildSetupInstalled } from "./highSchoolFamilyProfiles";
 
 const uuid = z.string().uuid();
 const requestProof = z.object({
@@ -59,19 +60,28 @@ export class HighSchoolChildDevices {
   }
   private async child(db: Pick<ParentSql, "query">, id: string, parentId?: string, allowDisabled=false) {
     // All identifiers are canonical server-owned records; intake is not access.
+    const independent=await independentChildSetupInstalled(db);
+    const consentCondition=independent
+      ? `((r.status='approved' AND r.consent_version=$2 AND r.consented_at IS NOT NULL)
+        OR(c.profile_consent_version=$2 AND c.profile_consented_at IS NOT NULL
+          AND c.profile_details->>'consent'='true' AND c.profile_details->>'consentVersion'=$2))`
+      : `(r.status='approved' AND r.consent_version=$2 AND r.consented_at IS NOT NULL)`;
     const row = (await db.query(`SELECT c.*,r.team_id FROM hs_onboarding.children c
-      JOIN hs_onboarding.player_requests r ON r.id=c.player_request_id AND r.auth_id=c.parent_auth_id
-      WHERE c.id=$1 AND (c.enabled=true OR $4::boolean) AND c.revoked_at IS NULL AND r.status='approved'
-      AND r.consent_version=$2 AND r.consented_at IS NOT NULL
+      LEFT JOIN hs_onboarding.player_requests r ON r.id=c.player_request_id AND r.auth_id=c.parent_auth_id
+      WHERE c.id=$1 AND (c.enabled=true OR $4::boolean) AND c.revoked_at IS NULL AND ${consentCondition}
       AND($3::uuid IS NULL OR c.parent_auth_id=$3::uuid)`, [id, HS_CONSENT_VERSION, parentId ?? null,allowDisabled])).rows[0];
     if (!row) throw new OnboardingError("CHILD_ACCESS_UNAVAILABLE", 403);
     if(this.options.production){
       const allowed=(await db.query("SELECT hs_onboarding.production_child_parent_allowed($1) AS allowed",[row.parent_auth_id])).rows[0]?.allowed;
       if(!allowed)throw new OnboardingError("CHILD_ACCESS_UNAVAILABLE",403);
-      const total=(await db.query(`SELECT count(DISTINCT player_key)::int AS n FROM hs_onboarding.player_requests
+      const total=(await db.query(independent?`SELECT count(DISTINCT key)::int AS n FROM(
+        SELECT coalesce(c.profile_details->>'id',r.player_key::text,c.id::text) AS key
+        FROM hs_onboarding.children c LEFT JOIN hs_onboarding.player_requests r ON r.id=c.player_request_id WHERE c.parent_auth_id=$1
+        UNION SELECT player_key::text FROM hs_onboarding.player_requests WHERE auth_id=$1) household`
+        :`SELECT count(DISTINCT player_key)::int AS n FROM hs_onboarding.player_requests
         WHERE auth_id=$1 AND status='approved'`,[row.parent_auth_id])).rows[0]?.n;
       if(!total||total>HS_MAX_FAMILY_PLAYERS)throw new OnboardingError("FAMILY_PLAYER_LIMIT",403);
-      const memberships=(await db.query(`SELECT DISTINCT t.id,p.league_id FROM public.team_memberships m
+      const memberships=(await db.query(`SELECT DISTINCT t.id,p.league_id,t.name FROM public.team_memberships m
         JOIN public.teams t ON t.id=m.team_id AND t.program_type='high_school'
         JOIN hs_onboarding.programs p ON p.id=t.program_id AND p.status='approved'
         JOIN hs_onboarding.teams source ON source.id::text=t.id AND source.program_id=p.id
@@ -80,21 +90,33 @@ export class HighSchoolChildDevices {
             AND parent.user_id=$2::text AND parent.child_profile_id IS NULL
             AND parent.role='parent' AND parent.status='approved')`,[id,row.parent_auth_id])).rows;
       const covered=[];
-      for(const team of memberships)if(await this.options.coverage?.(row.parent_auth_id,team.league_id))covered.push(team.id);
-      if(!covered.length)throw new OnboardingError("APPROVED_TEAM_AND_COVERAGE_REQUIRED",403);
-      row.teamIds=covered;
+      for(const team of memberships)if(await this.options.coverage?.(row.parent_auth_id,team.league_id))covered.push(team);
+      const standalone=independent&&row.profile_consent_version===HS_CONSENT_VERSION
+        &&row.profile_consented_at&&row.profile_details?.consent===true&&row.profile_details?.consentVersion===HS_CONSENT_VERSION;
+      if(!covered.length&&!standalone)throw new OnboardingError("APPROVED_TEAM_AND_COVERAGE_REQUIRED",403);
+      row.teamIds=covered.map(team=>team.id);
+      row.teams=covered.map(team=>({id:team.id,name:team.name}));
+      row.teamStatus=covered.length?"connected":memberships.length?"coverage_pending":"awaiting_team";
     }
     return row;
   }
   async children(actor: OnboardingActor, grant?: string) {
     await this.authority(actor, grant);
-    const rows = (await this.pool.query(`SELECT coalesce(c.id,r.player_key) AS id,r.player_key AS "playerKey",
+    const independent=await independentChildSetupInstalled(this.pool);
+    const rows = (await this.pool.query(independent?`SELECT c.id,
+      coalesce(c.profile_details->>'id',r.player_key::text,c.id::text) AS "playerKey",
+      c.first_name AS "firstName",c.last_name AS "lastName",c.enabled,t.name AS "teamName"
+      FROM hs_onboarding.children c LEFT JOIN hs_onboarding.player_requests r ON r.id=c.player_request_id
+      LEFT JOIN hs_onboarding.teams t ON t.id=r.team_id
+      WHERE c.parent_auth_id=$1 AND c.revoked_at IS NULL ORDER BY c.first_name,c.id`
+      :`SELECT coalesce(c.id,r.player_key) AS id,r.player_key AS "playerKey",
       r.details->>'firstName' AS "firstName",r.details->>'lastName' AS "lastName",
       ($2::boolean AND coalesce(c.enabled,false) AND r.status='approved'
         AND r.consent_version=$3 AND r.consented_at IS NOT NULL) AS enabled,t.name AS "teamName"
       FROM hs_onboarding.player_requests r JOIN hs_onboarding.teams t ON t.id=r.team_id
       LEFT JOIN hs_onboarding.children c ON c.player_request_id=r.id AND c.parent_auth_id=r.auth_id AND c.revoked_at IS NULL
-      WHERE r.auth_id=$1 ORDER BY r.consented_at,r.id LIMIT 4`, [actor.authId,this.activationAvailable,HS_CONSENT_VERSION])).rows;
+      WHERE r.auth_id=$1 ORDER BY r.consented_at,r.id LIMIT 4`,
+      independent?[actor.authId]:[actor.authId,this.activationAvailable,HS_CONSENT_VERSION])).rows;
     // Deliberately do not claim that a consented intake has been activated.
     if(this.options.production)for(const row of rows){
       try{await this.child(this.pool,row.id,actor.authId,true);row.canActivate=true;}
@@ -308,6 +330,7 @@ export class HighSchoolChildDevices {
   }
   async ownSession(token: unknown) {
     const session = await this.session(token);
+    if(this.options.production)await this.syncChats(this.pool,session.child_id,session.parent_auth_id,session.child.teamIds);
     let schedule = (await this.pool.query(`SELECT id,title,starts_at AS "startsAt",location
       FROM hs_onboarding.child_events WHERE child_id=$1 ORDER BY starts_at LIMIT 100`, [session.child_id])).rows;
     if(this.options.production)schedule=(await this.pool.query(`SELECT id,title,starts_at AS "startsAt",rink AS location
@@ -316,7 +339,19 @@ export class HighSchoolChildDevices {
     const chats = (await this.pool.query(`SELECT c.id,c.name,c.kind FROM hs_onboarding.child_chats c
       JOIN hs_onboarding.child_chat_members m ON m.chat_id=c.id WHERE m.child_id=$1
        AND ${this.chatScope} ORDER BY c.name`, [session.child_id, session.parent_auth_id, session.child.teamIds??[session.child.team_id]])).rows;
-    return { child: { id: session.child_id, firstName: session.child.first_name, lastName: session.child.last_name }, schedule, chats };
+    return { child: { id: session.child_id, firstName: session.child.first_name, lastName: session.child.last_name,
+      birthYear:session.child.profile_details?.birthYear,gradYear:session.child.profile_details?.gradYear },
+      teamStatus:session.child.teamStatus,teams:session.child.teams??[],schedule, chats };
+  }
+  private async syncChats(db: Pick<ParentSql,"query">,childId:string,parentId:string,teamIds:string[]) {
+    await db.query(`INSERT INTO hs_onboarding.child_chats(id,kind,name,parent_auth_id)
+      VALUES($1,'family','Family',$2) ON CONFLICT(parent_auth_id) WHERE kind='family' DO NOTHING`,[randomUUID(),parentId]);
+    for(const teamId of teamIds)await db.query(`INSERT INTO hs_onboarding.child_chats(id,kind,name,team_id)
+      VALUES($1,'team','Team',$2) ON CONFLICT(team_id,kind) WHERE team_id IS NOT NULL DO NOTHING`,[randomUUID(),teamId]);
+    await db.query(`INSERT INTO hs_onboarding.child_chat_members(chat_id,child_id)
+      SELECT id,$1 FROM hs_onboarding.child_chats WHERE(kind='family' AND parent_auth_id=$2)
+        OR(kind='team' AND team_id=ANY($3::uuid[]) AND parent_auth_id IS NULL)
+      ON CONFLICT DO NOTHING`,[childId,parentId,teamIds]);
   }
   async messages(token: unknown, chatId: string) {
     uuid.parse(chatId);

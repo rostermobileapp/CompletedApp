@@ -191,11 +191,14 @@ export class HighSchoolFamilyReview extends StaffBase {
         const parentId = guardian.adult_user_id ?? row.auth_id;
         // Never create or replace an adult account as a side effect of review.
         if (!(await db.query("SELECT 1 FROM public.users WHERE id=$1", [parentId])).rows.length) staffFail("GUARDIAN_ACCOUNT_REQUIRED", 403);
-        const existing = (await db.query(`SELECT id,parent_auth_id,revoked_at,enabled FROM hs_onboarding.children WHERE player_request_id=$1 FOR UPDATE`, [id])).rows[0];
-        if (existing && (existing.parent_auth_id !== row.auth_id || existing.revoked_at || existing.enabled)) staffFail("CHILD_REVIEW_REQUIRED", 409);
+        const existing = (await db.query(`SELECT id,parent_auth_id,revoked_at,enabled,player_request_id FROM hs_onboarding.children
+          WHERE player_request_id=$1 OR(id=$2 AND parent_auth_id=$3) FOR UPDATE`, [id,player.id,row.auth_id])).rows[0];
+        if (existing && (existing.parent_auth_id !== row.auth_id || existing.revoked_at ||
+          (existing.player_request_id && existing.player_request_id!==id))) staffFail("CHILD_REVIEW_REQUIRED", 409);
         const childId = existing?.id ?? randomUUID();
         if (!existing) await db.query(`INSERT INTO hs_onboarding.children(id,parent_auth_id,player_request_id,first_name,last_name,enabled)
           VALUES($1,$2,$3,$4,$5,false)`, [childId, row.auth_id, id, player.firstName, player.lastName]);
+        else await db.query("UPDATE hs_onboarding.children SET player_request_id=$2 WHERE id=$1",[childId,id]);
         // Separate rows preserve a parent's existing staff role on this team.
         if (!(await db.query(`SELECT 1 FROM public.team_memberships WHERE user_id=$1 AND team_id=$2 AND role='parent' AND status='approved'`, [parentId, teamId])).rows.length)
           await db.query(`INSERT INTO public.team_memberships(id,user_id,team_id,role,status,is_captain) VALUES($1,$2,$3,'parent','approved',false)`,

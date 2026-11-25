@@ -55,6 +55,8 @@ function errorMessage(error: unknown) {
     PLAYER_ALREADY_CLAIMED: "That invited player is already linked to another family.",
     PLAYER_ALREADY_SUBMITTED: "This child already has a team request. Refresh to see its status.",
     PLAYER_CONSENT_REQUIRED: "Review consent for every child and confirm you are their authorized guardian.",
+    BIRTH_YEAR_REQUIRED: "Choose a birth year for each child before saving consent.",
+    CHILD_IDENTITY_MISMATCH: "These details do not match the existing child profile. Check the invitation with the team before continuing.",
     PLAYER_REVIEW_FORBIDDEN: "This request cannot be reviewed by your current account.",
     STAFF_TEAM_FORBIDDEN: "Your staff access no longer includes this team.",
     STAFF_MANAGEMENT_FORBIDDEN: "Your account does not have authority to manage team requests.",
@@ -307,7 +309,8 @@ export function FamilySetup({
   const localNewCount = draftPlayers.filter(player => !state?.players.some(saved => saved.id === player.id)).length;
   const totalChildren = knownChildren + localNewCount;
   const detailsValid = draftPlayers.length > 0 && draftPlayers.every(player =>
-    player.firstName.trim().length > 0 && player.lastName.trim().length > 0,
+    player.firstName.trim().length > 0 && player.lastName.trim().length > 0
+      && Number.isInteger(player.birthYear) && player.birthYear! >= 1900 && player.birthYear! <= new Date().getFullYear(),
   );
   const canSaveConsent = detailsValid && draftPlayers.every(player => player.consent) && guardian;
   const hasSavedConsent = savedDraftPlayers.length > 0
@@ -344,6 +347,7 @@ export function FamilySetup({
       guardianConfirmed: true,
     },
     "Child privacy choices saved. Team access still depends on team approval.",
+    ["family-device-children"],
   );
 
   const discardDraft = async () => {
@@ -526,7 +530,7 @@ export function FamilySetup({
       || editablePlayers.some(player => {
         const saved = savedDraftPlayers.find(item => item.id === player.id);
         return !saved || saved.firstName !== player.firstName || saved.lastName !== player.lastName
-          || saved.gradYear !== player.gradYear || saved.position !== player.position
+          || saved.gradYear !== player.gradYear || saved.birthYear !== player.birthYear || saved.position !== player.position
           || saved.jerseyNumber !== player.jerseyNumber;
       }));
     const consentPlayers = state.imported ? draftPlayers : editablePlayers;
@@ -538,14 +542,14 @@ export function FamilySetup({
         <span className="family-kicker">{addedCount} of {state.maximumPlayers} children</span>
       </div>
       <h1>Your family, your pace</h1>
-      <p className="hsy-subtitle">Save a draft, review consent for each child, then send a team request. Your adult team is separate.</p>
+      <p className="hsy-subtitle">Set up each child and review their privacy choices. You can connect a team later. Your adult team is separate.</p>
       {state.imported && <div className="hsy-alert" role="status">These player details were staged by the team and are read-only here. Matching and consent do not change the server-owned identity.</div>}
 
       <div className="family-panel soft" style={{ marginBottom: 17 }}>
         <div className="hsy-between">
           <div>
             <div className="family-kicker">Private by default</div>
-            <p className="hsy-note" style={{ marginBottom: 0 }}>No child email, phone, address or birthday is collected. Names stay hidden until parent verification.</p>
+            <p className="hsy-note" style={{ marginBottom: 0 }}>We collect birth year only—not a full birthday, email, phone or address. Names stay hidden until parent verification.</p>
           </div>
           <ShieldCheck size={23} aria-hidden="true" />
         </div>
@@ -587,6 +591,12 @@ export function FamilySetup({
             </label>
           </div>
           <div className="family-grid-two hsy-grid2" style={{ marginTop: 12 }}>
+            <label className="family-field-label">Birth year
+              <select className="hsy-field" aria-label="Birth year" value={player.birthYear ?? ""} disabled={busy !== ""} onChange={event => changePlayer(player.id, { birthYear: event.target.value ? Number(event.target.value) : undefined })}>
+                <option value="">Choose birth year</option>
+                {Array.from({ length: 101 }, (_, index) => new Date().getFullYear() - index).map(year => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>
             <label className="family-field-label">Graduation year
               <select className="hsy-field" value={player.gradYear} disabled={busy !== ""} onChange={event => changePlayer(player.id, { gradYear: Number(event.target.value) })}>
                 {Array.from({ length: 15 }, (_, index) => 2026 + index).map(year => <option key={year} value={year}>{year}</option>)}
@@ -607,25 +617,31 @@ export function FamilySetup({
         {addedCount < state.maximumPlayers && editablePlayers.length < state.maximumPlayers && <button className="hsy-secondary" disabled={busy !== ""} onClick={() => setPlayers(current => [...current, freshPlayer()])}>Add another child</button>}
         <button className="hsy-secondary" style={{ width: "100%" }} disabled={busy !== "" || !dirty} onClick={() => void saveDraft()}>{busy === "draft" ? "Saving draft…" : "Save draft"}</button>
         {savedDraftPlayers.length > 0 && <button className="family-remove" type="button" disabled={busy !== ""} onClick={() => void discardDraft()}>Discard all unsubmitted drafts</button>}
-        {dirty && <p className="hsy-note" style={{ margin: 0 }}>Save the latest details as a draft before giving consent. Saving a draft resets guardian confirmation and all child consent.</p>}
+        {dirty && <p className="hsy-note" style={{ margin: 0 }}>You can save a draft, or complete the privacy choices below to save these details and consent together.</p>}
       </div>}
 
       {consentPlayers.length > 0 && <div className="family-panel" style={{ marginTop: 16 }}>
         <div className="family-kicker">Consent for each child</div>
         <p className="hsy-note">Your choices apply separately to each child. Parent or legal guardian consent is required before a team request.</p>
-        {state.imported && <p className="hsy-note">Team-provided identity details are read-only. Only the privacy choices and guardian consent below can be submitted.</p>}
+        {state.imported && <p className="hsy-note">Team-provided names and roster details are read-only. You provide the birth year, privacy choices and guardian consent below.</p>}
         <div className="family-privacy-copy">{HS_CONSENT_TEXT}</div>
         {consentPlayers.map((player, index) => <div className="family-consent-list" key={`consent-${player.id}`}>
           <strong>{player.firstName.trim() || `Player ${index + 1}`} · privacy choices</strong>
-          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== "" || (dirty && !state.imported)} checked={player.photoConsent} onChange={event => changePlayer(player.id, { photoConsent: event.target.checked })} />Allow this player’s photo to be shown to their team</label>
-          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== "" || (dirty && !state.imported)} checked={player.publicNameConsent} onChange={event => changePlayer(player.id, { publicNameConsent: event.target.checked })} />Allow this player’s name in public results</label>
-          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== "" || (dirty && !state.imported)} checked={player.consent} onChange={event => setPlayers(current => current.map(item => item.id === player.id ? { ...item, consent: event.target.checked } : item))} />I am this player’s parent or legal guardian, and I agree to the privacy terms.</label>
+          {state.imported&&<label className="family-field-label">Birth year
+            <select className="hsy-field" aria-label="Birth year" value={player.birthYear??""} disabled={busy!==""} onChange={event=>changePlayer(player.id,{birthYear:event.target.value?Number(event.target.value):undefined})}>
+              <option value="">Choose birth year</option>
+              {Array.from({length:101},(_,i)=>new Date().getFullYear()-i).map(year=><option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>}
+          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== ""} checked={player.photoConsent} onChange={event => changePlayer(player.id, { photoConsent: event.target.checked })} />Allow this player’s photo to be shown to their team</label>
+          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== ""} checked={player.publicNameConsent} onChange={event => changePlayer(player.id, { publicNameConsent: event.target.checked })} />Allow this player’s name in public results</label>
+          <label className="hsy-toggle"><input type="checkbox" disabled={busy !== ""} checked={player.consent} onChange={event => setPlayers(current => current.map(item => item.id === player.id ? { ...item, consent: event.target.checked } : item))} />I am this player’s parent or legal guardian, and I agree to the privacy terms.</label>
         </div>)}
         <label className="hsy-toggle" style={{ marginTop: 14, padding: 12, border: "1px solid var(--family-line)", borderRadius: 12 }}>
-          <input type="checkbox" disabled={busy !== "" || (dirty && !state.imported)} checked={guardian} onChange={event => setGuardian(event.target.checked)} />
+          <input type="checkbox" disabled={busy !== ""} checked={guardian} onChange={event => setGuardian(event.target.checked)} />
           I am the authorized adult guardian for these players.
         </label>
-        <button className="family-quiet-button" style={{ paddingLeft: 0, marginTop: 8 }} disabled={busy !== "" || (dirty && !state.imported) || !canSaveConsent} onClick={() => void saveConsent()}>
+        <button className="family-quiet-button" style={{ paddingLeft: 0, marginTop: 8 }} disabled={busy !== "" || !canSaveConsent} onClick={() => void saveConsent()}>
           Save child consent
         </button>
       </div>}
@@ -665,10 +681,10 @@ export function FamilySetup({
             <span className="family-status draft">Draft</span>
           </div>
           <div className="family-meta-row">{player.gradYear} · {player.position === "F" ? "Forward" : player.position === "D" ? "Defense" : "Goalie"}</div>
-          <div className="family-device-state"><span>Device access</span><strong>Disabled</strong></div>
+          <div className="family-device-state"><span>Device access</span><strong>{devicePanel ? "Manage below" : "Disabled"}</strong></div>
         </article>)}
         {requests.length === 0 && draftRows.length === 0 && <div className="family-empty" style={{ marginTop: 11 }}>
-          <strong>No team requests yet</strong><p>Child profiles are created only after a team approves a request.</p>
+          <strong>No team requests yet</strong><p>You can finish child setup now and connect a team later.</p>
         </div>}
         {requests.map(item => <FamilyRequestCard key={item.id} request={item} busy={busy === `team-${item.teamId}`} deviceTesting={!!devicePanel}
           onViewTeam={teamAccessAvailable ? () => void viewTeam(item.teamId) : undefined} />)}
@@ -685,7 +701,7 @@ export function FamilySetup({
       <div className="family-panel soft" style={{ marginTop: 18 }}>
         <div className="family-kicker">What happens next</div>
         <p className="hsy-note" style={{ marginBottom: 0 }}>{devicePanel
-          ?"Team approval is separate from coverage. Pairing requires both, plus your verified approval for each child's phone."
+          ?"Save child consent, then pair their phone below. A team can be added later through your account; approved, covered team information will appear on their phone."
           :"Team approval is separate from coverage. A successful request never activates a child login or device; device access is disabled."}</p>
       </div>
     </section>;

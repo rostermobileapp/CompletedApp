@@ -3,19 +3,54 @@ import { Check } from "lucide-react";
 import { HsyButton, HsyInput, ScreenFrame, type RequestFn } from "./shared";
 
 type ChildData = {
-  child: { firstName: string; lastName?: string };
+  child: { firstName: string; lastName?: string;birthYear?:number;gradYear?:number };
+  teamStatus?: "awaiting_team" | "coverage_pending" | "connected";
+  teams?: Array<{id:string;name:string}>;
   schedule?: Array<{ id: string; title?: string; startsAt?: string; location?: string }>;
   chats?: Array<{ id: string; name: string; kind?: "team" | "family" }>;
 };
 type ChildMessage = { id: string; sender: string; body: string; createdAt: string };
 
-export function ChildProfileScreen({ data, request }: { data: ChildData; request: RequestFn }) {
+export function ChildProfileScreen({ data, request, autoRefresh=true }: { data: ChildData; request: RequestFn; autoRefresh?:boolean }) {
+  const [current,setCurrent]=useState(data);
+  const [refreshError,setRefreshError]=useState("");
+  useEffect(()=>setCurrent(data),[data]);
   const [selectedChat, setSelectedChat] = useState<NonNullable<ChildData["chats"]>[number]>();
   const [messages, setMessages] = useState<ChildMessage[]>([]);
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  useEffect(()=>{
+    if(!autoRefresh)return;
+    let live=true,pending=false;
+    const refresh=async()=>{
+      if(pending||document.visibilityState==="hidden")return;
+      pending=true;
+      try{
+        const next=await request("GET","/api/high-school/child-device/session");
+        if(live){
+          setCurrent(next);setRefreshError("");
+          setSelectedChat(previous=>{
+            if(previous&&!next.chats?.some((chat:any)=>chat.id===previous.id)){
+              setMessages([]);setBody("");return undefined;
+            }
+            return previous;
+          });
+        }
+      }catch{
+        if(live){
+          setCurrent(previous=>({...previous,schedule:[],chats:[],teams:[]}));
+          setSelectedChat(undefined);setMessages([]);setBody("");
+          setRefreshError("Access could not be refreshed. Check your connection or ask your parent to verify this phone.");
+        }
+      }finally{pending=false;}
+    };
+    const timer=window.setInterval(()=>void refresh(),15_000);
+    const onFocus=()=>void refresh();
+    window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onFocus);
+    return()=>{live=false;window.clearInterval(timer);window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onFocus);};
+  },[request,autoRefresh]);
   const chatUrl = selectedChat ? `/api/high-school/child-device/chats/${encodeURIComponent(selectedChat.id)}/messages` : undefined;
   const load = useCallback(async () => {
     if (!chatUrl) return;
@@ -43,10 +78,19 @@ export function ChildProfileScreen({ data, request }: { data: ChildData; request
   return <ScreenFrame>
     <section className="hsy-content" style={{ paddingTop: 44 }}>
       <div className="hsy-success" style={{ display: "inline-flex", padding: 12, marginBottom: 18 }}><Check size={24}/></div>
-      <h1 className="hsy-title-success">You're in, {data.child.firstName}</h1>
+      <h1 className="hsy-title-success">You're in, {current.child.firstName}</h1>
       <p className="hsy-subtitle">Your parent approved this session. It opens only your approved player profile.</p>
+      {current.child.birthYear&&<p className="hsy-note">Birth year: {current.child.birthYear}{current.child.gradYear?` · Graduation year: ${current.child.gradYear}`:""}</p>}
+      {refreshError&&<p role="alert" className="hsy-error">{refreshError}</p>}
+      {current.teamStatus==="awaiting_team"&&<div className="hsy-card tint" role="status">
+        <strong>Ready for your team</strong><p className="hsy-note">Your profile is set up. Ask your parent to accept your team invitation in their account. Approved team information will appear here automatically—no new setup code is needed.</p>
+      </div>}
+      {current.teamStatus==="coverage_pending"&&<div className="hsy-card tint" role="status">
+        <strong>Your team is connected</strong><p className="hsy-note">Your parent needs to check Player Pro or league coverage before team information is available. You do not need to pair this phone again.</p>
+      </div>}
+      {!!current.teams?.length&&<div className="hsy-card" style={{marginBottom:16}}><strong>Your teams</strong>{current.teams.map(team=><p className="hsy-note" key={team.id}>{team.name}</p>)}</div>}
       <div className="hsy-card"><strong>Team schedule</strong>
-        {data.schedule?.length ? data.schedule.map(event => <div className="hsy-list-row" key={event.id}>
+        {current.schedule?.length ? current.schedule.map(event => <div className="hsy-list-row" key={event.id}>
           <span><strong>{event.title ?? "Team event"}</strong>
             <small style={{ display: "block", color: "#64748b" }}>
               {event.startsAt && <time dateTime={event.startsAt}>{new Date(event.startsAt).toLocaleString()}</time>}
@@ -56,7 +100,7 @@ export function ChildProfileScreen({ data, request }: { data: ChildData; request
         </div>) : <p className="hsy-note">No schedule items yet.</p>}
       </div>
       <div className="hsy-card" style={{ marginTop: 16 }}><strong>Approved chats</strong>
-        {data.chats?.length ? data.chats.map(chat => <HsyButton className="hsy-secondary" key={chat.id} style={{ width: "100%", marginTop: 12 }} onClick={() => setSelectedChat(chat)}>
+        {current.chats?.length ? current.chats.map(chat => <HsyButton className="hsy-secondary" key={chat.id} style={{ width: "100%", marginTop: 12 }} onClick={() => setSelectedChat(chat)}>
           {chat.name}
         </HsyButton>) : <p className="hsy-note">No chats are available.</p>}
       </div>

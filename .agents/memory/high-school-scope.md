@@ -3,6 +3,27 @@ name: High School scope boundaries
 description: Owner-supplied High School product constraints and phase-by-phase approval rules.
 ---
 
+## Child profiles before team connection
+
+The owner now requires birth year alongside graduation year and wants a child
+profile/device set up before joining a team. Collect the year only, not a full
+date of birth. A later invitation through the parent's account must populate the
+same child's existing phone session, not create a second child or require pairing
+again.
+
+**Why:** During restricted production testing, the owner explicitly identified
+team-first activation as the wrong product flow and requested independent setup.
+This supersedes the earlier requirement that approved team membership and
+coverage precede all child pairing, not the restricted rollout or child-safety
+requirements.
+
+**How to apply:** Require saved guardian consent and verified-parent device
+approval for baseline profile access. Continue to require canonical approved
+membership and payer-scoped coverage for team schedules/chats, and revalidate
+them on reads. Preserve stable household identity through invitation claims.
+Keep the selected-account rollout and two-player limit, and obtain specific
+approval before applying additional production schema changes.
+
 ## Restricted production onboarding testing
 
 The owner wants to test the complete onboarding and coach/parent journeys in

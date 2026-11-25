@@ -39,7 +39,7 @@ export function ProductionOnboardingTest({actorId,approvals=false}:{actorId:stri
         <button className="hsy-secondary" onClick={()=>navigate("/high-school/family")}>Family and child devices</button>
         <button className="hsy-secondary" onClick={()=>navigate("/high-school/onboarding/approvals")}>Review staff requests</button>
         <button className="hsy-secondary" onClick={()=>navigate("/high-school/home")}>Choose an approved school team</button>
-        <p className="hsy-note">Staff approval, guardian consent and coverage are required before child pairing. Device setup uses a secure link, a separate code, and approval on a verified parent device. Purchases and test notification delivery are not enabled.</p>
+        <p className="hsy-note">Save child details and guardian consent before pairing. A team can be connected later; staff approval and coverage govern team information, not the initial profile setup. Device setup uses a secure link, a separate code, and approval on a verified parent device. Purchases and test notification delivery are not enabled.</p>
       </div>}
     </section>
   </ScreenFrame>;
