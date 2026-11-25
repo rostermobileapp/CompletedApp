@@ -21,7 +21,7 @@ export function Under18ShareScreen({ onCode, onBack }: {onCode?:()=>void;onBack:
       <div style={{display:"inline-flex",padding:14,borderRadius:16,background:"#eff6ff",color:"#2563eb",marginBottom:18}}><Link2 size={26}/></div>
       <h1>Players under 18 join through a parent</h1><p className="hsy-subtitle">Your parent's Roster account connects you to your team.</p>
       <div className="hsy-stack">
-        {onCode&&<button className="hsy-choice" onClick={onCode}><span className="hsy-choice-icon"><span style={{fontWeight:800}}>•••</span></span><span className="hsy-choice-copy"><strong>I have a code from my parent</strong><small>Enter the 6-character code from their phone</small></span></button>}
+        {onCode&&<button className="hsy-choice" onClick={onCode}><span className="hsy-choice-icon"><span style={{fontWeight:800}}>•••</span></span><span className="hsy-choice-copy"><strong>I have a code from my parent</strong><small>Use their setup link and 6-character code</small></span></button>}
         <button className="hsy-choice" onClick={()=>void share()}><span className="hsy-choice-icon"><Share2 size={24}/></span><span className="hsy-choice-copy"><strong>Share with a parent</strong><small>Send them a link to set up Roster and add you</small></span></button>
       </div>
       {notice&&<div role="status" className="hsy-card tint" style={{marginTop:16}}><p className="hsy-note" style={{margin:"0 0 8px"}}>{notice}</p>{fallback&&<div className="hsy-row"><input className="hsy-field" aria-label="Signup link to copy" readOnly value={signupLink} onFocus={e=>e.currentTarget.select()}/><button className="hsy-secondary" onClick={()=>void copy()}><Copy size={17}/></button></div>}</div>}

@@ -45,9 +45,26 @@ try{
     const errors:string[]=[];let apiCalls=0;
     page.on("pageerror",error=>errors.push(error.message));
     await page.route("**/api/**",route=>{apiCalls++;return route.abort();});
-    await page.goto(`${origin}/under-18/code`);
-    assert.equal(await page.getByRole("textbox",{name:"Code character 1",exact:true}).count(),0);
+    await page.goto(`${origin}/under-18`);
+    await page.getByRole("button",{name:"I have a code from my parent"}).click();
+    await page.getByRole("heading",{name:"Enter your parent's code"}).waitFor();
+    for(const [i,char] of [..."K7P2QX"].entries())
+      await page.getByRole("textbox",{name:`Code character ${i+1}`,exact:true}).fill(char);
+    assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);
     assert.equal(await page.evaluate("window.fixtureRequests.length"),0);checks++;
+    for(const invalid of ["not a link",`${origin}/login?challengeId=${challenge}`,`${origin}/under-18/code?challengeId=invalid`,`javascript:alert(1)`]){
+      await page.getByRole("textbox",{name:"Parent's setup link",exact:true}).fill(invalid);
+      assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);
+    }
+    assert.equal(await page.evaluate("window.fixtureRequests.length"),0);checks++;
+    await page.getByRole("textbox",{name:"Parent's setup link",exact:true}).fill(`${origin}/under-18/code?challengeId=${challenge}`);
+    await page.getByRole("button",{name:"Continue",exact:true}).click();
+    await page.getByRole("heading",{name:"Waiting for your parent"}).waitFor();
+    await page.getByRole("heading",{name:"You're in, Synthetic Player",exact:true}).waitFor({timeout:10000});
+    assert.ok(!page.url().includes("K7P2QX"));checks++;
+    await page.goto(`${origin}/under-18/code`);
+    await page.getByRole("textbox",{name:"Parent's setup link",exact:true}).waitFor();
+    assert.equal(await page.getByRole("button",{name:"Continue",exact:true}).isDisabled(),true);checks++;
     for(const decision of ["approved","denied","expired"]){
       await page.goto(`${origin}/under-18/code?challengeId=${challenge}&decision=${decision}`);
       for(const [i,char] of [..."K7P2QX"].entries())
