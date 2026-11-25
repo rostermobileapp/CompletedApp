@@ -301,3 +301,17 @@ mtime_ms = 1795556616607
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/91ba2f4e-65fe-4a4f-bd6b-a08e3eb09fbc/4a02abfc-4f2a-4386-b521-272b154022fd"
 storage_version_token = "1795556825759673"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "0SPXs9OMIuGbzK6P5uwnp"
+uri = "file://generated-artifacts/family-theme/family-390.png"
+type = "image"
+title = "Updated Family setup"
+description = "Phone-width rendering of the actual Family component using isolated test data, not a live signed-in account."
+logical_id = "99bbfe97-2601-4ff2-ae32-7615e6c587c4"
+content_hash = "sha256:49a70296b09dd19f97721dfd34a11fc4fac925e3d2d24855ca0f665ff3da8db8"
+size = 60750
+mtime_ms = 1795567345485
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/99bbfe97-2601-4ff2-ae32-7615e6c587c4/78199cc5-9851-4409-853c-45784cfd194f"
+storage_version_token = "1795567393232596"
+content_type = "image/png"

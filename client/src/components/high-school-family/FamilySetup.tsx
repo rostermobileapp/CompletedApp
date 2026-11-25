@@ -413,7 +413,7 @@ export function FamilySetup({
   if (authorityFailure === "PARENT_VERIFICATION_REQUIRED") {
     return <div className="hsy family-setup">
       <div className="family-topline">
-        <span className="family-brand">Roster · Family setup</span>
+        <span className="family-brand">RosterHockey · Family setup</span>
         <button className="family-quiet-button" onClick={onExit}>Back to my account</button>
       </div>
       <div className="family-error-block"><div className="hsy-alert" role="status">Parent verification is required. Child details and invitation tokens have been cleared from this screen.</div></div>
@@ -429,7 +429,7 @@ export function FamilySetup({
   if (authorityFailure === "INVALID_SESSION" || authorityFailure === "FAMILY_ELIGIBILITY_REQUIRED") {
     return <div className="hsy family-setup">
       <div className="family-topline">
-        <span className="family-brand">Roster · Family setup</span>
+        <span className="family-brand">RosterHockey · Family setup</span>
         <button className="family-quiet-button" onClick={onExit}>Back to my account</button>
       </div>
       <section className="hsy-content">
@@ -448,7 +448,7 @@ export function FamilySetup({
   if (state?.started && !state.verified) {
     return <div className="hsy family-setup">
       <div className="family-topline">
-        <span className="family-brand">Roster · Family setup</span>
+        <span className="family-brand">RosterHockey · Family setup</span>
         <button className="family-quiet-button" onClick={onExit}>Back to my account</button>
       </div>
       <div className="family-error-block" aria-live="polite">
@@ -471,9 +471,9 @@ export function FamilySetup({
         <h1>Loading your setup</h1>
         <p className="hsy-subtitle">Checking only the current household request.</p>
         <div className="family-busy-line" />
-        <div className="family-panel soft" style={{ marginTop: 18 }}>
-          <div style={{ height: 14, width: "44%", background: "#e8eff0", borderRadius: 8 }} />
-          <div style={{ height: 12, width: "78%", background: "#edf2f3", borderRadius: 8, marginTop: 13 }} />
+        <div className="family-panel soft family-skeleton" style={{ marginTop: 18 }} aria-hidden="true">
+          <div className="family-skeleton-line short" />
+          <div className="family-skeleton-line" />
         </div>
       </section>;
     }
@@ -492,16 +492,13 @@ export function FamilySetup({
         <div className="family-intro-mark" />
         <span className="hsy-section-label">A separate path for your family</span>
         <h1>Set up a school-team player</h1>
-        <p className="hsy-subtitle">Keep your adult roster. Add a child only when you are ready, with parent verification and clear team approval.</p>
-        <div className="family-panel soft">
-          <div className="family-kicker">Your account stays yours</div>
-          <h2 style={{ marginTop: 8 }}>Family setup does not replace your team</h2>
-          <p className="hsy-note">This starts family protection only. It does not enroll children, create child accounts, or activate a device.</p>
-        </div>
+        <p className="hsy-subtitle">Add up to {HS_MAX_FAMILY_PLAYERS} children for a school team. Your adult teams stay unchanged.</p>
         <div className="family-form-stack">
           <div className="family-panel">
-            <div className="family-kicker">Before you begin</div>
-            <p className="hsy-note">Starting family protection adds parent email verification to this login, including access to your adult account. Verification email delivery is disabled in this DEV phase.</p>
+            <div className="family-kicker">Your account stays yours</div>
+            <h2 style={{ marginTop: 8 }}>Parent verification comes first</h2>
+            <p className="hsy-note">We’ll send a code to your registered email. Parent verification will also protect access to your adult account, parent controls and password changes. Starting setup does not enroll children or enable child sign-in or device access.</p>
+            {import.meta.env.DEV && <p className="family-dev-note">Development environment: email delivery may use a development mail flow.</p>}
             <div className="family-meta-row" style={{ marginTop: 12 }}>
               <span><ShieldCheck size={15} style={{ verticalAlign: "-3px", marginRight: 4 }} />Parent email verification</span>
               <span><UsersRound size={15} style={{ verticalAlign: "-3px", marginRight: 4 }} />Up to {HS_MAX_FAMILY_PLAYERS} players</span>
@@ -548,7 +545,7 @@ export function FamilySetup({
             <div className="family-kicker">Private by default</div>
             <p className="hsy-note" style={{ marginBottom: 0 }}>No child email, phone, address or birthday is collected. Names stay hidden until parent verification.</p>
           </div>
-          <ShieldCheck size={23} color="#176e71" aria-hidden="true" />
+          <ShieldCheck size={23} aria-hidden="true" />
         </div>
       </div>
 
@@ -690,23 +687,23 @@ export function FamilySetup({
   };
 
   return <main className="hsy family-setup">
-    <div className="family-topline">
-      <span className="family-brand">Roster · Family setup</span>
-      <div className="family-top-actions">
-        <button className="family-quiet-button" disabled={loading} onClick={() => void refresh(false)} aria-label="Refresh family setup status">
-          <RefreshCw size={15} style={{ verticalAlign: "-3px", marginRight: 4 }} />Refresh
-        </button>
-        <button className="family-quiet-button" onClick={onExit} aria-label="Back to my account"><ChevronLeft size={16} style={{ verticalAlign: "-3px" }} />My account</button>
-      </div>
-    </div>
-    {busy && <div className="family-busy-line" aria-label="Saving changes" />}
     <div className="hsy-frame">
+      <div className="family-topline">
+        <span className="family-brand">RosterHockey<span className="family-brand-subtitle">Family setup</span></span>
+        <div className="family-top-actions">
+          <button className="family-quiet-button" disabled={loading} onClick={() => void refresh(false)} aria-label="Refresh family setup status">
+            <RefreshCw size={15} style={{ verticalAlign: "-3px", marginRight: 4 }} />Refresh
+          </button>
+          <button className="family-quiet-button" onClick={onExit} aria-label="Back to my account"><ChevronLeft size={16} style={{ verticalAlign: "-3px" }} />My account</button>
+        </div>
+      </div>
+      {busy && <div className="family-busy-line" aria-label="Saving changes" />}
       {error && <div className="family-error-block"><div className="hsy-error" role="alert">{error}<button className="family-quiet-button" style={{ float: "right", minHeight: 30 }} onClick={() => setError("")}>Dismiss</button></div></div>}
       {notice && <div className="family-error-block"><div className="hsy-success" role="status">{notice}</div></div>}
       {pageContent()}
-    </div>
-    <div className="family-topline" style={{ justifyContent: "center", borderTop: "1px solid var(--family-line)", borderBottom: 0 }}>
-      <button className="family-quiet-button" onClick={onExit}>Return to my adult account</button>
+      <div className="family-bottomline">
+        <button className="family-quiet-button" onClick={onExit}>Return to my adult account</button>
+      </div>
     </div>
   </main>;
 }

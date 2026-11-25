@@ -350,6 +350,15 @@ does not make adult profiles part of the High School authority or family model.
 
 ## Light onboarding auth and verification
 
+Family setup should use the existing light, blue-accented onboarding design,
+not a separate teal theme.
+
+**Why:** The owner flagged the live Family setup page as inconsistent with the
+design theme after approving the compact Family entry in Profile.
+
+**How to apply:** Reuse onboarding typography, colors, controls and mobile width
+for family screens without changing global theme or family security behavior.
+
 Keep signup/sign-in dialogs, signup email verification and every parent
 verification state in the same light design as the onboarding, even when the
 surrounding app uses dark mode. Apply the light styling locally, not globally.
