@@ -292,8 +292,9 @@ It adds private consent/profile metadata to the existing child registry,
 permits a consented child profile without an initial team-request link, and
 installs a private version marker. It preserves the restricted enabled-parent
 constraint, existing rows and original installation manifests. It creates no
-profiles and enables no devices automatically. **It has not been applied to
-production.** Application releases and real-phone acceptance remain separate.
+profiles and enables no devices automatically. **The owner approved this
+database update and it was applied to production on November 25, 2026.**
+Application releases and real-phone acceptance remain separate.
 
 Verification of this revision passed:
 
@@ -311,3 +312,21 @@ Verification of this revision passed:
 The repository-wide type check retained 224 existing diagnostics, with no
 diagnostics matching the changed feature files. Browser checks used isolated
 API adapters rather than real inboxes or physical devices. No app was published.
+
+### Approved production database installation
+
+The owner explicitly approved the database update only. The authorized
+installer committed the separate migration successfully, reporting zero
+account resets, zero automatically created children and preserved production
+protections.
+
+A fresh read-only verification after commit confirmed all three profile/consent
+columns, the optional initial team-request link, validated consent and
+restricted-parent constraints, the valid unique household identity index,
+private-marker row-level security, denied browser-role access, and the exact
+migration manifest. Both original family/onboarding readiness checks passed.
+
+No Railway or Vercel release, Git push, account activation, subscription change
+or real-device pairing was performed as part of this database-only approval.
+The matching backend/frontend releases are still required before treating
+independent child setup as live and ready for phone testing.
