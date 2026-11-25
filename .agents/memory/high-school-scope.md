@@ -82,12 +82,14 @@ shared login is the parent; preserve the parent-device and child-device boundary
 
 Parent verification must always offer an exit, including midway through setup.
 
-**Why:** The owner was trapped on verification when reopening the app. Navigating
-an unverified shared login to the signed-in Home only repeats the security gate.
+**Why:** The owner explicitly rejected signing out as a navigation action:
+“You should just be able to go back to the home screen! Don't sign the parent out!”
 
-**How to apply:** Verified parents return Home without losing their remembered
-approval. For locked shared logins, explicitly label the safe exit as signing out
-and returning Home; keep saved family setup and existing authorization checks.
+**How to apply:** Always offer Back to Home without signing out, clearing device
+approval or changing saved family setup, including when verification is locked or
+unavailable. Home must not immediately reopen the verification gate. Keep private
+parent/adult data protected server-side; a signed-in Home without parent approval
+must not confer authority or mount protected account queries.
 
 Keep the reusable remembered-device proof out of JavaScript-readable storage.
 

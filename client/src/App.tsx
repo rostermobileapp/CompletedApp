@@ -113,6 +113,7 @@ import HighSchoolYouthOnboardingPreview from "@/pages/HighSchoolYouthOnboardingP
 import Under18Onboarding from "@/pages/Under18Onboarding";
 import { isAgeFirstSignupEnabled, signupAgeRestriction } from "@/lib/signupAgeRestriction";
 import ParentVerification from "@/pages/ParentVerification";
+import { ParentAccountHome } from "@/components/high-school-family/ParentAccountHome";
 import { TeamSkinBoundary } from "@/components/high-school-skins/TeamSkinBoundary";
 import { familyAgeEligibility } from "@shared/familyEligibility";
 
@@ -346,6 +347,9 @@ export function Router() {
 
   if (isDevParentClient) {
     if (parentStatus.isLoading) return <LoadingScreen />;
+    if ((location === "/" || location === "/app") && (parentStatus.isError || (parentStatus.data?.enrolled && !parentStatus.data.verified))) {
+      return <ParentAccountHome />;
+    }
     if (parentStatus.isError || (parentStatus.data?.enrolled && !parentStatus.data.verified)) {
       return <ParentVerification enrolled={parentStatus.data?.enrolled} unavailable={parentStatus.isError} />;
     }

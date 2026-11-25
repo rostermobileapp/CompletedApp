@@ -15,6 +15,7 @@ import { useProductionOnboardingAccess } from "@/hooks/useProductionOnboardingAc
 import HighSchoolYouthOnboarding from "@/pages/HighSchoolYouthOnboarding";
 import { ProductionOnboardingTest } from "@/components/high-school-onboarding/ProductionOnboardingTest";
 import { FamilyDevices } from "./FamilyDevices";
+import { ParentAccountHome } from "./ParentAccountHome";
 
 const SchoolRuntime=lazy(()=>import("@/components/high-school-skins/TeamSkinBoundary")
   .then(module=>({default:module.ProductionSchoolRuntime})));
@@ -65,6 +66,8 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
   if (path === "/forgot-password") return <ForgotPassword />;
   if (isLoading) return <main role="status" className="min-h-screen grid place-items-center">Checking account access…</main>;
   if (!user) return <>{entry}</>;
+  // Home does not confer parent authority or mount protected account queries.
+  if ((path === "/" || path === "/app") && (status.isError || protectedWithoutProof)) return <ParentAccountHome />;
   if (status.isError) return <ParentVerification unavailable />;
   if (!status.data) return <main role="status" className="min-h-screen grid place-items-center">Checking account access…</main>;
   if (protectedWithoutProof || verification) return <ParentVerification enrolled={status.data.enrolled} verified={status.data.verified} />;

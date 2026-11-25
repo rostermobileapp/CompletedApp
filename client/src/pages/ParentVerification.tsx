@@ -29,7 +29,6 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
 }) {
   const [, navigate] = useLocation();
   const [leaving, setLeaving] = useState(false);
-  const [exitError, setExitError] = useState("");
   const [purpose, setPurpose] = useState<Purpose>(initialPurpose);
   const [challenge, setChallenge] = useState<string>();
   const [code, setCode] = useState("");
@@ -117,22 +116,12 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
     setPurpose(next); setChallenge(undefined); setCode(""); setPasswordGrant(undefined);
     setPassword(""); setConfirm(""); setError(""); setMessage("");
   };
-  const canReturnSignedIn = !authenticated || !enrolled || verified || unlocked || finished;
-  const goHome = async () => {
+  const goHome = () => {
     if (leaving) return;
-    setLeaving(true); setExitError("");
-    try {
-      if (!canReturnSignedIn) {
-        const result = await supabase.auth.signOut({ scope: "local" });
-        if (result.error) throw result.error;
-        parentVerificationSession.clear();
-      }
-      // Do not restore the interrupted flow after an explicit Home action.
-      try { forgetMobileScreen(window.localStorage); } catch { /* Storage can be blocked. */ }
-      navigate("/", { replace: true });
-    } catch {
-      setExitError("Could not sign out. Please retry Sign out and go Home. Your saved family setup has not been changed.");
-    } finally { setLeaving(false); }
+    setLeaving(true);
+    // Navigation never ends the login or changes parent-device authority.
+    try { forgetMobileScreen(window.localStorage); } catch { /* Storage can be blocked. */ }
+    navigate("/", { replace: true });
   };
   const working = busy || leaving;
   const button = "rounded-lg border px-4 py-3 text-sm font-medium disabled:opacity-50";
@@ -141,10 +130,8 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
     <section className="parent-verification-card w-full max-w-md rounded-2xl border bg-card p-6 shadow-lg space-y-5" aria-labelledby="parent-verification-title">
       <nav aria-label="Parent verification navigation" className="space-y-2">
         <button type="button" className={`${button} w-full text-center`} onClick={() => void goHome()} disabled={leaving}>
-          {leaving ? "Returning Home…" : canReturnSignedIn ? "Back to Home" : "Sign out and go Home"}
+          {leaving ? "Returning Home…" : "Back to Home"}
         </button>
-        {!canReturnSignedIn && <p className="text-xs text-muted-foreground">Leaving while parent controls are locked signs you out. Your saved family setup will still be here when you return.</p>}
-        {exitError && <p role="alert" className="text-sm text-destructive">{exitError}</p>}
       </nav>
       <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Parent verification</p>
       <h1 id="parent-verification-title" className="text-2xl font-semibold">Verify you're the parent</h1>
