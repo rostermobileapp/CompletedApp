@@ -25,7 +25,7 @@ export const nonproductionHttpGuard: RequestHandler = (req, res, next) => {
   // These internal DEV endpoints have their own verified-session/code checks.
   // This permits no provider delivery and no generic password/reset endpoints.
   if (process.env.NONPRODUCTION_ISOLATED === "1" && req.method === "POST" &&
-      /^\/api\/high-school\/parent-verification\/(?:challenge|verify|revoke|password)$/.test(req.path)) {
+      /^\/api\/high-school\/parent-verification\/(?:challenge|verify|revoke|password|forget-device|socket-grant)$/.test(req.path)) {
     return next();
   }
   if (testCardsEnabled && (

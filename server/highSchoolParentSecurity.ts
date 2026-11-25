@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { PARENT_CODE_DIGITS, PARENT_CODE_SECONDS, PARENT_CODE_FAILURE_LIMIT, PARENT_CODE_PATTERN, PARENT_CODE_FAILURE_WINDOW_MINUTES } from "../shared/highSchoolParentCodePolicy";
+import { PARENT_CODE_DIGITS, PARENT_CODE_SECONDS, PARENT_CODE_FAILURE_LIMIT, PARENT_CODE_PATTERN, PARENT_CODE_FAILURE_WINDOW_MINUTES, PARENT_ACTION_SECONDS, PARENT_DEVICE_SECONDS, PARENT_PASSWORD_SECONDS } from "../shared/highSchoolParentCodePolicy";
 
 export interface ParentSql {
   query(text: string, values?: any[]): Promise<{ rows: any[]; rowCount?: number | null }>;
@@ -127,7 +127,7 @@ export class HighSchoolParentSecurity {
     // Neither full address nor code is returned or logged.
     return { challengeId: id, expiresInSeconds: PARENT_CODE_SECONDS };
   }
-  async verify(actor: ParentActor, id: unknown, code: unknown) {
+  async verify(actor: ParentActor, id: unknown, code: unknown, rememberDevice = false) {
     if (!isUuid(id) || typeof code !== "string" || !PARENT_CODE_PATTERN.test(code)) {
       throw new ParentSecurityError("INVALID_CODE", 400);
     }
@@ -156,7 +156,8 @@ export class HighSchoolParentSecurity {
       if (this.stagedEnrollment && purpose === "parent_action") {
         await tx.query("UPDATE hs_parent_security.accounts SET activated_at=coalesce(activated_at,now()) WHERE auth_id=$1", [actor.authId]);
       }
-      const seconds = purpose === "password_change" ? 120 : 600;
+      const seconds = purpose === "password_change" ? PARENT_PASSWORD_SECONDS
+        : rememberDevice ? PARENT_DEVICE_SECONDS : PARENT_ACTION_SECONDS;
       await tx.query(`INSERT INTO hs_parent_security.grants(token_digest,auth_id,session_id,purpose,expires_at)
         VALUES ($1,$2,$3,$4,now()+($5 * interval '1 second'))`,
       [parentDigest(token), actor.authId, actor.sessionId, purpose, seconds]);
@@ -181,6 +182,36 @@ export class HighSchoolParentSecurity {
       await tx.query("UPDATE hs_parent_security.grants SET consumed=true WHERE auth_id=$1 AND session_id=$2", [actor.authId, actor.sessionId]);
       await tx.query("UPDATE hs_parent_security.challenges SET consumed=true WHERE auth_id=$1 AND session_id=$2", [actor.authId, actor.sessionId]);
       await this.audit(tx, actor, "session_authority_revoked");
+    });
+  }
+  /** Cookie possession can revoke its device/temporary proofs, never grant access. */
+  async forgetDevice(token: unknown, deviceId: unknown) {
+    if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token)) return;
+    const digest = parentDigest(token);
+    if (deviceId !== undefined && deviceId !== digest) return;
+    const owner = (await this.pool.query(`SELECT auth_id FROM hs_parent_security.grants
+      WHERE token_digest=$1 AND purpose='parent_action' AND NOT consumed`, [digest])).rows[0];
+    if (!owner) return;
+    await this.transaction(async tx => {
+      await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [owner.auth_id]);
+      const revoked = (await tx.query(`UPDATE hs_parent_security.grants SET consumed=true
+        WHERE token_digest=$1 AND purpose='parent_action' AND NOT consumed RETURNING auth_id,session_id`, [digest])).rows[0];
+      if (revoked) await tx.query(`UPDATE hs_parent_security.grants SET consumed=true
+        WHERE auth_id=$1 AND session_id=$2 AND purpose='parent_action'
+          AND expires_at<=now()+interval '10 minutes' AND NOT consumed`, [revoked.auth_id, revoked.session_id]);
+    });
+  }
+  async socketGrant(actor: ParentActor, rememberedToken?: string) {
+    return this.transaction(async tx => {
+      await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [actor.authId]);
+      if (!await this.authorized(actor, rememberedToken, tx)) throw new ParentSecurityError("PARENT_VERIFICATION_REQUIRED", 403);
+      const token = randomBytes(32).toString("base64url");
+      const result = await tx.query(`INSERT INTO hs_parent_security.grants(token_digest,auth_id,session_id,purpose,expires_at)
+        SELECT $1,$2,$3,'parent_action',least(expires_at,now()+interval '10 minutes')
+        FROM hs_parent_security.grants WHERE token_digest=$4
+        RETURNING greatest(0,floor(extract(epoch FROM expires_at-now())))::int AS seconds`,
+      [parentDigest(token), actor.authId, actor.sessionId, parentDigest(rememberedToken!)]);
+      return { verificationToken: token, expiresInSeconds: result.rows[0].seconds };
     });
   }
   async changePassword(actor: ParentActor, token: unknown, password: unknown) {

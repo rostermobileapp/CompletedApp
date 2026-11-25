@@ -24432,15 +24432,15 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
             // identity. Never trust a client-supplied user ID.
             if (userId || authenticating) break;
             authenticating = true;
+            const grant = typeof data.parentGrant === "string" ? data.parentGrant : undefined;
             const authenticatedUser = await getAuthenticatedDatabaseUser(
               typeof data.accessToken === 'string' ? data.accessToken : '',
-              typeof data.parentGrant === 'string' ? data.parentGrant : undefined,
+              grant,
             );
             userId = authenticatedUser?.id ?? null;
             if (userId) {
-              if (isParentSecurityDevelopment()) {
+              if (isParentSecurityDevelopment() || grant) {
                 const token = data.accessToken as string;
-                const grant = typeof data.parentGrant === "string" ? data.parentGrant : undefined;
                 stillAuthorized = guardVerifiedAdultSocket(ws, () => adultSocketAuthorized(token, grant));
               }
               const userConnections = activeConnections.get(userId) ?? new Set<WebSocket>();
