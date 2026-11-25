@@ -3,6 +3,22 @@ name: High School scope boundaries
 description: Owner-supplied High School product constraints and phase-by-phase approval rules.
 ---
 
+## Restricted production onboarding testing
+
+The owner wants to test the complete onboarding and coach/parent journeys in
+production, restricted to explicitly selected existing test accounts rather
+than all users. The owner will handle the Vercel frontend deployment.
+
+**Why:** After requesting production age-first signup, the owner clarified
+that the other journeys must also be testable and selected a limited set of
+accounts. This is not approval for a public school-feature rollout.
+
+**How to apply:** Enforce eligibility on the server, not through client account
+claims or a visible-link check. Preserve existing adult accounts and canonical
+staff authority; do not reset onboarding or grant roles to make a test pass.
+Obtain specific approval before installing additional production schema/Auth
+changes. Child login and device activation remain disabled.
+
 ## Authorized live family rollout (November 24, 2026)
 
 The owner now wants family setup in the live app for “Every account that has an
