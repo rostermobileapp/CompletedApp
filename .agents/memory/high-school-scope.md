@@ -5,6 +5,22 @@ description: Owner-supplied High School product constraints and phase-by-phase a
 
 ## Child profiles before team connection
 
+An approved child device must stay signed in across app shutdown and reopening,
+until the parent revokes access. Do not tie its continuing approval to the
+parent's provider login remaining active, or require routine code re-entry.
+
+**Why:** On November 25, 2026, the owner reported that every app restart asked
+for the parent code and explicitly required the child to stay logged in unless
+the parent revokes access.
+
+**How to apply:** Persist only the restricted child-device capability, never
+parent verification authority. Keep initial pairing short-lived and protected
+by current parent approval. Revalidate child revocation, consent and applicable
+team/coverage permissions server-side on every request. Temporary connection
+failures must preserve the saved login. Distinguish browser process-restart
+tests from actual installed-native-app acceptance. A token already lost before
+this behavior was installed cannot be recovered by inventing child identity.
+
 The owner requires birth year, makes graduation year optional, and wants a child
 profile/device set up before joining a team. The child's phone needs only the
 setup code, never a separate setup link. Collect the year only, not a full

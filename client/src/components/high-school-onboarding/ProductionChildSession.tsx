@@ -24,5 +24,10 @@ export function ProductionChildSession({token}:{token:string}) {
     </div>
   </section></div></main>;
   if(!session.data)return <main className="hsy" role="status" aria-live="polite">Checking player access…</main>;
-  return <ChildProfileScreen data={session.data} request={request} autoRefresh={false} onSignOut={leave}/>;
+  return <>
+    {!childSkinSession.persistenceAvailable()&&<p role="alert" className="bg-background text-destructive p-4">
+      This device is not saving player sign-in. Enable app storage to stay signed in after closing the app.
+    </p>}
+    <ChildProfileScreen data={session.data} request={request} autoRefresh={false} onSignOut={leave}/>
+  </>;
 }

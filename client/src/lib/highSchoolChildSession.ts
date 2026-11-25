@@ -22,22 +22,53 @@ export async function requestChildSession(token: string, method: string, url: st
   return response.json();
 }
 
-// Child-only capability, scoped to this tab and server expiry. Parent
+// Persist only the approved child capability across app restarts. Parent
 // verification is NEVER persisted or inherited by a child session.
 const tokenKey="roster-child-session";
-const childStorage=(()=>{try{return typeof window!=="undefined"?window.sessionStorage:undefined;}catch{return undefined;}})();
-let childToken: string | null = (()=>{try{const token=childStorage?.getItem(tokenKey);return token&&/^hs_child_[A-Za-z0-9_-]{43}$/.test(token)?token:null;}catch{return null;}})();
+const storage=(kind:"localStorage"|"sessionStorage")=>{try{return typeof window!=="undefined"?window[kind]:undefined;}catch{return undefined;}};
+const valid=(token:unknown):token is string=>typeof token==="string"&&/^hs_child_[A-Za-z0-9_-]{43}$/.test(token);
+const read=(kind:"localStorage"|"sessionStorage")=>{try{const token=storage(kind)?.getItem(tokenKey);return valid(token)?token:null;}catch{return null;}};
+const remove=(kind:"localStorage"|"sessionStorage")=>{try{storage(kind)?.removeItem(tokenKey);}catch{/* Storage may be blocked by the device. */}};
+let persistent=false;
+function persist(token:string) {
+  try {
+    const target=storage("localStorage");
+    if(!target)throw new Error("Persistent player storage is unavailable");
+    target.setItem(tokenKey,token);
+    persistent=target.getItem(tokenKey)===token;
+    if(persistent){remove("sessionStorage");return;}
+  }catch{/* Keep this launch usable, but expose the persistence failure to the UI. */}
+  persistent=false;
+  remove("localStorage"); // Never restore an older child's grant after a failed account switch.
+  try{storage("sessionStorage")?.setItem(tokenKey,token);}catch{/* Current launch only; the UI warns the user. */}
+}
+let childToken: string | null = read("localStorage");
+if(childToken){persistent=true;remove("sessionStorage");}
+else {
+  childToken=read("sessionStorage");
+  if(childToken)persist(childToken); // Upgrade an already paired, still-open app.
+}
 let revision = 0;
 const listeners = new Set<() => void>();
+function changed(){revision++;listeners.forEach(fn=>fn());}
+if(typeof window!=="undefined")window.addEventListener("storage",event=>{
+  if(event.storageArea!==storage("localStorage")||(event.key!==tokenKey&&event.key!==null))return;
+  const next=read("localStorage");
+  if(next===childToken)return;
+  childToken=next;persistent=!!next;remove("sessionStorage");
+  if(next)parentVerificationSession.clear();
+  changed();
+});
 export const childSkinSession = {
   snapshot: () => childToken,
   revision: () => revision,
+  persistenceAvailable: () => persistent,
   subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
   save(token: string) {
-    if (!/^hs_child_[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("Invalid child session");
+    if (!valid(token)) throw new Error("Invalid child session");
+    persist(token);
     parentVerificationSession.clear();
-    try{childStorage?.setItem(tokenKey,token);}catch{/* Memory-only if tab storage is unavailable. */}
-    childToken = token; revision++; listeners.forEach(fn => fn());
+    childToken = token; changed();
   },
-  clear() { childToken = null;try{childStorage?.removeItem(tokenKey);}catch{/* Memory-only. */} revision++; listeners.forEach(fn => fn()); },
+  clear() { childToken = null;persistent=false;remove("localStorage");remove("sessionStorage");changed(); },
 };

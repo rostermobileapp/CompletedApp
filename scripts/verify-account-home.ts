@@ -98,7 +98,8 @@ app.get("/bundle.js",(_req,res)=>res.type("js").send(bundle.outputFiles[0].text)
 app.get("/patches-home-icon.png",(_req,res)=>res.sendFile(path.join(root,"client/public/patches-home-icon.png")));
 app.get("*",(req,res)=>{
   const light=req.query.theme==="light";
-  res.type("html").send(`<!doctype html><html class="${light?"":"dark"}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script src="/bundle.js"></script></body></html>`);
+  const child=(req.query.role??"child")==="child";
+  res.type("html").send(`<!doctype html><html class="${light?"":"dark"}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script>localStorage.${child?"setItem('roster-child-session','hs_child_"+"a".repeat(43)+"')":"removeItem('roster-child-session')"}</script><script src="/bundle.js"></script></body></html>`);
 });
 const server=app.listen(process.argv.includes("--serve")?3003:0,"127.0.0.1");
 await new Promise<void>(resolve=>server.once("listening",resolve));

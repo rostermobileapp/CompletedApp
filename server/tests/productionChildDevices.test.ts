@@ -104,6 +104,7 @@ test("approval issues a distinct child capability only after revalidating the pa
   const result=await service.poll({requestId:id(7),requestToken:"a".repeat(43)});
   assert.equal(result.status,"approved");assert.match((result as any).sessionToken,/^hs_child_[A-Za-z0-9_-]{43}$/);
   assert.ok(calls.some(c=>c.sql.includes("INSERT INTO hs_onboarding.child_sessions")));
+  assert.ok(calls.some(c=>c.sql.includes("'infinity'::timestamptz")));
   const ended=fixture({session:false});await rejects(ended.service.poll({requestId:id(7),requestToken:"a".repeat(43)}),"PARENT_SESSION_ENDED");
 });
 test("parents can revoke their child's devices even after coverage ends",async()=>{

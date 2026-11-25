@@ -45,12 +45,18 @@ test("parents can list and revoke one child device without affecting any other d
       devices[name] = { id: requestId, token, childId };
     }
 
-    await t.test("only active sessions belonging to the verified parent are listed, with safe fields", async () => {
+    await t.test("approval outlives legacy expiry and parent login, but revoked devices stay excluded", async () => {
+      // Routine parent Auth-session cleanup must not revoke an approved child.
+      await pool.query("DELETE FROM auth.sessions WHERE id=$1", [actors.parent.sessionId]);
+      await service.ownSession(devices.Phone.token);
+      await service.ownSession(devices.Expired.token);
+      await service.ownSession(devices["Ended approval"].token);
+      await assert.rejects(service.ownSession(devices.Revoked.token), (e:any)=>e.code==="INVALID_CHILD_SESSION");
       const result = await service.sessions(actors.parent);
-      assert.deepEqual(result.sessions.map(s => s.deviceLabel).sort(), ["Phone", "Tablet"]);
+      assert.deepEqual(result.sessions.map(s => s.deviceLabel).sort(), ["Ended approval", "Expired", "Phone", "Tablet"]);
       for (const session of result.sessions) {
         assert.deepEqual(Object.keys(session).sort(), ["childId", "deviceLabel", "expiresAt", "id"]);
-        assert.ok(new Date(session.expiresAt).getTime() > Date.now());
+        assert.equal(session.expiresAt,null);
         assert.equal(session.childId, ids.child1);
       }
       assert.deepEqual((await service.sessions(actors.otherParent)).sessions.map(s => s.deviceLabel), ["Other household"]);
@@ -65,7 +71,7 @@ test("parents can list and revoke one child device without affecting any other d
         await assert.rejects(service.revokeSession(who, childId, deviceId),
           (e: any) => e.code === "CHILD_DEVICE_UNAVAILABLE");
       }
-      assert.equal((await service.sessions(actors.parent)).sessions.length, 2);
+      assert.equal((await service.sessions(actors.parent)).sessions.length, 4);
     });
     await t.test("revoking one session invalidates only that token and preserves pairing and other devices", async () => {
       const beforeRequests = (await pool.query("SELECT * FROM hs_onboarding.device_requests ORDER BY id")).rows;
@@ -77,7 +83,7 @@ test("parents can list and revoke one child device without affecting any other d
       await assert.rejects(service.ownSession(devices.Phone.token), (e: any) => e.code === "INVALID_CHILD_SESSION");
       await service.ownSession(devices.Tablet.token);
       await service.ownSession(devices["Other household"].token);
-      assert.deepEqual((await service.sessions(actors.parent)).sessions.map(s => s.deviceLabel), ["Tablet"]);
+      assert.deepEqual((await service.sessions(actors.parent)).sessions.map(s => s.deviceLabel).sort(), ["Ended approval", "Expired", "Tablet"]);
       assert.deepEqual((await pool.query("SELECT * FROM hs_onboarding.device_requests ORDER BY id")).rows, beforeRequests);
       assert.deepEqual((await pool.query("SELECT * FROM hs_onboarding.device_codes ORDER BY id")).rows, beforeCodes);
       // Retry remains safe, including after child access has been disabled.

@@ -224,17 +224,15 @@ export class HighSchoolChildDevices {
     await this.authority(actor, grant);
     if (!this.activationAvailable) return { sessions: [], activationAvailable: false };
     // request_id is a nonsecret, unique session handle. Never return token digests
-    // or pairing proofs. Match the same expiry/parent-session rules as child reads.
+    // or pairing proofs. Device approval outlives the parent's login session.
     const sessions = (await this.pool.query(`SELECT s.request_id AS id,s.child_id AS "childId",
-      r.device_label AS "deviceLabel",s.expires_at AS "expiresAt"
+      r.device_label AS "deviceLabel",NULL::timestamptz AS "expiresAt"
       FROM hs_onboarding.child_sessions s
       JOIN hs_onboarding.device_requests r ON r.id=s.request_id
         AND r.child_id=s.child_id AND r.parent_auth_id=s.parent_auth_id
       JOIN hs_onboarding.children c ON c.id=s.child_id AND c.parent_auth_id=s.parent_auth_id
-      JOIN auth.sessions a ON a.id=s.approved_session_id AND a.user_id=s.parent_auth_id
-      WHERE s.parent_auth_id=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
+      WHERE s.parent_auth_id=$1 AND s.revoked_at IS NULL
         AND c.enabled=true AND c.revoked_at IS NULL
-        AND(a.not_after IS NULL OR a.not_after>now())
       ORDER BY s.created_at,s.request_id`, [actor.authId])).rows;
     return { sessions, activationAvailable: true };
   }
@@ -291,7 +289,7 @@ export class HighSchoolChildDevices {
       const sessionToken = `hs_child_${secret()}`;
       await tx.query(`INSERT INTO hs_onboarding.child_sessions
         (token_digest,child_id,request_id,parent_auth_id,approved_session_id,expires_at)
-        VALUES($1,$2,$3,$4,$5,now()+interval '12 hours')`,
+        VALUES($1,$2,$3,$4,$5,'infinity'::timestamptz)`,
       [parentDigest(sessionToken), request.child_id, request.id, request.parent_auth_id, request.approved_session_id]);
       await tx.query("UPDATE hs_onboarding.device_requests SET status='redeemed' WHERE id=$1", [request.id]);
       return { status: "approved", sessionToken };
@@ -302,10 +300,11 @@ export class HighSchoolChildDevices {
     if (typeof token !== "string" || !/^hs_child_[A-Za-z0-9_-]{43}$/.test(token)) {
       throw new OnboardingError("INVALID_CHILD_SESSION", 401);
     }
+    // Approval is a durable child-device grant, not a copy of the parent's
+    // provider session. Keep the original approver ID for audit only. Legacy
+    // 12-hour timestamps no longer end unrevoked, otherwise-authorized grants.
     const row = (await db.query(`SELECT s.* FROM hs_onboarding.child_sessions s
-      JOIN auth.sessions a ON a.id=s.approved_session_id AND a.user_id=s.parent_auth_id
-      WHERE s.token_digest=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
-      AND(a.not_after IS NULL OR a.not_after>now())`, [parentDigest(token)])).rows[0];
+      WHERE s.token_digest=$1 AND s.revoked_at IS NULL`, [parentDigest(token)])).rows[0];
     if (!row) throw new OnboardingError("INVALID_CHILD_SESSION", 401);
     const child = await this.child(db, row.child_id, row.parent_auth_id);
     return { ...row, child };

@@ -96,7 +96,7 @@ app.get("/page.css", async (_req, res) => {
 });
 app.get("*", (req, res) => res.type("html").send(`<!doctype html><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/page.css">
-  <div id="root"></div><script>sessionStorage.removeItem('roster-child-session');window.__fixture=${JSON.stringify(fixture)};
+  <div id="root"></div><script>localStorage.removeItem('roster-child-session');sessionStorage.removeItem('roster-child-session');window.__fixture=${JSON.stringify(fixture)};
   localStorage.setItem('dashboardSelectedType','team');localStorage.setItem('dashboardSelectedId',${JSON.stringify(req.query.initial ?? "varsity")});
   </script><script src="/page.js"></script>`));
 const server = app.listen(0, "127.0.0.1"); await new Promise<void>(resolve => server.on("listening", resolve));
