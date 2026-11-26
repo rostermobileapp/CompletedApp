@@ -135,7 +135,7 @@ export function ResolvedSkinRuntime({ context, adult, entry }: {
       activeTeam={team}
       onTeamChange={changeTeam}
       operational={context.actor.type === "adult" &&
-        ["head_coach", "assistant_coach", "team_manager", "athletic_director"].includes(team.role)}
+        ["head_coach", "assistant_coach", "team_manager", "athletic_director", "parent"].includes(team.role)}
     />
   </TeamSkinFacts.Provider>;
 }

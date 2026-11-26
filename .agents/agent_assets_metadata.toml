@@ -357,3 +357,17 @@ mtime_ms = 1795644723848
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/5e3982ac-f2c9-4a5c-9006-f5946f54a60e/b917ab8b-1300-4a4d-958f-5b0959ab9e2d"
 storage_version_token = "1795644914462544"
 content_type = "image/png"
+
+[[outputs]]
+id = "eAgcyQip1wHcNUSoSvAvn"
+uri = "file://generated-artifacts/parent-child-chat/parent-thread-390.png"
+type = "image"
+title = "Private child conversation"
+description = "Phone-size verification with synthetic test data. Parent and child replies use the same private history."
+logical_id = "699bc4cf-6559-42d7-a3a8-f2332556e174"
+content_hash = "sha256:cc65b43448b43b58c63777c3a3f7423d8dd03bd7cc994bd98fc71c7d076238b3"
+size = 47749
+mtime_ms = 1795704779896
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/699bc4cf-6559-42d7-a3a8-f2332556e174/85f85a07-cea1-4dc4-825c-7fb22d76efcd"
+storage_version_token = "1795704900430884"
+content_type = "image/png"

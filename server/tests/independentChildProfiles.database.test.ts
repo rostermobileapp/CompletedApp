@@ -43,6 +43,7 @@ test("a consented child pairs before a team and the same phone receives a later 
       await db.query("SELECT set_config('roster.independent_children','owner-authorized',false)");
       const migration=await readFile("scripts/production/high-school-independent-children.sql","utf8");
       await db.query(migration.replace("-- CHILD_PROFILE_MANIFEST","INSERT INTO hs_onboarding.independent_child_version VALUES(1,repeat('a',64));"));
+      await db.query(await readFile("scripts/production/high-school-parent-child-chat.sql","utf8"));
       await db.query("COMMIT");
     }finally{db.release();}
     const original=(await pool.query("SELECT * FROM public.users WHERE id=$1",[actor.authId])).rows[0];
@@ -76,6 +77,12 @@ test("a consented child pairs before a team and the same phone receives a later 
       const data=await devices.ownSession(token);
       assert.equal(data.teamStatus,"awaiting_team");assert.deepEqual(data.schedule,[]);
       assert.equal(data.chats.length,1);assert.equal(data.chats[0].kind,"family");
+      assert.equal(data.chats[0].id,child.id);
+      assert.equal((await devices.parentChats(actor)).threads[0].id,child.id);
+      await devices.sendParentMessage(actor,child.id,{body:"Ready before a team is connected"});
+      assert.equal((await devices.messages(token,child.id)).messages[0].body,"Ready before a team is connected");
+      await devices.sendMessage(token,child.id,{body:"I can reply without team coverage"});
+      assert.equal((await devices.parentMessages(actor,child.id)).messages.length,2);
       await assert.rejects(()=>devices.start({code:code.code},"second-fixture-source"),(e:any)=>e.code==="INVALID_OR_EXPIRED_CODE");
       await assert.rejects(()=>devices.createCode({...actors.otherParent,productionTest:true},{childId:child.id}));
       verified=false;await assert.rejects(()=>devices.createCode(actor,{childId:child.id}));verified=true;

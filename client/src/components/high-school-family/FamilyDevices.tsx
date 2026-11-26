@@ -16,7 +16,7 @@ export function FamilyDevices({actorId}:{actorId:string}) {
     queryKey:["family-device-requests",actorId],
     queryFn:async()=>(await apiRequest("GET",`${base}/device-requests`)).json(),retry:false,refetchInterval:10_000,
   });
-  const sessions=useQuery<{sessions:Array<{id:string;childId:string;deviceLabel:string;expiresAt:string}>}>({
+  const sessions=useQuery<{sessions:Array<{id:string;childId:string;deviceLabel:string;expiresAt:string|null}>}>({
     queryKey:["family-device-sessions",actorId],
     queryFn:async()=>(await apiRequest("GET",`${base}/device-sessions`)).json(),retry:false,refetchInterval:10_000,
   });
@@ -39,7 +39,7 @@ export function FamilyDevices({actorId}:{actorId:string}) {
       {sessions.isSuccess&&!sessions.data.sessions.some(session=>session.childId===child.id)&&<p className="hsy-note">No active devices.</p>}
       {!sessions.isError&&sessions.data?.sessions.filter(session=>session.childId===child.id).map(session=><div className="hsy-card" key={session.id} style={{marginTop:8}}>
         <strong>{session.deviceLabel}</strong>
-        <p className="hsy-note">Expires <time dateTime={session.expiresAt}>{new Date(session.expiresAt).toLocaleString()}</time></p>
+        <p className="hsy-note">Stays signed in until you sign out this device.</p>
         <button className="hsy-secondary" disabled={busy} aria-label={`Sign out ${session.deviceLabel} for ${child.firstName}`} onClick={()=>void act(async()=>{
           await apiRequest("POST",`${base}/children/${encodeURIComponent(child.id)}/devices/${encodeURIComponent(session.id)}/revoke`,{});
           await sessions.refetch();

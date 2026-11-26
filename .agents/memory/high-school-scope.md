@@ -45,6 +45,23 @@ ambiguous matches in either direction rather than combining children.
 Keep the selected-account rollout and two-player limit, and obtain specific
 approval before applying additional production schema changes.
 
+## Parent-child conversations
+
+An approved child must automatically appear as a named private conversation in
+the parent's Messages, regardless of which adult team, school team or All teams
+selection is active. It must work before the child has a team or team coverage.
+Each child has a separate conversation, not a shared sibling/household history.
+
+**Why:** On November 26, 2026, the owner reported that setup left no conversation
+for messaging their child and requested a thread named for that child in every
+team selection. Separate threads avoid mixing siblings' private messages.
+
+**How to apply:** Keep both directions connected to the same private history.
+Derive ownership from canonical guardian/child records, not adult roster
+membership or placeholder accounts. Preserve verified-parent and child-device
+revocation boundaries. Keep conversations out of Demo and visual-only previews;
+do not add email notifications for chat.
+
 ## Restricted production onboarding testing
 
 The owner wants to test the complete onboarding and coach/parent journeys in

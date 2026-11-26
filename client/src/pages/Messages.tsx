@@ -2,6 +2,8 @@
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { motion, AnimatePresence } from 'framer-motion';
+import { ParentChildThreads } from "@/components/high-school-family/ParentChildThreads";
+import { useDemo } from "@/context/DemoContext";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, CreditCard, DollarSign, CheckCircle, RefreshCw, Check } from 'lucide-react';
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
@@ -632,6 +634,8 @@ function ConversationRail({
 
 export default function Messages() {
   const { user } = useAuth();
+  const { isActive: isDemoActive } = useDemo();
+  const [hasChildThreads,setHasChildThreads] = useState(false);
   const { canAccessPremiumFeatures, hasPersonalProAccess } = usePermissions();
   const { data: dbUser } = useQuery<{ id: string; displayId?: string }>({
     queryKey: ['/api/user'],
@@ -2812,6 +2816,7 @@ export default function Messages() {
           
           {/* Conversations List */}
           <div className="px-6 mb-6 flex-1">
+            <ParentChildThreads actorId={isDemoActive?undefined:user?.id} onHasThreadsChange={setHasChildThreads}/>
             {conversationsLoading ? (
               <div className="space-y-3" data-testid="conversations-loading">
                 {[1, 2, 3].map(i => (
@@ -2826,7 +2831,7 @@ export default function Messages() {
                   </div>
                 ))}
               </div>
-            ) : conversations.length > 0 ? (
+            ) : (conversations.length > 0 || hasChildThreads) ? (
               <div className="space-y-3" data-testid="conversations-list">
                 {conversations.map((conversation: Conversation) => (
                   <div 

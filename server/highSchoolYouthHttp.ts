@@ -38,6 +38,9 @@ export function registerHighSchoolYouthRoutes(
   app.get(`${base}/league-draft`, parent((_req, actor, grant) => service.leagueDraft(actor, grant)));
   app.post(`${base}/league-draft`, parent((req, actor, grant) => service.saveLeagueDraft(actor, req.body, grant)));
   app.get(`${base}/children`, parent((_req, actor, grant) => children.children(actor, grant)));
+  app.get(`${base}/child-chats`, parent((_req,actor,grant)=>children.parentChats(actor,grant)));
+  app.get(`${base}/child-chats/:id/messages`,parent((req,actor,grant)=>children.parentMessages(actor,req.params.id,grant)));
+  app.post(`${base}/child-chats/:id/messages`,parent((req,actor,grant)=>children.sendParentMessage(actor,req.params.id,req.body,grant)));
   // The child service independently verifies the selected parent, challenge,
   // approval, canonical memberships and coverage for every production request.
   app.post(`${base}/device-codes`, parent((req, actor, grant) => children.createCode(actor, req.body, grant)));

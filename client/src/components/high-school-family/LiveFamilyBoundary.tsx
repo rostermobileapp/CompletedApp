@@ -80,8 +80,10 @@ export function LiveFamilyBoundary({ children, entry }: { children: ReactNode; e
   const backToAdult = async () => {
     try {
       const { teamIds } = await loadAdultTeams();
-      if (teamIds[0]) selection.setTeamSelection(teamIds[0]); else selection.clearSelection();
-      setExitError(""); navigate("/profile");
+      if (selection.selectedType==="team"&&teamIds.includes(selection.selectedId??"")) {
+        // Preserve the parent's current, authorized adult team.
+      } else if (teamIds[0]) selection.setTeamSelection(teamIds[0]); else selection.clearSelection();
+      setExitError(""); navigate("/");
     } catch { setExitError("Adult team access could not be checked. Please retry."); }
   };
   if (family) return <>{exitError && <p role="alert">{exitError}</p>}

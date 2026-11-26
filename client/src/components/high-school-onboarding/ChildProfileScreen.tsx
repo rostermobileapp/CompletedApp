@@ -70,13 +70,24 @@ export function ChildProfileScreen({ data, request, autoRefresh=true, onSignOut 
     setMessages(result.messages ?? []);
   }, [chatUrl, request]);
   useEffect(() => {
-    let live = true;
+    let live = true, pending = false;
     if (!chatUrl) return;
     setLoading(true); setMessages([]); setError("");
-    request("GET", chatUrl).then(result => { if (live) setMessages(result.messages ?? []); })
-      .catch(error => { if (live) setError(error.message); })
-      .finally(() => { if (live) setLoading(false); });
-    return () => { live = false; };
+    const refreshMessages=()=>{
+      if(pending||document.visibilityState==="hidden")return;
+      pending=true;
+      void request("GET",chatUrl).then(result=>{
+        if(live){setMessages(result.messages??[]);setError("");}
+      }).catch(error=>{
+        if(live){setMessages([]);setError(error.message);}
+      }).finally(()=>{pending=false;if(live)setLoading(false);});
+    };
+    refreshMessages();
+    const timer=window.setInterval(refreshMessages,5_000);
+    window.addEventListener("focus",refreshMessages);
+    document.addEventListener("visibilitychange",refreshMessages);
+    return () => { live = false;window.clearInterval(timer);
+      window.removeEventListener("focus",refreshMessages);document.removeEventListener("visibilitychange",refreshMessages); };
   }, [chatUrl, request]);
   const send = async () => {
     if (!chatUrl || !body.trim() || sending) return;

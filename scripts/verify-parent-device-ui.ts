@@ -230,8 +230,8 @@ try {
     await page.getByRole("heading", { name: "Your family, your pace", exact: true }).waitFor();
     assert.equal(new URL(page.url()).pathname, "/high-school/family"); checks++;
     await page.getByRole("button", {name:"Back to my account",exact:true}).click();
-    // No adult teams in this synthetic fixture: its exit returns to Profile.
-    await page.waitForURL("**/profile");
+    // No adult teams in this synthetic fixture: return to unscoped adult Home.
+    await page.waitForURL(url=>url.pathname==="/");
     await page.goto(`${origin}/high-school/family?mode=boundary`);
     await page.getByRole("heading", { name: "Your family, your pace", exact: true }).waitFor();
     assert.equal(mail.length, 1); checks++;

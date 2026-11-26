@@ -25,6 +25,7 @@ import {
 import { queryClient } from "@/lib/queryClient";
 import { StaffOperations } from "./StaffOperations";
 import { ScopedAccountFrame, ScopedHomeNotice } from "@/components/dashboard/ScopedAccountHome";
+import { ParentChildThreads } from "@/components/high-school-family/ParentChildThreads";
 import "./team-skin-shell.css";
 
 type TeamSkinShellProps = {
@@ -200,6 +201,8 @@ export function TeamSkinShell({ context, activeTeam, onTeamChange, operational =
                 role={safeTeam.role as "head_coach" | "assistant_coach" | "team_manager" | "athletic_director"}
                 onContextRefresh={() => { void queryClient.invalidateQueries({ queryKey: ["team-skin-context"] }); }}
               />
+            ) : allowed && operational && skin==="parent" && currentTab==="Chat" ? (
+              <ParentChildThreads actorId={context.actor.id}/>
             ) : allowed ? (
               <section className="tss-welcome" aria-live="polite">
                 <div className="tss-welcome-top">

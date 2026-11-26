@@ -10,6 +10,7 @@ import {
 import { OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
 import { requireProductionOnboardingTester } from "./productionOnboardingTests";
 import { independentChildSetupInstalled } from "./highSchoolFamilyProfiles";
+import { parentChildChatInstalled, requireParentChildChat, readParentChildMessages, writeParentChildMessage } from "./highSchoolParentChildChat";
 
 const uuid = z.string().uuid();
 const requestProof = z.object({
@@ -337,12 +338,55 @@ export class HighSchoolChildDevices {
       team_id AS "teamId",opponent,status
       FROM hs_onboarding.staff_events WHERE team_id=ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY starts_at LIMIT 100`,
     [session.child.teamIds])).rows;
-    const chats = (await this.pool.query(`SELECT c.id,c.name,c.kind FROM hs_onboarding.child_chats c
+    let chats = (await this.pool.query(`SELECT c.id,c.name,c.kind FROM hs_onboarding.child_chats c
       JOIN hs_onboarding.child_chat_members m ON m.chat_id=c.id WHERE m.child_id=$1
        AND ${this.chatScope} ORDER BY c.name`, [session.child_id, session.parent_auth_id, session.child.teamIds??[session.child.team_id]])).rows;
+    // Additive rollout: legacy Family remains usable until the private-message
+    // table is installed. Afterwards each child gets their own parent thread.
+    if(await parentChildChatInstalled(this.pool))chats=[
+      {id:session.child_id,name:"Parent",kind:"family"},...chats.filter(chat=>chat.kind!=="family"),
+    ];
     return { child: { id: session.child_id, firstName: session.child.first_name, lastName: session.child.last_name,
       birthYear:session.child.profile_details?.birthYear,gradYear:session.child.profile_details?.gradYear },
       teamStatus:session.child.teamStatus,teams:session.child.teams??[],schedule, chats };
+  }
+  async parentChats(actor:OnboardingActor,grant?:string) {
+    await this.authority(actor,grant);this.ready();
+    await requireParentChildChat(this.pool);
+    const rows=(await this.pool.query(`SELECT c.id,c.first_name,c.last_name,
+      latest.body AS "lastMessage",latest.created_at AS "lastMessageAt"
+      FROM hs_onboarding.children c
+      LEFT JOIN LATERAL(SELECT body,created_at FROM hs_onboarding.parent_child_messages
+        WHERE child_id=c.id AND parent_auth_id=c.parent_auth_id ORDER BY created_at DESC,id DESC LIMIT 1) latest ON true
+      WHERE c.parent_auth_id=$1 AND c.enabled=true AND c.revoked_at IS NULL
+        AND EXISTS(SELECT 1 FROM hs_onboarding.child_sessions s WHERE s.child_id=c.id AND s.parent_auth_id=c.parent_auth_id)
+      ORDER BY c.first_name,c.id`,[actor.authId])).rows;
+    const threads=[];
+    for(const row of rows){
+      try{await this.child(this.pool,row.id,actor.authId);}
+      catch(error){if(error instanceof OnboardingError&&error.status===403)continue;throw error;}
+      threads.push({id:row.id,name:[row.first_name,row.last_name].filter(Boolean).join(" "),
+        lastMessage:row.lastMessage,lastMessageAt:row.lastMessageAt});
+    }
+    return {threads};
+  }
+  private async parentChatChild(db:Pick<ParentSql,"query">,actor:OnboardingActor,id:string,grant?:string,tx?:ParentTransaction) {
+    this.ready();uuid.parse(id);await this.authority(actor,grant,tx);
+    await this.child(db,id,actor.authId);
+    if(!(await db.query(`SELECT 1 FROM hs_onboarding.child_sessions WHERE child_id=$1 AND parent_auth_id=$2 LIMIT 1`,
+      [id,actor.authId])).rows.length)throw new OnboardingError("CHILD_CHAT_FORBIDDEN",403);
+    await requireParentChildChat(db);
+  }
+  async parentMessages(actor:OnboardingActor,id:string,grant?:string) {
+    await this.parentChatChild(this.pool,actor,id,grant);
+    return readParentChildMessages(this.pool,id,actor.authId,"parent");
+  }
+  async sendParentMessage(actor:OnboardingActor,id:string,input:unknown,grant?:string) {
+    return this.tx(async tx=>{
+      await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE",[actor.authId]);
+      await this.parentChatChild(tx,actor,id,grant,tx);
+      return writeParentChildMessage(tx,id,actor.authId,"parent",input);
+    });
   }
   private async syncChats(db: Pick<ParentSql,"query">,childId:string,parentId:string,teamIds:string[]) {
     await db.query(`INSERT INTO hs_onboarding.child_chats(id,kind,name,parent_auth_id)
@@ -357,6 +401,10 @@ export class HighSchoolChildDevices {
   async messages(token: unknown, chatId: string) {
     uuid.parse(chatId);
     const session = await this.session(token);
+    if(chatId===session.child_id){
+      await requireParentChildChat(this.pool);
+      return readParentChildMessages(this.pool,session.child_id,session.parent_auth_id,"child");
+    }
     const allowed = (await this.pool.query(`SELECT c.id FROM hs_onboarding.child_chats c
       JOIN hs_onboarding.child_chat_members m ON m.chat_id=c.id
       WHERE m.child_id=$1 AND c.id=$4 AND ${this.chatScope}`,
@@ -380,11 +428,15 @@ export class HighSchoolChildDevices {
   }
   async sendMessage(token: unknown, chatId: string, input: unknown) {
     uuid.parse(chatId);
-    const { body } = z.object({ body: z.string().trim().min(1).max(1000) }).strict().parse(input);
     return this.tx(async tx => {
       const beforeLock = await this.session(token, tx);
       await tx.query("SELECT auth_id FROM hs_parent_security.accounts WHERE auth_id=$1 FOR UPDATE", [beforeLock.parent_auth_id]);
       const session = await this.session(token, tx);
+      if(chatId===session.child_id){
+        await requireParentChildChat(tx);
+        return writeParentChildMessage(tx,session.child_id,session.parent_auth_id,"child",input);
+      }
+      const { body } = z.object({ body: z.string().trim().min(1).max(1000) }).strict().parse(input);
       if ((await tx.query("SELECT to_regclass('hs_onboarding.staff_version') AS installed")).rows[0]?.installed) {
         await this.canonicalChatMember(tx, session, chatId);
       }

@@ -33,7 +33,7 @@ const mocks: Record<string, string> = {
   "@/pages/ParentVerification": `export default function Verify(){return <h1>Parent email verification</h1>}`,
   "@/pages/ResetPassword": `export default function Reset(){return <h1>Recovery route</h1>}`,
   "@/pages/ForgotPassword": `export default function Forgot(){return <h1>Recovery request route</h1>}`,
-  "./FamilySetup": `export function FamilySetup(){return <h1>Owned private child fixture</h1>}`,
+  "./FamilySetup": `export function FamilySetup({onExit}){return <><h1>Owned private child fixture</h1><button onClick={onExit}>Return to my adult account</button></>}`,
   "./FamilyStaffReview": `export function FamilyStaffReview({teamId}){return <p>Reviewing {teamId}</p>}`,
   "@/components/high-school-skins/TeamSkinBoundary": `export function ProductionSchoolRuntime(){return <h1>School runtime</h1>}`,
   "@/pages/HighSchoolYouthOnboarding": `export default function Onboarding(){return <h1>School onboarding</h1>}`,
@@ -110,12 +110,17 @@ try {
     assert.equal(await page.getByRole("button", { name: "Add a child without finishing my playing profile" }).count(), 0);
     await page.goto(`${origin}/profile?mode=ordinary`);
     await page.getByRole("heading", { name: "Ordinary adult runtime" }).waitFor();
-    await page.goto(`${origin}/profile?mode=protected`);
+    await page.goto(`${origin}/high-school/family?mode=protected`);
     await page.getByRole("heading", { name: "Parent email verification" }).waitFor();
     assert.equal(await page.evaluate("window.adultMounts"), 0);
     await page.goto(`${origin}/high-school/family?mode=verified`);
     await page.getByRole("heading", { name: "Owned private child fixture" }).waitFor();
     assert.equal(await page.evaluate("window.adultMounts"), 0);
+    await page.getByRole("button",{name:"Return to my adult account",exact:true}).click();
+    await page.getByRole("heading",{name:"Ordinary adult runtime"}).waitFor();
+    assert.equal(new URL(page.url()).pathname,"/");
+    await page.goto(`${origin}/high-school/family?mode=verified`);
+    await page.getByRole("heading", { name: "Owned private child fixture" }).waitFor();
     await page.evaluate(`window.fixtureClient.setQueryData(['private-child-data'],{name:'Owned synthetic child'});window.clearFixtureProof()`);
     await page.getByRole("heading", { name: "Parent email verification" }).waitFor();
     assert.equal(await page.getByText("Owned private child fixture").count(), 0);
