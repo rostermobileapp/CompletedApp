@@ -23,12 +23,12 @@ export async function createStaffFixture(dispatch?: StaffDispatch) {
       DO $$ DECLARE n text; BEGIN FOREACH n IN ARRAY ARRAY['anon','authenticated','service_role','supabase_auth_admin'] LOOP
         IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=n) THEN EXECUTE format('CREATE ROLE %I',n); END IF;
       END LOOP; END $$;
-      CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,email_confirmed_at timestamptz,
+      CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,email_confirmed_at timestamptz,deleted_at timestamptz,
         raw_app_meta_data jsonb,raw_user_meta_data jsonb DEFAULT '{}');
       CREATE TABLE auth.sessions(id uuid PRIMARY KEY,user_id uuid REFERENCES auth.users(id),not_after timestamptz);
       CREATE TABLE hs_parent_security.accounts(auth_id uuid PRIMARY KEY,parent_email text);
       CREATE TABLE public.users(id varchar PRIMARY KEY,email text UNIQUE,first_name text,last_name text,role text DEFAULT 'free_tier',
-        deleted_at timestamptz,display_id varchar);
+        deleted_at timestamptz,display_id varchar,date_of_birth varchar DEFAULT '1980-01-01');
       CREATE TABLE public.teams(id varchar PRIMARY KEY,name text NOT NULL);
       CREATE TABLE public.leagues(id varchar PRIMARY KEY,name text,commissioner_id varchar,league_type varchar DEFAULT 'adult');
       CREATE TABLE public.team_memberships(id varchar PRIMARY KEY DEFAULT gen_random_uuid(),user_id varchar NOT NULL REFERENCES public.users(id),
@@ -46,6 +46,7 @@ export async function createStaffFixture(dispatch?: StaffDispatch) {
     // Repeat installation must preserve existing data and constraints.
     await db.query(await readFile("scripts/dev-only/high-school-staff-operations.sql", "utf8"));
     await db.query(await readFile("migrations/0061_school_player_eligibility.sql", "utf8"));
+    await db.query(await readFile("migrations/0062_school_eligibility_alerts.sql", "utf8"));
   } finally { db.release(); }
   const ids = Object.fromEntries(["league", "program", "foreignProgram", "varsity", "jv", "foreign", "child1", "child2", "child3", "req1", "req2", "req3"].map(k => [k, randomUUID()]));
   const actors: Record<string, OnboardingActor> = {};

@@ -13,6 +13,7 @@ import { TeamSkinService } from "./teamSkinService";
 import { registerHighSchoolOnboarding } from "./highSchoolOnboardingHttp";
 import { registerHighSchoolYouthRoutes } from "./highSchoolYouthHttp";
 import { registerHighSchoolStaffRoutes } from "./highSchoolStaffHttp";
+import { SchoolEligibilityAlerts } from "./schoolEligibilityAlerts";
 import { registerTeamSkinRoutes } from "./teamSkinHttp";
 import { productionOnboardingTester, productionOnboardingTestsInstalled, requireProductionOnboardingTester, syncProductionSchoolLeagues } from "./productionOnboardingTests";
 
@@ -50,6 +51,6 @@ export async function registerProductionOnboardingTests(
   registerSchoolLeagueManagement(app,new SchoolLeagueManagement(pool,true),authenticateTester);
   registerHighSchoolOnboarding(app,intake,parent,authenticateTester,(actor,grant)=>youth.state(actor,grant));
   registerHighSchoolYouthRoutes(app,youth,child,authenticateTester,true);
-  registerHighSchoolStaffRoutes(app,staff,events,chat,parent,authenticateTester,true);
+  registerHighSchoolStaffRoutes(app,staff,events,chat,parent,authenticateTester,true,new SchoolEligibilityAlerts(pool,true));
   registerTeamSkinRoutes(app,new TeamSkinService(pool,adultTeams),parent,child,authenticateTester,true);
 }

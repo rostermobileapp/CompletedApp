@@ -110,3 +110,4 @@
 - [Parent verification acceptance](parent-verification-acceptance.md) — test code approval through the real boundary and Family continuation; a standalone form misses remount failures.
 - [School and Youth invitation boundary](team-invitation-boundary.md) — all-account invite-only self-service entry; public display IDs are never proof, and both team and league classifiers matter.
 - [School and program hierarchy](school-program-hierarchy.md) — schools and programs are distinct; one school has multiple programs and each program can have multiple teams.
+- [Coach alert adulthood](coach-alert-adulthood.md) — eligibility alerts require adult DOB evidence; do not infer adulthood from a coaching role or use Family’s 21+ threshold.

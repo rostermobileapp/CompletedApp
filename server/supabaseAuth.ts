@@ -22,6 +22,7 @@ import { registerSchoolLeagueManagement } from "./schoolLeagueManagementHttp";
 import { HighSchoolStaffEvents } from './highSchoolStaffEvents';
 import { HighSchoolStaffChat } from './highSchoolStaffChat';
 import { registerHighSchoolStaffRoutes } from './highSchoolStaffHttp';
+import { SchoolEligibilityAlerts } from "./schoolEligibilityAlerts";
 import { existingStaffPaymentEligibility } from './highSchoolStaffPaymentEligibility';
 import { HighSchoolFamilySetup, HighSchoolFamilyReview } from './highSchoolFamilySetup';
 import { registerHighSchoolFamilyRoutes } from './highSchoolFamilyHttp';
@@ -144,7 +145,7 @@ export async function setupAuth(app: Express) {
     const staff = new HighSchoolStaffOperations(pool, existingStaffPaymentEligibility);
     registerSchoolLeagueManagement(app, new SchoolLeagueManagement(pool), authenticateOnboarding);
     onboarding.staffDecisions = staff;
-    registerHighSchoolStaffRoutes(app,staff,new HighSchoolStaffEvents(pool),new HighSchoolStaffChat(pool),parent,authenticateOnboarding);
+    registerHighSchoolStaffRoutes(app,staff,new HighSchoolStaffEvents(pool),new HighSchoolStaffChat(pool),parent,authenticateOnboarding,false,new SchoolEligibilityAlerts(pool));
     const family = new HighSchoolFamilySetup(pool, parent, async (id, leagueId) =>
       await hasPersonalPro(id) ? "personal" : await proCoverage.hasProFor(id, { leagueId }) ? "league" : "uncovered");
     family.intake.staffDecisions = staff;

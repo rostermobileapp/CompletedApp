@@ -3,6 +3,7 @@ import { playerEligibilityInput, type SchoolEligibilityWorkspace, type SchoolPla
 import { StaffBase, staffFail, uuid } from "./highSchoolStaffBase";
 import type { OnboardingActor } from "./highSchoolOnboarding";
 import type { ParentTransaction } from "./highSchoolParentSecurity";
+import { queueEligibilityAlerts } from "./schoolEligibilityAlerts";
 
 export async function requirePlayerEligibility(db: Pick<ParentTransaction, "query">) {
   const [row] = (await db.query(`SELECT
@@ -96,8 +97,15 @@ export class SchoolPlayerEligibilityService extends StaffBase {
       restricted=excluded.restricted,reason=excluded.reason,updated_by=excluded.updated_by,
       updated_at=now(),version=${table}.version+1`,
     [scope === "league" ? leagueId : teamId, playerId, data.restricted, data.restricted ? data.reason : "", actor.authId]);
+    const auditId = randomUUID();
     await db.query(`INSERT INTO hs_onboarding.player_eligibility_audit(id,league_id,team_id,child_id,scope,restricted,reason,actor_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [randomUUID(), leagueId, teamId, playerId, scope, data.restricted, data.reason, actor.authId]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [auditId, leagueId, teamId, playerId, scope, data.restricted, data.reason, actor.authId]);
+    if (scope === "league" && player.leagueRestricted !== data.restricted) {
+      // A league restriction follows this child across every approved roster in
+      // the league, not just the team selected in the management screen.
+      const affected = (await this.roster(db, leagueId)).filter(row => row.playerId === playerId);
+      await queueEligibilityAlerts(db, auditId, affected.map(row => row.teamId), this.live);
+    }
     // Already-saved future lineups must not continue dressing a restricted child.
     if (data.restricted) await db.query(`UPDATE hs_onboarding.staff_lineup lineup SET state='scratch',updated_by=$5
       FROM hs_onboarding.staff_events event JOIN hs_onboarding.teams t ON t.id=event.team_id

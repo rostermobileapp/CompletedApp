@@ -17,6 +17,7 @@ import "./staff-operations.css";
 import { FamilyStaffReview } from "@/components/high-school-family/FamilyStaffReview";
 import { ScopedHomeFeed, ScopedHomeNotice } from "@/components/dashboard/ScopedAccountHome";
 import { PlayerEligibilityPanel } from "@/components/PlayerEligibilityPanel";
+import { useSchoolEligibilityAlerts } from "@/hooks/useSchoolEligibilityAlerts";
 
 type Props = { actorId: string; teamId: string; role: StaffRole; onContextRefresh: () => void };
 type Request = { method: string; path: string; body?: unknown; refreshContext?: boolean };
@@ -100,6 +101,7 @@ function Modal({ title, close, children }: { title: string; close: () => void; c
 }
 
 export function StaffOperations({ actorId, teamId, role, onContextRefresh }: Props) {
+  const eligibilityAlerts = useSchoolEligibilityAlerts(actorId, teamId, role === "head_coach" || role === "assistant_coach");
   const [path, navigate] = useLocation();
   const queryClient = useQueryClient();
   const page = (path.split("/").pop() || "home").toLowerCase();
@@ -186,6 +188,10 @@ export function StaffOperations({ actorId, teamId, role, onContextRefresh }: Pro
         {activePage === "roster" && <button className="staff-btn-primary" type="button" onClick={() => setModal({ kind: "roster-import" })}><FileUp size={15} /> Import roster</button>}
       </div>}
       {notice && <div className={`staff-alert ${notice.type}`} role={notice.type === "error" ? "alert" : "status"}>{notice.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}{notice.text}</div>}
+      {eligibilityAlerts.isError && <div className="staff-alert error" role="alert"><AlertCircle size={16} />
+        <span>Eligibility alerts could not be checked. Review current playing status before setting the lineup.</span>
+        <button className="staff-btn" type="button" onClick={() => void eligibilityAlerts.refetch()}>Retry alerts</button>
+      </div>}
       {activePage === "home" && <ScopedHomeFeed events={data.events.map(event => ({...event,location:event.rink}))}
         teamName={data.team.name} onUnavailable={feature => setHomeNotice(`${feature} is not available in this team view yet.`)}
         onAlerts={() => navigate("/high-school/more")} alerts={gaps.length + data.approvals.length}

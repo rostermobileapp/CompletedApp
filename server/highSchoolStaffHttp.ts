@@ -6,10 +6,12 @@ import type { HighSchoolStaffOperations } from "./highSchoolStaffOperations";
 import type { HighSchoolStaffEvents } from "./highSchoolStaffEvents";
 import type { HighSchoolStaffChat } from "./highSchoolStaffChat";
 import { importText, previewEvents, previewRoster } from "./highSchoolStaffImports";
+import { SchoolEligibilityAlerts } from "./schoolEligibilityAlerts";
 
 export function registerHighSchoolStaffRoutes(app: Express, staff: HighSchoolStaffOperations,
   events: HighSchoolStaffEvents, chat: HighSchoolStaffChat, _parent: HighSchoolParentSecurity,
-  authenticate: (req: Request) => Promise<OnboardingActor>, allowProduction = false) {
+  authenticate: (req: Request) => Promise<OnboardingActor>, allowProduction = false,
+  eligibilityAlerts?: SchoolEligibilityAlerts) {
   const base = "/api/high-school/staff/teams/:teamId";
   const handle = (work: (req: Request, actor: OnboardingActor) => Promise<unknown>): RequestHandler => async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store"); res.setHeader("Pragma", "no-cache");
@@ -29,6 +31,10 @@ export function registerHighSchoolStaffRoutes(app: Express, staff: HighSchoolSta
   };
   app.get(base, handle((r, a) => staff.workspace(a, r.params.teamId)));
   app.get(`${base}/eligibility`, handle((r, a) => staff.eligibility(a, r.params.teamId)));
+  if (eligibilityAlerts) {
+    app.get(`${base}/eligibility-alerts`, handle((r, a) => eligibilityAlerts.inbox(a, r.params.teamId)));
+    app.post(`${base}/eligibility-alerts/:id/read`, handle((r, a) => eligibilityAlerts.acknowledge(a, r.params.teamId, r.params.id)));
+  }
   app.post(`${base}/eligibility/:playerId`, handle((r, a) => staff.setEligibility(a, r.params.teamId, r.params.playerId, r.body)));
   app.put(`${base}/settings`, handle((r, a) => staff.settings(a, r.params.teamId, r.body)));
   app.post(`${base}/roster/import/preview`, handle(async (r, a) => {
