@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, Send } from "lucide-react";
+import { createPortal } from "react-dom";
 import { apiRequest } from "@/lib/queryClient";
 import { parentVerificationSession } from "@/lib/parentVerificationSession";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useChatViewport } from "@/components/messages/useChatViewport";
+import { ChatComposer, ChatMessageBubble, ConversationHeader, ConversationListRow, useChatScroll } from "@/components/messages/ChatPresentation";
 
 const base="/api/high-school/onboarding/child-chats";
 type Thread={id:string;name:string;lastMessage?:string;lastMessageAt?:string};
-type Message={id:string;body:string;sender:string;authorKind:"parent"|"child";createdAt:string};
+type Message={id:string;body:string;sender:string;authorKind?:"parent"|"child";createdAt:string};
 /** Intentionally independent of dashboard team/league selection. */
 export function ParentChildThreads({actorId,onHasThreadsChange}:{actorId?:string;onHasThreadsChange?:(hasThreads:boolean)=>void}) {
   const revision=useSyncExternalStore(parentVerificationSession.subscribe,parentVerificationSession.snapshot);
@@ -28,19 +29,18 @@ export function ParentChildThreads({actorId,onHasThreadsChange}:{actorId?:string
   useEffect(()=>{onHasThreadsChange?.(hasThreads);},[hasThreads,onHasThreadsChange]);
   if(!enabled)return null;
   return <section aria-label="Messages with your children" className="border-b border-border" data-testid="parent-child-threads">
-    {threads.isError?<p role="alert" className="p-4 text-sm text-destructive">
+    {threads.isLoading?<div className="space-y-3 py-3" data-testid="child-conversations-loading">{[1,2].map(item=>
+      <div key={item} className="h-[72px] animate-pulse rounded-lg bg-muted/70" />)}</div>
+      :threads.isError?<p role="alert" className="p-4 text-sm text-destructive">
       Child conversations could not be loaded. <button className="underline" onClick={()=>void threads.refetch()}>Retry child conversations</button>
-    </p>:threads.data?.threads.map(thread=><button key={thread.id} type="button" className="flex items-center gap-3 w-full p-4 text-left hover:bg-muted/50"
-      onClick={()=>setSelected(thread)} aria-label={`Message ${thread.name}`}>
-      <span className="rounded-full bg-primary/10 p-3 text-primary"><MessageCircle size={22}/></span>
-      <span className="min-w-0"><strong className="block truncate">{thread.name}</strong>
-        <span className="block text-sm text-muted-foreground truncate">{thread.lastMessage||"Message your child"}</span></span>
-    </button>)}
+    </p>:<div className="space-y-3">{threads.data?.threads.map(thread=><ConversationListRow key={thread.id} title={thread.name} lastMessage={thread.lastMessage}
+      onClick={()=>setSelected(thread)} testId={`parent-child-thread-${thread.id}`} />)}</div>}
     {selected&&<ChildConversation key={`${actorId}:${revision}:${selected.id}`} actorId={actorId!}
       thread={selected} onClose={()=>setSelected(undefined)}/>}
   </section>;
 }
 function ChildConversation({actorId,thread,onClose}:{actorId:string;thread:Thread;onClose:()=>void}) {
+  const {bottomOffset}=useChatViewport();
   const client=useQueryClient();
   const [body,setBody]=useState(""),[error,setError]=useState(""),[sending,setSending]=useState(false);
   const attempt=useRef<{body:string;id:string}>();
@@ -50,8 +50,10 @@ function ChildConversation({actorId,thread,onClose}:{actorId:string;thread:Threa
     queryFn:async({signal})=>(await apiRequest("GET",path,undefined,signal)).json(),
     retry:false,staleTime:0,gcTime:0,refetchInterval:5_000,
   });
+  const lastMessage=messages.data?.messages.at(-1);
+  const scroll=useChatScroll(thread.id,lastMessage?.id,lastMessage?.authorKind==="parent"||lastMessage?.sender==="You");
   const send=async()=>{
-    if(!body.trim()||sending)return;
+    if(!body.trim()||sending||messages.isError)return;
     setSending(true);setError("");
     const text=body.trim();
     if(attempt.current?.body!==text)attempt.current={body:text,id:crypto.randomUUID()};
@@ -62,26 +64,29 @@ function ChildConversation({actorId,thread,onClose}:{actorId:string;thread:Threa
     }catch{setError("Your message could not be sent. Check your connection and parent verification, then retry.");}
     finally{setSending(false);}
   };
-  return <Dialog open onOpenChange={open=>{if(!open)onClose();}}>
-    <DialogContent className="max-w-lg max-h-[85dvh] flex flex-col">
-      <DialogHeader><DialogTitle>{thread.name}</DialogTitle><DialogDescription>Private conversation with your child.</DialogDescription></DialogHeader>
-      <div className="min-h-0 overflow-y-auto space-y-3 flex-1" aria-label={`Conversation with ${thread.name}`} aria-live="polite">
-        {messages.isLoading&&<p role="status">Loading messages…</p>}
-        {messages.isError?<p role="alert">Messages could not be loaded. <button className="underline" onClick={()=>void messages.refetch()}>Retry messages</button></p>:
-          messages.data?.messages.map(message=><div key={message.id} className={`rounded-xl p-3 ${message.authorKind==="parent"?"bg-primary/10 ml-6":"bg-muted mr-6"}`}>
-            <strong className="text-xs">{message.authorKind==="parent"?"You":thread.name}</strong>
-            <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
-          </div>)}
-        {messages.isSuccess&&!messages.data.messages.length&&<p className="text-sm text-muted-foreground">No messages yet. Say hello.</p>}
+  return createPortal(<section aria-label={`Conversation with ${thread.name}`} className="fixed inset-0 z-[70] flex min-h-0 flex-col overflow-hidden bg-background text-foreground"
+    style={{bottom:bottomOffset,paddingTop:"var(--native-inset-top, env(safe-area-inset-top, 0px))"}}>
+    <ConversationHeader title={thread.name} subtitle="Private conversation" onBack={onClose} />
+    <div className="relative min-h-0 flex-1" data-testid="messages-container">
+      <div ref={scroll.scrollRef} onScroll={scroll.onScroll} className="absolute inset-0 overflow-y-auto" aria-live="polite" style={{overflowAnchor:"none"}}>
+        <div className="space-y-4 p-4 pb-6">
+          {messages.isLoading&&<div className="space-y-4" data-testid="messages-loading">{[1,2,3].map(i=><div key={i} className="h-12 w-2/3 animate-pulse rounded-lg bg-muted"/>)}</div>}
+          {messages.isError?<p role="alert" className="text-sm text-destructive">
+            Messages could not be loaded. <button className="underline" onClick={()=>void messages.refetch()}>Retry messages</button>
+          </p>:messages.data?.messages.map(message=><ChatMessageBubble key={message.id}
+            mine={message.authorKind==="parent"||message.sender.trim().toLowerCase()==="you"}
+            sender={message.authorKind==="parent"||message.sender.trim().toLowerCase()==="you"?"You":thread.name}
+            body={message.body} createdAt={message.createdAt} testId={`message-${message.id}`} />)}
+          {messages.isSuccess&&!messages.data.messages.length&&<p className="text-sm text-muted-foreground">No messages yet. Say hello.</p>}
+        </div>
       </div>
-      {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
-      <form className="flex gap-2" onSubmit={event=>{event.preventDefault();void send();}}>
-        <label className="flex-1 min-w-0"><span className="sr-only">Message {thread.name}</span>
-          <input value={body} maxLength={1000} disabled={sending} onChange={event=>setBody(event.target.value)}
-            className="w-full rounded-lg border bg-background px-3 py-3" placeholder="Type a message…"/></label>
-        <button className="rounded-lg bg-primary text-primary-foreground px-4 disabled:opacity-50" type="submit"
-          disabled={!body.trim()||sending||messages.isError} aria-label="Send message to child"><Send size={20}/></button>
-      </form>
-    </DialogContent>
-  </Dialog>;
+    </div>
+    {error&&<p role="alert" className="px-4 pt-2 text-sm text-destructive">{error}</p>}
+    <form onSubmit={event=>{event.preventDefault();void send();}}
+      className="border-t border-border bg-background px-4 pt-2 pb-[calc(8px+var(--native-inset-bottom,env(safe-area-inset-bottom,0px)))]">
+      <ChatComposer value={body} onChange={value=>setBody(value.slice(0,1000))} onSend={()=>void send()}
+        disabled={sending||messages.isError} placeholder="Type a message..." ariaLabel={`Message ${thread.name}`}
+        sendTestId="button-send-message" sendAriaLabel="Send message to child" />
+    </form>
+  </section>,document.body);
 }

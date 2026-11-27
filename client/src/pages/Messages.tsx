@@ -3,9 +3,10 @@
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { motion, AnimatePresence } from 'framer-motion';
 import { ParentChildThreads } from "@/components/high-school-family/ParentChildThreads";
+import { ChatComposer, ConversationHeader, ConversationListRow, chatMessagePresentation } from "@/components/messages/ChatPresentation";
 import { useDemo } from "@/context/DemoContext";
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, CreditCard, DollarSign, CheckCircle, RefreshCw, Check } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, CreditCard, DollarSign, CheckCircle, RefreshCw, Check } from 'lucide-react';
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useLocation } from 'wouter';
@@ -1810,11 +1811,11 @@ export default function Messages() {
     }
   };
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setNewMessage(e.target.value);
+  const handleInputChange = (value: string) => {
+    setNewMessage(value);
     
     // Start typing indicator when user starts typing
-    if (e.target.value.trim() && !isTyping) {
+    if (value.trim() && !isTyping) {
       handleTypingStart();
     }
     
@@ -1823,7 +1824,7 @@ export default function Messages() {
       clearTimeout(typingTimeoutRef.current);
     }
     
-    if (e.target.value.trim()) {
+    if (value.trim()) {
       typingTimeoutRef.current = setTimeout(() => {
         handleTypingStop();
       }, 3000);
@@ -2833,94 +2834,37 @@ export default function Messages() {
               </div>
             ) : (conversations.length > 0 || hasChildThreads) ? (
               <div className="space-y-3" data-testid="conversations-list">
-                {conversations.map((conversation: Conversation) => (
-                  <div 
-                    key={conversation.id}
-                    className="rounded-lg hairline elev-rest p-4 cursor-pointer hover:bg-accent/50 transition-colors group dark:bg-[#212121] bg-[#e2e2e2]" 
-                    data-testid={`card-conversation-${conversation.id}`}
-                    onClick={() => {
-                      setSelectedConversation(conversation.id);
-                      navigate(`/messages/${conversation.id}`);
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Enhanced Avatar Display */}
-                      <div className="relative">
-                        {conversation.type === 'team_group' || conversation.type === 'custom_group' ? (
-                          // Group chat avatar
-                          (<div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                            <Users className="w-5 h-5 text-muted-foreground" />
-                          </div>)
-                        ) : (
-                          // Direct message avatar - show profile pic if available
-                          ((() => {
-                            const profileImageUrl = getOtherParticipantProfileImage(conversation);
-                            const imageUrl = getImageUrl(profileImageUrl);
-                            return imageUrl ? (
-                              <img 
-                                src={imageUrl} 
-                                alt=""
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                                <span className="text-muted-foreground text-sm font-semibold">
-                                  {getInitials(getParticipantName(conversation))}
-                                </span>
-                              </div>
-                            );
-                          })())
-                        )}
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold" data-testid={`text-conversation-name-${conversation.id}`}>
-                            {getParticipantName(conversation)}
-                          </h3>
-                          {/* Unread message indicator */}
-                          {unreadCountsMap[conversation.id] > 0 && (
-                            <div className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid={`badge-unread-${conversation.id}`}>
-                              {unreadCountsMap[conversation.id] > 99 ? '99+' : unreadCountsMap[conversation.id]}
-                            </div>
-                          )}
-                          {/* Group chat type indicator */}
-                        </div>
-                        
-                        {/* Enhanced last message display */}
-                        {conversation.lastMessage && (
-                          <p className="text-sm text-muted-foreground truncate" data-testid={`text-last-message-${conversation.id}`}>
-                            {conversation.lastMessage.content}
-                          </p>
-                        )}
-                        
-                        
-                      </div>
-                      
-                      {/* Conditional Delete/Leave conversation button */}
-                      {canUserManageConversation(conversation) ? (
-                        <button
-                          onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                          className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
-                          title="Delete conversation"
-                          data-testid={`button-delete-conversation-${conversation.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </button>
-                      ) : (
-                        // Show Leave button for conversations user can't delete (now includes direct and captain chats)
-                        (<button
-                          onClick={(e) => handleLeaveConversation(conversation.id, e)}
-                          className="p-2 hover:bg-orange-500/20 rounded-lg transition-colors"
-                          title="Leave conversation"
-                          data-testid={`button-leave-conversation-${conversation.id}`}
-                        >
-                          <LogOut className="w-4 h-4 text-orange-600" />
-                        </button>)
-                      )}
-                    </div>
-                  </div>
-                ))}
+                {conversations.map((conversation: Conversation) => {
+                  const group = conversation.type === 'team_group' || conversation.type === 'custom_group';
+                  const imageUrl = getImageUrl(group ? undefined : getOtherParticipantProfileImage(conversation));
+                  const title = getParticipantName(conversation);
+                  const unread = unreadCountsMap[conversation.id] || 0;
+                  return <ConversationListRow key={conversation.id} title={title}
+                    lastMessage={conversation.lastMessage?.content}
+                    titleTestId={`text-conversation-name-${conversation.id}`}
+                    lastMessageTestId={`text-last-message-${conversation.id}`}
+                    emptyPreview=""
+                    unreadCount={unread}
+                    unreadTestId={`badge-unread-${conversation.id}`}
+                    avatar={group
+                      ? <span className="w-10 h-10 bg-muted rounded-full flex items-center justify-center shrink-0"><Users className="w-5 h-5 text-muted-foreground" /></span>
+                      : imageUrl
+                        ? <img src={imageUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                        : <span className="w-10 h-10 bg-muted rounded-full flex items-center justify-center shrink-0"><span className="text-muted-foreground text-sm font-semibold">{getInitials(title)}</span></span>}
+                    onClick={() => { setSelectedConversation(conversation.id); navigate(`/messages/${conversation.id}`); }}
+                    testId={`card-conversation-${conversation.id}`}
+                    rightAction={canUserManageConversation(conversation) ? <button
+                      onClick={event => { event.stopPropagation(); handleDeleteConversation(conversation.id, event); }}
+                      className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
+                      title="Delete conversation" data-testid={`button-delete-conversation-${conversation.id}`}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </button> : <button
+                      onClick={event => { event.stopPropagation(); handleLeaveConversation(conversation.id, event); }}
+                      className="p-2 hover:bg-orange-500/20 rounded-lg transition-colors"
+                      title="Leave conversation" data-testid={`button-leave-conversation-${conversation.id}`}>
+                      <LogOut className="w-4 h-4 text-orange-600" />
+                    </button>} />;
+                })}
               </div>
             ) : (
               <div className="text-center py-12" data-testid="empty-conversations">
@@ -2934,37 +2878,16 @@ export default function Messages() {
       ) : (
         <>
           {/* Chat Header */}
-          <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pl-[12px] pr-[12px] pt-[4px] pb-[4px]" data-testid="chat-header">
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => {
-                  setSelectedConversation(null);
-                  navigate('/messages');
-                }}
-                className="p-2 hover:bg-accent rounded-lg transition-colors" 
-                data-testid="button-back"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setShowMembersModal(true)}
-                className="w-8 h-8 bg-muted rounded-full flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
-                data-testid="button-show-members"
-                title="View group members"
-              >
-                <Users className="w-4 h-4 text-muted-foreground" />
-              </button>
-              <div className="flex-1">
-                <h2 className="font-semibold" data-testid="text-chat-title">{getChatTitle()}</h2>
-                <p className="text-xs text-muted-foreground" data-testid="text-chat-status">
-                  {currentConversation?.type === 'direct' 
-                    ? (onlineUsers.length > 0 ? 'Online' : 'Offline')
-                    : (onlineUsers.length > 0 ? `${onlineUsers.length} online` : 'Team members')}
-                </p>
-              </div>
-              
-            </div>
-          </div>
+          <ConversationHeader title={getChatTitle()}
+            subtitle={currentConversation?.type === 'direct'
+              ? (onlineUsers.length > 0 ? 'Online' : 'Offline')
+              : (onlineUsers.length > 0 ? `${onlineUsers.length} online` : 'Team members')}
+            onBack={() => { setSelectedConversation(null); navigate('/messages'); }}
+            avatar={<button onClick={() => setShowMembersModal(true)}
+              className="w-8 h-8 bg-muted rounded-full flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
+              data-testid="button-show-members" title="View group members">
+              <Users className="w-4 h-4 text-muted-foreground" />
+            </button>} />
           
           
           {/* Messages */}
@@ -3047,12 +2970,13 @@ export default function Messages() {
                 const message = item.data;
                 const isCurrentUser = message.senderId === currentUserId;
                 const isFirstUnread = firstUnreadMessage?.id === message.id;
+                const presentation = chatMessagePresentation(isCurrentUser, message.messageType === 'poll');
                 
                 return (
                   <motion.div
                     key={message.id}
                     ref={isFirstUnread ? firstUnreadMessageRef : null}
-                    className={`flex gap-3 items-start ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                    className={presentation.row}
                     data-testid={`message-${message.id}`}
                     initial={{ opacity: 0, scale: 0.72, y: 8 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -3071,14 +2995,10 @@ export default function Messages() {
                       </div>
                     )}
                     
-                    <div className={`${message.messageType === 'poll' ? 'w-3/4 lg:max-w-[20%]' : 'max-w-[70%]'} ${isCurrentUser ? 'order-1' : 'order-2'}`}>
+                    <div className={presentation.column}>
                       <div
-                        className={`rounded-lg ${
-                          message.messageType === 'poll'
-                            ? `text-foreground ${isCurrentUser ? 'ml-auto' : ''}`
-                            : `p-3 elev-rest ${isCurrentUser ? 'text-white ml-auto' : 'text-white'}`
-                        }`}
-                        style={message.messageType === 'poll' ? undefined : { backgroundColor: isCurrentUser ? '#3c82f4' : '#212121' }}
+                        className={presentation.bubble}
+                        style={presentation.style}
                         onClick={message.messageType !== 'poll' ? (e) => openReactionPicker(e, message.id) : undefined}
                       >
                         {!isCurrentUser && (
@@ -3566,7 +3486,14 @@ export default function Messages() {
             </div>
           )}
           
-          <div className="flex items-end gap-2">
+          <ChatComposer value={newMessage}
+            onChange={handleInputChange}
+            onSend={handleSendMessage} onBlur={handleTypingStop} textareaRef={textareaRef}
+            sendDisabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
+            sendClassName="mb-1 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            sendContent={isUploadingFiles
+              ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              : <Send className="w-4 h-4" />}>
             {/* FREE TIER RESTRICTION: Attachments disabled for free tier - greyed out */}
             <button 
               onClick={() => {
@@ -3636,35 +3563,7 @@ export default function Messages() {
             >
               <DollarSign className="w-4 h-4" />
             </button>
-            <textarea
-              ref={textareaRef}
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={handleInputChange}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              onBlur={handleTypingStop}
-              className="flex-1 resize-none overflow-y-auto min-h-[40px] max-h-[120px] py-2 px-3 rounded-md hairline elev-inset bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              rows={1}
-              data-testid="input-message"
-            />
-            <Button 
-              onClick={handleSendMessage}
-              disabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
-              className="mb-1"
-              data-testid="button-send-message"
-            >
-              {isUploadingFiles ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-            
+          </ChatComposer>
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -3675,7 +3574,6 @@ export default function Messages() {
               accept="*/*"
               data-testid="file-input"
             />
-          </div>
         </div>
         );
         if (isDesktopWeb) return inputBar;

@@ -45,6 +45,20 @@ ambiguous matches in either direction rather than combining children.
 Keep the selected-account rollout and two-player limit, and obtain specific
 approval before applying additional production schema changes.
 
+## Adult UI parity for child-accessible features
+
+Every function available to a child must mirror the adult account's design and
+UI. Parent-child conversations must also use the normal adult chat presentation
+on both sides, not a separate Family dialog or simplified child-chat design.
+
+**Why:** On November 27, 2026, the owner explicitly rejected both chat designs
+and required adult UI parity for every child-accessible function.
+
+**How to apply:** Reuse real adult presentation components and styles with the
+restricted child transport. Shared appearance does not authorize adult APIs,
+payments, arbitrary contacts, or unsupported controls. Keep existing child
+permissions and verified-parent boundaries intact.
+
 ## Parent-child conversations
 
 An approved child must automatically appear as a named private conversation in

@@ -137,7 +137,7 @@ try {
     await page.getByLabel("Team schedule calendar",{exact:true}).waitFor();
     await page.getByTestId("mobile-schedule-toggle-list").click();checks++;
     await page.getByTestId("nav-messages").click();
-    await page.getByRole("button",{name:"Family",exact:true}).click();
+    await page.getByRole("button",{name:"Message Family",exact:true}).click();
     await page.getByLabel("Message this approved chat").fill("Ready for practice.");
     await page.getByRole("button",{name:"Send message",exact:true}).click();
     await page.getByText("Ready for practice.",{exact:true}).first().waitFor();

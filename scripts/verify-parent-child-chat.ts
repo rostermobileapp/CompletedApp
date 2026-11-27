@@ -74,6 +74,10 @@ try{
   assert.ok((await service.messages(tokens[ids.child1],ids.child1)).messages.some(m=>m.id===legacyId));
   assert.deepEqual((await service.messages(tokens[ids.child3],ids.child3)).messages,[]);
   mark("Repeat-safe migration preserves each child's own old messages without copying sibling history");
+  // Exercise real scroll geometry rather than a two-message, non-scrolling chat.
+  for(let i=0;i<18;i++)await service.sendParentMessage(actors.parent,ids.child1,{
+    body:`Earlier practice note ${i+1}. ${"Please bring your equipment and water. ".repeat(8)}`,
+  });
 
   const bundle=await build({bundle:true,write:false,platform:"browser",format:"iife",jsx:"automatic",
     alias:{"@":path.join(root,"client/src"),"@shared":path.join(root,"shared"),"@assets":path.join(root,"attached_assets")},
@@ -100,18 +104,20 @@ try{
       import{ProductionChildSession}from'./client/src/components/high-school-onboarding/ProductionChildSession';
       import{FamilyDevices}from'./client/src/components/high-school-family/FamilyDevices';
       import{TeamSkinShell}from'./client/src/components/high-school-skins/TeamSkinShell';
+      import{BottomNavigationView}from'./client/src/components/BottomNavigationView';
       function App(){const[team,setTeam]=useState('adult-one');const[hasThreads,setHasThreads]=useState(false);return new URLSearchParams(location.search).has('child')?
         <ProductionChildSession token={window.childToken}/>:new URLSearchParams(location.search).has('school')?
         <TeamSkinShell context={{actor:{id:"${actors.parent.authId}",type:"adult"},restricted:true,
           teams:['adult-one','adult-two'].map(id=>({id,name:id,program_type:'high_school',role:'parent',status:'approved'}))}}
           activeTeam={{id:team,name:team,program_type:'high_school',role:'parent',status:'approved'}}
-          operational onTeamChange={setTeam}/>:<main className="p-4">
+          operational onTeamChange={setTeam}/>:<><main className="p-4">
           <label>Team<select aria-label="Team selection" value={team} onChange={e=>setTeam(e.target.value)}>
             <option value="adult-one">Adult team one</option><option value="adult-two">Adult team two</option>
             <option value="school">School team</option><option value="all">All teams</option></select></label>
           <ParentChildThreads actorId="${actors.parent.authId}" onHasThreadsChange={setHasThreads}/>
           {!hasThreads&&<p data-testid="empty-conversations">No conversations yet</p>}
-          <div className="hsy family-setup"><FamilyDevices actorId="${actors.parent.authId}"/></div></main>}
+          <div className="hsy family-setup"><FamilyDevices actorId="${actors.parent.authId}"/></div></main>
+          <BottomNavigationView activeId="messages" onNavigate={()=>{}}/></>}
       createRoot(document.getElementById('root')).render(<QueryClientProvider client={queryClient}><App/></QueryClientProvider>);`,
     }});
   const app=express();app.use(express.json());
@@ -171,38 +177,78 @@ try{
     assert.equal(await parentPage.getByText("Expires 12/31/1969",{exact:false}).count(),0);
     assert.ok(await parentPage.getByText("Stays signed in until you sign out this device.",{exact:true}).count()>0);
     await parentPage.getByRole("button",{name:"Message Casey Synthetic",exact:true}).click();
+    assert.equal(await parentPage.getByRole("dialog").count(),0,"Private chat must use the regular thread, not a dialog");
+    assert.equal(await parentPage.getByRole("textbox",{name:"Message Casey Synthetic",exact:true}).evaluate(node=>node.tagName),"TEXTAREA");
     const text=`Parent browser message ${width}`;
     await parentPage.getByRole("textbox",{name:"Message Casey Synthetic",exact:true}).fill(text);
     await parentPage.getByRole("button",{name:"Send message to child"}).click();
-    await parentPage.getByRole("dialog").getByText(text,{exact:true}).waitFor();
+    await parentPage.getByLabel("Conversation with Casey Synthetic",{exact:true}).getByText(text,{exact:true}).waitFor();
     await childPage.bringToFront();await childPage.goto(`${origin}/?child=1`);
     await childPage.getByTestId("nav-messages").click();
-    await childPage.getByRole("button",{name:"Parent",exact:true}).click();
+    await childPage.getByRole("button",{name:"Message Parent",exact:true}).click();
     await childPage.getByText(text,{exact:true}).waitFor();
+    assert.equal(await childPage.getByLabel("Message this approved chat").evaluate(node=>node.tagName),"TEXTAREA");
+    const reply=`Child browser reply ${width}\nReady for practice.`;
     await childPage.getByLabel("Message this approved chat").fill(`Child browser reply ${width}`);
+    await childPage.getByLabel("Message this approved chat").press("Shift+Enter");
+    await childPage.keyboard.insertText("Ready for practice.");
+    assert.equal(await childPage.getByLabel("Message this approved chat").inputValue(),reply);
     await childPage.getByRole("button",{name:"Send message",exact:true}).click();
-    await childPage.getByText(`Child browser reply ${width}`,{exact:true}).waitFor();
+    await childPage.getByText(reply,{exact:true}).waitFor();
     await parentPage.bringToFront();
-    await parentPage.getByRole("dialog").getByText(`Child browser reply ${width}`,{exact:true}).waitFor();
+    await parentPage.getByLabel("Conversation with Casey Synthetic",{exact:true}).getByText(reply,{exact:true}).waitFor();
     await parentPage.getByRole("textbox",{name:"Message Casey Synthetic",exact:true}).fill(`Parent follow-up ${width}`);
     await parentPage.getByRole("button",{name:"Send message to child"}).click();
     await childPage.bringToFront();
     await childPage.getByText(`Parent follow-up ${width}`,{exact:true}).waitFor();
+    for(const page of [parentPage,childPage]){
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,"Chat must not overflow horizontally");
+      const input=page===parentPage?page.getByRole("textbox",{name:"Message Casey Synthetic",exact:true}):page.getByLabel("Message this approved chat");
+      const rect=await input.boundingBox();
+      assert.ok(rect&&rect.y>=0&&rect.y+rect.height<=900,"Composer must remain within the visible viewport");
+      const navigation=await page.getByTestId("bottom-navigation").boundingBox();
+      assert.ok(navigation&&rect.y+rect.height<=navigation.y,"Composer must stay above the adult bottom navigation");
+      for(const name of ["Attach file","Send GIF","Create Poll","Request Payment"]){
+        assert.equal(await page.getByRole("button",{name,exact:true}).count(),0,"Unsupported adult-only tools must not be invented");
+      }
+    }
+    const bubbleColor=async(page:any,content:string)=>page.getByText(content,{exact:true}).evaluate((node:Element)=>{
+      for(let element:Element|null=node;element;element=element.parentElement){
+        const color=getComputedStyle(element).backgroundColor;
+        if(color!=="rgba(0, 0, 0, 0)"&&color!=="transparent")return color;
+      }
+      return "";
+    });
+    assert.equal(await bubbleColor(parentPage,text),"rgb(60, 130, 244)","Parent outgoing bubble must match adult blue");
+    assert.equal(await bubbleColor(childPage,text),"rgb(33, 33, 33)","Child incoming bubble must match adult chat");
+    assert.equal(await bubbleColor(childPage,reply),"rgb(60, 130, 244)","Child outgoing bubble must match adult blue");
     await parentPage.screenshot({path:`${out}/parent-thread-${width}.png`});
     await childPage.screenshot({path:`${out}/child-thread-${width}.png`});
+    for(const [name,page] of [["parent",parentPage],["child",childPage]] as const){
+      await page.evaluate(()=>document.documentElement.classList.remove("dark"));
+      await page.screenshot({path:`${out}/${name}-thread-light-${width}.png`});
+      await page.evaluate(()=>document.documentElement.classList.add("dark"));
+    }
+    await childPage.getByRole("button",{name:"Back to messages",exact:true}).click();
+    await childPage.getByRole("button",{name:"Message Parent",exact:true}).waitFor();
+    await parentPage.getByRole("button",{name:"Back to messages",exact:true}).click();
+    await parentPage.getByRole("button",{name:"Message Jamie Synthetic",exact:true}).click();
+    await parentPage.getByText("No messages yet. Say hello.",{exact:true}).waitFor();
+    assert.equal(await parentPage.getByRole("button",{name:"Send message to child"}).isDisabled(),true);
     await parentPage.reload();await parentPage.getByRole("button",{name:"Message Casey Synthetic",exact:true}).click();
-    await parentPage.getByRole("dialog").getByText(`Child browser reply ${width}`,{exact:true}).waitFor();
+    await parentPage.getByLabel("Conversation with Casey Synthetic",{exact:true}).getByText(reply,{exact:true}).waitFor();
     await parentPage.goto(`${origin}/high-school/chat?school=1`);
     await parentPage.getByRole("button",{name:"Message Casey Synthetic",exact:true}).waitFor();
     await parentPage.getByLabel("Choose active team",{exact:true}).selectOption("adult-two");
     await parentPage.getByRole("button",{name:"Message Jamie Synthetic",exact:true}).waitFor();
     await parentPage.getByRole("button",{name:"Message Casey Synthetic",exact:true}).click();
-    await parentPage.getByRole("dialog").getByText(`Child browser reply ${width}`,{exact:true}).waitFor();
+    await parentPage.getByLabel("Conversation with Casey Synthetic",{exact:true}).getByText(reply,{exact:true}).waitFor();
     await context.close();
-    mark(`${width}px: named threads survived adult/All/school selections and the real school-parent Chat; two-way replies, refresh and lifetime text passed`);
+    mark(`${width}px: adult-style nonmodal thread, bubble colors, multiline composer, light/dark layouts and safe controls passed; adult/All/school selections, replies, refresh and lifetime text passed`);
   }
   assert.deepEqual(errors,[]);
   assert.equal(apiCalls.some(c=>/email|resend/i.test(c.path)),false);
+  assert.ok(apiCalls.filter(c=>c.auth===`Bearer ${tokens[ids.child1]}`).every(c=>c.path.startsWith("/high-school/child-device/")));
   mark("No email requests or browser errors");
   const before=(await service.parentMessages(actors.parent,ids.child1)).messages.length;
   await service.revoke(actors.parent,ids.child1);

@@ -2,7 +2,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { BottomNavigationView } from "@/components/BottomNavigationView";
 import type { MainScreenId } from "@/lib/mainNavRoutes";
-import { useKeyboard } from "@/hooks/use-keyboard";
+import { useChatViewport } from "@/components/messages/useChatViewport";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   HomeHeader, HomeShortcutCards, HomeSummaryCards, HomeTeamSelector,
@@ -29,7 +29,7 @@ function subscribeTheme(change: () => void) {
 const darkSnapshot = () => document.documentElement.classList.contains("dark");
 
 export function ScopedAccountFrame({ name, teams, selectedTeamId, onTeamChange, activeId, onNavigate,
-  onRefresh, refreshing, onSignOut, menu, children }: {
+  onRefresh, refreshing, onSignOut, menu, children, fullScreen = false }: {
   name: string;
   teams: ScopedHomeTeam[];
   selectedTeamId?: string;
@@ -41,26 +41,28 @@ export function ScopedAccountFrame({ name, teams, selectedTeamId, onTeamChange, 
   onSignOut?: () => void;
   menu?: ReactNode;
   children: ReactNode;
+  fullScreen?: boolean;
 }) {
   const dark = useSyncExternalStore(subscribeTheme, darkSnapshot, () => true);
-  const keyboard = useKeyboard();
+  const {keyboard,bottomOffset}=useChatViewport();
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const selected = teams.find(team => team.id === selectedTeamId) ?? teams[0];
-  return <div className="min-h-screen flex flex-col bg-background text-foreground pb-[calc(100px+var(--native-inset-bottom,env(safe-area-inset-bottom,0px)))]"
+  return <div className={`${fullScreen ? "h-[100dvh] min-h-0 overflow-hidden" : "min-h-screen pb-[calc(100px+var(--native-inset-bottom,env(safe-area-inset-bottom,0px)))]"} flex flex-col bg-background text-foreground`}
+    style={fullScreen ? { height: `calc(100dvh - ${bottomOffset}px)`,paddingTop:"var(--native-inset-top, env(safe-area-inset-top, 0px))" } : undefined}
     data-testid="scoped-account-home">
-    <HomeHeader dark={dark}
+    {!fullScreen && <HomeHeader dark={dark}
       avatar={<span className="text-primary-foreground text-lg font-semibold">{name.charAt(0).toUpperCase() || "U"}</span>}
       onProfile={() => onNavigate("profile")} onRefresh={onRefresh} refreshing={refreshing}
-      onMenu={() => setMenuOpen(true)} />
-    <HomeTeamSelector label={selected ? `${selected.name}${selected.role ? ` · ${selected.role}` : ""}` : "No team connected"} open={selectorOpen} onClick={() => setSelectorOpen(open => !open)}>
+      onMenu={() => setMenuOpen(true)} />}
+    {!fullScreen && <HomeTeamSelector label={selected ? `${selected.name}${selected.role ? ` · ${selected.role}` : ""}` : "No team connected"} open={selectorOpen} onClick={() => setSelectorOpen(open => !open)}>
       {teams.length ? teams.map(team => <button key={team.id} type="button"
         className="w-full p-3 text-left hover:bg-muted/50 transition-colors text-sm"
         aria-current={selected?.id === team.id ? "true" : undefined}
         onClick={() => { onTeamChange(team.id); setSelectorOpen(false); }}>
         {team.name}{team.role && <span className="block text-xs text-muted-foreground">{team.role}</span>}
       </button>) : <p className="p-3 text-sm text-muted-foreground">Your approved team will appear here when it is connected.</p>}
-    </HomeTeamSelector>
+    </HomeTeamSelector>}
     {selected?.role && <p className="sr-only" data-testid="skin-role-label">{selected.role}</p>}
     {children}
     {!keyboard.isOpen && <BottomNavigationView activeId={activeId} onNavigate={onNavigate} />}
