@@ -33,8 +33,11 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
   const [pane, setPane] = useState<Pane>("overview");
   const [notice, setNotice] = useState("");
   const [noticeError, setNoticeError] = useState(false);
+  const [schoolName, setSchoolName] = useState("");
+  const [schoolTown, setSchoolTown] = useState("");
   const [programName, setProgramName] = useState("");
-  const [town, setTown] = useState("");
+  const [programSchoolId, setProgramSchoolId] = useState("");
+  const [editingProgram, setEditingProgram] = useState<{ id: string; name: string; schoolId: string } | null>(null);
   const [teamName, setTeamName] = useState("");
   const [programId, setProgramId] = useState("");
   const [inviteTeamId, setInviteTeamId] = useState("");
@@ -54,6 +57,14 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
     workspace?.teams.forEach(team => map.set(team.programId, [...(map.get(team.programId) || []), team]));
     return map;
   }, [workspace?.teams]);
+  const programsBySchool = useMemo(() => {
+    const map = new Map<string, SchoolLeagueWorkspace["programs"]>();
+    workspace?.programs.forEach(program => {
+      if (program.schoolId) map.set(program.schoolId, [...(map.get(program.schoolId) || []), program]);
+    });
+    return map;
+  }, [workspace?.programs]);
+  const unlinkedPrograms = workspace?.programs.filter(program => !program.schoolId) || [];
   const selectedScheduleTeam = workspace?.teams.some(team => team.id === scheduleTeamId) ? scheduleTeamId : "";
   const previewCurrent = !!preview && preview.teamId === selectedScheduleTeam && preview.format === scheduleFormat && preview.text === scheduleText;
 
@@ -124,6 +135,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
   const staffRequests = workspace.staffRequests;
   const parentRequests = workspace.parentRequests;
   const statItems = [
+    ["Schools", workspace.schools.length],
     ["Programs", workspace.programs.length],
     ["Teams", workspace.teams.length],
     ["Staff requests", staffRequests.length],
@@ -161,36 +173,74 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
       </section>}
 
       {pane === "overview" && <section className="mt-6 space-y-5">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {statItems.map(([label, value]) => <div key={label} className="rounded-xl bg-card hairline elev-rest p-4"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs font-medium text-muted-foreground">{label}</p></div>)}
         </div>
-        {workspace.programs.length === 0 && <div className="rounded-xl border border-border bg-muted p-5 sm:p-6">
-          <h2 className="text-lg font-semibold">Start with your school programs</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Create a program, add its teams, then invite staff and families. A family invitation can include up to two players so parents don’t need to repeat setup.</p>
-          <ol className="mt-4 grid gap-2 text-sm sm:grid-cols-3"><li><span className="font-semibold">1.</span> Add a program and town</li><li><span className="font-semibold">2.</span> Create a team under it</li><li><span className="font-semibold">3.</span> Invite coaches and families</li></ol>
+        {workspace.schools.length === 0 && <div className="rounded-xl border border-border bg-muted p-5 sm:p-6">
+          <h2 className="text-lg font-semibold">Start with a school</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Set up the school first, add one or more programs to it, then create teams. A school can be reused across your leagues.</p>
+          <ol className="mt-4 grid gap-2 text-sm sm:grid-cols-3"><li><span className="font-semibold">1.</span> Add a school</li><li><span className="font-semibold">2.</span> Add a program to that school</li><li><span className="font-semibold">3.</span> Create teams, then invite people</li></ol>
         </div>}
         <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
           <section className={cardClass}>
-            <div className="flex flex-wrap items-end justify-between gap-3"><SectionTitle eyebrow="Organization" title="Programs & teams" /><button className={secondaryButton} onClick={() => setPane("people")}>Manage invitations</button></div>
-            {workspace.programs.length === 0 ? <div className="mt-5 rounded-lg border border-dashed border-border p-6 text-center"><p className="font-medium">No programs yet</p><p className="mt-1 text-sm text-muted-foreground">Add the first program to begin building your league.</p></div> : <div className="mt-5 space-y-3">
-              {workspace.programs.map(program => <article key={program.id} className="rounded-lg bg-background hairline elev-rest p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{program.name}</h3><p className="mt-1 text-sm text-muted-foreground">{program.town}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs capitalize text-muted-foreground">{program.status.replace(/_/g, " ")}</span></div>
-                {teamsByProgram.get(program.id)?.length ? <div className="mt-3 flex flex-wrap gap-2">{teamsByProgram.get(program.id)!.map(team => <span key={team.id} className="rounded-md border border-border px-3 py-1.5 text-xs">{team.name}</span>)}</div> : <p className="mt-3 text-xs text-muted-foreground">No teams in this program.</p>}
-                <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={event => { event.preventDefault(); if (!teamName.trim() || programId !== program.id) return; void runAction("/teams", { programId: program.id, name: teamName.trim() }, "Team created.", result => { setTeamName(""); setOneTime(result.teamCode ? { teamCode: result.teamCode } : null); }); }}>
-                  <input className={inputClass} aria-label={`New team name for ${program.name}`} placeholder="Team name" value={programId === program.id ? teamName : ""} onFocus={() => setProgramId(program.id)} onChange={event => { setProgramId(program.id); setTeamName(event.target.value); }} required maxLength={100} />
-                  <button className={secondaryButton} type="submit" disabled={action.isPending || !teamName.trim() || programId !== program.id}>Add team</button>
-                </form>
+            <div className="flex flex-wrap items-end justify-between gap-3"><SectionTitle eyebrow="Organization" title="Schools → programs → teams" /><button className={secondaryButton} onClick={() => setPane("people")}>Manage invitations</button></div>
+            {!workspace.schools.length && !workspace.programs.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-6 text-center"><p className="font-medium">No schools yet</p><p className="mt-1 text-sm text-muted-foreground">Add a school to begin building this league.</p></div> : <div className="mt-5 space-y-4">
+              {workspace.schools.map(school => <article key={school.id} className="rounded-xl border border-border bg-background p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">School</p><h3 className="mt-1 text-lg font-semibold">{school.name}</h3><p className="mt-1 text-sm text-muted-foreground">{school.town}</p></div>
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{programsBySchool.get(school.id)?.length || 0} programs in this league</span>
+                </div>
+                {programsBySchool.get(school.id)?.length ? <div className="mt-4 space-y-3">
+                  {programsBySchool.get(school.id)!.map(program => <article key={program.id} className="rounded-lg bg-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-medium text-muted-foreground">Program</p><h4 className="font-semibold">{program.name}</h4><p className="mt-1 text-xs text-muted-foreground">{program.town}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs capitalize text-muted-foreground">{program.status.replace(/_/g, " ")}</span></div>
+                    <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={event => { event.preventDefault(); if (!editingProgram || editingProgram.id !== program.id || !editingProgram.name.trim() || !editingProgram.schoolId) return; void runAction(`/programs/${encodeURIComponent(program.id)}`, { name: editingProgram.name.trim(), schoolId: editingProgram.schoolId }, "Program updated.", () => setEditingProgram(null)); }}>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <input className={inputClass} aria-label={`Program name for ${school.name}`} value={editingProgram?.id === program.id ? editingProgram.name : program.name} onChange={event => setEditingProgram({ id: program.id, name: event.target.value, schoolId: editingProgram?.id === program.id ? editingProgram.schoolId : (program.schoolId || school.id) })} required maxLength={100} />
+                        <select className={inputClass} aria-label={`School for ${program.name}`} value={editingProgram?.id === program.id ? editingProgram.schoolId : school.id} onChange={event => setEditingProgram({ id: program.id, name: editingProgram?.id === program.id ? editingProgram.name : program.name, schoolId: event.target.value })}>
+                          {workspace.schools.map(option => <option key={option.id} value={option.id}>{option.name} · {option.town}</option>)}
+                        </select>
+                      </div>
+                      <button className={secondaryButton} type="submit" disabled={action.isPending || editingProgram?.id !== program.id || !editingProgram.name.trim()}>Save program</button>
+                    </form>
+                    {teamsByProgram.get(program.id)?.length ? <div className="mt-3 flex flex-wrap gap-2">{teamsByProgram.get(program.id)!.map(team => <span key={team.id} className="rounded-md border border-border px-3 py-1.5 text-xs">{team.name}</span>)}</div> : <p className="mt-3 text-xs text-muted-foreground">No teams in this program.</p>}
+                    <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={event => { event.preventDefault(); if (!teamName.trim() || programId !== program.id) return; void runAction("/teams", { programId: program.id, name: teamName.trim() }, "Team created.", result => { setTeamName(""); setOneTime(result.teamCode ? { teamCode: result.teamCode } : null); }); }}>
+                      <input className={inputClass} aria-label={`New team name for ${school.name} ${program.name}`} placeholder="Team name" value={programId === program.id ? teamName : ""} onFocus={() => setProgramId(program.id)} onChange={event => { setProgramId(program.id); setTeamName(event.target.value); }} required maxLength={100} />
+                      <button className={secondaryButton} type="submit" disabled={action.isPending || !teamName.trim() || programId !== program.id}>Add team</button>
+                    </form>
+                  </article>)}
+                </div> : <p className="mt-4 rounded-lg bg-muted p-4 text-sm text-muted-foreground">This school has no programs in this league yet. You can reuse the school in another league without exposing that league’s teams here.</p>}
               </article>)}
+              {unlinkedPrograms.length > 0 && <section className="rounded-xl border border-dashed border-border p-4 sm:p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Needs school link</p><h3 className="mt-1 font-semibold">Unlinked programs</h3><p className="mt-1 text-sm text-muted-foreground">Choose a school to repair each program’s hierarchy. Existing teams stay with their program.</p>
+                <div className="mt-4 space-y-3">{unlinkedPrograms.map(program => <article key={program.id} className="rounded-lg bg-background hairline p-4">
+                  <p className="mb-3 font-medium">{program.name} <span className="text-sm font-normal text-muted-foreground">· No school linked</span></p>
+                  <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={event => { event.preventDefault(); if (!editingProgram || editingProgram.id !== program.id || !editingProgram.name.trim() || !editingProgram.schoolId) return; void runAction(`/programs/${encodeURIComponent(program.id)}`, { name: editingProgram.name.trim(), schoolId: editingProgram.schoolId }, "Program linked to school.", () => setEditingProgram(null)); }}>
+                    <div className="grid gap-2 sm:grid-cols-2"><input className={inputClass} aria-label={`Program name for ${program.name}`} value={editingProgram?.id === program.id ? editingProgram.name : program.name} onChange={event => setEditingProgram({ id: program.id, name: event.target.value, schoolId: editingProgram?.id === program.id ? editingProgram.schoolId : "" })} required maxLength={100} />
+                      <select className={inputClass} aria-label={`School for ${program.name}`} value={editingProgram?.id === program.id ? editingProgram.schoolId : ""} onChange={event => setEditingProgram({ id: program.id, name: editingProgram?.id === program.id ? editingProgram.name : program.name, schoolId: event.target.value })} required><option value="">Select a school</option>{workspace.schools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.town}</option>)}</select></div>
+                    <button className={secondaryButton} type="submit" disabled={action.isPending || !(editingProgram?.id === program.id && editingProgram.name.trim() && editingProgram.schoolId)}>Save program</button>
+                  </form>
+                </article>)}</div>
+              </section>}
             </div>}
           </section>
 
-          <section className={cardClass}>
-            <SectionTitle eyebrow="New program" title="Add a school" detail="Programs created here are approved by you as league commissioner. Staff and family requests still need separate approval." />
-            <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/programs", { name: programName.trim(), town: town.trim() }, "Program submitted for league approval.", () => { setProgramName(""); setTown(""); }); }}>
-              <Field label="Program or school name"><input className={inputClass} value={programName} onChange={event => setProgramName(event.target.value)} required maxLength={100} placeholder="e.g. Northview High" /></Field>
-              <Field label="Town"><input className={inputClass} value={town} onChange={event => setTown(event.target.value)} required maxLength={100} placeholder="Town or city" /></Field>
-              <button className={primaryButton} disabled={action.isPending || !programName.trim() || !town.trim()}>Submit program</button>
-            </form>
+          <section className="space-y-5">
+            <section className={cardClass}>
+              <SectionTitle eyebrow="Step 1" title="Add a school" detail="Schools you own or administer can be reused across your leagues." />
+              <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/schools", { name: schoolName.trim(), town: schoolTown.trim() }, "School added.", () => { setSchoolName(""); setSchoolTown(""); }); }}>
+                <Field label="School name"><input className={inputClass} value={schoolName} onChange={event => setSchoolName(event.target.value)} required maxLength={100} placeholder="e.g. Northview High School" /></Field>
+                <Field label="Town"><input className={inputClass} value={schoolTown} onChange={event => setSchoolTown(event.target.value)} required maxLength={100} placeholder="Town or city" /></Field>
+                <button className={primaryButton} disabled={action.isPending || !schoolName.trim() || !schoolTown.trim()}>Add school</button>
+              </form>
+            </section>
+            <section className={cardClass}>
+              <SectionTitle eyebrow="Step 2" title="Add a program" detail="Choose a school, then create teams under the program. People and invitations keep their existing approval flow." />
+              {!workspace.schools.length ? <p className="mt-5 rounded-lg bg-muted p-4 text-sm text-muted-foreground">Add a school first to create a program.</p> : <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/programs", { name: programName.trim(), schoolId: programSchoolId }, "Program created.", () => { setProgramName(""); setProgramSchoolId(""); }); }}>
+                <Field label="School"><select className={inputClass} value={programSchoolId} onChange={event => setProgramSchoolId(event.target.value)} required><option value="">Select a school</option>{workspace.schools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.town}</option>)}</select></Field>
+                <Field label="Program name"><input className={inputClass} value={programName} onChange={event => setProgramName(event.target.value)} required maxLength={100} placeholder="e.g. Hockey" /></Field>
+                <button className={primaryButton} disabled={action.isPending || !programName.trim() || !programSchoolId}>Add program</button>
+              </form>}
+            </section>
           </section>
         </div>
         <section className={cardClass}>
@@ -210,7 +260,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
               : { kind: "parent", teamId: inviteTeamId, email: email.trim(), players: players.map(player => ({ firstName: player.firstName.trim(), lastName: player.lastName.trim(), gradYear: Number(player.gradYear), position: player.position, jerseyNumber: player.jerseyNumber })) };
             void runAction("/invitations", body, "Invitation created. Share it manually with the recipient.", result => { setOneTime(result); setEmail(""); setPlayers([{ firstName: "", lastName: "", gradYear: String(new Date().getFullYear() + 4), position: "F", jerseyNumber: "" }]); });
           }}>
-            <Field label="Team"><select className={inputClass} value={inviteTeamId} onChange={event => setInviteTeamId(event.target.value)} required><option value="">Select a team</option>{workspace.teams.map(team => <option key={team.id} value={team.id}>{workspace.programs.find(program => program.id === team.programId)?.name || "Program"} — {team.name}</option>)}</select></Field>
+            <Field label="Team"><select className={inputClass} value={inviteTeamId} onChange={event => setInviteTeamId(event.target.value)} required><option value="">Select a team</option>{workspace.teams.map(team => { const program = workspace.programs.find(item => item.id === team.programId); const school = workspace.schools.find(item => item.id === program?.schoolId); return <option key={team.id} value={team.id}>{school ? `${school.name} / ` : "Unlinked school / "}{program?.name || "Program"} / {team.name}</option>; })}</select></Field>
             <Field label="Invite type"><select className={inputClass} value={inviteKind} onChange={event => setInviteKind(event.target.value as "staff" | "parent")}><option value="staff">Staff member</option><option value="parent">Parent and player(s)</option></select></Field>
             <Field label="Recipient email"><input className={inputClass} type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required placeholder="name@example.com" /></Field>
             {inviteKind === "staff" ? <Field label="Role"><select className={inputClass} value={role} onChange={event => setRole(event.target.value)}>{Object.entries(roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field> : <div className="space-y-3">
@@ -256,7 +306,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
         <section className={cardClass}>
           <SectionTitle eyebrow="Season calendar" title="Import a team schedule" detail="Preview every row before import. Nothing is saved until a clean preview is confirmed." />
           {!workspace.teams.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-5 text-center"><p className="font-medium">A team is needed before scheduling</p><button className={`${secondaryButton} mt-3`} onClick={() => setPane("overview")}>Create a program and team</button></div> : <div className="mt-5 space-y-4">
-            <Field label="Team"><select className={inputClass} value={scheduleTeamId} onChange={event => changeSchedule("team", event.target.value)} required><option value="">Select a team</option>{workspace.teams.map(team => <option key={team.id} value={team.id}>{workspace.programs.find(program => program.id === team.programId)?.name || "Program"} — {team.name}</option>)}</select></Field>
+            <Field label="Team"><select className={inputClass} value={scheduleTeamId} onChange={event => changeSchedule("team", event.target.value)} required><option value="">Select a team</option>{workspace.teams.map(team => { const program = workspace.programs.find(item => item.id === team.programId); const school = workspace.schools.find(item => item.id === program?.schoolId); return <option key={team.id} value={team.id}>{school ? `${school.name} / ` : "Unlinked school / "}{program?.name || "Program"} / {team.name}</option>; })}</select></Field>
             <Field label="File format"><select className={inputClass} value={scheduleFormat} onChange={event => changeSchedule("format", event.target.value)}><option value="csv">CSV</option><option value="ical">iCalendar (.ics)</option></select></Field>
             {scheduleFormat === "csv" ? <p className="rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">Required CSV headers: <code className="font-mono">title, startsAt</code>. Optional: <code className="font-mono">opponent, rink, address</code>. Include a timezone offset in each start time, for example <code className="font-mono">2026-10-12T18:30:00-04:00</code>.</p> : <p className="rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">iCalendar must contain timed events with UTC <code className="font-mono">DTSTART</code>. Local/TZID, all-day, and recurring events need to be expanded or exported as UTC timed events first.</p>}
             <Field label="Choose a schedule file"><input className={inputClass} type="file" accept={scheduleFormat === "csv" ? ".csv,text/csv" : ".ics,text/calendar"} onChange={event => void loadFile(event.target.files?.[0])} /></Field>

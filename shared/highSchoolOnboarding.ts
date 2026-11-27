@@ -30,7 +30,11 @@ export const hsChoosePath = z.object({ path: z.enum(HS_PATHS), adultConfirmed: z
 export const hsSaveDraft = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("staff"), revision: z.number().int().nonnegative(), role: z.enum(HS_STAFF_ROLES),
     programId: z.string().uuid().optional(), teamId: z.string().uuid().optional(),
-    newSchool: z.object({ leagueId: z.string().uuid(), name: name, town: name }).strict().optional(),
+    newSchool: z.object({
+      leagueId: z.string().uuid(), name: name, town: name,
+      // Older clients omit this; their explicit school request becomes Hockey.
+      programName: name.default("Hockey"),
+    }).strict().optional(),
   }).strict(),
   z.object({ kind: z.literal("parent"), revision: z.number().int().nonnegative(), guardianConfirmed: z.literal(true),
     players: z.array(hsPlayerDraft).min(1).max(HS_MAX_FAMILY_PLAYERS),

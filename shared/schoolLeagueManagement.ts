@@ -2,7 +2,9 @@ import { z } from "zod";
 import { staffRoles, eventInput, type StaffEventInput, type StaffRole } from "./highSchoolStaff";
 
 const name = z.string().trim().min(1).max(100);
-export const schoolProgramInput = z.object({ name, town: name }).strict();
+export const schoolInput = z.object({ name, town: name }).strict();
+export const schoolProgramInput = z.object({ name, schoolId: z.string().uuid() }).strict();
+export const schoolProgramUpdateInput = schoolProgramInput;
 export const schoolTeamInput = z.object({ programId: z.string().uuid(), name }).strict();
 const invitationBase = { teamId: z.string().uuid(), email: z.string().trim().email().transform(value => value.toLowerCase()) };
 export const schoolInvitationInput = z.discriminatedUnion("kind", [
@@ -21,7 +23,8 @@ export const schoolScheduleImportInput = z.object({
 export interface SchoolLeagueWorkspace {
   actorId: string;
   league: { id: string; name: string; leagueType: "high_school" | "youth" };
-  programs: { id: string; name: string; town: string; status: string }[];
+  schools: { id: string; name: string; town: string }[];
+  programs: { id: string; name: string; town: string; status: string; schoolId: string | null }[];
   teams: { id: string; name: string; programId: string }[];
   staffRequests: { id: string; authId: string; name: string; role: StaffRole; school: string; teamName: string | null }[];
   parentRequests: { id: string; parentAuthId: string; firstName: string; lastName: string; teamId: string; teamName: string }[];

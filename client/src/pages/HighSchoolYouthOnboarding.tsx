@@ -41,7 +41,7 @@ export default function HighSchoolYouthOnboarding({request=realRequest,authentic
   const [programs,setPrograms]=useState<any[]>([]); const [search,setSearch]=useState(""); const [programId,setProgramId]=useState(""); const [teamId,setTeamId]=useState("");
   const [catalogLoading,setCatalogLoading]=useState(false);
   const [schoolLeagues,setSchoolLeagues]=useState<Array<{id:string;name:string}>>([]);
-  const [schoolRequest,setSchoolRequest]=useState<SchoolRequest>({name:"",town:"",leagueId:""});
+  const [schoolRequest,setSchoolRequest]=useState<SchoolRequest>({name:"",town:"",programName:"Hockey",leagueId:""});
   const [players,setPlayers]=useState<ParentPlayer[]>([newPlayer()]); const [consentIndex,setConsentIndex]=useState(0); const [guardian,setGuardian]=useState(false);
   const [entry,setEntry]=useState(""); const [imported,setImported]=useState(false); const [children,setChildren]=useState<any[]>([]);
   const [matchedInvitation,setMatchedInvitation]=useState("");

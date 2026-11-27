@@ -12,13 +12,19 @@ export function registerSchoolLeagueManagement(app: Express, service: SchoolLeag
     try { res.json(await work(req, await authenticate(req)) ?? { saved: true }); }
     catch (error) {
       const known = error instanceof OnboardingError || error instanceof ParentSecurityError;
-      res.status(known ? error.status : error instanceof ZodError ? 400 : 503).json({
-        code: known ? error.code : error instanceof ZodError ? "INVALID_SCHOOL_LEAGUE_INPUT" : "SCHOOL_LEAGUE_UNAVAILABLE",
+      const duplicate = (error as { code?: string })?.code === "23505";
+      res.status(known ? error.status : duplicate ? 409 : error instanceof ZodError ? 400 : 503).json({
+        code: known ? error.code : duplicate ? "PROGRAM_ALREADY_EXISTS_FOR_SCHOOL" : error instanceof ZodError ? "INVALID_SCHOOL_LEAGUE_INPUT" : "SCHOOL_LEAGUE_UNAVAILABLE",
+        ...(error instanceof OnboardingError && error.code === "SCHOOL_STRUCTURE_UPDATE_REQUIRED" ? {
+          message: "The school and program database update has not been installed. Existing teams and permissions are unchanged.",
+        } : {}),
       });
     }
   };
   app.get(base, handle((r, a) => service.workspace(a, r.params.leagueId)));
+  app.post(`${base}/schools`, handle((r, a) => service.school(a, r.params.leagueId, r.body)));
   app.post(`${base}/programs`, handle((r, a) => service.program(a, r.params.leagueId, r.body)));
+  app.post(`${base}/programs/:id`, handle((r, a) => service.updateProgram(a, r.params.leagueId, r.params.id, r.body)));
   app.post(`${base}/teams`, handle((r, a) => service.team(a, r.params.leagueId, r.body)));
   app.post(`${base}/invitations`, handle((r, a) => service.invitation(a, r.params.leagueId, r.body)));
   app.post(`${base}/staff/:id/decision`, handle((r, a) => service.staffDecision(a, r.params.leagueId, r.params.id, r.body)));

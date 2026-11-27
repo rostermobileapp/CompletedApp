@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
-  schoolInvitationInput, schoolProgramInput, schoolScheduleImportInput,
+  schoolInvitationInput, schoolInput, schoolProgramInput, schoolProgramUpdateInput, schoolScheduleImportInput,
   schoolSchedulePreviewInput, schoolTeamInput, type SchoolLeagueWorkspace,
 } from "../shared/schoolLeagueManagement";
 import { OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
@@ -44,15 +44,34 @@ export class SchoolLeagueManagement extends StaffBase {
     if (!team) throw new OnboardingError("TEAM_LEAGUE_MISMATCH", 403);
     return team;
   }
+  private async schoolAccess(db: ParentTransaction, actor: OnboardingActor, schoolId: string) {
+    const [school] = (await db.query(`SELECT s.id,s.name,s.town FROM hs_onboarding.schools s
+      WHERE s.id=$1 AND (s.created_by=$2 OR EXISTS (
+        SELECT 1 FROM hs_onboarding.programs p JOIN public.leagues l ON l.id=p.league_id::text
+        WHERE p.school_id=s.id AND l.commissioner_id=$2::text AND l.league_type IN('high_school','youth')
+      )) FOR SHARE OF s`, [schoolId, actor.authId])).rows;
+    if (!school) throw new OnboardingError("SCHOOL_ACCESS_FORBIDDEN", 403);
+    return school;
+  }
   async workspace(actor: OnboardingActor, leagueId: string): Promise<SchoolLeagueWorkspace> {
     return this.transaction(async db => {
       const league = await this.owner(db, actor, leagueId);
-      const programs = (await db.query("SELECT id,name,town,status FROM hs_onboarding.programs WHERE league_id=$1 ORDER BY name", [leagueId])).rows;
+      if (!(await db.query("SELECT to_regclass('hs_onboarding.schools') AS installed")).rows[0]?.installed)
+        throw new OnboardingError("SCHOOL_STRUCTURE_UPDATE_REQUIRED", 503);
+      const schools = (await db.query(`SELECT s.id,s.name,s.town FROM hs_onboarding.schools s
+        WHERE s.created_by=$1 OR EXISTS (SELECT 1 FROM hs_onboarding.programs p
+          JOIN public.leagues l ON l.id=p.league_id::text WHERE p.school_id=s.id
+          AND l.commissioner_id=$1::text AND l.league_type IN('high_school','youth'))
+        ORDER BY s.name,s.town,s.id`, [actor.authId])).rows;
+      const programs = (await db.query(`SELECT p.id,p.name,coalesce(s.town,p.town) AS town,p.status,p.school_id AS "schoolId"
+        FROM hs_onboarding.programs p LEFT JOIN hs_onboarding.schools s ON s.id=p.school_id
+        WHERE p.league_id=$1 ORDER BY s.name,p.name`, [leagueId])).rows;
       const teams = (await db.query(`SELECT t.id,t.name,t.program_id AS "programId" FROM hs_onboarding.teams t
         JOIN hs_onboarding.programs p ON p.id=t.program_id WHERE p.league_id=$1 ORDER BY p.name,t.name`, [leagueId])).rows;
-      const staffRequests = (await db.query(`SELECT r.id,r.auth_id AS "authId",r.role,p.name AS school,t.name AS "teamName",
+      const staffRequests = (await db.query(`SELECT r.id,r.auth_id AS "authId",r.role,coalesce(s.name,p.name) AS school,t.name AS "teamName",
         coalesce(nullif(trim(concat(u.raw_user_meta_data->>'first_name',' ',u.raw_user_meta_data->>'last_name')),''),'Staff applicant') AS name
         FROM hs_onboarding.staff_requests r JOIN hs_onboarding.programs p ON p.id=r.program_id
+        LEFT JOIN hs_onboarding.schools s ON s.id=p.school_id
         JOIN auth.users u ON u.id=r.auth_id LEFT JOIN hs_onboarding.teams t ON t.id=r.team_id
         WHERE p.league_id=$1 AND r.status='pending' ORDER BY r.created_at LIMIT 200`, [leagueId])).rows;
       const parentRequests = (await db.query(`SELECT r.id,r.auth_id AS "parentAuthId",r.team_id AS "teamId",
@@ -64,17 +83,40 @@ export class SchoolLeagueManagement extends StaffBase {
         e.starts_at AS "startsAt",e.status FROM hs_onboarding.staff_events e
         JOIN hs_onboarding.teams t ON t.id=e.team_id JOIN hs_onboarding.programs p ON p.id=t.program_id
         WHERE p.league_id=$1 AND e.deleted_at IS NULL ORDER BY e.starts_at LIMIT 500`, [leagueId])).rows;
-      return { actorId: actor.authId, league, programs, teams, staffRequests, parentRequests, events };
+      return { actorId: actor.authId, league, schools, programs, teams, staffRequests, parentRequests, events };
+    });
+  }
+  async school(actor: OnboardingActor, leagueId: string, input: unknown) {
+    const data = schoolInput.parse(input);
+    return this.transaction(async db => {
+      await this.owner(db, actor, leagueId);
+      const id = randomUUID();
+      await db.query("INSERT INTO hs_onboarding.schools(id,name,town,created_by) VALUES($1,$2,$3,$4)",
+        [id, data.name, data.town, actor.authId]);
+      return { saved: true, id };
     });
   }
   async program(actor: OnboardingActor, leagueId: string, input: unknown) {
     const data = schoolProgramInput.parse(input);
     return this.transaction(async db => {
       const league = await this.owner(db, actor, leagueId);
+      const school = await this.schoolAccess(db, actor, data.schoolId);
       await db.query("INSERT INTO hs_onboarding.leagues(id,name) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET name=excluded.name", [leagueId, league.name]);
       const id = randomUUID();
-      await db.query(`INSERT INTO hs_onboarding.programs(id,league_id,name,town,status,requested_by,approved_by)
-        VALUES($1,$2,$3,$4,'approved',$5,$5)`, [id, leagueId, data.name, data.town, actor.authId]);
+      await db.query(`INSERT INTO hs_onboarding.programs(id,league_id,school_id,name,town,status,requested_by,approved_by)
+        VALUES($1,$2,$3,$4,$5,'approved',$6,$6)`, [id, leagueId, school.id, data.name, school.town, actor.authId]);
+      return { saved: true, id };
+    });
+  }
+  async updateProgram(actor: OnboardingActor, leagueId: string, id: string, input: unknown) {
+    z.string().uuid().parse(id);
+    const data = schoolProgramUpdateInput.parse(input);
+    return this.transaction(async db => {
+      await this.owner(db, actor, leagueId);
+      const school = await this.schoolAccess(db, actor, data.schoolId);
+      const updated = await db.query(`UPDATE hs_onboarding.programs SET school_id=$3,name=$4,town=$5
+        WHERE id=$1 AND league_id=$2 RETURNING id`, [id, leagueId, school.id, data.name, school.town]);
+      if (!updated.rows.length) throw new OnboardingError("PROGRAM_LEAGUE_MISMATCH", 403);
       return { saved: true, id };
     });
   }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import express from "express";
+import { readFile } from "node:fs/promises";
 import { createStaffFixture } from "./helpers/highSchoolStaffFixture";
 import { SchoolLeagueManagement } from "../schoolLeagueManagement";
 import { registerSchoolLeagueManagement } from "../schoolLeagueManagementHttp";
@@ -20,6 +21,9 @@ test("school league owner manages real teams and invitations without acquiring a
     const foreignLeague = randomUUID();
     await pool.query("INSERT INTO hs_onboarding.leagues(id,name) VALUES($1,'Other league')", [foreignLeague]);
     await pool.query("UPDATE hs_onboarding.programs SET league_id=$2 WHERE id=$1", [ids.foreignProgram, foreignLeague]);
+    const migration = await readFile("migrations/0060_school_program_separation.sql", "utf8");
+    await pool.query(migration);
+    await pool.query(migration);
     const app = express();app.use(express.json());
     registerSchoolLeagueManagement(app, service, async req => {
       if (req.get("authorization") !== "Bearer synthetic-adult-session") throw Object.assign(new Error("Denied"), { code: "INVALID_SESSION" });
@@ -27,24 +31,91 @@ test("school league owner manages real teams and invitations without acquiring a
     });
     server = app.listen(0, "127.0.0.1");await new Promise<void>(resolve => server!.once("listening", resolve));
     const origin = `http://127.0.0.1:${(server.address() as any).port}`;
-    let team: { id: string; teamCode: string }, school: { id: string };
-    await t.test("real HTTP creates a program, canonical team and secret code, without an AD membership", async () => {
+    let team: { id: string; teamCode: string }, school: { id: string }, program: { id: string };
+    await t.test("migration preserves existing programs, teams, memberships and private storage", async () => {
+      const legacy = (await service.workspace(a.league, leagueId)).programs.find(row => row.id === ids.program)!;
+      assert.equal(legacy.schoolId, ids.program);assert.equal(legacy.name, "program");
+      assert.equal((await pool.query("SELECT program_id FROM hs_onboarding.teams WHERE id=$1", [ids.varsity])).rows[0].program_id, ids.program);
+      assert.equal((await pool.query("SELECT status FROM public.team_memberships WHERE user_id=$1 AND team_id=$2", [a.head.authId, ids.varsity])).rows[0].status, "approved");
+      const privacy = (await pool.query(`SELECT relrowsecurity,
+        has_table_privilege('anon','hs_onboarding.schools','SELECT') AS anon,
+        has_table_privilege('authenticated','hs_onboarding.schools','SELECT') AS authenticated
+        FROM pg_class WHERE oid='hs_onboarding.schools'::regclass`)).rows[0];
+      assert.deepEqual(privacy, { relrowsecurity: true, anon: false, authenticated: false });
+    });
+    await t.test("real HTTP creates a school, separate program, canonical team and secret code without an AD membership", async () => {
       const before = (await pool.query("SELECT count(*)::int AS n FROM public.team_memberships WHERE user_id=$1", [a.league.authId])).rows[0].n;
-      let response = await fetch(`${origin}/api/high-school/leagues/${leagueId}/management/programs`, {
+      let response = await fetch(`${origin}/api/high-school/leagues/${leagueId}/management/schools`, {
         method: "POST", headers: { authorization: "Bearer synthetic-adult-session", "content-type": "application/json" },
         body: JSON.stringify({ name: "New School", town: "Fixture Town" }),
       });
       assert.equal(response.status, 200);assert.equal(response.headers.get("cache-control"), "private, no-store");
       school = await response.json() as any;
-      team = await service.team(a.league, leagueId, { programId: school.id, name: "New School Varsity" });
+      response = await fetch(`${origin}/api/high-school/leagues/${leagueId}/management/programs`, {
+        method: "POST", headers: { authorization: "Bearer synthetic-adult-session", "content-type": "application/json" },
+        body: JSON.stringify({ name: "Hockey", schoolId: school.id }),
+      });
+      assert.equal(response.status, 200); program = await response.json() as any;
+      assert.notEqual(program.id, school.id);
+      team = await service.team(a.league, leagueId, { programId: program.id, name: "New School Varsity" });
       assert.match(team.teamCode, /^[0-9A-F]{16}$/);
       const record = (await pool.query("SELECT * FROM hs_onboarding.teams WHERE id=$1", [team.id])).rows[0];
       assert.equal(record.code_digest, parentDigest(team.teamCode));assert.notEqual(record.code_digest, team.teamCode);
       const canonical = (await pool.query("SELECT * FROM public.teams WHERE id=$1", [team.id])).rows[0];
-      assert.equal(canonical.league_id, leagueId);assert.equal(canonical.program_id, school.id);
+      assert.equal(canonical.league_id, leagueId);assert.equal(canonical.program_id, program.id);
       assert.equal((await pool.query("SELECT count(*)::int AS n FROM public.team_memberships WHERE user_id=$1", [a.league.authId])).rows[0].n, before);
       const workspace = await service.workspace(a.league, leagueId);
       assert.ok(workspace.teams.some(row => row.id === team.id));assert.ok(!JSON.stringify(workspace).includes(team.teamCode));
+    });
+    await t.test("one school has multiple programs and a program has three independent teams", async () => {
+      await service.team(a.league, leagueId, { programId: program.id, name: "JV" });
+      await service.team(a.league, leagueId, { programId: program.id, name: "Freshman" });
+      const other = await service.program(a.league, leagueId, { schoolId: school.id, name: "Girls Hockey" });
+      let workspace = await service.workspace(a.league, leagueId);
+      assert.equal(workspace.programs.filter(row => row.schoolId === school.id).length, 2);
+      assert.equal(workspace.teams.filter(row => row.programId === program.id).length, 3);
+      await service.updateProgram(a.league, leagueId, other.id, { schoolId: school.id, name: "Girls Varsity Hockey" });
+      workspace = await service.workspace(a.league, leagueId);
+      assert.equal(workspace.programs.find(row => row.id === other.id)?.name, "Girls Varsity Hockey");
+      const duplicate = await fetch(`${origin}/api/high-school/leagues/${leagueId}/management/programs`, {
+        method: "POST", headers: { authorization: "Bearer synthetic-adult-session", "content-type": "application/json" },
+        body: JSON.stringify({ name: "hockey", schoolId: school.id }),
+      });
+      assert.equal(duplicate.status, 409);
+    });
+    await t.test("school reuse across owned leagues does not share teams or grant foreign program access", async () => {
+      const secondLeague = randomUUID();
+      await pool.query("INSERT INTO public.leagues(id,name,league_type,commissioner_id) VALUES($1,'Youth league','youth',$2)", [secondLeague, a.league.authId]);
+      const shared = await service.program(a.league, secondLeague, { schoolId: school.id, name: "Hockey" });
+      const workspace = await service.workspace(a.league, secondLeague);
+      assert.ok(workspace.schools.some(row => row.id === school.id));
+      assert.ok(workspace.programs.some(row => row.id === shared.id));
+      assert.ok(!workspace.programs.some(row => row.id === program.id));
+      assert.ok(!workspace.teams.some(row => row.id === team.id));
+      await reject(service.program(a.league, leagueId, { schoolId: ids.foreignProgram, name: "Stolen" }), "SCHOOL_ACCESS_FORBIDDEN");
+      await reject(service.updateProgram(a.league, leagueId, ids.foreignProgram, { schoolId: school.id, name: "Stolen" }), "PROGRAM_LEAGUE_MISMATCH");
+      await reject(service.updateProgram(a.outsider, leagueId, program.id, { schoolId: school.id, name: "Stolen" }), "LEAGUE_MANAGEMENT_FORBIDDEN");
+    });
+    await t.test("legacy programs can be renamed and explicitly relinked without changing staff, children or teams", async () => {
+      const before = (await pool.query("SELECT id,team_id,user_id,child_profile_id,role,status FROM public.team_memberships ORDER BY id")).rows;
+      await service.updateProgram(a.league, leagueId, ids.program, { schoolId: school.id, name: "Legacy Hockey" });
+      const after = (await pool.query("SELECT id,team_id,user_id,child_profile_id,role,status FROM public.team_memberships ORDER BY id")).rows;
+      assert.deepEqual(after, before);
+      assert.equal((await pool.query("SELECT program_id FROM hs_onboarding.teams WHERE id=$1", [ids.varsity])).rows[0].program_id, ids.program);
+      const legacy = (await service.workspace(a.league, leagueId)).programs.find(row => row.id === ids.program)!;
+      assert.equal(legacy.schoolId, school.id);assert.equal(legacy.name, "Legacy Hockey");
+    });
+    await t.test("staff school requests save distinct school and program records but grant no access", async () => {
+      const intake = new HighSchoolOnboarding(pool, new HighSchoolParentSecurity(pool));
+      const state = await intake.state(a.manager);
+      await intake.save(a.manager, { kind: "staff", revision: state.revision, role: "head_coach",
+        newSchool: { name: "Requested School", town: "Requested Town", programName: "Requested Hockey", leagueId } });
+      const [record] = (await pool.query(`SELECT p.name,p.status,s.name AS school,s.town FROM hs_onboarding.programs p
+        JOIN hs_onboarding.schools s ON s.id=p.school_id WHERE p.requested_by=$1 AND p.name='Requested Hockey'`, [a.manager.authId])).rows;
+      assert.deepEqual(record, { name: "Requested Hockey", status: "pending", school: "Requested School", town: "Requested Town" });
+      const result = await intake.catalog(a.manager, "Requested School");
+      assert.equal(result.programs.length, 1);assert.equal(result.programs[0].name, "Requested Hockey");
+      assert.equal(result.programs[0].schoolName, "Requested School");
     });
     await t.test("global commissioner labels, cross-league targets and revoked sessions do not grant ownership", async () => {
       await pool.query("UPDATE public.users SET role='commissioner' WHERE id=$1", [a.outsider.authId]);

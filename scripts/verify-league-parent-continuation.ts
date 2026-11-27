@@ -27,6 +27,7 @@ let browser:any,server:any,backendServer:any,created=0,denied=false,leagueAttemp
 const createdTypes:string[]=[];
 const calls:{path:string;service:string}[]=[];
 try {
+  await pool.query(await readFile("migrations/0060_school_program_separation.sql", "utf8"));
   await pool.query(`
     ALTER TABLE public.teams ADD COLUMN league_id varchar;
     CREATE TABLE hs_parent_security.grants(token_digest text PRIMARY KEY,auth_id uuid,session_id uuid,purpose text,expires_at timestamptz,consumed boolean DEFAULT false);
@@ -128,15 +129,37 @@ try {
   assert.equal(created,1);
    assert.equal(mail.length,0);
    assert.equal(new URL(page.url()).pathname,"/league-management");
-   await page.getByLabel("Program or school name",{exact:true}).fill("Fixture School");
+   await page.getByLabel("School name",{exact:true}).fill("Fixture School");
    await page.getByLabel("Town",{exact:true}).fill("Fixture Town");
-   await page.getByRole("button",{name:"Submit program",exact:true}).click();
-   await page.getByLabel("New team name for Fixture School",{exact:true}).fill("Fixture Varsity");
+   await page.getByRole("button",{name:"Add school",exact:true}).click();
+   await page.getByLabel("School",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
+   await page.getByLabel("Program name",{exact:true}).fill("Hockey");
+   await page.getByRole("button",{name:"Add program",exact:true}).click();
+   await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill("Fixture Varsity");
    await page.getByRole("button",{name:"Add team",exact:true}).click();
    await page.getByText("Fixture Varsity",{exact:true}).waitFor();
+   for (const name of ["Fixture JV", "Fixture Freshman"]) {
+     await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill(name);
+     await page.getByRole("button",{name:"Add team",exact:true}).click();
+     await page.getByText(name,{exact:true}).waitFor();
+   }
+   await page.getByLabel("Program name for Fixture School",{exact:true}).fill("Ice Hockey");
+   await page.getByRole("button",{name:"Save program",exact:true}).click();
+   await page.getByLabel("New team name for Fixture School Ice Hockey",{exact:true}).waitFor();
+   await page.getByLabel("School",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
+   await page.getByLabel("Program name",{exact:true}).fill("Girls Hockey");
+   await page.getByRole("button",{name:"Add program",exact:true}).click();
+   await page.getByLabel("New team name for Fixture School Girls Hockey",{exact:true}).waitFor();
+   const schoolRecord = (await pool.query("SELECT id FROM hs_onboarding.schools WHERE name='Fixture School'")).rows[0];
+   assert.equal((await pool.query("SELECT count(*)::int AS n FROM hs_onboarding.programs WHERE school_id=$1", [schoolRecord.id])).rows[0].n,2);
+   assert.equal((await pool.query(`SELECT count(*)::int AS n FROM hs_onboarding.teams t JOIN hs_onboarding.programs p ON p.id=t.program_id WHERE p.school_id=$1 AND p.name='Ice Hockey'`, [schoolRecord.id])).rows[0].n,3);
+   await page.setViewportSize({width:402,height:874});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
+   await page.screenshot({path:`${out}/school-hierarchy-phone.png`,fullPage:true});
+   await page.setViewportSize({width:1280,height:1000});
    await page.screenshot({path:`${out}/school-management.png`});
    await page.getByRole("button",{name:"Manage invitations",exact:true}).click();
-   await page.getByLabel("Team",{exact:true}).selectOption({label:"Fixture School — Fixture Varsity"});
+   await page.getByLabel("Team",{exact:true}).selectOption({label:"Fixture School / Ice Hockey / Fixture Varsity"});
    await page.getByLabel("Recipient email",{exact:true}).fill(fixture.actors.applicant.email);
    await page.getByRole("button",{name:"Create manual invitation",exact:true}).click();
    await page.getByText("One-time invitation",{exact:true}).waitFor();
@@ -163,7 +186,7 @@ try {
    await page.getByRole("status").filter({hasText:"Request approved"}).waitFor();
    assert.equal((await pool.query("SELECT role FROM public.team_memberships WHERE user_id=$1 AND role='head_coach'",[fixture.actors.applicant.authId])).rows.length,1);
    await page.getByRole("button",{name:"Schedule",exact:true}).click();
-   await page.getByLabel("Team",{exact:true}).selectOption({label:"Fixture School — Fixture Varsity"});
+   await page.getByLabel("Team",{exact:true}).selectOption({label:"Fixture School / Ice Hockey / Fixture Varsity"});
    await page.getByLabel("Or paste schedule text",{exact:true}).fill("title,startsAt,opponent,rink,address\nFixture match,2026-12-01T18:00:00-05:00,Opponent,Fixture Rink,Town");
    await page.getByRole("button",{name:"Preview schedule",exact:true}).click();
    await page.getByRole("button",{name:"Import 1 events",exact:true}).click();

@@ -7,7 +7,12 @@ export const schoolLeagueBase = (leagueId: string) => `/api/high-school/leagues/
 export function useSchoolLeagueWorkspace(leagueId: string, enabled = true) {
   return useQuery<SchoolLeagueWorkspace>({
     queryKey: schoolLeagueKey(leagueId), enabled: enabled && !!leagueId, retry: false, gcTime: 0,
-    queryFn: async ({ signal }) => (await apiRequest("GET", schoolLeagueBase(leagueId), undefined, signal)).json(),
+    queryFn: async ({ signal }) => {
+      const data = await (await apiRequest("GET", schoolLeagueBase(leagueId), undefined, signal)).json();
+      if (!Array.isArray(data.schools) || !Array.isArray(data.programs))
+        throw new Error("School and program management needs the matching backend and database update. Your existing records have not been changed.");
+      return data;
+    },
   });
 }
 export function useSchoolLeagueAction(leagueId: string) {

@@ -4,6 +4,7 @@ import { hsChoosePath, hsSaveDraft, hsTeamEntry, HS_CONSENT_VERSION, HS_MAX_FAMI
 import { HighSchoolParentSecurity, ParentSecurityError, parentDigest, type ParentActor, type ParentSql, type ParentTransaction } from "./highSchoolParentSecurity";
 import { requireProductionOnboardingTester } from "./productionOnboardingTests";
 import { independentChildSetupInstalled, saveIndependentChildProfiles } from "./highSchoolFamilyProfiles";
+import { schoolProgramPresentation } from "./schoolProgramPresentation";
 
 export class OnboardingError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
@@ -124,10 +125,11 @@ export class HighSchoolOnboarding {
   async catalog(actor: OnboardingActor, query: string) {
     await this.active(actor); this.fixture(actor);
     if (query.length>100) fail("INVALID_SEARCH");
-    const programs = (await this.pool.query(`SELECT p.id,p.name,p.town,p.status,p.league_id,
+    const school = await schoolProgramPresentation(this.pool);
+    const programs = (await this.pool.query(`SELECT p.id,p.name,${school.name} AS "schoolName",${school.town} AS town,p.status,p.league_id,
       coalesce((SELECT json_agg(json_build_object('id',t.id,'name',t.name)) FROM hs_onboarding.teams t WHERE t.program_id=p.id),'[]') AS teams
-      FROM hs_onboarding.programs p WHERE (p.status='approved' OR p.requested_by=$1)
-      AND position(lower($2) in lower(p.name||' '||p.town))>0 ORDER BY p.name LIMIT 30`, [actor.authId,query])).rows;
+      FROM hs_onboarding.programs p ${school.join} WHERE (p.status='approved' OR p.requested_by=$1)
+      AND position(lower($2) in lower(${school.name}||' '||p.name||' '||${school.town}))>0 ORDER BY p.name LIMIT 30`, [actor.authId,query])).rows;
     const leagues = (await this.pool.query("SELECT id,name FROM hs_onboarding.leagues ORDER BY name LIMIT 30")).rows;
     return {programs,leagues};
   }
@@ -168,8 +170,19 @@ export class HighSchoolOnboarding {
         if(!["head_coach","athletic_director"].includes(data.role)) fail("SCHOOL_CREATION_ROLE_REQUIRED",403);
         if(!(await tx.query("SELECT 1 FROM hs_onboarding.leagues WHERE id=$1",[data.newSchool.leagueId])).rows.length) fail("UNKNOWN_LEAGUE");
         const programId=randomUUID();
-        await tx.query("INSERT INTO hs_onboarding.programs(id,league_id,name,town,status,requested_by) VALUES($1,$2,$3,$4,'pending',$5)",
-          [programId,data.newSchool.leagueId,data.newSchool.name,data.newSchool.town,actor.authId]);
+        const separated = !!(await tx.query("SELECT to_regclass('hs_onboarding.schools') AS installed")).rows[0]?.installed;
+        if (separated) {
+          const schoolId = randomUUID();
+          await tx.query("INSERT INTO hs_onboarding.schools(id,name,town,created_by) VALUES($1,$2,$3,$4)",
+            [schoolId,data.newSchool.name,data.newSchool.town,actor.authId]);
+          await tx.query(`INSERT INTO hs_onboarding.programs(id,league_id,school_id,name,town,status,requested_by)
+            VALUES($1,$2,$3,$4,$5,'pending',$6)`,
+          [programId,data.newSchool.leagueId,schoolId,data.newSchool.programName,data.newSchool.town,actor.authId]);
+        } else {
+          // Compatibility while the separately approved migration rolls out.
+          await tx.query("INSERT INTO hs_onboarding.programs(id,league_id,name,town,status,requested_by) VALUES($1,$2,$3,$4,'pending',$5)",
+            [programId,data.newSchool.leagueId,data.newSchool.name,data.newSchool.town,actor.authId]);
+        }
         const id=randomUUID();
         await tx.query("INSERT INTO hs_onboarding.staff_requests(id,auth_id,program_id,team_id,role) VALUES($1,$2,$3,NULL,$4)",[id,actor.authId,programId,data.role]);
         await tx.query("UPDATE hs_onboarding.flows SET status='waiting_approval',draft=$2,revision=revision+1,updated_at=now() WHERE auth_id=$1",
@@ -304,9 +317,11 @@ export class HighSchoolOnboarding {
   }
   async approvals(actor:OnboardingActor){
     await this.active(actor);this.fixture(actor);
+    const school = await schoolProgramPresentation(this.pool);
     if (this.staffDecisions && await this.staffDecisions.installed()) {
-      return (await this.pool.query(`SELECT r.id,r.role,r.status,p.name AS school
+      return (await this.pool.query(`SELECT r.id,r.role,r.status,${school.name} AS school,p.name AS "programName"
         FROM hs_onboarding.staff_requests r JOIN hs_onboarding.programs p ON p.id=r.program_id
+        ${school.join}
         WHERE r.status='pending' AND r.auth_id<>$1 AND (
           EXISTS(SELECT 1 FROM hs_onboarding.league_approvers a WHERE a.auth_id=$1 AND a.league_id=p.league_id)
           OR EXISTS(SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
@@ -316,8 +331,9 @@ export class HighSchoolOnboarding {
               AND r.role IN('assistant_coach','team_manager')))))
         ORDER BY r.created_at LIMIT 50`,[actor.authId])).rows;
     }
-    return (await this.pool.query(`SELECT r.id,r.role,r.status,p.name AS school
+    return (await this.pool.query(`SELECT r.id,r.role,r.status,${school.name} AS school,p.name AS "programName"
       FROM hs_onboarding.staff_requests r JOIN hs_onboarding.programs p ON p.id=r.program_id
+      ${school.join}
       WHERE r.status='pending' AND r.auth_id<>$1 AND (
         EXISTS(SELECT 1 FROM hs_onboarding.league_approvers a WHERE a.auth_id=$1 AND a.league_id=p.league_id)
         OR EXISTS(SELECT 1 FROM hs_onboarding.staff_requests a WHERE a.auth_id=$1 AND a.program_id=r.program_id AND a.status='approved'

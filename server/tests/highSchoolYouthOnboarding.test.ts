@@ -298,7 +298,7 @@ test("an already redeemed request cannot mint another session", async () => {
   const service = new HighSchoolChildDevices(db, approvedParent, true);
   await assert.rejects(service.poll({ requestId: id(3), requestToken: "a".repeat(43) }), (e: any) => e.code === "DEVICE_REQUEST_ALREADY_USED");
 });
-test("all schema tables stay private and no migration is added to production", () => {
+test("child-device schema tables stay private and all school response bodies stay out of logs", () => {
   const sql = readFileSync("scripts/dev-only/high-school-youth-onboarding.sql", "utf8");
   assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
   assert.match(sql, /REVOKE ALL ON ALL TABLES IN SCHEMA hs_onboarding/);
@@ -306,5 +306,5 @@ test("all schema tables stay private and no migration is added to production", (
   const auth = readFileSync("server/supabaseAuth.ts", "utf8");
   assert.match(auth, /new HighSchoolChildDevices\(pool, parent, false\)/);
   const logs = readFileSync("server/index.ts", "utf8");
-  assert.ok(logs.includes("!path.startsWith('/api/high-school/child-device/')"));
+  assert.ok(logs.includes("!path.startsWith('/api/high-school/')"));
 });
