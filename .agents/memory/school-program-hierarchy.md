@@ -17,3 +17,21 @@ grant access to another league's teams. Do not automatically merge historical
 schools by matching names or replace existing team/staff/player identities.
 Existing program-scoped permissions do not become school-wide authority merely
 because two programs share a school.
+
+## Scoped editing permissions
+
+League administrators cannot edit team lines or message players through their
+league-admin authority. Coaches cannot edit league settings and are restricted
+to their own teams. Both coaches and league administrators can change player
+eligibility within their authorized scope.
+
+**Why:** The owner explicitly specified these editing boundaries on November
+27, 2026. A higher organizational role does not automatically inherit every
+lower-level operational permission.
+
+**How to apply:** Enforce separate capabilities on server reads and writes as
+well as visible controls. Do not grant team coaching or player-chat access just
+because an actor owns the league. Preserve independent parent-child rights;
+the league-admin restriction does not revoke a parent's own private child chat.
+The precedence between a league eligibility restriction and a coach's change
+needs an explicit policy decision before implementing overrides.
