@@ -149,6 +149,25 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
       : workspace.teams.length === 0
         ? "Create a team inside a program after selecting its school."
         : "Add another school, program, or seasonal team as your league grows.";
+  const currentSetupStage: "school" | "program" | "team" | "complete" =
+    workspace.schools.length === 0
+      ? "school"
+      : workspace.programs.length === 0
+        ? "program"
+        : workspace.teams.length === 0
+          ? "team"
+          : "complete";
+  const setupState = (stage: "school" | "program" | "team") =>
+    currentSetupStage === stage ? "current" : currentSetupStage === "complete" || (
+      (stage === "school" && workspace.schools.length > 0) ||
+      (stage === "program" && workspace.programs.length > 0) ||
+      (stage === "team" && workspace.teams.length > 0)
+    ) ? "complete" : "upcoming";
+  const setupStateClass = (state: string) => state === "current"
+    ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+    : state === "complete"
+      ? "border-primary/25 bg-primary/5"
+      : "border-border bg-card";
 
   return <main className="min-h-[70dvh] bg-background px-4 pb-16 pt-5 text-foreground sm:px-6 lg:px-8">
     <div className="mx-auto max-w-7xl">
@@ -182,7 +201,18 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
 
       {pane === "overview" && <section className="mt-6 space-y-5">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {statItems.map(([label, value]) => <div key={label} className="rounded-xl bg-card hairline elev-rest p-4"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs font-medium text-muted-foreground">{label}</p></div>)}
+          {statItems.map(([label, value]) => {
+            const stage = label === "Schools" ? "school" : label === "Programs" ? "program" : label === "Teams" ? "team" : null;
+            const state = stage ? setupState(stage) : null;
+            return <div key={label} data-testid={stage ? `setup-count-${stage}` : undefined} data-state={state || undefined} aria-current={state === "current" ? "step" : undefined}
+              className={`rounded-xl bg-card hairline elev-rest p-4 ${stage ? setupStateClass(state!) : ""}`}>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-2xl font-semibold">{value}</p>
+                {state === "current" ? <span className="rounded-full bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">Current step</span> : state === "complete" ? <span className="text-xs font-semibold text-primary">Complete</span> : null}
+              </div>
+              <p className="mt-1 text-xs font-medium text-muted-foreground">{label}</p>
+            </div>;
+          })}
         </div>
         <section aria-labelledby="setup-order-heading" className="rounded-xl border border-border bg-muted p-5 sm:p-6" data-testid="league-setup-guidance">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -192,8 +222,8 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">The league is already created. Build beneath it in order: add a school, create a program for that school, then add seasonal teams inside the program.</p>
             </div>
             <div className="shrink-0 rounded-lg border border-border bg-card px-3 py-2 text-sm">
-              <span className="font-semibold">Next step</span>
-              <p className="mt-0.5 max-w-xs text-muted-foreground">{nextSetupAction}</p>
+              <span className="font-semibold">{currentSetupStage === "complete" ? "Initial setup complete" : "Next step"}</span>
+              <p className="mt-0.5 max-w-xs text-muted-foreground">{currentSetupStage === "complete" ? "Your first school, program, and team are in place. Add more as the league grows." : nextSetupAction}</p>
             </div>
           </div>
           <ol className="mt-5 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4" aria-label="League organization setup order">
@@ -202,18 +232,18 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
               <span className="mt-1 block font-semibold">{workspace.league.name}</span>
               <span className="mt-1 block text-xs text-muted-foreground">League</span>
             </li>
-            <li className="rounded-lg border border-border bg-card p-3">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 1</span>
+            <li data-testid="setup-step-school" data-state={setupState("school")} aria-current={setupState("school") === "current" ? "step" : undefined} className={`rounded-lg border p-3 ${setupStateClass(setupState("school"))}`}>
+              <span className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Step 1</span>{setupState("school") === "current" ? <span className="text-primary">Current step</span> : setupState("school") === "complete" ? <span className="text-primary">Complete</span> : null}</span>
               <span className="mt-1 block font-semibold">Add a school</span>
               <span className="mt-1 block text-xs text-muted-foreground">Shared school identity</span>
             </li>
-            <li className="rounded-lg border border-border bg-card p-3">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2</span>
+            <li data-testid="setup-step-program" data-state={setupState("program")} aria-current={setupState("program") === "current" ? "step" : undefined} className={`rounded-lg border p-3 ${setupStateClass(setupState("program"))}`}>
+              <span className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Step 2</span>{setupState("program") === "current" ? <span className="text-primary">Current step</span> : setupState("program") === "complete" ? <span className="text-primary">Complete</span> : null}</span>
               <span className="mt-1 block font-semibold">Add a program</span>
               <span className="mt-1 block text-xs text-muted-foreground">Choose its school</span>
             </li>
-            <li className="rounded-lg border border-border bg-card p-3">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3</span>
+            <li data-testid="setup-step-team" data-state={setupState("team")} aria-current={setupState("team") === "current" ? "step" : undefined} className={`rounded-lg border p-3 ${setupStateClass(setupState("team"))}`}>
+              <span className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Step 3</span>{setupState("team") === "current" ? <span className="text-primary">Current step</span> : setupState("team") === "complete" ? <span className="text-primary">Complete</span> : null}</span>
               <span className="mt-1 block font-semibold">Create a team</span>
               <span className="mt-1 block text-xs text-muted-foreground">Inside the selected program, for a season</span>
             </li>
@@ -256,7 +286,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
 
         <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
           <section className="space-y-5" aria-label="School and program setup forms">
-            <section className={cardClass}>
+            <section data-state={setupState("school")} className={`${cardClass} ${setupState("school") === "current" ? "border border-primary/35 bg-primary/5" : ""}`}>
               <SectionTitle eyebrow="Step 1" title="Add a school" detail="Schools you own or administer can be reused across your leagues." />
               <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/schools", { name: schoolName.trim(), town: schoolTown.trim() }, "School added.", () => { setSchoolName(""); setSchoolTown(""); }); }}>
                 <Field label="School name"><input className={inputClass} value={schoolName} onChange={event => setSchoolName(event.target.value)} required maxLength={100} placeholder="e.g. Northview High School" /></Field>
@@ -264,7 +294,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
                 <button className={primaryButton} disabled={action.isPending || !schoolName.trim() || !schoolTown.trim()}>Add school</button>
               </form>
             </section>
-            <section className={cardClass}>
+            <section data-state={setupState("program")} className={`${cardClass} ${setupState("program") === "current" ? "border border-primary/35 bg-primary/5" : ""}`}>
               <SectionTitle eyebrow="Step 2" title="Add a program" detail="Select the school first. Programs keep boys’ and girls’ hockey operations distinct; create teams inside a program in Step 3." />
               {!workspace.schools.length ? <p className="mt-5 rounded-lg bg-muted p-4 text-sm text-muted-foreground">Add a school first to create a program.</p> : <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/programs", { name: programName.trim(), schoolId: programSchoolId }, "Program created.", () => { setProgramName(""); setProgramSchoolId(""); }); }}>
                 <Field label="School"><select className={inputClass} value={programSchoolId} onChange={event => setProgramSchoolId(event.target.value)} required><option value="">Select a school</option>{workspace.schools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.town}</option>)}</select></Field>
@@ -296,7 +326,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
                     </form>
                     {teamsByProgram.get(program.id)?.length ? <div className="mt-3 flex flex-wrap gap-2">{teamsByProgram.get(program.id)!.map(team => <span key={team.id} className="rounded-md border border-border px-3 py-1.5 text-xs">{team.name}</span>)}</div> : <p className="mt-3 text-xs text-muted-foreground">No teams in this program.</p>}
                     <div className="mt-4 rounded-lg border border-border bg-muted/50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3 · Team in {program.name}</p>
+                      <p className={`rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide ${setupState("team") === "current" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>Step 3 · Team in {program.name}{setupState("team") === "current" ? " · Current step" : setupState("team") === "complete" ? " · Complete" : ""}</p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">This program already belongs to {school.name}. Add a competitive roster for its season here.</p>
                       <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={event => { event.preventDefault(); if (!teamName.trim() || programId !== program.id) return; void runAction("/teams", { programId: program.id, name: teamName.trim() }, "Team created.", result => { setTeamName(""); setOneTime(result.teamCode ? { teamCode: result.teamCode } : null); }); }}>
                         <input className={inputClass} aria-label={`New team name for ${school.name} ${program.name}`} placeholder="e.g. Varsity Gold (2026–27)" value={programId === program.id ? teamName : ""} onFocus={() => setProgramId(program.id)} onChange={event => { setProgramId(program.id); setTeamName(event.target.value); }} required maxLength={100} />

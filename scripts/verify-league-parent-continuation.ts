@@ -130,7 +130,21 @@ try {
    assert.equal(mail.length,0);
    assert.equal(new URL(page.url()).pathname,"/league-management");
    const setupGuide=page.getByTestId("league-setup-guidance");
+   const expectSetupStage=async(current:"school"|"program"|"team"|"complete")=>{
+     const stages=["school","program","team"] as const;
+     for(const [index,stage] of stages.entries()){
+       const state=current===stage?"current":current==="complete"||index<stages.indexOf(current as typeof stages[number])?"complete":"upcoming";
+       for(const kind of ["count","step"]){
+         const tile=page.getByTestId(`setup-${kind}-${stage}`);
+         await page.waitForFunction(({id,state})=>document.querySelector(`[data-testid="${id}"]`)?.getAttribute("data-state")===state,
+           {id:`setup-${kind}-${stage}`,state});
+         assert.equal(await tile.getAttribute("aria-current"),state==="current"?"step":null);
+       }
+     }
+   };
    await setupGuide.getByRole("heading",{name:"Your organization has four levels",exact:true}).waitFor();
+   await expectSetupStage("school");
+   await page.getByTestId("setup-count-school").locator("..").screenshot({path:`${out}/setup-current-school.png`});
    await setupGuide.getByText("Add a school to begin your organization.",{exact:true}).waitFor();
    assert.equal(await page.getByRole("button",{name:"Add team",exact:true}).count(),0);
    const counts=async()=> (await pool.query(`SELECT
@@ -157,17 +171,31 @@ try {
    await page.setViewportSize({width:1280,height:1000});
    await page.getByLabel("School name",{exact:true}).fill("Fixture School");
    await page.getByLabel("Town",{exact:true}).fill("Fixture Town");
+   await expectSetupStage("school");
    await page.getByRole("button",{name:"Add school",exact:true}).click();
    await setupGuide.getByText("Add a program to one of your schools.",{exact:true}).waitFor();
+   await expectSetupStage("program");
+   await page.getByTestId("setup-count-program").locator("..").screenshot({path:`${out}/setup-current-program.png`});
    assert.equal(await page.getByRole("button",{name:"Add team",exact:true}).count(),0);
    await page.getByLabel("School",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
    await page.getByLabel("Program name",{exact:true}).fill("Hockey");
+   await page.route("**/management/programs",route=>route.fulfill({status:500,contentType:"application/json",
+     body:JSON.stringify({code:"SYNTHETIC_PROGRAM_FAILURE",message:"Synthetic program creation failed."})}),{times:1});
+   await page.getByRole("button",{name:"Add program",exact:true}).click();
+   await page.getByRole("alert").filter({hasText:"Synthetic program creation failed."}).waitFor();
+   await expectSetupStage("program");
    await page.getByRole("button",{name:"Add program",exact:true}).click();
    await setupGuide.getByText("Create a team inside a program after selecting its school.",{exact:true}).waitFor();
+   await expectSetupStage("team");
+   await page.getByTestId("setup-count-team").locator("..").screenshot({path:`${out}/setup-current-team.png`});
    await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill("Fixture Varsity");
    await page.getByRole("button",{name:"Add team",exact:true}).click();
    await page.getByText("Fixture Varsity",{exact:true}).waitFor();
-   await setupGuide.getByText("Add another school, program, or seasonal team as your league grows.",{exact:true}).waitFor();
+   await expectSetupStage("complete");
+   await setupGuide.getByText("Initial setup complete",{exact:true}).waitFor();
+   await page.getByTestId("setup-count-team").locator("..").screenshot({path:`${out}/setup-complete.png`});
+   await page.reload();
+   await expectSetupStage("complete");
    for (const name of ["Fixture JV", "Fixture Freshman"]) {
      await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill(name);
      await page.getByRole("button",{name:"Add team",exact:true}).click();
