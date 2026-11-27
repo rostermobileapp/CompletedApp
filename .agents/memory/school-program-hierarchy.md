@@ -78,3 +78,19 @@ whether coaches could reverse a league administrator's eligibility decision.
 eligible only when neither applies; clearing either restriction must not erase
 the other. Playing eligibility is not parental consent, roster approval, or
 device access and must not silently change any of them.
+
+## School deletion consent
+
+Allow deleting a school that has programs and teams, rather than requiring it
+to be emptied first. Require a warning that all linked programs and teams will
+also be deleted and explicit confirmation of the affected scope.
+
+**Why:** The owner explicitly rejected blocking deletion of populated schools.
+Organizational deletion is not revocation of a child's identity, login or
+private parent-child communication.
+
+**How to apply:** Remove the linked structure from active use and revoke its
+team access, but preserve account, guardian, device and independent family-chat
+records. Retain internal history anchors where physical cascades would destroy
+those records. Never use one league's ownership to delete another owner's
+shared school structure.

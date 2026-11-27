@@ -30,7 +30,7 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
   const adult = a.applicant;
   let grant = "", first = player(), second = player("Jamie");
   try {
-    await pool.query(`ALTER TABLE public.users ADD COLUMN onboarding_completed boolean DEFAULT false, ADD COLUMN date_of_birth varchar;
+    await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS onboarding_completed boolean DEFAULT false, ADD COLUMN IF NOT EXISTS date_of_birth varchar;
       CREATE TABLE hs_parent_security.grants(token_digest text PRIMARY KEY,auth_id uuid,session_id uuid,purpose text,expires_at timestamptz,consumed boolean DEFAULT false);
       CREATE TABLE hs_parent_security.audit(auth_id uuid,session_id uuid,event text,created_at timestamptz DEFAULT now());
       CREATE TABLE hs_parent_security.challenges(id uuid PRIMARY KEY,auth_id uuid,session_id uuid,purpose text,code_digest text,expires_at timestamptz,
@@ -43,6 +43,9 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
       await db.query(await readFile("scripts/dev-only/high-school-family-setup.sql", "utf8"));
     } finally { db.release(); }
     await pool.query("UPDATE public.users SET onboarding_completed=true,date_of_birth='1990-01-01' WHERE id=$1", [adult.authId]);
+    // The shared staff fixture now supplies adult DOBs. This negative case
+    // deliberately exercises missing DOB, independently of fixture defaults.
+    await pool.query("UPDATE public.users SET date_of_birth=NULL WHERE id=$1",[a.head.authId]);
     await pool.query("UPDATE hs_onboarding.flows SET path='player',block_legacy=false,draft=$2 WHERE auth_id=$1", [adult.authId, { untouchedAdult: true }]);
     await pool.query("INSERT INTO hs_onboarding.contexts(auth_id,hockey_type,journey) VALUES($1,'adult',$2)", [adult.authId, { original: "player profile" }]);
     const adultTeam = randomUUID();
@@ -164,7 +167,7 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
     await t.test("legacy adult IDs and invitation-backed consent use canonical authority and atomic writes", async () => {
       const actor = { authId: randomUUID(), sessionId: randomUUID(), email: "legacy-family@example.com", fixture: true, emailVerified: true };
       const adultId = `legacy-${randomUUID()}`;
-      await pool.query("INSERT INTO auth.users VALUES($1,$2,now(),$3,'{}')", [actor.authId, actor.email, { synthetic_high_school_onboarding_dev: true }]);
+      await pool.query("INSERT INTO auth.users(id,email,email_confirmed_at,raw_app_meta_data,raw_user_meta_data) VALUES($1,$2,now(),$3,'{}')", [actor.authId, actor.email, { synthetic_high_school_onboarding_dev: true }]);
       await pool.query("INSERT INTO auth.sessions VALUES($1,$2,NULL)", [actor.sessionId, actor.authId]);
       await pool.query("INSERT INTO public.users(id,email,first_name,last_name,onboarding_completed,date_of_birth) VALUES($1,$2,'Legacy','Fixture',true,'1990-01-01')", [adultId, actor.email]);
       await pool.query("INSERT INTO public.team_memberships(user_id,team_id,role,status) VALUES($1,$2,'player','approved')", [adultId, adultTeam]);

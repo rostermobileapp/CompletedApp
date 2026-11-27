@@ -7,6 +7,19 @@ export const schoolLeagueNameInput = z.object({
   expectedName: z.string().min(1).max(200),
 }).strict();
 export const schoolInput = z.object({ name, town: name }).strict();
+export const schoolUpdateInput = schoolInput.extend({
+  expectedName: z.string().min(1).max(100), expectedTown: z.string().min(1).max(100),
+}).strict();
+export const schoolDeleteInput = z.object({
+  expectedName: z.string().min(1).max(100), expectedTown: z.string().min(1).max(100),
+  programIds: z.array(z.string().uuid()).max(10000),
+  teamIds: z.array(z.string().uuid()).max(10000),
+  confirmation: z.string().min(1).max(100),
+}).strict();
+export interface SchoolDeletionPreview {
+  school: { id: string; name: string; town: string };
+  programCount: number; teamCount: number; programIds: string[]; teamIds: string[];
+}
 export const schoolProgramInput = z.object({ name, schoolId: z.string().uuid() }).strict();
 export const schoolProgramUpdateInput = schoolProgramInput;
 export const schoolTeamInput = z.object({ programId: z.string().uuid(), name }).strict();
@@ -27,7 +40,7 @@ export const schoolScheduleImportInput = z.object({
 export interface SchoolLeagueWorkspace {
   actorId: string;
   league: { id: string; name: string; leagueType: "high_school" | "youth" };
-  schools: { id: string; name: string; town: string }[];
+  schools: { id: string; name: string; town: string; canEdit: boolean; canDelete: boolean; deleteBlockedReason?: string }[];
   programs: { id: string; name: string; town: string; status: string; schoolId: string | null }[];
   teams: { id: string; name: string; programId: string }[];
   staffRequests: { id: string; authId: string; name: string; role: StaffRole; school: string; teamName: string | null }[];

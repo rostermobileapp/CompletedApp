@@ -12,6 +12,7 @@ import { HighSchoolFamilyReview } from "./highSchoolFamilySetup";
 import { previewEvents } from "./highSchoolStaffImports";
 import { StaffBase } from "./highSchoolStaffBase";
 import { SchoolPlayerEligibilityService } from "./schoolPlayerEligibility";
+import { deleteSchool, requireSchoolStructure, schoolDeletionPreview, updateSchool } from "./schoolStructureManagement";
 
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 const decision = z.object({ approve: z.boolean() }).strict();
@@ -55,6 +56,24 @@ export class SchoolLeagueManagement extends StaffBase {
       return { saved: true };
     });
   }
+  async updateSchool(actor: OnboardingActor, leagueId: string, id: string, input: unknown) {
+    return this.transaction(async db => {
+      await this.owner(db, actor, leagueId);
+      return updateSchool(db, actor, id, input);
+    });
+  }
+  async schoolDeletionPreview(actor: OnboardingActor, leagueId: string, id: string) {
+    return this.transaction(async db => {
+      await this.owner(db, actor, leagueId);
+      return schoolDeletionPreview(db, actor, id);
+    });
+  }
+  async deleteSchool(actor: OnboardingActor, leagueId: string, id: string, input: unknown) {
+    return this.transaction(async db => {
+      await this.owner(db, actor, leagueId);
+      return deleteSchool(db, actor, id, input);
+    });
+  }
   private async target(db: ParentTransaction, leagueId: string, teamId: string) {
     z.string().uuid().parse(teamId);
     const [team] = (await db.query(`SELECT t.id,t.program_id FROM hs_onboarding.teams t
@@ -67,7 +86,7 @@ export class SchoolLeagueManagement extends StaffBase {
   }
   private async schoolAccess(db: ParentTransaction, actor: OnboardingActor, schoolId: string) {
     const [school] = (await db.query(`SELECT s.id,s.name,s.town FROM hs_onboarding.schools s
-      WHERE s.id=$1 AND (s.created_by=$2 OR EXISTS (
+      WHERE s.id=$1 AND s.deleted_at IS NULL AND (s.created_by=$2 OR EXISTS (
         SELECT 1 FROM hs_onboarding.programs p JOIN public.leagues l ON l.id=p.league_id::text
         WHERE p.school_id=s.id AND l.commissioner_id=$2::text AND l.league_type IN('high_school','youth')
       )) FOR SHARE OF s`, [schoolId, actor.authId])).rows;
@@ -79,31 +98,40 @@ export class SchoolLeagueManagement extends StaffBase {
       const league = await this.owner(db, actor, leagueId);
       if (!(await db.query("SELECT to_regclass('hs_onboarding.schools') AS installed")).rows[0]?.installed)
         throw new OnboardingError("SCHOOL_STRUCTURE_UPDATE_REQUIRED", 503);
-      const schools = (await db.query(`SELECT s.id,s.name,s.town FROM hs_onboarding.schools s
-        WHERE s.created_by=$1 OR EXISTS (SELECT 1 FROM hs_onboarding.programs p
+      await requireSchoolStructure(db);
+      const schools = (await db.query(`SELECT s.id,s.name,s.town,
+        NOT EXISTS(SELECT 1 FROM hs_onboarding.programs p LEFT JOIN public.leagues l ON l.id=p.league_id::text
+          WHERE p.school_id=s.id AND p.deleted_at IS NULL AND l.commissioner_id IS DISTINCT FROM $1::text) AS "canEdit",
+        NOT EXISTS(SELECT 1 FROM hs_onboarding.programs p LEFT JOIN public.leagues l ON l.id=p.league_id::text
+          WHERE p.school_id=s.id AND p.deleted_at IS NULL AND l.commissioner_id IS DISTINCT FROM $1::text) AS "canDelete"
+        FROM hs_onboarding.schools s
+        WHERE s.deleted_at IS NULL AND (s.created_by=$1::uuid OR EXISTS (SELECT 1 FROM hs_onboarding.programs p
           JOIN public.leagues l ON l.id=p.league_id::text WHERE p.school_id=s.id
-          AND l.commissioner_id=$1::text AND l.league_type IN('high_school','youth'))
+          AND p.deleted_at IS NULL AND l.commissioner_id=$1::text AND l.league_type IN('high_school','youth')))
         ORDER BY s.name,s.town,s.id`, [actor.authId])).rows;
+      for(const school of schools) if(!school.canDelete)
+        school.deleteBlockedReason="This school is shared with a league you do not administer.";
       const programs = (await db.query(`SELECT p.id,p.name,coalesce(s.town,p.town) AS town,p.status,p.school_id AS "schoolId"
         FROM hs_onboarding.programs p LEFT JOIN hs_onboarding.schools s ON s.id=p.school_id
-        WHERE p.league_id=$1 ORDER BY s.name,p.name`, [leagueId])).rows;
+        WHERE p.league_id=$1 AND p.deleted_at IS NULL ORDER BY s.name,p.name`, [leagueId])).rows;
       const teams = (await db.query(`SELECT t.id,t.name,t.program_id AS "programId" FROM hs_onboarding.teams t
-        JOIN hs_onboarding.programs p ON p.id=t.program_id WHERE p.league_id=$1 ORDER BY p.name,t.name`, [leagueId])).rows;
+        JOIN hs_onboarding.programs p ON p.id=t.program_id
+        WHERE p.league_id=$1 AND p.deleted_at IS NULL AND t.deleted_at IS NULL ORDER BY p.name,t.name`, [leagueId])).rows;
       const staffRequests = (await db.query(`SELECT r.id,r.auth_id AS "authId",r.role,coalesce(s.name,p.name) AS school,t.name AS "teamName",
         coalesce(nullif(trim(concat(u.raw_user_meta_data->>'first_name',' ',u.raw_user_meta_data->>'last_name')),''),'Staff applicant') AS name
         FROM hs_onboarding.staff_requests r JOIN hs_onboarding.programs p ON p.id=r.program_id
         LEFT JOIN hs_onboarding.schools s ON s.id=p.school_id
         JOIN auth.users u ON u.id=r.auth_id LEFT JOIN hs_onboarding.teams t ON t.id=r.team_id
-        WHERE p.league_id=$1 AND r.status='pending' ORDER BY r.created_at LIMIT 200`, [leagueId])).rows;
+        WHERE p.league_id=$1 AND p.deleted_at IS NULL AND r.status='pending' ORDER BY r.created_at LIMIT 200`, [leagueId])).rows;
       const parentRequests = (await db.query(`SELECT r.id,r.auth_id AS "parentAuthId",r.team_id AS "teamId",
         r.details->>'firstName' AS "firstName",r.details->>'lastName' AS "lastName",t.name AS "teamName"
         FROM hs_onboarding.player_requests r JOIN hs_onboarding.teams t ON t.id=r.team_id
         JOIN hs_onboarding.programs p ON p.id=t.program_id
-        WHERE p.league_id=$1 AND r.status='pending_staff' ORDER BY r.consented_at LIMIT 200`, [leagueId])).rows;
+        WHERE p.league_id=$1 AND p.deleted_at IS NULL AND r.status='pending_staff' ORDER BY r.consented_at LIMIT 200`, [leagueId])).rows;
       const events = (await db.query(`SELECT e.id,e.team_id AS "teamId",t.name AS "teamName",e.title,e.opponent,
         e.starts_at AS "startsAt",e.status FROM hs_onboarding.staff_events e
         JOIN hs_onboarding.teams t ON t.id=e.team_id JOIN hs_onboarding.programs p ON p.id=t.program_id
-        WHERE p.league_id=$1 AND e.deleted_at IS NULL ORDER BY e.starts_at LIMIT 500`, [leagueId])).rows;
+        WHERE p.league_id=$1 AND p.deleted_at IS NULL AND e.deleted_at IS NULL ORDER BY e.starts_at LIMIT 500`, [leagueId])).rows;
       return { actorId: actor.authId, league, schools, programs, teams, staffRequests, parentRequests, events };
     });
   }
@@ -136,7 +164,7 @@ export class SchoolLeagueManagement extends StaffBase {
       await this.owner(db, actor, leagueId);
       const school = await this.schoolAccess(db, actor, data.schoolId);
       const updated = await db.query(`UPDATE hs_onboarding.programs SET school_id=$3,name=$4,town=$5
-        WHERE id=$1 AND league_id=$2 RETURNING id`, [id, leagueId, school.id, data.name, school.town]);
+        WHERE id=$1 AND league_id=$2 AND deleted_at IS NULL RETURNING id`, [id, leagueId, school.id, data.name, school.town]);
       if (!updated.rows.length) throw new OnboardingError("PROGRAM_LEAGUE_MISMATCH", 403);
       return { saved: true, id };
     });

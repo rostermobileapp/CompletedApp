@@ -127,8 +127,8 @@ export class HighSchoolOnboarding {
     if (query.length>100) fail("INVALID_SEARCH");
     const school = await schoolProgramPresentation(this.pool);
     const programs = (await this.pool.query(`SELECT p.id,p.name,${school.name} AS "schoolName",${school.town} AS town,p.status,p.league_id,
-      coalesce((SELECT json_agg(json_build_object('id',t.id,'name',t.name)) FROM hs_onboarding.teams t WHERE t.program_id=p.id),'[]') AS teams
-      FROM hs_onboarding.programs p ${school.join} WHERE (p.status='approved' OR p.requested_by=$1)
+      coalesce((SELECT json_agg(json_build_object('id',t.id,'name',t.name)) FROM hs_onboarding.teams t WHERE t.program_id=p.id AND ${school.teamActive}),'[]') AS teams
+      FROM hs_onboarding.programs p ${school.join} WHERE ${school.active} AND (p.status='approved' OR p.requested_by=$1)
       AND position(lower($2) in lower(${school.name}||' '||p.name||' '||${school.town}))>0 ORDER BY p.name LIMIT 30`, [actor.authId,query])).rows;
     const leagues = (await this.pool.query("SELECT id,name FROM hs_onboarding.leagues ORDER BY name LIMIT 30")).rows;
     return {programs,leagues};

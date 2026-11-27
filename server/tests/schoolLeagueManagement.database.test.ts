@@ -24,6 +24,7 @@ test("school league owner manages real teams and invitations without acquiring a
     const migration = await readFile("migrations/0060_school_program_separation.sql", "utf8");
     await pool.query(migration);
     await pool.query(migration);
+    await pool.query(await readFile("migrations/0063_school_structure_deletion.sql","utf8"));
     const app = express();app.use(express.json());
     registerSchoolLeagueManagement(app, service, async req => {
       if (req.get("authorization") !== "Bearer synthetic-adult-session") throw Object.assign(new Error("Denied"), { code: "INVALID_SESSION" });

@@ -18,6 +18,15 @@ export function registerSchoolLeagueManagement(app: Express, service: SchoolLeag
         ...(error instanceof OnboardingError && error.code === "LEAGUE_NAME_CHANGED_REFRESH_REQUIRED" ? {
           message: "The league name changed elsewhere. Reload the latest name before saving again.",
         } : {}),
+        ...(error instanceof OnboardingError && error.code === "SCHOOL_STRUCTURE_EDIT_UPDATE_REQUIRED" ? {
+          message:"The school editing and deletion database update must be installed before using this workspace.",
+        } : {}),
+        ...(error instanceof OnboardingError && error.code === "SCHOOL_STRUCTURE_CHANGED_REFRESH_REQUIRED" ? {
+          message:"The school or its linked programs and teams changed. Reload before saving or confirming deletion.",
+        } : {}),
+        ...(error instanceof OnboardingError && error.code === "SCHOOL_SHARED_WITH_OTHER_LEAGUES" ? {
+          message:"This school is shared with a league you do not administer. You cannot change or delete its shared structure.",
+        } : {}),
         ...(error instanceof OnboardingError && error.code === "SCHOOL_STRUCTURE_UPDATE_REQUIRED" ? {
           message: "The school and program database update has not been installed. Existing teams and permissions are unchanged.",
         } : {}),
@@ -30,6 +39,9 @@ export function registerSchoolLeagueManagement(app: Express, service: SchoolLeag
   app.post(`${base}/eligibility/:teamId/:playerId`, handle((r, a) =>
     service.setEligibility(a, r.params.leagueId, r.params.teamId, r.params.playerId, r.body)));
   app.post(`${base}/schools`, handle((r, a) => service.school(a, r.params.leagueId, r.body)));
+  app.post(`${base}/schools/:id`, handle((r, a) => service.updateSchool(a, r.params.leagueId, r.params.id, r.body)));
+  app.get(`${base}/schools/:id/deletion-preview`, handle((r, a) => service.schoolDeletionPreview(a, r.params.leagueId, r.params.id)));
+  app.post(`${base}/schools/:id/delete`, handle((r, a) => service.deleteSchool(a, r.params.leagueId, r.params.id, r.body)));
   app.post(`${base}/programs`, handle((r, a) => service.program(a, r.params.leagueId, r.body)));
   app.post(`${base}/programs/:id`, handle((r, a) => service.updateProgram(a, r.params.leagueId, r.params.id, r.body)));
   app.post(`${base}/teams`, handle((r, a) => service.team(a, r.params.leagueId, r.body)));

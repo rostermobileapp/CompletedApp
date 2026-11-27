@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useSchoolLeagueAction, useSchoolLeagueWorkspace } from "@/hooks/useSchoolLeagueManagement";
 import type { SchoolLeagueActionResult, SchoolLeagueWorkspace } from "@shared/schoolLeagueManagement";
 import { PlayerEligibilityPanel } from "@/components/PlayerEligibilityPanel";
+import { SchoolSetupWizard } from "@/components/league-management/SchoolSetupWizard";
 
 type Pane = "overview" | "people" | "schedule" | "eligibility";
 type SchedulePreview = { teamId: string; format: "csv" | "ical"; text: string; result: SchoolLeagueActionResult };
@@ -38,42 +39,28 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
   const [leagueNameDraft, setLeagueNameDraft] = useState("");
   const [leagueNameExpected, setLeagueNameExpected] = useState("");
   const [leagueNameConflict, setLeagueNameConflict] = useState(false);
-  const [schoolName, setSchoolName] = useState("");
-  const [schoolTown, setSchoolTown] = useState("");
-  const [programName, setProgramName] = useState("");
-  const [programSchoolId, setProgramSchoolId] = useState("");
-  const [editingProgram, setEditingProgram] = useState<{ id: string; name: string; schoolId: string } | null>(null);
-  const [teamName, setTeamName] = useState("");
-  const [programId, setProgramId] = useState("");
   const [inviteTeamId, setInviteTeamId] = useState("");
   const [inviteKind, setInviteKind] = useState<"staff" | "parent">("staff");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("head_coach");
   const [players, setPlayers] = useState([{ firstName: "", lastName: "", gradYear: String(new Date().getFullYear() + 4), position: "F", jerseyNumber: "" }]);
   const [oneTime, setOneTime] = useState<SchoolLeagueActionResult | null>(null);
+  const [teamInviteCode, setTeamInviteCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [scheduleTeamId, setScheduleTeamId] = useState("");
   const [scheduleFormat, setScheduleFormat] = useState<"csv" | "ical">("csv");
   const [scheduleText, setScheduleText] = useState("");
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
 
-  const teamsByProgram = useMemo(() => {
-    const map = new Map<string, SchoolLeagueWorkspace["teams"]>();
-    workspace?.teams.forEach(team => map.set(team.programId, [...(map.get(team.programId) || []), team]));
-    return map;
-  }, [workspace?.teams]);
-  const programsBySchool = useMemo(() => {
-    const map = new Map<string, SchoolLeagueWorkspace["programs"]>();
-    workspace?.programs.forEach(program => {
-      if (program.schoolId) map.set(program.schoolId, [...(map.get(program.schoolId) || []), program]);
-    });
-    return map;
-  }, [workspace?.programs]);
-  const unlinkedPrograms = workspace?.programs.filter(program => !program.schoolId) || [];
+  const changePane = (nextPane: Pane) => {
+    if (nextPane === pane) return;
+    setOneTime(null);
+    setPane(nextPane);
+  };
   const selectedScheduleTeam = workspace?.teams.some(team => team.id === scheduleTeamId) ? scheduleTeamId : "";
   const previewCurrent = !!preview && preview.teamId === selectedScheduleTeam && preview.format === scheduleFormat && preview.text === scheduleText;
 
-  const runAction = async (path: string, body: unknown, success: string, done?: (result: SchoolLeagueActionResult) => void) => {
+  const runAction = async (path: string, body: unknown, success: string, done?: (result: SchoolLeagueActionResult) => void, failed?: (error: unknown) => void) => {
     setCopied(false);
     setNotice("");
     setNoticeError(false);
@@ -85,8 +72,17 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
       const message = error instanceof Error ? error.message : "We couldn't save that change. Please try again.";
       setNotice(message);
       setNoticeError(true);
+      failed?.(error);
       if ((error as { data?: { code?: string } })?.data?.code === "LEAGUE_NAME_CHANGED_REFRESH_REQUIRED") setLeagueNameConflict(true);
     }
+  };
+  const reloadSchool = async (schoolId: string) => {
+    const refreshed = await workspaceQuery.refetch();
+    const school = refreshed.data?.schools.find(item => item.id === schoolId);
+    if (refreshed.isError || !school) {
+      throw refreshed.error || new Error("The latest school values could not be loaded. Please retry.");
+    }
+    return { name: school.name, town: school.town };
   };
   const openLeagueNameEditor = () => {
     setLeagueNameDraft(workspace?.league.name || "");
@@ -162,40 +158,6 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
 
   const staffRequests = workspace.staffRequests;
   const parentRequests = workspace.parentRequests;
-  const statItems = [
-    ["Schools", workspace.schools.length],
-    ["Programs", workspace.programs.length],
-    ["Teams", workspace.teams.length],
-    ["Staff requests", staffRequests.length],
-    ["Family requests", parentRequests.length],
-  ] as const;
-  const nextSetupAction = workspace.schools.length === 0
-    ? "Add a school to begin your organization."
-    : workspace.programs.length === 0
-      ? "Add a program to one of your schools."
-      : workspace.teams.length === 0
-        ? "Create a team inside a program after selecting its school."
-        : "Add another school, program, or seasonal team as your league grows.";
-  const currentSetupStage: "school" | "program" | "team" | "complete" =
-    workspace.schools.length === 0
-      ? "school"
-      : workspace.programs.length === 0
-        ? "program"
-        : workspace.teams.length === 0
-          ? "team"
-          : "complete";
-  const setupState = (stage: "school" | "program" | "team") =>
-    currentSetupStage === stage ? "current" : currentSetupStage === "complete" || (
-      (stage === "school" && workspace.schools.length > 0) ||
-      (stage === "program" && workspace.programs.length > 0) ||
-      (stage === "team" && workspace.teams.length > 0)
-    ) ? "complete" : "upcoming";
-  const setupStateClass = (state: string) => state === "current"
-    ? "border-primary bg-primary/10 ring-1 ring-primary/30"
-    : state === "complete"
-      ? "border-primary/25 bg-primary/5"
-      : "border-border bg-card";
-
   return <main className="min-h-[70dvh] bg-background px-4 pb-16 pt-5 text-foreground sm:px-6 lg:px-8">
     <div className="mx-auto max-w-7xl">
       <header className="rounded-xl bg-primary p-5 text-primary-foreground elev-rest sm:p-7">
@@ -240,7 +202,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
       </div>}
 
       <nav className="mt-5 flex gap-1 overflow-x-auto border-b border-border" aria-label="League management sections">
-        {(["overview", "people", "schedule", "eligibility"] as const).map(item => <button key={item} onClick={() => setPane(item)} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium capitalize ${pane === item ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+        {(["overview", "people", "schedule", "eligibility"] as const).map(item => <button key={item} onClick={() => changePane(item)} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium capitalize ${pane === item ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
           {item === "people" ? "People & requests" : item === "schedule" ? "Schedule" : item === "eligibility" ? "Eligibility" : "Overview"}
         </button>)}
       </nav>
@@ -252,167 +214,18 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
         <button className={`${secondaryButton} mt-3`} onClick={() => void copyInvitation()}>{copied ? "Copied" : "Copy code"}</button>
       </section>}
 
-      {pane === "overview" && <section className="mt-6 space-y-5">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {statItems.map(([label, value]) => {
-            const stage = label === "Schools" ? "school" : label === "Programs" ? "program" : label === "Teams" ? "team" : null;
-            const state = stage ? setupState(stage) : null;
-            return <div key={label} data-testid={stage ? `setup-count-${stage}` : undefined} data-state={state || undefined} aria-current={state === "current" ? "step" : undefined}
-              className={`rounded-xl bg-card hairline elev-rest p-4 ${stage ? setupStateClass(state!) : ""}`}>
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-2xl font-semibold">{value}</p>
-                {state === "current" ? <span className="rounded-full bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">Current step</span> : state === "complete" ? <span className="text-xs font-semibold text-primary">Complete</span> : null}
-              </div>
-              <p className="mt-1 text-xs font-medium text-muted-foreground">{label}</p>
-            </div>;
-          })}
-        </div>
-        <section aria-labelledby="setup-order-heading" className="rounded-xl border border-border bg-muted p-5 sm:p-6" data-testid="league-setup-guidance">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">League setup</p>
-              <h2 id="setup-order-heading" className="mt-1 text-lg font-semibold">Your organization has four levels</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">The league is already created. Build beneath it in order: add a school, create a program for that school, then add seasonal teams inside the program.</p>
-            </div>
-            <div className="shrink-0 rounded-lg border border-border bg-card px-3 py-2 text-sm">
-              <span className="font-semibold">{currentSetupStage === "complete" ? "Initial setup complete" : "Next step"}</span>
-              <p className="mt-0.5 max-w-xs text-muted-foreground">{currentSetupStage === "complete" ? "Your first school, program, and team are in place. Add more as the league grows." : nextSetupAction}</p>
-            </div>
-          </div>
-          <ol className="mt-5 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4" aria-label="League organization setup order">
-            <li className="rounded-lg border border-border bg-card p-3">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Already created</span>
-              <span className="mt-1 block font-semibold">{workspace.league.name}</span>
-              <span className="mt-1 block text-xs text-muted-foreground">League</span>
-            </li>
-            <li data-testid="setup-step-school" data-state={setupState("school")} aria-current={setupState("school") === "current" ? "step" : undefined} className={`rounded-lg border p-3 ${setupStateClass(setupState("school"))}`}>
-              <span className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Step 1</span>{setupState("school") === "current" ? <span className="text-primary">Current step</span> : setupState("school") === "complete" ? <span className="text-primary">Complete</span> : null}</span>
-              <span className="mt-1 block font-semibold">Add a school</span>
-              <span className="mt-1 block text-xs text-muted-foreground">Shared school identity</span>
-            </li>
-            <li data-testid="setup-step-program" data-state={setupState("program")} aria-current={setupState("program") === "current" ? "step" : undefined} className={`rounded-lg border p-3 ${setupStateClass(setupState("program"))}`}>
-              <span className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Step 2</span>{setupState("program") === "current" ? <span className="text-primary">Current step</span> : setupState("program") === "complete" ? <span className="text-primary">Complete</span> : null}</span>
-              <span className="mt-1 block font-semibold">Add a program</span>
-              <span className="mt-1 block text-xs text-muted-foreground">Choose its school</span>
-            </li>
-            <li data-testid="setup-step-team" data-state={setupState("team")} aria-current={setupState("team") === "current" ? "step" : undefined} className={`rounded-lg border p-3 ${setupStateClass(setupState("team"))}`}>
-              <span className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Step 3</span>{setupState("team") === "current" ? <span className="text-primary">Current step</span> : setupState("team") === "complete" ? <span className="text-primary">Complete</span> : null}</span>
-              <span className="mt-1 block font-semibold">Create a team</span>
-              <span className="mt-1 block text-xs text-muted-foreground">Inside the selected program, for a season</span>
-            </li>
-          </ol>
-          <details className="mt-4 rounded-lg border border-border bg-card" data-testid="league-setup-example-disclosure">
-            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-              View an example organization and what each level means
-            </summary>
-            <div className="border-t border-border px-4 py-4">
-              <p className="text-sm font-medium">Illustrative hierarchy</p>
-              <ul className="mt-3 space-y-2 text-sm leading-6">
-                <li><span className="font-semibold">League:</span> Greater Cleveland High School Hockey League (GCHSHL)
-                  <ul className="ml-5 mt-1 space-y-2 border-l border-border pl-4">
-                    <li><span className="font-semibold">School:</span> St. Ignatius High School
-                      <ul className="ml-5 mt-1 space-y-2 border-l border-border pl-4">
-                        <li><span className="font-semibold">Program:</span> St. Ignatius Boys’ Ice Hockey
-                          <ul className="ml-5 mt-1 space-y-1 text-muted-foreground">
-                            <li>Team: Varsity Gold (2026–27)</li>
-                            <li>Team: Varsity Blue (2026–27)</li>
-                            <li>Team: Junior Varsity (2026–27)</li>
-                          </ul>
-                        </li>
-                        <li><span className="font-semibold">Program:</span> St. Ignatius Girls’ Ice Hockey (if applicable)
-                          <ul className="ml-5 mt-1 space-y-1 text-muted-foreground">
-                            <li>Team: Girls’ Varsity (2026–27)</li>
-                          </ul>
-                        </li>
-                      </ul>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
-              <div className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
-                <p>One school represents a shared identity, such as its logo, colors, home rink, and athletic director. This organizational guidance does not add or configure those settings.</p>
-                <p>Programs distinguish organizational contexts such as boys’ and girls’ coaching staffs, program leadership, budgets, booster information, history, and roster pipelines. Teams are competitive rosters within a program for a particular season.</p>
-              </div>
-            </div>
-          </details>
-        </section>
-
-        <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
-          <section className="space-y-5" aria-label="School and program setup forms">
-            <section data-state={setupState("school")} className={`${cardClass} ${setupState("school") === "current" ? "border border-primary/35 bg-primary/5" : ""}`}>
-              <SectionTitle eyebrow="Step 1" title="Add a school" detail="Schools you own or administer can be reused across your leagues." />
-              <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/schools", { name: schoolName.trim(), town: schoolTown.trim() }, "School added.", () => { setSchoolName(""); setSchoolTown(""); }); }}>
-                <Field label="School name"><input className={inputClass} value={schoolName} onChange={event => setSchoolName(event.target.value)} required maxLength={100} placeholder="e.g. Northview High School" /></Field>
-                <Field label="Town"><input className={inputClass} value={schoolTown} onChange={event => setSchoolTown(event.target.value)} required maxLength={100} placeholder="Town or city" /></Field>
-                <button className={primaryButton} disabled={action.isPending || !schoolName.trim() || !schoolTown.trim()}>Add school</button>
-              </form>
-            </section>
-            <section data-state={setupState("program")} className={`${cardClass} ${setupState("program") === "current" ? "border border-primary/35 bg-primary/5" : ""}`}>
-              <SectionTitle eyebrow="Step 2" title="Add a program" detail="Select the school first. Programs keep boys’ and girls’ hockey operations distinct; create teams inside a program in Step 3." />
-              {!workspace.schools.length ? <p className="mt-5 rounded-lg bg-muted p-4 text-sm text-muted-foreground">Add a school first to create a program.</p> : <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/programs", { name: programName.trim(), schoolId: programSchoolId }, "Program created.", () => { setProgramName(""); setProgramSchoolId(""); }); }}>
-                <Field label="School"><select className={inputClass} value={programSchoolId} onChange={event => setProgramSchoolId(event.target.value)} required><option value="">Select a school</option>{workspace.schools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.town}</option>)}</select></Field>
-                <Field label="Program name"><input className={inputClass} value={programName} onChange={event => setProgramName(event.target.value)} required maxLength={100} placeholder="e.g. Boys’ Ice Hockey" /></Field>
-                <button className={primaryButton} disabled={action.isPending || !programName.trim() || !programSchoolId}>Add program</button>
-              </form>}
-            </section>
-          </section>
-
-          <section className={cardClass}>
-            <div className="flex flex-wrap items-end justify-between gap-3"><SectionTitle eyebrow="Organization" title="Schools, programs & teams" detail="Teams are created only within an existing program under its school." /><button className={secondaryButton} onClick={() => setPane("people")}>Manage invitations</button></div>
-            {!workspace.schools.length && !workspace.programs.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-6 text-center"><p className="font-medium">No schools yet</p><p className="mt-1 text-sm text-muted-foreground">Add a school to begin building this league.</p></div> : <div className="mt-5 space-y-4">
-              {workspace.schools.map(school => <article key={school.id} className="rounded-xl border border-border bg-background p-4 sm:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
-                  <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">School</p><h3 className="mt-1 text-lg font-semibold">{school.name}</h3><p className="mt-1 text-sm text-muted-foreground">{school.town}</p></div>
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{programsBySchool.get(school.id)?.length || 0} programs in this league</span>
-                </div>
-                {programsBySchool.get(school.id)?.length ? <div className="mt-4 space-y-3">
-                  {programsBySchool.get(school.id)!.map(program => <article key={program.id} className="rounded-lg bg-card p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-medium text-muted-foreground">Program</p><h4 className="font-semibold">{program.name}</h4><p className="mt-1 text-xs text-muted-foreground">{program.town}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs capitalize text-muted-foreground">{program.status.replace(/_/g, " ")}</span></div>
-                    <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={event => { event.preventDefault(); if (!editingProgram || editingProgram.id !== program.id || !editingProgram.name.trim() || !editingProgram.schoolId) return; void runAction(`/programs/${encodeURIComponent(program.id)}`, { name: editingProgram.name.trim(), schoolId: editingProgram.schoolId }, "Program updated.", () => setEditingProgram(null)); }}>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <input className={inputClass} aria-label={`Program name for ${school.name}`} value={editingProgram?.id === program.id ? editingProgram.name : program.name} onChange={event => setEditingProgram({ id: program.id, name: event.target.value, schoolId: editingProgram?.id === program.id ? editingProgram.schoolId : (program.schoolId || school.id) })} required maxLength={100} />
-                        <select className={inputClass} aria-label={`School for ${program.name}`} value={editingProgram?.id === program.id ? editingProgram.schoolId : school.id} onChange={event => setEditingProgram({ id: program.id, name: editingProgram?.id === program.id ? editingProgram.name : program.name, schoolId: event.target.value })}>
-                          {workspace.schools.map(option => <option key={option.id} value={option.id}>{option.name} · {option.town}</option>)}
-                        </select>
-                      </div>
-                      <button className={secondaryButton} type="submit" disabled={action.isPending || editingProgram?.id !== program.id || !editingProgram.name.trim()}>Save program</button>
-                    </form>
-                    {teamsByProgram.get(program.id)?.length ? <div className="mt-3 flex flex-wrap gap-2">{teamsByProgram.get(program.id)!.map(team => <span key={team.id} className="rounded-md border border-border px-3 py-1.5 text-xs">{team.name}</span>)}</div> : <p className="mt-3 text-xs text-muted-foreground">No teams in this program.</p>}
-                    <div className="mt-4 rounded-lg border border-border bg-muted/50 p-3">
-                      <p className={`rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide ${setupState("team") === "current" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>Step 3 · Team in {program.name}{setupState("team") === "current" ? " · Current step" : setupState("team") === "complete" ? " · Complete" : ""}</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">This program already belongs to {school.name}. Add a competitive roster for its season here.</p>
-                      <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={event => { event.preventDefault(); if (!teamName.trim() || programId !== program.id) return; void runAction("/teams", { programId: program.id, name: teamName.trim() }, "Team created.", result => { setTeamName(""); setOneTime(result.teamCode ? { teamCode: result.teamCode } : null); }); }}>
-                        <input className={inputClass} aria-label={`New team name for ${school.name} ${program.name}`} placeholder="e.g. Varsity Gold (2026–27)" value={programId === program.id ? teamName : ""} onFocus={() => setProgramId(program.id)} onChange={event => { setProgramId(program.id); setTeamName(event.target.value); }} required maxLength={100} />
-                        <button className={secondaryButton} type="submit" disabled={action.isPending || !teamName.trim() || programId !== program.id}>Add team</button>
-                      </form>
-                    </div>
-                  </article>)}
-                </div> : <p className="mt-4 rounded-lg bg-muted p-4 text-sm text-muted-foreground">This school has no programs in this league yet. You can reuse the school in another league without exposing that league’s teams here.</p>}
-              </article>)}
-              {unlinkedPrograms.length > 0 && <section className="rounded-xl border border-dashed border-border p-4 sm:p-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Needs school link</p><h3 className="mt-1 font-semibold">Unlinked programs</h3><p className="mt-1 text-sm text-muted-foreground">Choose a school to repair each program’s hierarchy. Existing teams stay with their program.</p>
-                <div className="mt-4 space-y-3">{unlinkedPrograms.map(program => <article key={program.id} className="rounded-lg bg-background hairline p-4">
-                  <p className="mb-3 font-medium">{program.name} <span className="text-sm font-normal text-muted-foreground">· No school linked</span></p>
-                  <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={event => { event.preventDefault(); if (!editingProgram || editingProgram.id !== program.id || !editingProgram.name.trim() || !editingProgram.schoolId) return; void runAction(`/programs/${encodeURIComponent(program.id)}`, { name: editingProgram.name.trim(), schoolId: editingProgram.schoolId }, "Program linked to school.", () => setEditingProgram(null)); }}>
-                    <div className="grid gap-2 sm:grid-cols-2"><input className={inputClass} aria-label={`Program name for ${program.name}`} value={editingProgram?.id === program.id ? editingProgram.name : program.name} onChange={event => setEditingProgram({ id: program.id, name: event.target.value, schoolId: editingProgram?.id === program.id ? editingProgram.schoolId : "" })} required maxLength={100} />
-                      <select className={inputClass} aria-label={`School for ${program.name}`} value={editingProgram?.id === program.id ? editingProgram.schoolId : ""} onChange={event => setEditingProgram({ id: program.id, name: editingProgram?.id === program.id ? editingProgram.name : program.name, schoolId: event.target.value })} required><option value="">Select a school</option>{workspace.schools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.town}</option>)}</select></div>
-                    <button className={secondaryButton} type="submit" disabled={action.isPending || !(editingProgram?.id === program.id && editingProgram.name.trim() && editingProgram.schoolId)}>Save program</button>
-                  </form>
-                </article>)}</div>
-              </section>}
-            </div>}
-          </section>
-        </div>
-        <section className={cardClass}>
-          <div className="flex flex-wrap items-end justify-between gap-3"><SectionTitle eyebrow="Coming up" title="League schedule" /><button className={secondaryButton} onClick={() => setPane("schedule")}>Import schedule</button></div>
-          {workspace.events.length ? <div className="mt-4 divide-y divide-border">{workspace.events.slice(0, 5).map(event => <div key={event.id} className="flex flex-col justify-between gap-1 py-3 sm:flex-row sm:items-center"><div><p className="font-medium">{event.title}{event.opponent ? <span className="font-normal text-muted-foreground"> · {event.opponent}</span> : null}</p><p className="mt-1 text-xs text-muted-foreground">{event.teamName} · {formatDate(event.startsAt)}</p></div><span className="w-fit rounded-full bg-muted px-2.5 py-1 text-xs capitalize text-muted-foreground">{event.status}</span></div>)}</div> : <p className="mt-4 rounded-lg bg-muted p-5 text-center text-sm text-muted-foreground">No schedule events yet. Choose a team and preview a schedule file to get started.</p>}
-        </section>
-      </section>}
-
+      {pane === "overview" && <SchoolSetupWizard
+        workspace={workspace}
+        isPending={action.isPending}
+        runAction={runAction}
+        onReloadSchool={reloadSchool}
+        teamInviteCode={teamInviteCode}
+        onTeamCreated={result => setTeamInviteCode(result.teamCode || "")}
+      />}
       {pane === "people" && <section className="mt-6 grid gap-5 lg:grid-cols-[.9fr_1.1fr]">
         <section className={cardClass}>
           <SectionTitle eyebrow="Invite people" title="Create an invitation" detail="Invitations are delivered manually. Copy the one-time invitation and share it with the recipient; no email is sent." />
-          {!workspace.teams.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-5 text-center"><p className="font-medium">Create a program and team first</p><button className={`${secondaryButton} mt-3`} onClick={() => setPane("overview")}>Go to organization setup</button></div> : <form className="mt-5 space-y-4" onSubmit={event => {
+          {!workspace.teams.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-5 text-center"><p className="font-medium">Create a program and team first</p><button className={`${secondaryButton} mt-3`} onClick={() => changePane("overview")}>Go to organization setup</button></div> : <form className="mt-5 space-y-4" onSubmit={event => {
             event.preventDefault();
             if (!workspace.teams.some(team => team.id === inviteTeamId)) return;
             const body = inviteKind === "staff"
@@ -465,7 +278,7 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
       {pane === "schedule" && <section className="mt-6 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
         <section className={cardClass}>
           <SectionTitle eyebrow="Season calendar" title="Import a team schedule" detail="Preview every row before import. Nothing is saved until a clean preview is confirmed." />
-          {!workspace.teams.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-5 text-center"><p className="font-medium">A team is needed before scheduling</p><button className={`${secondaryButton} mt-3`} onClick={() => setPane("overview")}>Create a program and team</button></div> : <div className="mt-5 space-y-4">
+          {!workspace.teams.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-5 text-center"><p className="font-medium">A team is needed before scheduling</p><button className={`${secondaryButton} mt-3`} onClick={() => changePane("overview")}>Create a program and team</button></div> : <div className="mt-5 space-y-4">
             <Field label="Team"><select className={inputClass} value={scheduleTeamId} onChange={event => changeSchedule("team", event.target.value)} required><option value="">Select a team</option>{workspace.teams.map(team => { const program = workspace.programs.find(item => item.id === team.programId); const school = workspace.schools.find(item => item.id === program?.schoolId); return <option key={team.id} value={team.id}>{school ? `${school.name} / ` : "Unlinked school / "}{program?.name || "Program"} / {team.name}</option>; })}</select></Field>
             <Field label="File format"><select className={inputClass} value={scheduleFormat} onChange={event => changeSchedule("format", event.target.value)}><option value="csv">CSV</option><option value="ical">iCalendar (.ics)</option></select></Field>
             {scheduleFormat === "csv" ? <p className="rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">Required CSV headers: <code className="font-mono">title, startsAt</code>. Optional: <code className="font-mono">opponent, rink, address</code>. Include a timezone offset in each start time, for example <code className="font-mono">2026-10-12T18:30:00-04:00</code>.</p> : <p className="rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">iCalendar must contain timed events with UTC <code className="font-mono">DTSTART</code>. Local/TZID, all-day, and recurring events need to be expanded or exported as UTC timed events first.</p>}

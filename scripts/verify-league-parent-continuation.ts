@@ -28,6 +28,7 @@ const createdTypes:string[]=[];
 const calls:{path:string;service:string}[]=[];
 try {
   await pool.query(await readFile("migrations/0060_school_program_separation.sql", "utf8"));
+  await pool.query(await readFile("migrations/0063_school_structure_deletion.sql", "utf8"));
   await pool.query(`
     ALTER TABLE public.teams ADD COLUMN league_id varchar;
     CREATE TABLE hs_parent_security.grants(token_digest text PRIMARY KEY,auth_id uuid,session_id uuid,purpose text,expires_at timestamptz,consumed boolean DEFAULT false);
@@ -147,73 +148,73 @@ try {
    await page.getByRole("heading",{name:"Renamed High School League",exact:true}).waitFor();
    assert.equal((await pool.query("SELECT name FROM public.leagues WHERE id=$1",[createdLeagueId])).rows[0].name,"Renamed High School League");
    assert.equal((await pool.query("SELECT count(*)::int n FROM hs_onboarding.leagues WHERE id=$1",[createdLeagueId])).rows[0].n,0);
-   const setupGuide=page.getByTestId("league-setup-guidance");
-   const expectSetupStage=async(current:"school"|"program"|"team"|"complete")=>{
-     const stages=["school","program","team"] as const;
-     for(const [index,stage] of stages.entries()){
-       const state=current===stage?"current":current==="complete"||index<stages.indexOf(current as typeof stages[number])?"complete":"upcoming";
-       for(const kind of ["count","step"]){
-         const tile=page.getByTestId(`setup-${kind}-${stage}`);
-         await page.waitForFunction(({id,state})=>document.querySelector(`[data-testid="${id}"]`)?.getAttribute("data-state")===state,
-           {id:`setup-${kind}-${stage}`,state});
-         assert.equal(await tile.getAttribute("aria-current"),state==="current"?"step":null);
-       }
+   const expectSetupStage=async(current:"school"|"program"|"team")=>{
+     await page.waitForFunction(step=>document.querySelector(`[data-step-content="${step}"]`)?.getAttribute("data-step-content")===step,current);
+     for(const stage of ["school","program","team"]) {
+       const tile=page.getByTestId(`setup-count-${stage}`);
+       assert.equal(await tile.getAttribute("aria-current"),stage===current?"step":null);
      }
+     for(const other of ["school","program","team"].filter(s=>s!==current))
+       await page.locator(`[data-step-content="${other}"]`).waitFor({state:"detached"});
    };
-   await setupGuide.getByRole("heading",{name:"Your organization has four levels",exact:true}).waitFor();
+   const chooseStep=async(step:"school"|"program"|"team")=>{
+     await page.getByRole("button",{name:`${step[0].toUpperCase()+step.slice(1)} step`,exact:true}).click();
+     await expectSetupStage(step);
+   };
    await expectSetupStage("school");
-   await page.getByTestId("setup-count-school").locator("..").screenshot({path:`${out}/setup-current-school.png`});
-   await setupGuide.getByText("Add a school to begin your organization.",{exact:true}).waitFor();
+   assert.equal(await page.getByLabel("Program name",{exact:true}).count(),0);
    assert.equal(await page.getByRole("button",{name:"Add team",exact:true}).count(),0);
-   const counts=async()=> (await pool.query(`SELECT
-     (SELECT count(*)::int FROM hs_onboarding.schools) AS schools,
-     (SELECT count(*)::int FROM hs_onboarding.programs) AS programs,
-     (SELECT count(*)::int FROM hs_onboarding.teams) AS teams`)).rows[0];
-   const beforeExample=await counts();
-   const example=page.getByTestId("league-setup-example-disclosure");
-   assert.equal(await example.evaluate((element:HTMLDetailsElement)=>element.open),false);
-   await example.locator("summary").click();
-   await example.getByText("Team: Varsity Gold (2026–27)",{exact:true}).waitFor();
-   await example.getByText(/St\. Ignatius Girls’ Ice Hockey/).waitFor();
-   await page.screenshot({path:`${out}/setup-hierarchy-example-desktop.png`});
-   await page.setViewportSize({width:402,height:874});
-   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
-   await setupGuide.screenshot({path:`${out}/setup-hierarchy-example-phone.png`});
-   await example.locator("summary").click();
-   assert.deepEqual(await counts(),beforeExample,"Opening guidance must not create example records");
-   const schoolForm=page.getByRole("region",{name:"School and program setup forms",exact:true});
-   const schoolBox=await schoolForm.getByRole("heading",{name:"Add a school",exact:true}).boundingBox();
-   const programBox=await schoolForm.getByRole("heading",{name:"Add a program",exact:true}).boundingBox();
-   const guideBox=await setupGuide.boundingBox();
-   assert.ok(guideBox&&schoolBox&&programBox&&guideBox.y<schoolBox.y&&schoolBox.y<programBox.y);
-   await page.setViewportSize({width:1280,height:1000});
+   await chooseStep("team");
+   assert.equal(await page.getByRole("button",{name:"Add school",exact:true}).count(),0);
+   await chooseStep("school");
+   assert.equal(await page.getByTestId("school-setup-panel").getAttribute("data-direction"),"backward");
+   await page.getByRole("button",{name:"Program step",exact:true}).click();
+   await page.getByRole("button",{name:"School step",exact:true}).click();
+   await expectSetupStage("school");
    await page.getByLabel("School name",{exact:true}).fill("Fixture School");
    await page.getByLabel("Town",{exact:true}).fill("Fixture Town");
    await expectSetupStage("school");
    await page.getByRole("button",{name:"Add school",exact:true}).click();
-   await setupGuide.getByText("Add a program to one of your schools.",{exact:true}).waitFor();
-   await expectSetupStage("program");
-   await page.getByTestId("setup-count-program").locator("..").screenshot({path:`${out}/setup-current-program.png`});
+   await page.getByRole("heading",{name:"Fixture School",exact:true}).waitFor();
+   await expectSetupStage("school");
+   assert.equal(await page.getByLabel("Program name",{exact:true}).count(),0);
+   const schoolRows=page.getByRole("region",{name:"Existing schools",exact:true});
+   let schoolRow=schoolRows.locator("li").first();
+   await schoolRow.getByRole("button",{name:"Edit",exact:true}).click();
+   await schoolRow.getByLabel("School name",{exact:true}).fill("Edited School");
+   await schoolRow.getByLabel("Town",{exact:true}).fill("Edited Town");
+   await schoolRow.getByRole("button",{name:"Save",exact:true}).click();
+   await page.getByRole("heading",{name:"Edited School",exact:true}).waitFor();
+   schoolRow=schoolRows.locator("li").first();
+   await schoolRow.getByRole("button",{name:"Edit",exact:true}).click();
+   await schoolRow.getByLabel("School name",{exact:true}).fill("Fixture School");
+   await schoolRow.getByLabel("Town",{exact:true}).fill("Fixture Town");
+   await schoolRow.getByRole("button",{name:"Save",exact:true}).click();
+   await page.getByRole("heading",{name:"Fixture School",exact:true}).waitFor();
+   await chooseStep("program");
+   assert.equal(await page.getByTestId("school-setup-panel").getAttribute("data-direction"),"forward");
    assert.equal(await page.getByRole("button",{name:"Add team",exact:true}).count(),0);
-   await page.getByLabel("School",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
-   await page.getByLabel("Program name",{exact:true}).fill("Hockey");
+   await page.getByLabel("School for this program",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
+   const addProgramForm=page.getByRole("button",{name:"Add program",exact:true}).locator("..");
+   await addProgramForm.getByLabel("Program name",{exact:true}).fill("Hockey");
    await page.route("**/management/programs",route=>route.fulfill({status:500,contentType:"application/json",
      body:JSON.stringify({code:"SYNTHETIC_PROGRAM_FAILURE",message:"Synthetic program creation failed."})}),{times:1});
    await page.getByRole("button",{name:"Add program",exact:true}).click();
    await page.getByRole("alert").filter({hasText:"Synthetic program creation failed."}).waitFor();
    await expectSetupStage("program");
    await page.getByRole("button",{name:"Add program",exact:true}).click();
-   await setupGuide.getByText("Create a team inside a program after selecting its school.",{exact:true}).waitFor();
-   await expectSetupStage("team");
-   await page.getByTestId("setup-count-team").locator("..").screenshot({path:`${out}/setup-current-team.png`});
-   await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill("Fixture Varsity");
+   await page.getByRole("region",{name:"Existing programs",exact:true}).getByLabel("Program name",{exact:true}).waitFor();
+   await expectSetupStage("program");
+   await chooseStep("team");
+   await page.getByLabel("School for this team",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
+   await page.getByLabel("Program for this team",{exact:true}).selectOption({label:"Hockey"});
+   await page.getByLabel("Team name",{exact:true}).fill("Fixture Varsity");
    await page.getByRole("button",{name:"Add team",exact:true}).click();
    await page.getByText("Fixture Varsity",{exact:true}).waitFor();
-   await expectSetupStage("complete");
-   await setupGuide.getByText("Initial setup complete",{exact:true}).waitFor();
+   await expectSetupStage("team");
    await page.getByTestId("setup-count-team").locator("..").screenshot({path:`${out}/setup-complete.png`});
    await page.reload();
-   await expectSetupStage("complete");
+   await expectSetupStage("school");
    // A second admin/device changes the persisted name while this editor is open.
    await page.getByTestId("edit-league-name").click();
    await page.getByLabel("League name",{exact:true}).fill("My stale edit");
@@ -230,31 +231,63 @@ try {
    await page.getByTestId("save-league-name").click();
    await page.getByRole("heading",{name:"Final High School League",exact:true}).waitFor();
    assert.equal((await pool.query("SELECT name FROM hs_onboarding.leagues WHERE id=$1",[createdLeagueId])).rows[0].name,"Final High School League");
-   await expectSetupStage("complete");
+   await chooseStep("team");
+   await page.getByLabel("School for this team",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
+   await page.getByLabel("Program for this team",{exact:true}).selectOption({label:"Hockey"});
    for (const name of ["Fixture JV", "Fixture Freshman"]) {
-     await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill(name);
+     await page.getByLabel("Team name",{exact:true}).fill(name);
      await page.getByRole("button",{name:"Add team",exact:true}).click();
      await page.getByText(name,{exact:true}).waitFor();
    }
-   await page.getByLabel("Program name for Fixture School",{exact:true}).fill("Ice Hockey");
+   await chooseStep("program");
+   await page.getByRole("region",{name:"Existing programs",exact:true}).getByLabel("Program name",{exact:true}).fill("Ice Hockey");
    await page.getByRole("button",{name:"Save program",exact:true}).click();
-   await page.getByLabel("New team name for Fixture School Ice Hockey",{exact:true}).waitFor();
-   await page.getByLabel("School",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
-   await page.getByLabel("Program name",{exact:true}).fill("Girls Hockey");
+   await page.getByRole("region",{name:"Existing programs",exact:true}).getByLabel("Program name",{exact:true}).waitFor();
+   await addProgramForm.getByLabel("School for this program",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
+   await addProgramForm.getByLabel("Program name",{exact:true}).fill("Girls Hockey");
    await page.getByRole("button",{name:"Add program",exact:true}).click();
-   await page.getByLabel("New team name for Fixture School Girls Hockey",{exact:true}).waitFor();
+   await page.waitForFunction(()=>[...document.querySelectorAll<HTMLInputElement>('input')].some(e=>e.value==="Girls Hockey"));
    const schoolRecord = (await pool.query("SELECT id FROM hs_onboarding.schools WHERE name='Fixture School'")).rows[0];
    assert.equal((await pool.query("SELECT count(*)::int AS n FROM hs_onboarding.programs WHERE school_id=$1", [schoolRecord.id])).rows[0].n,2);
    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM hs_onboarding.teams t JOIN hs_onboarding.programs p ON p.id=t.program_id WHERE p.school_id=$1 AND p.name='Ice Hockey'`, [schoolRecord.id])).rows[0].n,3);
    await page.setViewportSize({width:402,height:874});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
-   const teamBox=await page.getByLabel("New team name for Fixture School Ice Hockey",{exact:true}).boundingBox();
-   const populatedProgramBox=await schoolForm.getByRole("heading",{name:"Add a program",exact:true}).boundingBox();
-   assert.ok(teamBox&&populatedProgramBox&&populatedProgramBox.y<teamBox.y,"School/program forms must precede team creation on phones");
+   await chooseStep("school");
+   assert.equal(await page.getByLabel("Program name",{exact:true}).count(),0);
+   assert.equal(await page.getByLabel("Team name",{exact:true}).count(),0);
    await page.screenshot({path:`${out}/school-hierarchy-phone.png`,fullPage:true});
+   const structure=new SchoolLeagueManagement(pool);
+   const deletionSchool=await structure.school(actor,createdLeagueId,{name:"Delete Fixture School",town:"Town"});
+   const deletionProgram=await structure.program(actor,createdLeagueId,{name:"Delete Program",schoolId:deletionSchool.id});
+   await structure.team(actor,createdLeagueId,{name:"Delete Team",programId:deletionProgram.id});
+   await page.reload();await expectSetupStage("school");
+   const deletionRow=schoolRows.locator("li").filter({has:page.getByRole("heading",{name:"Delete Fixture School",exact:true})});
+   await deletionRow.getByRole("button",{name:"Delete",exact:true}).click();
+   const confirmDelete=page.getByRole("button",{name:"Delete school and linked records",exact:true});
+   await confirmDelete.waitFor();assert.equal(await confirmDelete.isDisabled(),true);
+   await page.getByRole("button",{name:"Cancel",exact:true}).click();
+   assert.equal((await structure.workspace(actor,createdLeagueId)).schools.some(s=>s.id===deletionSchool.id),true);
+   await deletionRow.getByRole("button",{name:"Delete",exact:true}).click();
+   await confirmDelete.waitFor();
+   await page.getByLabel("Type school name to confirm deletion",{exact:true}).fill("Delete Fixture School");
+   await page.screenshot({path:`${out}/school-deletion-warning-phone.png`});
+   await confirmDelete.click();
+   await page.getByRole("heading",{name:"Delete Fixture School",exact:true}).waitFor({state:"detached"});
+   const remaining=await structure.workspace(actor,createdLeagueId);
+   assert.equal(remaining.programs.length,2);assert.equal(remaining.teams.length,3);
+   await expectSetupStage("school");
+   for(const [step,count]of [["school",1],["program",2],["team",3]] as const)
+     assert.equal(await page.getByTestId(`setup-count-${step}`).locator(".font-mono").innerText(),String(count));
+   await page.emulateMedia({reducedMotion:"reduce"});
+   await chooseStep("program");
+   assert.equal(await page.locator('[data-step-content="program"]').evaluate(el=>{
+     const transform=getComputedStyle(el).transform;
+     return transform==="none"?0:new DOMMatrixReadOnly(transform).m41;
+   }),0);
+   await chooseStep("school");await page.emulateMedia({reducedMotion:"no-preference"});
    await page.setViewportSize({width:1280,height:1000});
    await page.screenshot({path:`${out}/school-management.png`});
-   await page.getByRole("button",{name:"Manage invitations",exact:true}).click();
+   await page.getByRole("button",{name:"People & requests",exact:true}).click();
    await page.getByLabel("Team",{exact:true}).selectOption({label:"Fixture School / Ice Hockey / Fixture Varsity"});
    await page.getByLabel("Recipient email",{exact:true}).fill(fixture.actors.applicant.email);
    await page.getByRole("button",{name:"Create manual invitation",exact:true}).click();
@@ -277,7 +310,7 @@ try {
    const applicant=await intake.state(fixture.actors.applicant);
    await intake.lookup(fixture.actors.applicant,staffInvitation,applicant.revision);
    await page.reload();
-   await page.getByRole("button",{name:"Manage invitations",exact:true}).click();
+   await page.getByRole("button",{name:"People & requests",exact:true}).click();
    await page.getByRole("button",{name:"Approve",exact:true}).click();
    await page.getByRole("status").filter({hasText:"Request approved"}).waitFor();
    assert.equal((await pool.query("SELECT role FROM public.team_memberships WHERE user_id=$1 AND role='head_coach'",[fixture.actors.applicant.authId])).rows.length,1);
