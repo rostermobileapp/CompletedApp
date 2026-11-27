@@ -22,6 +22,9 @@ export function registerSchoolLeagueManagement(app: Express, service: SchoolLeag
     }
   };
   app.get(base, handle((r, a) => service.workspace(a, r.params.leagueId)));
+  app.get(`${base}/eligibility`, handle((r, a) => service.eligibility(a, r.params.leagueId)));
+  app.post(`${base}/eligibility/:teamId/:playerId`, handle((r, a) =>
+    service.setEligibility(a, r.params.leagueId, r.params.teamId, r.params.playerId, r.body)));
   app.post(`${base}/schools`, handle((r, a) => service.school(a, r.params.leagueId, r.body)));
   app.post(`${base}/programs`, handle((r, a) => service.program(a, r.params.leagueId, r.body)));
   app.post(`${base}/programs/:id`, handle((r, a) => service.updateProgram(a, r.params.leagueId, r.params.id, r.body)));

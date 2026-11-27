@@ -58,10 +58,11 @@ test("real isolated PostgreSQL staff operations and HTTP boundaries", async t =>
       await events.import(a.head, ids.varsity, { rows: [event] }); await events.import(a.head, ids.varsity, { rows: [event] });
       assert.equal((await pool.query("SELECT count(*)::int AS n FROM hs_onboarding.staff_events WHERE team_id=$1", [ids.varsity])).rows[0].n, 2);
     });
-    await t.test("lineups admit only consented canonical players and same-program callups", async () => {
-      await events.saveLineup(a.head, ids.varsity, eventId, { entries: [{ playerId: ids.child1, state: "dress" }, { playerId: ids.child2, state: "dress" }] });
+    await t.test("lineups admit only consented players on the coach's own team", async () => {
+      await denied(() => events.saveLineup(a.head, ids.varsity, eventId, { entries: [{ playerId: ids.child2, state: "dress" }] }));
+      await events.saveLineup(a.head, ids.varsity, eventId, { entries: [{ playerId: ids.child1, state: "dress" }] });
       const lineup = await events.lineup(a.assistant, ids.varsity, eventId);
-      assert.equal(lineup.entries.length, 2); assert.ok(lineup.entries.some(p => p.callup));
+      assert.equal(lineup.entries.length, 1); assert.ok(lineup.entries.every(p => !p.callup));
       for (const playerId of [ids.child3, a.head.authId, randomUUID()]) await denied(() =>
         events.saveLineup(a.head, ids.varsity, eventId, { entries: [{ playerId, state: "dress" }] }));
       await denied(() => events.report(a.head, ids.varsity, eventId, { version: 3, homeScore: 3, awayScore: 1 }), "FINAL_REPORT_AVAILABLE_TWO_HOURS_AFTER_START");

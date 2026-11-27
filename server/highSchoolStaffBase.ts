@@ -85,7 +85,8 @@ export class StaffBase {
       JOIN hs_onboarding.player_requests r ON r.id=c.player_request_id AND r.auth_id=c.parent_auth_id AND r.team_id::text=t.id
       WHERE m.status='approved' AND m.role='player' AND m.user_id IS NULL AND r.status='approved'
       AND t.program_type='high_school' AND t.program_id=$2 AND($4::boolean OR t.id=$1)
-      ORDER BY t.name,c.id`, [scope.teamId, scope.programId, HS_CONSENT_VERSION, program])).rows;
+      ORDER BY t.name,c.id`, [scope.teamId, scope.programId, HS_CONSENT_VERSION,
+        program && scope.role === "athletic_director" && !this.leagueAdministration])).rows;
     const year = new Date().getUTCFullYear();
     const month = new Date().getUTCMonth();
     const schoolYear = year + (month >= 6 ? 1 : 0);

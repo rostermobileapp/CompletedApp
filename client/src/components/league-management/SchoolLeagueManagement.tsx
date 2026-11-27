@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useSchoolLeagueAction, useSchoolLeagueWorkspace } from "@/hooks/useSchoolLeagueManagement";
 import type { SchoolLeagueActionResult, SchoolLeagueWorkspace } from "@shared/schoolLeagueManagement";
+import { PlayerEligibilityPanel } from "@/components/PlayerEligibilityPanel";
 
-type Pane = "overview" | "people" | "schedule";
+type Pane = "overview" | "people" | "schedule" | "eligibility";
 type SchedulePreview = { teamId: string; format: "csv" | "ical"; text: string; result: SchoolLeagueActionResult };
 
 const roles: Record<string, string> = {
@@ -160,8 +161,8 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
       </div>}
 
       <nav className="mt-5 flex gap-1 overflow-x-auto border-b border-border" aria-label="League management sections">
-        {(["overview", "people", "schedule"] as const).map(item => <button key={item} onClick={() => setPane(item)} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium capitalize ${pane === item ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-          {item === "people" ? "People & requests" : item === "schedule" ? "Schedule" : "Overview"}
+        {(["overview", "people", "schedule", "eligibility"] as const).map(item => <button key={item} onClick={() => setPane(item)} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium capitalize ${pane === item ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          {item === "people" ? "People & requests" : item === "schedule" ? "Schedule" : item === "eligibility" ? "Eligibility" : "Overview"}
         </button>)}
       </nav>
       {oneTime && (oneTime.invitation || oneTime.teamCode) && <section className="mt-5 rounded-lg border border-border bg-muted p-4">
@@ -337,6 +338,10 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
             }}>Import {preview.result.rows?.length || 0} events</button>
           </div>}
         </section>
+      </section>}
+
+      {pane === "eligibility" && <section className="mt-6">
+        <PlayerEligibilityPanel mode="league" id={leagueId} />
       </section>}
 
       {action.isPending && <div aria-live="polite" className="fixed bottom-5 right-5 z-20 rounded-lg bg-card hairline elev-lift px-4 py-3 text-sm text-foreground">Saving changes…</div>}

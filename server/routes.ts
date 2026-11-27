@@ -62,6 +62,7 @@ import {
 } from "./permissionMiddleware";
 import { db, pool } from "./db";
 import { TeamEntryPolicy, enforceTeamEntry } from "./teamEntryPolicy";
+import { adultTeamOperationsAllowed } from "./schoolTeamBoundary";
 import { getTeamStreaks } from "./teamStreaks";
 import {
   finalizeScorekeeperGame,
@@ -1539,6 +1540,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   }
   const canManageTeamLines = async (team: any, userId: string) =>
     !!team &&
+    (await adultTeamOperationsAllowed(pool, team.id)) &&
     (team.creatorId === userId || (await storage.isTeamCaptain(team.id, userId)));
 
   // Draft tool: setup wizard, draft engine routes, live draft room
@@ -10332,8 +10334,7 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       // Auth: creator OR any team captain (captainId on teams table OR isCaptain in team_memberships)
       const team = await storage.getTeam(teamId);
       if (!team) return res.status(404).json({ message: 'Team not found' });
-      const isCreatorOrCaptain =
-        team.creatorId === userId || (await storage.isTeamCaptain(teamId, userId));
+      const isCreatorOrCaptain = await canManageTeamLines(team, userId);
       if (!isCreatorOrCaptain) {
         return res.status(403).json({ message: 'Only team captains or creators can set lines' });
       }
@@ -14796,6 +14797,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       }
 
       const messageData = insertMessageSchema.parse(req.body);
+      const conversation = await messagingService.getConversation(messageData.conversationId);
+      if (!conversation || conversation.teamId !== req.params.id ||
+          !await messagingService.isUserInConversation(req.user.claims.sub, messageData.conversationId) ||
+          !await adultTeamOperationsAllowed(pool, req.params.id)) {
+        return res.status(403).json({ message: "Use your authorized team chat." });
+      }
       const message = await storage.sendMessage({
         ...messageData,
         senderId: req.user.claims.sub,
@@ -22916,6 +22923,9 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       // EXCEPT when the founder (U00001) is a participant — then any user may reply.
       const conversation = await messagingService.getConversation(conversationId);
       if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+      if (conversation.teamId && !await adultTeamOperationsAllowed(pool, conversation.teamId)) {
+        return res.status(403).json({ message: "Use your authorized school team chat." });
+      }
       const accessParticipants = await messagingService.getConversationParticipants(conversationId);
       const support = accessParticipants.some(p => (p as any).user?.displayId === "U00001");
       const freeTeamChat = conversation.type === "team_group" && !!conversation.teamId &&

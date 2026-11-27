@@ -4,6 +4,7 @@ import type { OnboardingActor } from "./highSchoolOnboarding";
 import type { ParentTransaction } from "./highSchoolParentSecurity";
 import { eventInput } from "../shared/highSchoolStaff";
 import { StaffBase, staffFail, uuid, type StaffScope } from "./highSchoolStaffBase";
+import { assertPlayerCanDress, requirePlayerEligibility } from "./schoolPlayerEligibility";
 
 const versionInput = z.object({ version: z.number().int().positive() }).strict();
 export class HighSchoolStaffEvents extends StaffBase {
@@ -93,9 +94,10 @@ export class HighSchoolStaffEvents extends StaffBase {
     return this.afterChange(actor, teamId, result);
   }
   async lineup(actor: OnboardingActor, teamId: string, id: string) {
+    if (this.leagueAdministration) staffFail("LEAGUE_ADMIN_COACHING_FORBIDDEN", 403);
     return this.withScope(actor, teamId, async (db, scope) => {
       await this.event(db, scope, id);
-      const players = await this.players(db, scope, true);
+      const players = await this.players(db, scope);
       const saved = (await db.query("SELECT child_id,state FROM hs_onboarding.staff_lineup WHERE event_id=$1", [id])).rows;
       const entries = saved.flatMap(row => {
         const player = players.find(p => p.id === row.child_id);
@@ -106,15 +108,21 @@ export class HighSchoolStaffEvents extends StaffBase {
     });
   }
   async saveLineup(actor: OnboardingActor, teamId: string, id: string, input: unknown) {
+    if (this.leagueAdministration) staffFail("LEAGUE_ADMIN_COACHING_FORBIDDEN", 403);
     const { entries } = z.object({ entries: z.array(z.object({ playerId: uuid, state: z.enum(["dress", "scratch"]) }).strict()).max(100) }).strict().parse(input);
     if (new Set(entries.map(e => e.playerId)).size !== entries.length) staffFail("DUPLICATE_LINEUP_PLAYER");
     return this.withScope(actor, teamId, async (db, scope) => {
       const event = await this.event(db, scope, id);
       if (event.status !== "scheduled") staffFail("FINAL_EVENT_LOCKED", 409);
-      const players = await this.players(db, scope, true);
+      const players = await this.players(db, scope);
+      await requirePlayerEligibility(db);
       for (const entry of entries) {
         const player = players.find(p => p.id === entry.playerId);
         if (!player || !player.guardianLinked || !player.consented) staffFail("LINEUP_REQUIRES_APPROVED_PLAYER_GUARDIAN_AND_CONSENT", 403);
+      }
+      // Stable order prevents inter-player advisory-lock inversions.
+      for (const entry of [...entries].sort((a, b) => a.playerId.localeCompare(b.playerId))) {
+        if (entry.state === "dress") await assertPlayerCanDress(db, scope.leagueId, teamId, entry.playerId);
       }
       await db.query("DELETE FROM hs_onboarding.staff_lineup WHERE event_id=$1", [id]);
       for (const entry of entries) await db.query(`INSERT INTO hs_onboarding.staff_lineup(event_id,child_id,state,updated_by)

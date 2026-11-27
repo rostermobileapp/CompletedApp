@@ -11,10 +11,18 @@ import { HighSchoolStaffEvents } from "./highSchoolStaffEvents";
 import { HighSchoolFamilyReview } from "./highSchoolFamilySetup";
 import { previewEvents } from "./highSchoolStaffImports";
 import { StaffBase } from "./highSchoolStaffBase";
+import { SchoolPlayerEligibilityService } from "./schoolPlayerEligibility";
 
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 const decision = z.object({ approve: z.boolean() }).strict();
 export class SchoolLeagueManagement extends StaffBase {
+  async eligibility(actor: OnboardingActor, leagueId: string) {
+    return new SchoolPlayerEligibilityService(this.pool, undefined, undefined, this.live).leagueWorkspace(actor, leagueId);
+  }
+  async setEligibility(actor: OnboardingActor, leagueId: string, teamId: string, playerId: string, input: unknown) {
+    return new SchoolPlayerEligibilityService(this.pool, undefined, undefined, this.live)
+      .setLeague(actor, leagueId, teamId, playerId, input);
+  }
   private staff: HighSchoolStaffOperations;
   private events: HighSchoolStaffEvents;
   private parents: HighSchoolFamilyReview;

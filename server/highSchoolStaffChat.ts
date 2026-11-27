@@ -6,6 +6,7 @@ import type { OnboardingActor } from "./highSchoolOnboarding";
 
 export class HighSchoolStaffChat extends StaffBase {
   private async room(db: ParentTransaction, scope: StaffScope, id: string) {
+    if (this.leagueAdministration) staffFail("LEAGUE_ADMIN_PLAYER_CHAT_FORBIDDEN", 403);
     uuid.parse(id);
     const room = (await db.query(`SELECT id,kind FROM hs_onboarding.child_chats WHERE id=$1 AND team_id=$2
       AND parent_auth_id IS NULL AND kind IN('team','parents','coaches')`, [id, scope.teamId])).rows[0];

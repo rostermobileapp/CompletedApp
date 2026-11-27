@@ -16,6 +16,7 @@ import { StaffLineupEditor } from "./StaffLineupEditor";
 import "./staff-operations.css";
 import { FamilyStaffReview } from "@/components/high-school-family/FamilyStaffReview";
 import { ScopedHomeFeed, ScopedHomeNotice } from "@/components/dashboard/ScopedAccountHome";
+import { PlayerEligibilityPanel } from "@/components/PlayerEligibilityPanel";
 
 type Props = { actorId: string; teamId: string; role: StaffRole; onContextRefresh: () => void };
 type Request = { method: string; path: string; body?: unknown; refreshContext?: boolean };
@@ -201,6 +202,7 @@ export function StaffOperations({ actorId, teamId, role, onContextRefresh }: Pro
         {workspace.data?.capabilities.manageStaff && <FamilyStaffReview actorId={actorId} teamId={teamId}
           onChanged={() => { void queryClient.invalidateQueries({ queryKey: workspaceKey }); onContextRefresh(); }} />}
         <RosterView roster={roster} staged={staged} onImport={() => setModal({ kind: "roster-import" })} />
+        <PlayerEligibilityPanel mode="team" id={teamId} />
       </>}
       {activePage === "chat" && <ChatView data={data} staffKey={staffKey} request={doRequest} pending={runRequest.isPending} />}
       {activePage === "more" && <MoreView actorId={actorId} data={data} role={role} canManage={canManage} canManageProgram={canManageProgram} canCreatePayment={canCreatePayment}

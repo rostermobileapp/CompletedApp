@@ -5,8 +5,16 @@ import type { ParentTransaction } from "./highSchoolParentSecurity";
 import { StaffBase, staffFail, staffName, uuid, type StaffScope } from "./highSchoolStaffBase";
 import { rosterImportRow } from "./highSchoolStaffImports";
 import { staffRoles } from "../shared/highSchoolStaff";
+import { SchoolPlayerEligibilityService } from "./schoolPlayerEligibility";
 
 export class HighSchoolStaffOperations extends StaffBase {
+  async eligibility(actor: OnboardingActor, teamId: string) {
+    return new SchoolPlayerEligibilityService(this.pool, undefined, undefined, this.live).teamWorkspace(actor, teamId);
+  }
+  async setEligibility(actor: OnboardingActor, teamId: string, playerId: string, input: unknown) {
+    return new SchoolPlayerEligibilityService(this.pool, undefined, undefined, this.live, this.leagueAdministration)
+      .setTeam(actor, teamId, playerId, input);
+  }
   async authorize(actor: OnboardingActor, teamId: string) {
     return this.withScope(actor, teamId, async () => ({ authorized: true }));
   }
@@ -68,7 +76,7 @@ export class HighSchoolStaffOperations extends StaffBase {
       const paymentRecipients = await this.invoiceableParents(db, scope);
       return { team, role: scope.role, capabilities: { manageStaff, manageProgram: scope.role === "athletic_director",
         createPayments: eligible, paymentReason: eligible ? "" : "Requires approved league membership and existing Player Pro or league commissioner entitlement." },
-        roster: [...own.map(cleanPlayer), ...staged], callupCandidates: allPlayers.filter(p => p.teamId !== teamId).map(cleanPlayer),
+        roster: [...own.map(cleanPlayer), ...staged], callupCandidates: [],
         events, rooms, staff, approvals, gaps, reports, audit, payments, paymentRecipients };
     });
   }

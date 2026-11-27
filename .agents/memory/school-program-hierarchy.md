@@ -33,5 +33,13 @@ lower-level operational permission.
 well as visible controls. Do not grant team coaching or player-chat access just
 because an actor owns the league. Preserve independent parent-child rights;
 the league-admin restriction does not revoke a parent's own private child chat.
-The precedence between a league eligibility restriction and a coach's change
-needs an explicit policy decision before implementing overrides.
+League restrictions take priority over coach changes. A coach may clear the
+team's own restriction but cannot clear or bypass a league restriction.
+
+**Why:** The owner explicitly selected league-restriction priority when asked
+whether coaches could reverse a league administrator's eligibility decision.
+
+**How to apply:** Store league and team restrictions independently. A player is
+eligible only when neither applies; clearing either restriction must not erase
+the other. Playing eligibility is not parental consent, roster approval, or
+device access and must not silently change any of them.

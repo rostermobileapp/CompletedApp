@@ -28,6 +28,8 @@ export function registerHighSchoolStaffRoutes(app: Express, staff: HighSchoolSta
     }
   };
   app.get(base, handle((r, a) => staff.workspace(a, r.params.teamId)));
+  app.get(`${base}/eligibility`, handle((r, a) => staff.eligibility(a, r.params.teamId)));
+  app.post(`${base}/eligibility/:playerId`, handle((r, a) => staff.setEligibility(a, r.params.teamId, r.params.playerId, r.body)));
   app.put(`${base}/settings`, handle((r, a) => staff.settings(a, r.params.teamId, r.body)));
   app.post(`${base}/roster/import/preview`, handle(async (r, a) => {
     await staff.authorize(a, r.params.teamId);

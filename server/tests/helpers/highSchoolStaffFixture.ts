@@ -45,6 +45,7 @@ export async function createStaffFixture(dispatch?: StaffDispatch) {
     await db.query(await readFile("scripts/dev-only/high-school-staff-operations.sql", "utf8"));
     // Repeat installation must preserve existing data and constraints.
     await db.query(await readFile("scripts/dev-only/high-school-staff-operations.sql", "utf8"));
+    await db.query(await readFile("migrations/0061_school_player_eligibility.sql", "utf8"));
   } finally { db.release(); }
   const ids = Object.fromEntries(["league", "program", "foreignProgram", "varsity", "jv", "foreign", "child1", "child2", "child3", "req1", "req2", "req3"].map(k => [k, randomUUID()]));
   const actors: Record<string, OnboardingActor> = {};
