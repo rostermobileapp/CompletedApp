@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, ApiError } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/useAuth';
+import { readPendingLeagueDraft, savePendingLeagueDraft, clearPendingLeagueDraft } from '@/lib/pendingLeagueVerification';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, MapPin, Calendar, Globe, Monitor, Snowflake } from 'lucide-react';
@@ -11,9 +13,11 @@ import type { RinkSelection } from '@/components/RinkPickerField';
 import { useLocation } from 'wouter';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { insertLeagueSchema } from '@shared/schema';
+import { leagueTypeSchema, LEAGUE_TYPE_OPTIONS } from '@shared/leagueType';
 import type { z } from 'zod';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
@@ -51,6 +55,7 @@ const createLeagueSchema = insertLeagueSchema.extend({
 }).partial().extend({
   name: insertLeagueSchema.shape.name,
   maxTeams: insertLeagueSchema.shape.maxTeams,
+  leagueType: leagueTypeSchema,
 });
 
 type CreateLeagueForm = z.infer<typeof createLeagueSchema>;
@@ -62,8 +67,16 @@ export default function CreateLeague() {
   const { canManageLeague } = usePermissions();
   const isMobile = useIsMobile();
   const isDesktopWeb = useIsDesktopWeb();
+  const { user } = useAuth();
+  const [savedDraft] = useState(() => {
+    const pending = readPendingLeagueDraft(user?.id);
+    if (!pending) return;
+    const parsed = createLeagueSchema.safeParse({ leagueType: "adult", ...pending.values });
+    if (!parsed.success) { clearPendingLeagueDraft(); return; }
+    return { values: parsed.data, rink: pending.rink };
+  });
   const [createdLeague, setCreatedLeague] = useState<{ id: string; name: string } | null>(null);
-  const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(null);
+  const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(savedDraft?.rink ?? null);
 
   const form = useForm<CreateLeagueForm>({
     resolver: zodResolver(createLeagueSchema),
@@ -77,6 +90,8 @@ export default function CreateLeague() {
       season: '',
       maxTeams: 16,
       timezone: 'America/New_York',
+      leagueType: 'adult',
+      ...savedDraft?.values,
     },
   });
 
@@ -86,6 +101,7 @@ export default function CreateLeague() {
       return response.json();
     },
     onSuccess: (league) => {
+      clearPendingLeagueDraft();
       queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues/commissioner'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
@@ -99,7 +115,17 @@ export default function CreateLeague() {
         navigate(`/league-management?leagueId=${league.id}`);
       }
     },
-    onError: (error: any) => {
+    onError: (error: any, values) => {
+      if (error instanceof ApiError && error.status === 403 && error.data?.code === "PARENT_VERIFICATION_REQUIRED") {
+        if (savePendingLeagueDraft(user?.id, { values, rink: selectedRink })) {
+          // The server rejected this request before creating anything. Verify
+          // the adult device, restore the draft, then require a fresh submit.
+          navigate("/high-school/parent-verification?returnTo=create-league");
+          return;
+        }
+        toast({ title: "Adult verification required", description: "Your league details are still on this form. Allow this site's tab storage before continuing to verification so they are not lost.", variant: "destructive" });
+        return;
+      }
       toast({
         title: 'Failed to Create League',
         description: error.message || 'An error occurred while creating the league',
@@ -290,6 +316,22 @@ export default function CreateLeague() {
             <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
             
             <div className="space-y-4">
+              <fieldset>
+                <legend id="league-type-label" className="block text-sm font-medium mb-2">League Type *</legend>
+                <Controller name="leagueType" control={form.control} render={({ field }) => (
+                  <RadioGroup aria-labelledby="league-type-label" value={field.value} onValueChange={field.onChange}
+                    onBlur={field.onBlur} ref={field.ref} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {LEAGUE_TYPE_OPTIONS.map(option => (
+                      <label key={option.value} htmlFor={`league-type-${option.value}`}
+                        className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${field.value === option.value ? "border-primary bg-primary/10" : "border-[hsl(var(--hairline))] hover:bg-accent/50"}`}>
+                        <RadioGroupItem id={`league-type-${option.value}`} value={option.value} aria-label={option.label} />
+                        <span className="text-sm font-medium">{option.label}</span>
+                      </label>
+                    ))}
+                  </RadioGroup>
+                )} />
+                {form.formState.errors.leagueType && <p role="alert" className="text-destructive text-sm mt-1">{form.formState.errors.leagueType.message}</p>}
+              </fieldset>
               <div>
                 <label className="block text-sm font-medium mb-2" data-testid="label-league-name">
                   League Name *
@@ -349,6 +391,7 @@ export default function CreateLeague() {
                   Rink
                 </label>
                 <RinkPickerField
+                  initialSelection={selectedRink ?? undefined}
                   onSelect={(rink) => setSelectedRink(rink)}
                 />
               </div>

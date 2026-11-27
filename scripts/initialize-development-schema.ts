@@ -42,6 +42,7 @@ async function main() {
     )
   `);
   if (unexpected.rows[0].count !== 0) throw new Error("Development contains non-fixture users");
+  await pool.query(await readFile(new URL("../migrations/0059_league_type.sql", import.meta.url), "utf8"));
   await installOptionalAwardSchema();
   // Explicit schema/metadata setup, never server startup. Operational recovery,
   // purchase reconciliation, historical awards and worker starters are excluded.

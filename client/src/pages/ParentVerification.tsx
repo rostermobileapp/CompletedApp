@@ -28,6 +28,9 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
   authenticated?: boolean; enrolled?: boolean; verified?: boolean; unavailable?: boolean; initialPurpose?: Purpose;
 }) {
   const [, navigate] = useLocation();
+  // Strict local allowlist: never navigate to a URL supplied by the caller.
+  const resumeLeague = typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("returnTo") === "create-league";
   const [leaving, setLeaving] = useState(false);
   const [purpose, setPurpose] = useState<Purpose>(initialPurpose);
   const [challenge, setChallenge] = useState<string>();
@@ -133,13 +136,17 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
   return <main className="onboarding-light parent-verification-light min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-10">
     <section className="parent-verification-card w-full max-w-md rounded-2xl border bg-card p-6 shadow-lg space-y-5" aria-labelledby="parent-verification-title">
       <nav aria-label="Parent verification navigation" className="space-y-2">
+        {resumeLeague && <button type="button" className={`${button} w-full text-center`}
+          disabled={working} onClick={() => navigate("/create-league")}>Back to league form</button>}
         <button type="button" className={`${button} w-full text-center`} onClick={() => void goHome()} disabled={leaving}>
           {leaving ? "Returning Home…" : "Back to Home"}
         </button>
       </nav>
       <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Parent verification</p>
-      <h1 id="parent-verification-title" className="text-2xl font-semibold">Verify you're the parent</h1>
-      <p className="text-sm text-muted-foreground">Verify this parent device once to manage your children for 30 days, including after reopening the app. New devices and password changes need a code sent to the parent's registered email.</p>
+      <h1 id="parent-verification-title" className="text-2xl font-semibold">{resumeLeague ? "Verify your adult access" : "Verify you're the parent"}</h1>
+      <p className="text-sm text-muted-foreground">{resumeLeague
+        ? "This account has Family protection. Verify this adult device through the parent's registered email before creating a league. Your league details are saved in this tab. Verification does not create the league or change league permissions."
+        : "Verify this parent device once to manage your children for 30 days, including after reopening the app. New devices and password changes need a code sent to the parent's registered email."}</p>
       {finished ? <div role="status" className="space-y-3"><p>The shared password was changed. All previous sessions were ended.</p><a href="/login" className={button}>Sign in again</a></div>
         : !authenticated ? <p>Sign in with the shared family login first. <a className="underline" href="/login">Go to sign-in</a>.</p>
         : unavailable ? <p role="alert">The verification service is unavailable. Parent controls remain locked. Refresh to retry.</p>
@@ -168,13 +175,13 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
             <button className={`${button} w-full bg-primary text-primary-foreground`} disabled={working} type="submit">Change shared password</button>
           </form>}
           <button className={`${button} w-full`} disabled={working} onClick={lock}>Lock parent controls</button>
-          {parentApproved && <button type="button" disabled={working} onClick={() => navigate("/high-school/family")}
-            className={`${button} block w-full text-center bg-primary text-primary-foreground`}>Continue to family setup</button>}
+          {parentApproved && <button type="button" disabled={working} onClick={() => navigate(resumeLeague ? "/create-league" : "/high-school/family")}
+            className={`${button} block w-full text-center bg-primary text-primary-foreground`}>{resumeLeague ? "Continue creating league" : "Continue to family setup"}</button>}
         </>}
       {message && <p role="status" className="text-sm">{message}</p>}
-      {!message && parentApproved && <p role="status" className="text-sm">This parent device is verified. Continue to family setup to manage your children.</p>}
+      {!message && parentApproved && <p role="status" className="text-sm">{resumeLeague ? "This adult device is verified. Return to your saved league form, then choose Create League." : "This parent device is verified. Continue to family setup to manage your children."}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <p className="text-xs text-muted-foreground">No child profiles or production family accounts are enabled by this DEV test.</p>
+      <p className="text-xs text-muted-foreground">{resumeLeague ? "Family access and league permissions remain independently protected." : "No child profiles or production family accounts are enabled by this DEV test."}</p>
     </section>
   </main>;
 }

@@ -1,4 +1,5 @@
 import { sql, relations } from "drizzle-orm";
+import { LEAGUE_TYPES, leagueTypeSchema } from "./leagueType";
 import {
   index,
   uniqueIndex,
@@ -417,6 +418,7 @@ export const leagues = pgTable("leagues", {
   name: varchar("name").notNull(),
   uniqueLeagueId: varchar("unique_league_id", { length: 6 }).unique().notNull(), // L##### sequential display ID
   sport: sportEnum("sport").notNull(),
+  leagueType: varchar("league_type", { enum: LEAGUE_TYPES }).notNull().default("adult"),
   description: text("description"),
   location: varchar("location"),
   timezone: varchar("timezone").default("America/New_York"), // IANA timezone for date formatting
@@ -3067,7 +3069,7 @@ export const insertLeagueSchema = createInsertSchema(leagues).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-});
+}).extend({ leagueType: leagueTypeSchema.optional() });
 
 export const insertTeamSchema = createInsertSchema(teams).omit({
   id: true,

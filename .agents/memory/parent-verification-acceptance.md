@@ -30,3 +30,18 @@ not establish persistence after a browser process or native app closes.
 close/reopen in transport checks. Retain account/session binding and separate
 password-purpose proof. Confirm the released frontend and actual native-device
 behavior separately before claiming the phone issue is fixed.
+
+Family-enrolled adults can also be league administrators or coaches. When an
+adult write requires parent proof, provide a verification continuation rather
+than removing the proof requirement or showing only a generic role failure.
+Preserve in-progress form data across the account boundary's proof remount,
+scope temporary drafts to the actor and tab, and require explicit resubmission
+after verification rather than automatically replaying a creation request.
+
+**Why:** During the combined admin/parent testing setup, league creation was
+rejected by the Family write guard before league permissions ran. Shared-login
+credentials alone must not gain adult write authority.
+
+**How to apply:** Keep server checks and league permissions independent.
+Allow only known local return destinations, preserve the normal Family
+continuation, and never store verification credentials inside form drafts.

@@ -385,3 +385,17 @@ mtime_ms = 1795784153342
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/5b928c1c-95de-47c1-8b7d-06ab54a7e330/c22eb23d-2245-4839-83c6-10b95ed9188a"
 storage_version_token = "1795784241538456"
 content_type = "image/png"
+
+[[outputs]]
+id = "Jb068AebWqqDULrYdVB5o"
+uri = "file://generated-artifacts/league-parent-continuation/league-type-section.jpg"
+type = "image"
+title = "League type selection"
+description = "The new Adult, High School and Youth choices on the actual Create League form, shown in an isolated test preview."
+logical_id = "232c0ea0-b2c8-4a1e-9488-99978731895c"
+content_hash = "sha256:8656d10ea824728917f0dc65ae6f6b71f4ccfd153ad39efdca80be737b8bc989"
+size = 71361
+mtime_ms = 1795786052969
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/232c0ea0-b2c8-4a1e-9488-99978731895c/b4f50754-c0e1-4019-864a-e42b89bcb289"
+storage_version_token = "1795786106799459"
+content_type = "image/jpeg"
