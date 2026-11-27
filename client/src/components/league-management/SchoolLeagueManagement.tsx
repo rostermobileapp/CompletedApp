@@ -142,6 +142,13 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
     ["Staff requests", staffRequests.length],
     ["Family requests", parentRequests.length],
   ] as const;
+  const nextSetupAction = workspace.schools.length === 0
+    ? "Add a school to begin your organization."
+    : workspace.programs.length === 0
+      ? "Add a program to one of your schools."
+      : workspace.teams.length === 0
+        ? "Create a team inside a program after selecting its school."
+        : "Add another school, program, or seasonal team as your league grows.";
 
   return <main className="min-h-[70dvh] bg-background px-4 pb-16 pt-5 text-foreground sm:px-6 lg:px-8">
     <div className="mx-auto max-w-7xl">
@@ -177,14 +184,98 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {statItems.map(([label, value]) => <div key={label} className="rounded-xl bg-card hairline elev-rest p-4"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs font-medium text-muted-foreground">{label}</p></div>)}
         </div>
-        {workspace.schools.length === 0 && <div className="rounded-xl border border-border bg-muted p-5 sm:p-6">
-          <h2 className="text-lg font-semibold">Start with a school</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Set up the school first, add one or more programs to it, then create teams. A school can be reused across your leagues.</p>
-          <ol className="mt-4 grid gap-2 text-sm sm:grid-cols-3"><li><span className="font-semibold">1.</span> Add a school</li><li><span className="font-semibold">2.</span> Add a program to that school</li><li><span className="font-semibold">3.</span> Create teams, then invite people</li></ol>
-        </div>}
-        <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
+        <section aria-labelledby="setup-order-heading" className="rounded-xl border border-border bg-muted p-5 sm:p-6" data-testid="league-setup-guidance">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">League setup</p>
+              <h2 id="setup-order-heading" className="mt-1 text-lg font-semibold">Your organization has four levels</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">The league is already created. Build beneath it in order: add a school, create a program for that school, then add seasonal teams inside the program.</p>
+            </div>
+            <div className="shrink-0 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+              <span className="font-semibold">Next step</span>
+              <p className="mt-0.5 max-w-xs text-muted-foreground">{nextSetupAction}</p>
+            </div>
+          </div>
+          <ol className="mt-5 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4" aria-label="League organization setup order">
+            <li className="rounded-lg border border-border bg-card p-3">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Already created</span>
+              <span className="mt-1 block font-semibold">{workspace.league.name}</span>
+              <span className="mt-1 block text-xs text-muted-foreground">League</span>
+            </li>
+            <li className="rounded-lg border border-border bg-card p-3">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 1</span>
+              <span className="mt-1 block font-semibold">Add a school</span>
+              <span className="mt-1 block text-xs text-muted-foreground">Shared school identity</span>
+            </li>
+            <li className="rounded-lg border border-border bg-card p-3">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2</span>
+              <span className="mt-1 block font-semibold">Add a program</span>
+              <span className="mt-1 block text-xs text-muted-foreground">Choose its school</span>
+            </li>
+            <li className="rounded-lg border border-border bg-card p-3">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3</span>
+              <span className="mt-1 block font-semibold">Create a team</span>
+              <span className="mt-1 block text-xs text-muted-foreground">Inside the selected program, for a season</span>
+            </li>
+          </ol>
+          <details className="mt-4 rounded-lg border border-border bg-card" data-testid="league-setup-example-disclosure">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              View an example organization and what each level means
+            </summary>
+            <div className="border-t border-border px-4 py-4">
+              <p className="text-sm font-medium">Illustrative hierarchy</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6">
+                <li><span className="font-semibold">League:</span> Greater Cleveland High School Hockey League (GCHSHL)
+                  <ul className="ml-5 mt-1 space-y-2 border-l border-border pl-4">
+                    <li><span className="font-semibold">School:</span> St. Ignatius High School
+                      <ul className="ml-5 mt-1 space-y-2 border-l border-border pl-4">
+                        <li><span className="font-semibold">Program:</span> St. Ignatius Boys’ Ice Hockey
+                          <ul className="ml-5 mt-1 space-y-1 text-muted-foreground">
+                            <li>Team: Varsity Gold (2026–27)</li>
+                            <li>Team: Varsity Blue (2026–27)</li>
+                            <li>Team: Junior Varsity (2026–27)</li>
+                          </ul>
+                        </li>
+                        <li><span className="font-semibold">Program:</span> St. Ignatius Girls’ Ice Hockey (if applicable)
+                          <ul className="ml-5 mt-1 space-y-1 text-muted-foreground">
+                            <li>Team: Girls’ Varsity (2026–27)</li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+              <div className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
+                <p>One school represents a shared identity, such as its logo, colors, home rink, and athletic director. This organizational guidance does not add or configure those settings.</p>
+                <p>Programs distinguish organizational contexts such as boys’ and girls’ coaching staffs, program leadership, budgets, booster information, history, and roster pipelines. Teams are competitive rosters within a program for a particular season.</p>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
+          <section className="space-y-5" aria-label="School and program setup forms">
+            <section className={cardClass}>
+              <SectionTitle eyebrow="Step 1" title="Add a school" detail="Schools you own or administer can be reused across your leagues." />
+              <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/schools", { name: schoolName.trim(), town: schoolTown.trim() }, "School added.", () => { setSchoolName(""); setSchoolTown(""); }); }}>
+                <Field label="School name"><input className={inputClass} value={schoolName} onChange={event => setSchoolName(event.target.value)} required maxLength={100} placeholder="e.g. Northview High School" /></Field>
+                <Field label="Town"><input className={inputClass} value={schoolTown} onChange={event => setSchoolTown(event.target.value)} required maxLength={100} placeholder="Town or city" /></Field>
+                <button className={primaryButton} disabled={action.isPending || !schoolName.trim() || !schoolTown.trim()}>Add school</button>
+              </form>
+            </section>
+            <section className={cardClass}>
+              <SectionTitle eyebrow="Step 2" title="Add a program" detail="Select the school first. Programs keep boys’ and girls’ hockey operations distinct; create teams inside a program in Step 3." />
+              {!workspace.schools.length ? <p className="mt-5 rounded-lg bg-muted p-4 text-sm text-muted-foreground">Add a school first to create a program.</p> : <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/programs", { name: programName.trim(), schoolId: programSchoolId }, "Program created.", () => { setProgramName(""); setProgramSchoolId(""); }); }}>
+                <Field label="School"><select className={inputClass} value={programSchoolId} onChange={event => setProgramSchoolId(event.target.value)} required><option value="">Select a school</option>{workspace.schools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.town}</option>)}</select></Field>
+                <Field label="Program name"><input className={inputClass} value={programName} onChange={event => setProgramName(event.target.value)} required maxLength={100} placeholder="e.g. Boys’ Ice Hockey" /></Field>
+                <button className={primaryButton} disabled={action.isPending || !programName.trim() || !programSchoolId}>Add program</button>
+              </form>}
+            </section>
+          </section>
+
           <section className={cardClass}>
-            <div className="flex flex-wrap items-end justify-between gap-3"><SectionTitle eyebrow="Organization" title="Schools → programs → teams" /><button className={secondaryButton} onClick={() => setPane("people")}>Manage invitations</button></div>
+            <div className="flex flex-wrap items-end justify-between gap-3"><SectionTitle eyebrow="Organization" title="Schools, programs & teams" detail="Teams are created only within an existing program under its school." /><button className={secondaryButton} onClick={() => setPane("people")}>Manage invitations</button></div>
             {!workspace.schools.length && !workspace.programs.length ? <div className="mt-5 rounded-lg border border-dashed border-border p-6 text-center"><p className="font-medium">No schools yet</p><p className="mt-1 text-sm text-muted-foreground">Add a school to begin building this league.</p></div> : <div className="mt-5 space-y-4">
               {workspace.schools.map(school => <article key={school.id} className="rounded-xl border border-border bg-background p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -204,10 +295,14 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
                       <button className={secondaryButton} type="submit" disabled={action.isPending || editingProgram?.id !== program.id || !editingProgram.name.trim()}>Save program</button>
                     </form>
                     {teamsByProgram.get(program.id)?.length ? <div className="mt-3 flex flex-wrap gap-2">{teamsByProgram.get(program.id)!.map(team => <span key={team.id} className="rounded-md border border-border px-3 py-1.5 text-xs">{team.name}</span>)}</div> : <p className="mt-3 text-xs text-muted-foreground">No teams in this program.</p>}
-                    <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={event => { event.preventDefault(); if (!teamName.trim() || programId !== program.id) return; void runAction("/teams", { programId: program.id, name: teamName.trim() }, "Team created.", result => { setTeamName(""); setOneTime(result.teamCode ? { teamCode: result.teamCode } : null); }); }}>
-                      <input className={inputClass} aria-label={`New team name for ${school.name} ${program.name}`} placeholder="Team name" value={programId === program.id ? teamName : ""} onFocus={() => setProgramId(program.id)} onChange={event => { setProgramId(program.id); setTeamName(event.target.value); }} required maxLength={100} />
-                      <button className={secondaryButton} type="submit" disabled={action.isPending || !teamName.trim() || programId !== program.id}>Add team</button>
-                    </form>
+                    <div className="mt-4 rounded-lg border border-border bg-muted/50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3 · Team in {program.name}</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">This program already belongs to {school.name}. Add a competitive roster for its season here.</p>
+                      <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={event => { event.preventDefault(); if (!teamName.trim() || programId !== program.id) return; void runAction("/teams", { programId: program.id, name: teamName.trim() }, "Team created.", result => { setTeamName(""); setOneTime(result.teamCode ? { teamCode: result.teamCode } : null); }); }}>
+                        <input className={inputClass} aria-label={`New team name for ${school.name} ${program.name}`} placeholder="e.g. Varsity Gold (2026–27)" value={programId === program.id ? teamName : ""} onFocus={() => setProgramId(program.id)} onChange={event => { setProgramId(program.id); setTeamName(event.target.value); }} required maxLength={100} />
+                        <button className={secondaryButton} type="submit" disabled={action.isPending || !teamName.trim() || programId !== program.id}>Add team</button>
+                      </form>
+                    </div>
                   </article>)}
                 </div> : <p className="mt-4 rounded-lg bg-muted p-4 text-sm text-muted-foreground">This school has no programs in this league yet. You can reuse the school in another league without exposing that league’s teams here.</p>}
               </article>)}
@@ -223,25 +318,6 @@ export default function SchoolLeagueManagement({ leagueId }: { leagueId: string 
                 </article>)}</div>
               </section>}
             </div>}
-          </section>
-
-          <section className="space-y-5">
-            <section className={cardClass}>
-              <SectionTitle eyebrow="Step 1" title="Add a school" detail="Schools you own or administer can be reused across your leagues." />
-              <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/schools", { name: schoolName.trim(), town: schoolTown.trim() }, "School added.", () => { setSchoolName(""); setSchoolTown(""); }); }}>
-                <Field label="School name"><input className={inputClass} value={schoolName} onChange={event => setSchoolName(event.target.value)} required maxLength={100} placeholder="e.g. Northview High School" /></Field>
-                <Field label="Town"><input className={inputClass} value={schoolTown} onChange={event => setSchoolTown(event.target.value)} required maxLength={100} placeholder="Town or city" /></Field>
-                <button className={primaryButton} disabled={action.isPending || !schoolName.trim() || !schoolTown.trim()}>Add school</button>
-              </form>
-            </section>
-            <section className={cardClass}>
-              <SectionTitle eyebrow="Step 2" title="Add a program" detail="Choose a school, then create teams under the program. People and invitations keep their existing approval flow." />
-              {!workspace.schools.length ? <p className="mt-5 rounded-lg bg-muted p-4 text-sm text-muted-foreground">Add a school first to create a program.</p> : <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); void runAction("/programs", { name: programName.trim(), schoolId: programSchoolId }, "Program created.", () => { setProgramName(""); setProgramSchoolId(""); }); }}>
-                <Field label="School"><select className={inputClass} value={programSchoolId} onChange={event => setProgramSchoolId(event.target.value)} required><option value="">Select a school</option>{workspace.schools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.town}</option>)}</select></Field>
-                <Field label="Program name"><input className={inputClass} value={programName} onChange={event => setProgramName(event.target.value)} required maxLength={100} placeholder="e.g. Hockey" /></Field>
-                <button className={primaryButton} disabled={action.isPending || !programName.trim() || !programSchoolId}>Add program</button>
-              </form>}
-            </section>
           </section>
         </div>
         <section className={cardClass}>

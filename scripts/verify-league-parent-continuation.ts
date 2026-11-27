@@ -129,15 +129,45 @@ try {
   assert.equal(created,1);
    assert.equal(mail.length,0);
    assert.equal(new URL(page.url()).pathname,"/league-management");
+   const setupGuide=page.getByTestId("league-setup-guidance");
+   await setupGuide.getByRole("heading",{name:"Your organization has four levels",exact:true}).waitFor();
+   await setupGuide.getByText("Add a school to begin your organization.",{exact:true}).waitFor();
+   assert.equal(await page.getByRole("button",{name:"Add team",exact:true}).count(),0);
+   const counts=async()=> (await pool.query(`SELECT
+     (SELECT count(*)::int FROM hs_onboarding.schools) AS schools,
+     (SELECT count(*)::int FROM hs_onboarding.programs) AS programs,
+     (SELECT count(*)::int FROM hs_onboarding.teams) AS teams`)).rows[0];
+   const beforeExample=await counts();
+   const example=page.getByTestId("league-setup-example-disclosure");
+   assert.equal(await example.evaluate((element:HTMLDetailsElement)=>element.open),false);
+   await example.locator("summary").click();
+   await example.getByText("Team: Varsity Gold (2026–27)",{exact:true}).waitFor();
+   await example.getByText(/St\. Ignatius Girls’ Ice Hockey/).waitFor();
+   await page.screenshot({path:`${out}/setup-hierarchy-example-desktop.png`});
+   await page.setViewportSize({width:402,height:874});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
+   await setupGuide.screenshot({path:`${out}/setup-hierarchy-example-phone.png`});
+   await example.locator("summary").click();
+   assert.deepEqual(await counts(),beforeExample,"Opening guidance must not create example records");
+   const schoolForm=page.getByRole("region",{name:"School and program setup forms",exact:true});
+   const schoolBox=await schoolForm.getByRole("heading",{name:"Add a school",exact:true}).boundingBox();
+   const programBox=await schoolForm.getByRole("heading",{name:"Add a program",exact:true}).boundingBox();
+   const guideBox=await setupGuide.boundingBox();
+   assert.ok(guideBox&&schoolBox&&programBox&&guideBox.y<schoolBox.y&&schoolBox.y<programBox.y);
+   await page.setViewportSize({width:1280,height:1000});
    await page.getByLabel("School name",{exact:true}).fill("Fixture School");
    await page.getByLabel("Town",{exact:true}).fill("Fixture Town");
    await page.getByRole("button",{name:"Add school",exact:true}).click();
+   await setupGuide.getByText("Add a program to one of your schools.",{exact:true}).waitFor();
+   assert.equal(await page.getByRole("button",{name:"Add team",exact:true}).count(),0);
    await page.getByLabel("School",{exact:true}).selectOption({label:"Fixture School · Fixture Town"});
    await page.getByLabel("Program name",{exact:true}).fill("Hockey");
    await page.getByRole("button",{name:"Add program",exact:true}).click();
+   await setupGuide.getByText("Create a team inside a program after selecting its school.",{exact:true}).waitFor();
    await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill("Fixture Varsity");
    await page.getByRole("button",{name:"Add team",exact:true}).click();
    await page.getByText("Fixture Varsity",{exact:true}).waitFor();
+   await setupGuide.getByText("Add another school, program, or seasonal team as your league grows.",{exact:true}).waitFor();
    for (const name of ["Fixture JV", "Fixture Freshman"]) {
      await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill(name);
      await page.getByRole("button",{name:"Add team",exact:true}).click();
@@ -155,6 +185,9 @@ try {
    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM hs_onboarding.teams t JOIN hs_onboarding.programs p ON p.id=t.program_id WHERE p.school_id=$1 AND p.name='Ice Hockey'`, [schoolRecord.id])).rows[0].n,3);
    await page.setViewportSize({width:402,height:874});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
+   const teamBox=await page.getByLabel("New team name for Fixture School Ice Hockey",{exact:true}).boundingBox();
+   const populatedProgramBox=await schoolForm.getByRole("heading",{name:"Add a program",exact:true}).boundingBox();
+   assert.ok(teamBox&&populatedProgramBox&&populatedProgramBox.y<teamBox.y,"School/program forms must precede team creation on phones");
    await page.screenshot({path:`${out}/school-hierarchy-phone.png`,fullPage:true});
    await page.setViewportSize({width:1280,height:1000});
    await page.screenshot({path:`${out}/school-management.png`});

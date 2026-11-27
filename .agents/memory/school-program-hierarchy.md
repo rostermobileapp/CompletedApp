@@ -18,6 +18,24 @@ schools by matching names or replace existing team/staff/player identities.
 Existing program-scoped permissions do not become school-wide authority merely
 because two programs share a school.
 
+## Boys' and girls' program guidance
+
+The intended setup order is League → School → Program → Team. A school offering
+boys' and girls' hockey shares its institutional identity, while each program
+has a separate coaching staff, budget, history and roster pipeline. Varsity Gold,
+Varsity Blue and JV may all be teams within one boys' program; girls' varsity
+belongs to the separate girls' program at that same school.
+
+**Why:** The owner supplied this high-school example to clarify setup guidance
+on November 27, 2026. They placed shared logo, colors, home rink and athletic
+director at School level, and program leadership/booster information at Program
+level.
+
+**How to apply:** Keep these distinctions visible in setup guidance even after
+initial creation. This describes intended organization, not evidence that every
+associated settings field already exists. Label examples as illustrative and
+never create example schools, programs or teams without an explicit request.
+
 ## Scoped editing permissions
 
 League administrators cannot edit team lines or message players through their
