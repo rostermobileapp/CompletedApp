@@ -63,13 +63,28 @@ browser/service-role table grants are revoked, and child-owned eligibility data
 cascades with an already-authorized deletion of its child record. The migration
 does not add any restrictions to existing players or update existing records.
 
-This migration has been applied only to disposable loopback databases.
-The owner's earlier School/Program database approval does **not** authorize this
-new update. Obtain separate approval before changing the live external Supabase
-database. Never add it to startup DDL or alter the testing allowlist.
+The owner separately approved this eligibility database update on November 27,
+2026. It was applied to the validated live external Supabase database using
+`scripts/install-school-player-eligibility.ts --apply-owner-authorized-eligibility`.
+All three tables passed column, primary/foreign-key, child-cleanup, RLS and private
+access verification. They were empty at installation, so no player restrictions
+were introduced.
+
+The installer compared database-side fingerprints of all existing onboarding
+and parent-security records, plus public users, teams and team memberships,
+inside the installation transaction. These records were unchanged. No child,
+consent, membership or device records were exported or modified.
+
+For a subsequent read-only status check, use
+`scripts/install-school-player-eligibility.ts --production-read-only`.
+The installer validates the external production target against the configured
+production/DEV projects, verifies TLS, stops on a partial schema, and rolls back
+before commit if verification fails. Never add it to startup DDL or alter the
+testing allowlist.
 
 The owner handles GitHub pushes and the matching Vercel frontend/Railway backend
-releases. Do not publish automatically. The existing adult-password cutover
+releases. The database update did not publish code. Do not publish automatically.
+The existing adult-password cutover
 prerequisite remains separate.
 
 ## Verification scope
