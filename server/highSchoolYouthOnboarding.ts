@@ -72,7 +72,7 @@ export class HighSchoolYouthOnboarding {
     const flow = (await tx.query("SELECT * FROM hs_onboarding.flows WHERE auth_id=$1 FOR UPDATE", [actor.authId])).rows[0];
     if (!flow || !["staff", "parent", "league_admin"].includes(flow.path)) throw new OnboardingError("WRONG_ONBOARDING_PATH", 403);
     if (flow.revision !== revision) throw new OnboardingError("DRAFT_CONFLICT", 409);
-    if (await this.parent.enrolled(actor.authId) && !await this.parent.authorized(actor, grant, tx)) {
+    if (flow.path === "parent" && await this.parent.enrolled(actor.authId) && !await this.parent.authorized(actor, grant, tx)) {
       throw new OnboardingError("PARENT_VERIFICATION_REQUIRED", 403);
     }
     return flow;

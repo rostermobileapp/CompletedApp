@@ -5,6 +5,8 @@ import { HighSchoolOnboarding, type OnboardingActor } from "./highSchoolOnboardi
 import { HighSchoolYouthOnboarding } from "./highSchoolYouthOnboarding";
 import { HighSchoolChildDevices } from "./highSchoolChildDevices";
 import { HighSchoolStaffOperations } from "./highSchoolStaffOperations";
+import { SchoolLeagueManagement } from "./schoolLeagueManagement";
+import { registerSchoolLeagueManagement } from "./schoolLeagueManagementHttp";
 import { HighSchoolStaffEvents } from "./highSchoolStaffEvents";
 import { HighSchoolStaffChat } from "./highSchoolStaffChat";
 import { TeamSkinService } from "./teamSkinService";
@@ -45,6 +47,7 @@ export async function registerProductionOnboardingTests(
   const events=new HighSchoolStaffEvents(pool,async()=>false,async()=>{throw Error("TEST_NOTIFICATION_DELIVERY_DISABLED");},true);
   const chat=new HighSchoolStaffChat(pool,async()=>false,undefined,true);
   intake.staffDecisions=staff;
+  registerSchoolLeagueManagement(app,new SchoolLeagueManagement(pool,true),authenticateTester);
   registerHighSchoolOnboarding(app,intake,parent,authenticateTester,(actor,grant)=>youth.state(actor,grant));
   registerHighSchoolYouthRoutes(app,youth,child,authenticateTester,true);
   registerHighSchoolStaffRoutes(app,staff,events,chat,parent,authenticateTester,true);

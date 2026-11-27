@@ -16,7 +16,7 @@ test("actual public routes require invitations and cannot be bypassed by roles, 
   const f = await createStaffFixture();
   let server: any;
   try {
-    await f.pool.query(`CREATE TABLE public.leagues(id varchar PRIMARY KEY,name text,unique_league_id varchar,
+    await f.pool.query(`DROP TABLE public.leagues; CREATE TABLE public.leagues(id varchar PRIMARY KEY,name text,unique_league_id varchar,
       league_type varchar NOT NULL DEFAULT 'adult',commissioner_id varchar);
       ALTER TABLE public.teams ADD COLUMN league_id varchar, ADD COLUMN unique_team_id varchar;
       ALTER TABLE public.league_memberships ADD COLUMN id varchar DEFAULT gen_random_uuid(), ADD COLUMN league_role varchar;

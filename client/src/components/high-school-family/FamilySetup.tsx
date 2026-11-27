@@ -551,6 +551,7 @@ export function FamilySetup({
       </div>
       <h1>Your family, your pace</h1>
       <p className="hsy-subtitle">Set up each child and review their privacy choices. You can connect a team later. Your adult team is separate.</p>
+      <p className="hsy-note">Children use their own approved device and a child setup code. Do not share your adult password. If it was shared before, change it once in parent controls before using this setup.</p>
       {state.imported && <div className="hsy-alert" role="status">These player details were staged by the team and are read-only here. Matching and consent do not change the server-owned identity.</div>}
 
       <div className="family-panel soft" style={{ marginBottom: 17 }}>

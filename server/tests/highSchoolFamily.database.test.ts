@@ -70,7 +70,13 @@ test("existing adult family setup uses real isolated SQL, consent and canonical 
       assert.equal(await parent.authorized(fresh, grant), false);
       await reject(() => family.draft(fresh, { revision: 0, players: [first] }, grant), "PARENT_VERIFICATION_REQUIRED");
       assert.equal((await family.state(fresh, grant)).verified, false);
-      assert.equal((await new HighSchoolOnboarding(pool, parent).state(fresh, grant)).status, "parent_verification_required");
+      // Adult onboarding remains available; the independent Family state and
+      // writes above still reject this fresh session's missing parent proof.
+      const ordinary = await new HighSchoolOnboarding(pool, parent).state(fresh, grant);
+      assert.equal(ordinary.path, "player");
+      assert.notEqual(ordinary.status, "parent_verification_required");
+      assert.equal(ordinary.draft.untouchedAdult, true);
+      assert.equal(ordinary.draft.players, undefined);
       assert.equal((await family.state(adult, grant)).verified, true);
     });
     await t.test("stored DOB gates every own-family entry point, including shared invitation and consent intake", async () => {

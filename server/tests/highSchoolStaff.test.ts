@@ -27,7 +27,8 @@ test("runtime remains DEV guarded, child-disabled and free of outbound staff cha
   const chat = await readFile("server/highSchoolStaffChat.ts", "utf8");
   assert.doesNotMatch(chat, /import.*(?:oneSignal|resend|sendEmail|mailer)/);
   const http = await readFile("server/highSchoolStaffHttp.ts", "utf8");
-  assert.match(http, /isParentSecurityDevelopment/); assert.match(http, /parent\.authorized/);
+  assert.match(http, /isParentSecurityDevelopment/); assert.match(http, /authenticate\(req\)/);
+  assert.doesNotMatch(http, /parent\.authorized/);
   const schema = await readFile("shared/schema.ts", "utf8");
   assert.doesNotMatch(schema, /child_profile_id|program_type/);
 });

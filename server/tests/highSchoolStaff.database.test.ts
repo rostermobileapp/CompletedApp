@@ -210,7 +210,8 @@ test("real isolated PostgreSQL staff operations and HTTP boundaries", async t =>
         const url = `http://127.0.0.1:${port}/api/high-school/staff/teams/${ids.varsity}`;
         assert.equal((await fetch(url, { headers: { "x-fixture-actor": "head" } })).status, 200);
         parentRequired = true;
-        assert.equal((await fetch(url, { headers: { "x-fixture-actor": "head" } })).status, 403);
+        // Being a parent does not remove this adult's canonical staff authority.
+        assert.equal((await fetch(url, { headers: { "x-fixture-actor": "head" } })).status, 200);
         parentRequired = false;
         assert.equal((await fetch(url + "?role=athletic_director", { headers: { "x-fixture-actor": "pending" } })).status, 403);
         await pool.query("UPDATE auth.sessions SET not_after=now()-interval '1 minute' WHERE id=$1", [a.manager.sessionId]);

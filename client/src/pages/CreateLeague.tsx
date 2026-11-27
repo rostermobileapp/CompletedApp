@@ -4,10 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
-import { readPendingLeagueDraft, savePendingLeagueDraft, clearPendingLeagueDraft } from '@/lib/pendingLeagueVerification';
+import { readPendingLeagueDraft, clearPendingLeagueDraft } from '@/lib/pendingLeagueVerification';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, MapPin, Calendar, Globe, Monitor, Snowflake } from 'lucide-react';
+import { ArrowLeft, Crown, MapPin, Calendar, Globe, Monitor } from 'lucide-react';
 import { RinkPickerField } from '@/components/RinkPickerField';
 import type { RinkSelection } from '@/components/RinkPickerField';
 import { useLocation } from 'wouter';
@@ -19,7 +19,6 @@ import { usePermissions } from '@/context/SubscriptionContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 
 const TIMEZONE_OPTIONS = [
@@ -66,7 +65,6 @@ export default function CreateLeague() {
   const queryClient = useQueryClient();
   const { canManageLeague } = usePermissions();
   const isMobile = useIsMobile();
-  const isDesktopWeb = useIsDesktopWeb();
   const { user } = useAuth();
   const [savedDraft] = useState(() => {
     const pending = readPendingLeagueDraft(user?.id);
@@ -75,7 +73,6 @@ export default function CreateLeague() {
     if (!parsed.success) { clearPendingLeagueDraft(); return; }
     return { values: parsed.data, rink: pending.rink };
   });
-  const [createdLeague, setCreatedLeague] = useState<{ id: string; name: string } | null>(null);
   const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(savedDraft?.rink ?? null);
 
   const form = useForm<CreateLeagueForm>({
@@ -105,25 +102,12 @@ export default function CreateLeague() {
       queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues/commissioner'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
-      if (isDesktopWeb) {
-        setCreatedLeague({ id: league.id, name: league.name });
-      } else {
-        toast({
-          title: 'League Created',
-          description: `${league.name} has been created successfully!`,
-        });
-        navigate(`/league-management?leagueId=${league.id}`);
-      }
+      toast({ title: 'League Created', description: `${league.name} has been created successfully!` });
+      navigate(`/league-management?leagueId=${encodeURIComponent(league.id)}`);
     },
     onError: (error: any, values) => {
       if (error instanceof ApiError && error.status === 403 && error.data?.code === "PARENT_VERIFICATION_REQUIRED") {
-        if (savePendingLeagueDraft(user?.id, { values, rink: selectedRink })) {
-          // The server rejected this request before creating anything. Verify
-          // the adult device, restore the draft, then require a fresh submit.
-          navigate("/high-school/parent-verification?returnTo=create-league");
-          return;
-        }
-        toast({ title: "Adult verification required", description: "Your league details are still on this form. Allow this site's tab storage before continuing to verification so they are not lost.", variant: "destructive" });
+        toast({ title: "League creation unavailable", description: "The server still requires Family verification for league creation and needs the adult-access update. Your league details are still on this form.", variant: "destructive" });
         return;
       }
       toast({
@@ -180,109 +164,6 @@ export default function CreateLeague() {
             >
               Back to My Leagues
             </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (createdLeague) {
-    return (
-      <div className="min-h-screen flex flex-col pb-12" data-testid="create-league-success">
-        <div className="p-6 pt-[12px] pb-[12px]">
-          <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => navigate(`/league-management?leagueId=${createdLeague.id}`)}
-              className="text-muted-foreground"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">League Created</h1>
-          </div>
-        </div>
-        <div className="px-6 space-y-4 max-w-xl">
-          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <div className="font-semibold">{createdLeague.name}</div>
-                <div className="text-sm text-muted-foreground">Ready to go</div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="bg-card rounded-xl border border-yellow-500/40 bg-yellow-500/5 p-5"
-            data-testid="player-pro-upsell-card"
-          >
-            <div className="flex items-start gap-3">
-              <Crown className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold mb-1">Cover your players with Player Pro</div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  As commissioner you can pre-pay Player Pro for your whole league and save
-                  25% versus everyone paying individually. Seats auto-assign to members in
-                  join order.
-                </p>
-                <div className="flex gap-3 flex-wrap">
-                  <button
-                    onClick={() =>
-                      navigate(`/league-management?leagueId=${createdLeague.id}&settings=player-pro`)
-                    }
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-sm font-medium"
-                    data-testid="button-buy-player-pro"
-                  >
-                    Buy Player Pro seats
-                  </button>
-                  <button
-                    onClick={() => navigate(`/league-management?leagueId=${createdLeague.id}`)}
-                    className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-medium"
-                    data-testid="button-skip-player-pro"
-                  >
-                    Skip for now
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="bg-card rounded-xl border border-blue-500/40 bg-blue-500/5 p-5"
-            data-testid="draft-tool-cta-card"
-          >
-            <div className="flex items-start gap-3">
-              <Snowflake className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold mb-1">Want to draft your rosters live?</div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Once you've added at least two teams (and any captains), open the league
-                  and tap <span className="font-semibold">Setup Draft</span> next to
-                  &quot;New Season&quot; to run a real-time, mobile-friendly draft with
-                  timers, buddy pairs, and goalie modes.
-                </p>
-                <div className="flex gap-3 flex-wrap">
-                  <button
-                    onClick={() =>
-                      navigate(`/league-management?leagueId=${createdLeague.id}&tab=teams`)
-                    }
-                    className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white rounded-lg text-sm font-medium"
-                    data-testid="button-add-teams-first"
-                  >
-                    Add teams now
-                  </button>
-                  <button
-                    onClick={() => navigate(`/league-management?leagueId=${createdLeague.id}`)}
-                    className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-medium"
-                    data-testid="button-skip-draft-tool"
-                  >
-                    Maybe later
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

@@ -3,6 +3,22 @@ name: High School scope boundaries
 description: Owner-supplied High School product constraints and phase-by-phase approval rules.
 ---
 
+## Current adult/child authentication boundary
+
+Children use approved child-device sessions and setup codes, not the parent's
+adult sign-in password. This supersedes the older shared-login requirements and
+security investigations below, which are historical rather than current scope.
+Normal adult commissioner/coach actions must not require a parent email code.
+Family/child approvals and password changes retain separate parent authority.
+
+**Why:** On 2026-11-27 the owner approved this replacement after shared
+credentials caused Family protections to block ordinary league administration.
+
+**How to apply:** Before release, any previously shared adult password must be
+changed once. Do not infer that choosing this model changed any password.
+Keep provider signature/session verification, real league/team permissions,
+restricted child capabilities and parent revocation independently enforced.
+
 ## Child profiles before team connection
 
 An approved child device must stay signed in across app shutdown and reopening,
@@ -270,17 +286,15 @@ security boundary; a profile picker alone must not be treated as that proof.
 not only screens. Do not assume unresolved security feasibility,
 coverage-loss access or guardian-identity decisions have been approved.
 
-Keep shared parent credentials: the owner explicitly chose this when offered
-safer child sessions as an alternative. Children knowing the parent password is
-part of the threat model, not an assumption that may be removed.
+The original shared-parent-credentials requirement was superseded by the
+owner's approved child-device/setup-code model on 2026-11-27.
 
-**Why:** The owner confirmed the shared-login requirement after the direct
-Supabase Auth bypass risk was raised. This confirms product scope, not security
-feasibility or permission to weaken parent-device protections.
+**Why:** The owner chose separate child capabilities so an adult can retain
+commissioner and coach access without repeatedly unlocking Family controls.
 
-**How to apply:** Prove account changes and parent-authority operations cannot
-bypass approved-device checks. If the proof fails, stop and report the
-incompatibility; do not silently replace family authentication.
+**How to apply:** Require a one-time password change for any previously shared
+adult credential before release. Parent-only operations still need approved
+parent proof; ordinary adult actions use authenticated, permissioned sessions.
 
 Do not assume the shared-password model is secure under the DEV Auth settings
 tested on 2026-11-19: direct password takeover succeeded without parent approval.

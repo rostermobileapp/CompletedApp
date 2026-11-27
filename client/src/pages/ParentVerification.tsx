@@ -17,7 +17,7 @@ function friendlyError(error: unknown) {
     INVALID_CODE: "Enter the four-digit code from the parent's email.",
     INVALID_SESSION: "This session has ended. Sign in again before requesting a code.",
     INVALID_PASSWORD: "Use 12 or more characters with uppercase, lowercase, a number and a symbol. Keep it within 72 UTF-8 bytes.",
-    PASSWORD_MUST_DIFFER: "Choose a password different from the current shared password.",
+    PASSWORD_MUST_DIFFER: "Choose a password different from your current parent password.",
     PASSWORD_VERIFICATION_REQUIRED: "A fresh password-change code is required. Request another code.",
     FAMILY_NOT_ENROLLED: "This account has not started family setup.",
   };
@@ -49,6 +49,9 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
   const [unlocked, setUnlocked] = useState(verified);
   useEffect(() => { setUnlocked(verified); }, [verified]);
   useEffect(() => {
+    if (resumeLeague && authenticated && initialPurpose === "parent_action") navigate("/create-league", { replace: true });
+  }, [resumeLeague, authenticated, initialPurpose, navigate]);
+  useEffect(() => {
     const timer = window.setInterval(() => setTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -75,7 +78,7 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
     setCode(""); setChallenge(undefined);
     if (result.purpose === "password_change") {
       setPasswordGrant({ value: result.verificationToken, until: Date.now() + result.expiresInSeconds * 1000 });
-      setMessage("Email verified. Choose the new shared password within two minutes.");
+      setMessage("Email verified. Choose the new parent password within two minutes.");
     } else {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw { code: "INVALID_SESSION" };
@@ -145,10 +148,10 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
       <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Parent verification</p>
       <h1 id="parent-verification-title" className="text-2xl font-semibold">{resumeLeague ? "Verify your adult access" : "Verify you're the parent"}</h1>
       <p className="text-sm text-muted-foreground">{resumeLeague
-        ? "This account has Family protection. Verify this adult device through the parent's registered email before creating a league. Your league details are saved in this tab. Verification does not create the league or change league permissions."
+        ? "League creation uses commissioner access, not Family verification. Returning to your league form."
         : "Verify this parent device once to manage your children for 30 days, including after reopening the app. New devices and password changes need a code sent to the parent's registered email."}</p>
-      {finished ? <div role="status" className="space-y-3"><p>The shared password was changed. All previous sessions were ended.</p><a href="/login" className={button}>Sign in again</a></div>
-        : !authenticated ? <p>Sign in with the shared family login first. <a className="underline" href="/login">Go to sign-in</a>.</p>
+      {finished ? <div role="status" className="space-y-3"><p>Your parent password was changed. All previous sessions were ended.</p><a href="/login" className={button}>Sign in again</a></div>
+        : !authenticated ? <p>Sign in to your adult account first. Children must use a child setup code, not this password. <a className="underline" href="/login">Go to sign-in</a>.</p>
         : unavailable ? <p role="alert">The verification service is unavailable. Parent controls remain locked. Refresh to retry.</p>
         : !enrolled ? <p role="status">This account has not started family setup. Existing adult accounts are unchanged.</p>
         : <>
@@ -156,7 +159,7 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
             <button className={button} disabled={working} aria-pressed={purpose === "parent_action"} onClick={() => selectPurpose("parent_action")}>Parent controls</button>
             <button className={button} disabled={working} aria-pressed={purpose === "password_change"} onClick={() => selectPurpose("password_change")}>Change password</button>
           </div>
-          <p className="text-xs text-muted-foreground">{purpose === "password_change" ? "Password changes always require a separate, one-use email code." : "Remember this parent-only device for 30 days. Shared sign-in alone never unlocks parent controls. Sign out or lock parent controls to end its approval."}</p>
+          <p className="text-xs text-muted-foreground">{purpose === "password_change" ? "Password changes always require a separate, one-use email code." : "Remember this parent-only device for 30 days. Adult sign-in alone never unlocks parent controls. Sign out or lock parent controls to end its approval."}</p>
           {!passwordGrant && !parentApproved && <button className={`${button} w-full bg-primary text-primary-foreground`} onClick={request}
             disabled={working || tick < resendAt}>{tick < resendAt ? `Request another code in ${Math.ceil((resendAt - tick) / 1000)}s` : "Email a verification code"}</button>}
           {challenge && !parentApproved && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void verify(); }}>
@@ -167,12 +170,12 @@ export default function ParentVerification({ authenticated = true, enrolled = tr
             <button className={`${button} w-full`} type="submit" disabled={working || code.length !== PARENT_CODE_DIGITS}>Verify email code</button>
           </form>}
           {passwordGrant && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void changePassword(); }}>
-            <label className="block text-sm" htmlFor="new-shared-password">New shared password</label>
+            <label className="block text-sm" htmlFor="new-shared-password">New parent password</label>
             <input id="new-shared-password" className={input} type="password" autoComplete="new-password" minLength={12} value={password} required disabled={working} onChange={event => setPassword(event.target.value)} />
-            <label className="block text-sm" htmlFor="confirm-shared-password">Confirm shared password</label>
+            <label className="block text-sm" htmlFor="confirm-shared-password">Confirm parent password</label>
             <input id="confirm-shared-password" className={input} type="password" autoComplete="new-password" minLength={12} value={confirm} required disabled={working} onChange={event => setConfirm(event.target.value)} />
             <p className="text-xs text-muted-foreground">Use at least 12 characters, uppercase, lowercase, a number and a symbol. Changing it signs out every device.</p>
-            <button className={`${button} w-full bg-primary text-primary-foreground`} disabled={working} type="submit">Change shared password</button>
+            <button className={`${button} w-full bg-primary text-primary-foreground`} disabled={working} type="submit">Change parent password</button>
           </form>}
           <button className={`${button} w-full`} disabled={working} onClick={lock}>Lock parent controls</button>
           {parentApproved && <button type="button" disabled={working} onClick={() => navigate(resumeLeague ? "/create-league" : "/high-school/family")}

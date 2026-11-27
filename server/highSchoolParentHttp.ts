@@ -106,14 +106,14 @@ export function registerParentVerificationRoutes(
 export async function requireDevParentAuthority(
   security: HighSchoolParentSecurity, authId: string,
   verifiedToken: string, issuer: string, parentGrant?: string,
-  access: "parent_action" | "account_read" = "parent_action",
+  access: "parent_action" | "account_read" | "adult_account" = "parent_action",
 ) {
   if (!await security.enrolled(authId)) return;
   const actor = parentActorFromVerifiedToken(verifiedToken, authId, issuer);
-  // Ordinary app reads require a valid, still-active login, not an additional
-  // parent email proof. This server-owned mode never applies to Family routes
-  // or mutations, whose default remains parent_action.
-  if (access === "account_read") {
+  // Children use separately scoped device tokens, never the adult password.
+  // Adult account actions require an active provider login and route-specific
+  // permissions. Family/password operations still default to parent_action.
+  if (access === "account_read" || access === "adult_account") {
     await security.status(actor);
     return;
   }

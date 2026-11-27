@@ -15,7 +15,7 @@ test("league types validate and persist without changing legacy league data", as
     const columns = getTableConfig(leagues).columns.filter(column => column.name !== "league_type")
       .map(column => column.name === "id" ? '"id" varchar PRIMARY KEY DEFAULT gen_random_uuid()'
         : `"${column.name}" ${column.columnType === "PgEnumColumn" ? "text" : column.getSQLType()}`);
-    await f.pool.query(`CREATE TABLE public.leagues(${columns.join(",")})`);
+    await f.pool.query(`DROP TABLE public.leagues; CREATE TABLE public.leagues(${columns.join(",")})`);
     await f.pool.query("INSERT INTO public.leagues(name) VALUES('Legacy fixture league')");
     const migration = await readFile("migrations/0059_league_type.sql", "utf8");
     await f.pool.query(migration);

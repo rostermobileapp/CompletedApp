@@ -14,7 +14,7 @@ export const staffName = z.string().trim().min(1).max(100).refine(v => !/[\x00-\
 export class StaffBase {
   constructor(protected pool: ParentSql, protected paymentEligibility: StaffPaymentEligibility = async () => false,
     protected dispatch: StaffDispatch = async () => { /* Explicit no-delivery DEV transport. */ },
-    protected live = false) {}
+    protected live = false, protected leagueAdministration = false) {}
   async installed() {
     return !!(await this.pool.query("SELECT to_regclass('hs_onboarding.staff_version') AS installed")).rows[0]?.installed;
   }
@@ -41,7 +41,7 @@ export class StaffBase {
       JOIN public.teams t ON t.program_id=p.id JOIN hs_onboarding.teams source ON source.id::text=t.id AND source.program_id=p.id
       WHERE t.id=$1 AND t.program_type='high_school' AND p.status='approved' FOR UPDATE OF p`, [teamId])).rows[0];
     if (!program) staffFail("STAFF_TEAM_FORBIDDEN", 403);
-    const role = (await db.query(`SELECT m.role FROM public.team_memberships m
+    let role = (await db.query(`SELECT m.role FROM public.team_memberships m
       JOIN public.teams t ON t.id=m.team_id
       WHERE m.user_id=$1 AND m.child_profile_id IS NULL AND m.status='approved'
       AND t.program_type='high_school' AND t.program_id=$2
@@ -49,6 +49,13 @@ export class StaffBase {
       ORDER BY CASE m.role WHEN 'athletic_director' THEN 0 WHEN 'head_coach' THEN 1
         WHEN 'assistant_coach' THEN 2 ELSE 3 END LIMIT 1`,
     [actor.authId, program.id, teamId, [...staffRoles]])).rows[0]?.role;
+    if (this.leagueAdministration) {
+      const owner = (await db.query(`SELECT 1 FROM public.leagues WHERE id=$1 AND commissioner_id=$2
+        AND league_type IN('high_school','youth') FOR SHARE`, [program.league_id, actor.authId])).rows.length;
+      if (owner) role = "athletic_director";
+    }
+    // The owner capability above exists only in explicitly composed management
+    // services. It never creates an AD membership or grants access to staff chat.
     if (!role) staffFail("STAFF_TEAM_FORBIDDEN", 403);
     return { teamId, programId: program.id, leagueId: program.league_id, role };
   }

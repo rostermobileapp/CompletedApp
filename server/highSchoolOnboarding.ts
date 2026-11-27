@@ -63,7 +63,7 @@ export class HighSchoolOnboarding {
   async state(actor: OnboardingActor, grant?: string) {
     await this.active(actor);
     const row = (await this.pool.query(`SELECT * FROM ${this.flowTable} WHERE auth_id=$1`, [actor.authId])).rows[0];
-    if (await this.parent.enrolled(actor.authId) && !await this.parent.authorized(actor, grant)) {
+    if ((!row || row.path === "parent") && await this.parent.enrolled(actor.authId) && !await this.parent.authorized(actor, grant)) {
       return { active: !!row?.block_legacy, path: row?.path ?? null, revision: row?.revision ?? 0,
         status: "parent_verification_required", fixtureOnly: true };
     }
@@ -187,7 +187,9 @@ export class HighSchoolOnboarding {
     const canonical = this.liveFamily || this.staffDecisions && await this.staffDecisions.installed();
     const creator= canonical ? await tx.query(`SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
       WHERE m.user_id=$1::text AND m.child_profile_id IS NULL AND m.status='approved' AND t.program_type='high_school'
-      AND t.program_id=$2 AND(m.role='athletic_director' OR(m.role='head_coach' AND t.id=$3::text))`,
+      AND t.program_id=$2 AND(m.role='athletic_director' OR(m.role='head_coach' AND t.id=$3::text))
+      UNION ALL SELECT 1 FROM public.leagues l JOIN hs_onboarding.programs p ON p.league_id::text=l.id
+      WHERE l.commissioner_id=$1::text AND p.id=$2 AND l.league_type IN('high_school','youth')`,
     [row.created_by,row.program_id,row.team_id]) : await tx.query(`SELECT 1 FROM hs_onboarding.staff_requests WHERE auth_id=$1 AND program_id=$2 AND status='approved'
       AND (role='athletic_director' OR (role='head_coach' AND team_id=$3))`,[row.created_by,row.program_id,row.team_id]);
     if(!creator.rows.length) fail("INVALID_INVITATION",403);
@@ -239,7 +241,9 @@ export class HighSchoolOnboarding {
         const canonical = this.staffDecisions && await this.staffDecisions.installed();
         const creatorIsAd=(canonical ? await tx.query(`SELECT 1 FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
           WHERE m.user_id=$1::text AND m.child_profile_id IS NULL AND m.role='athletic_director' AND m.status='approved'
-          AND t.program_type='high_school' AND t.program_id=$2`,[invite.created_by,invite.program_id])
+          AND t.program_type='high_school' AND t.program_id=$2
+          UNION ALL SELECT 1 FROM public.leagues l JOIN hs_onboarding.programs p ON p.league_id::text=l.id
+          WHERE l.commissioner_id=$1::text AND p.id=$2 AND l.league_type IN('high_school','youth')`,[invite.created_by,invite.program_id])
           : await tx.query("SELECT 1 FROM hs_onboarding.staff_requests WHERE auth_id=$1 AND program_id=$2 AND role='athletic_director' AND status='approved'",[invite.created_by,invite.program_id])).rows.length;
         if(!creatorIsAd && !["assistant_coach","team_manager"].includes(invite.staff_role)) fail("INVALID_INVITATION",403);
         const id=randomUUID();

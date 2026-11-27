@@ -17,6 +17,8 @@ import { registerHighSchoolYouthRoutes } from './highSchoolYouthHttp';
 import { TeamSkinService } from './teamSkinService';
 import { registerTeamSkinRoutes } from './teamSkinHttp';
 import { HighSchoolStaffOperations } from './highSchoolStaffOperations';
+import { SchoolLeagueManagement } from "./schoolLeagueManagement";
+import { registerSchoolLeagueManagement } from "./schoolLeagueManagementHttp";
 import { HighSchoolStaffEvents } from './highSchoolStaffEvents';
 import { HighSchoolStaffChat } from './highSchoolStaffChat';
 import { registerHighSchoolStaffRoutes } from './highSchoolStaffHttp';
@@ -65,7 +67,7 @@ async function verifiedAdultSocketUser(accessToken: string, parentGrant?: string
   if (error || !user) return null;
   const parent = parentSecurity();
   if (parent) {
-    try { await requireDevParentAuthority(parent, user.id, accessToken, parentIssuer(), parentGrant); }
+    try { await requireDevParentAuthority(parent, user.id, accessToken, parentIssuer(), parentGrant, "adult_account"); }
     catch { return null; }
     // Revoked Auth sessions must not survive through a still-unexpired JWT.
     try {
@@ -140,6 +142,7 @@ export async function setupAuth(app: Express) {
     registerHighSchoolYouthRoutes(app,youth,children,authenticateOnboarding);
     registerTeamSkinRoutes(app,new TeamSkinService(pool,id=>storage.getUserTeams(id)),parent,children,authenticateOnboarding);
     const staff = new HighSchoolStaffOperations(pool, existingStaffPaymentEligibility);
+    registerSchoolLeagueManagement(app, new SchoolLeagueManagement(pool), authenticateOnboarding);
     onboarding.staffDecisions = staff;
     registerHighSchoolStaffRoutes(app,staff,new HighSchoolStaffEvents(pool),new HighSchoolStaffChat(pool),parent,authenticateOnboarding);
     const family = new HighSchoolFamilySetup(pool, parent, async (id, leagueId) =>
@@ -195,14 +198,13 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     if(await onboardingSecurity()?.blocksLegacy(user.id,user.email,!!user.email_confirmed_at)){
       return res.status(403).json({code:"HS_ONBOARDING_PENDING",message:"Finish the guarded DEV onboarding flow before using adult APIs."});
     }
-    // Normal Home and app reads use the existing authenticated account.
-    // Mutations retain the parent proof; Family/child routes have independent
-    // guards and never inherit this read-only distinction.
+    // Adult sign-in and child-device access are separate credentials. Ordinary
+    // adult actions use route-specific permissions, not Family enrollment.
+    // Parent/child-device/password endpoints enforce their own additional proof.
     const parent = parentSecurity();
     if (parent) {
       try {
-        await requireDevParentAuthority(parent, user.id, token, parentIssuer(), req.get(parentGrantHeader),
-          req.method === "GET" || req.method === "HEAD" ? "account_read" : "parent_action");
+        await requireDevParentAuthority(parent, user.id, token, parentIssuer(), req.get(parentGrantHeader), "adult_account");
       } catch (error) { return parentErrorResponse(res, error); }
     }
     if (await isRetiredAccount(user.id, user.email)) {

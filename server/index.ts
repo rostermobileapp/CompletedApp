@@ -104,10 +104,9 @@ app.use((req, res, next) => {
       const privateAwardResponse = path.includes('/awards') || path.startsWith('/api/team-awards/');
       if (capturedJsonResponse && !path.startsWith('/api/iap/') &&
           !path.startsWith('/api/organizer-card-payments/') &&
-          !path.startsWith('/api/high-school/parent-verification/') &&
-          !path.startsWith('/api/high-school/family/') &&
-          !path.startsWith('/api/high-school/child-device/') &&
-          !path.startsWith('/api/high-school/onboarding/') && !privateAwardResponse) {
+          // School responses include guardian/child data and invitation/device
+          // capabilities. New private routes must inherit the same redaction.
+          !path.startsWith('/api/high-school/') && !privateAwardResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

@@ -49,7 +49,7 @@ import CreateScrimmage from "@/pages/CreateScrimmage";
 import ScrimmageManagement from "@/pages/ScrimmageManagement";
 import InviteGroups from "@/pages/InviteGroups";
 import EditInviteGroup from "@/pages/EditInviteGroup";
-import LeagueManagement from "@/pages/LeagueManagement";
+import LeagueManagement from "@/pages/LeagueManagementEntry";
 import DraftRoom from "@/pages/DraftRoom";
 import LeagueList from "@/pages/LeagueList";
 import Calendar from "@/pages/Calendar";

@@ -31,17 +31,20 @@ close/reopen in transport checks. Retain account/session binding and separate
 password-purpose proof. Confirm the released frontend and actual native-device
 behavior separately before claiming the phone issue is fixed.
 
-Family-enrolled adults can also be league administrators or coaches. When an
-adult write requires parent proof, provide a verification continuation rather
-than removing the proof requirement or showing only a generic role failure.
-Preserve in-progress form data across the account boundary's proof remount,
-scope temporary drafts to the actor and tab, and require explicit resubmission
-after verification rather than automatically replaying a creation request.
+Family-enrolled adults can also be league administrators or coaches. Ordinary
+adult actions use the verified adult login, active provider session and actual
+league/team permissions, not an extra parent code. Parent-only Family and
+password operations still require their own additional proof. Children use only
+approved child-device/setup-code credentials, never a shared adult password.
 
 **Why:** During the combined admin/parent testing setup, league creation was
-rejected by the Family write guard before league permissions ran. Shared-login
-credentials alone must not gain adult write authority.
+rejected by the Family write guard before league permissions ran. On 2026-11-27
+the owner explicitly replaced the shared-password child model with approved
+child-device sessions. A previously shared adult password must be changed once
+before releasing/using that separation; this approval does not rotate passwords.
 
 **How to apply:** Keep server checks and league permissions independent.
-Allow only known local return destinations, preserve the normal Family
-continuation, and never store verification credentials inside form drafts.
+Prove child tokens cannot pass the provider-authenticated adult boundary, and
+that account and role revocation remain effective. Creation should open the
+selected management workspace directly, not a Family verification detour.
+Preserve normal protected Family continuation and separate password proof.

@@ -32,11 +32,13 @@ export function registerHighSchoolYouthRoutes(
       return work(req, actor, grant);
     });
   const base = "/api/high-school/onboarding";
-  app.post(`${base}/hockey-type`, parent((req, actor) => service.hockeyType(actor, req.body)));
-  app.post(`${base}/journey`, parent((req, actor, grant) => service.journey(actor, req.body, grant)));
-  app.get(`${base}/referral-partners`, parent((_req, actor) => service.referralPartners(actor)));
-  app.get(`${base}/league-draft`, parent((_req, actor, grant) => service.leagueDraft(actor, grant)));
-  app.post(`${base}/league-draft`, parent((req, actor, grant) => service.saveLeagueDraft(actor, req.body, grant)));
+  const adult = (work: (req: Request, actor: OnboardingActor, grant?: string) => Promise<unknown>) =>
+    respond(async req => work(req, await authenticate(req), req.get(parentGrantHeader)));
+  app.post(`${base}/hockey-type`, adult((req, actor) => service.hockeyType(actor, req.body)));
+  app.post(`${base}/journey`, adult((req, actor, grant) => service.journey(actor, req.body, grant)));
+  app.get(`${base}/referral-partners`, adult((_req, actor) => service.referralPartners(actor)));
+  app.get(`${base}/league-draft`, adult((_req, actor, grant) => service.leagueDraft(actor, grant)));
+  app.post(`${base}/league-draft`, adult((req, actor, grant) => service.saveLeagueDraft(actor, req.body, grant)));
   app.get(`${base}/children`, parent((_req, actor, grant) => children.children(actor, grant)));
   app.get(`${base}/child-chats`, parent((_req,actor,grant)=>children.parentChats(actor,grant)));
   app.get(`${base}/child-chats/:id/messages`,parent((req,actor,grant)=>children.parentMessages(actor,req.params.id,grant)));

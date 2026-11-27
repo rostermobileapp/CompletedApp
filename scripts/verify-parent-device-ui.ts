@@ -223,7 +223,7 @@ try {
     assert.equal(await page.getByRole("button", { name: "Email a verification code", exact: true }).count(), 0);
     await page.getByRole("button", { name: "Change password", exact: true }).click();
     await page.getByRole("button", { name: "Email a verification code", exact: true }).waitFor();
-    assert.equal(await page.getByLabel("New shared password", {exact:true}).count(), 0);
+    assert.equal(await page.getByLabel("New parent password", {exact:true}).count(), 0);
     await page.getByRole("button", { name: "Parent controls", exact: true }).click();
     assert.equal(mail.length, 1); checks++;
     await page.getByRole("button", { name: "Continue to family setup", exact: true }).click();

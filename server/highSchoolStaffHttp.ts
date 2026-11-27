@@ -2,14 +2,13 @@ import type { Express, Request, RequestHandler } from "express";
 import { z } from "zod";
 import { OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
 import { HighSchoolParentSecurity, ParentSecurityError, isParentSecurityDevelopment } from "./highSchoolParentSecurity";
-import { parentGrantHeader } from "./highSchoolParentHttp";
 import type { HighSchoolStaffOperations } from "./highSchoolStaffOperations";
 import type { HighSchoolStaffEvents } from "./highSchoolStaffEvents";
 import type { HighSchoolStaffChat } from "./highSchoolStaffChat";
 import { importText, previewEvents, previewRoster } from "./highSchoolStaffImports";
 
 export function registerHighSchoolStaffRoutes(app: Express, staff: HighSchoolStaffOperations,
-  events: HighSchoolStaffEvents, chat: HighSchoolStaffChat, parent: HighSchoolParentSecurity,
+  events: HighSchoolStaffEvents, chat: HighSchoolStaffChat, _parent: HighSchoolParentSecurity,
   authenticate: (req: Request) => Promise<OnboardingActor>, allowProduction = false) {
   const base = "/api/high-school/staff/teams/:teamId";
   const handle = (work: (req: Request, actor: OnboardingActor) => Promise<unknown>): RequestHandler => async (req, res) => {
@@ -17,8 +16,8 @@ export function registerHighSchoolStaffRoutes(app: Express, staff: HighSchoolSta
     if (!isParentSecurityDevelopment() && !allowProduction) { res.sendStatus(404); return; }
     try {
       const actor = await authenticate(req);
-      if (await parent.enrolled(actor.authId) && !await parent.authorized(actor, req.get(parentGrantHeader)))
-        throw new ParentSecurityError("PARENT_VERIFICATION_REQUIRED", 403);
+      // Actor verification and canonical staff authority are independent of
+      // whether this adult also has parent responsibilities.
       if (!await staff.installed()) throw new OnboardingError("DEV_STAFF_INSTALL_REQUIRED", 503);
       res.json(await work(req, actor));
     } catch (error) {

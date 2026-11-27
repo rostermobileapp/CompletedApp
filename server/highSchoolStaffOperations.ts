@@ -151,7 +151,7 @@ export class HighSchoolStaffOperations extends StaffBase {
     const row = (await db.query(`SELECT r.*,p.league_id,p.status AS program_status FROM hs_onboarding.staff_requests r
       JOIN hs_onboarding.programs p ON p.id=r.program_id WHERE r.id=$1 FOR UPDATE OF r`, [id])).rows[0];
     if (!row || row.auth_id === actor.authId || (scope && row.program_id !== scope.programId)) staffFail("APPROVAL_FORBIDDEN", 403);
-    const league = !!(await db.query(actor.productionTest
+    const league = !!(await db.query(actor.productionTest || this.leagueAdministration
       ?"SELECT 1 FROM public.leagues WHERE commissioner_id=$1::text AND id=$2::text"
       :"SELECT 1 FROM hs_onboarding.league_approvers WHERE auth_id=$1 AND league_id=$2", [actor.authId, row.league_id])).rows.length;
     const authorities = (await db.query(`SELECT m.role,m.team_id FROM public.team_memberships m JOIN public.teams t ON t.id=m.team_id
