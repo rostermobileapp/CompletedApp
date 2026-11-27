@@ -78,6 +78,18 @@ do not add email notifications for chat.
 
 ## Restricted production onboarding testing
 
+For the next testing round, the owner designated this setup on November 27, 2026:
+- **U00001:** admin of a new High School league, and parent of a child on the
+  coach's team.
+- **U00250:** coach in that same league.
+
+**Why:** The owner explicitly asked to retain this arrangement for future
+testing, covering league administration, coaching and parent-child access.
+
+**How to apply:** Use this relationship when preparing future test scenarios.
+This records the intended setup only; it does not authorize creating the league,
+changing account roles, enrolling a child or modifying production data.
+
 The owner wants to test the complete onboarding and coach/parent journeys in
 production, restricted to explicitly selected existing test accounts rather
 than all users. The owner will handle the Vercel frontend deployment.
