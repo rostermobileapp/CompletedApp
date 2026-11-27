@@ -11,12 +11,25 @@ League Management now has separate Add school and Add program forms. A program
 requires a selected school. Existing programs can be renamed or explicitly
 relinked without changing their IDs, teams, staff, players, or consent.
 
-## Database installation requires separate approval
+## Database installation
 
 `migrations/0060_school_program_separation.sql` targets the existing external
 Supabase database and requires the private `hs_onboarding` foundation.
-It has only been executed against disposable loopback test databases.
-Do not treat code approval as authorization to modify production.
+The owner explicitly approved this specific database update on November 27,
+2026, after the disposable loopback tests passed. It has now been applied to the
+validated external production Supabase database.
+
+Read-only preflight found zero existing programs, teams and staff requests in the
+private onboarding registry, so no School records needed to be backfilled.
+The existing child record and canonical school-team memberships were preserved.
+Post-installation verification confirmed RLS, restricted table privileges,
+the foreign key, the unique program-name index and no unlinked programs.
+
+`scripts/install-school-program-separation.ts` requires an explicit read-only or
+owner-authorized apply mode, validates the production target separately from DEV,
+and checks record preservation before committing. It is not a startup hook.
+Future database changes still require their own authorization; this approval is
+not permission for further schema/data updates or publishing.
 
 The migration:
 
@@ -49,8 +62,8 @@ The database update and matching backend/frontend are all required.
 A newer frontend against the older backend shows an explicit update error;
 the backend also reports an explicit missing-schema error.
 
-No production database, account, password, invitation delivery or rollout
-allowlist was changed as part of implementation. Existing parent verification,
+Only the separately approved database structure update was applied. No account,
+password, invitation delivery or rollout allowlist was changed. Existing parent verification,
 child-device isolation, invite-only team entry and canonical staff authority
 remain independent. The previously documented adult-password cutover
 prerequisite still applies.
