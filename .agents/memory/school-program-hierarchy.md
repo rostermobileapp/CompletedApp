@@ -36,6 +36,23 @@ initial creation. This describes intended organization, not evidence that every
 associated settings field already exists. Label examples as illustrative and
 never create example schools, programs or teams without an explicit request.
 
+## Setup views and navigation
+
+The three setup cards show counts of schools, programs and teams. The active
+highlight represents the step the administrator is viewing, not an inferred
+completion stage. Only the selected step's inputs and records belong in its
+main content area; do not show the full school/program/team tree alongside it.
+Step 1 includes existing school rows with Edit and Delete controls.
+
+**Why:** The owner explicitly corrected the all-steps-visible design and
+emphasized that no other step's information should appear while viewing a step.
+They requested a visible notice that steps are clickable.
+
+**How to apply:** Keep step selection independent of saved record counts.
+Forward navigation slides the next panel in from the right and moves the old
+panel left; backward navigation reverses that direction. Preserve this isolation
+when changing setup or adding actions.
+
 ## Scoped editing permissions
 
 League administrators cannot edit team lines or message players through their
