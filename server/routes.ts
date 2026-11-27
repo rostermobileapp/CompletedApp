@@ -61,6 +61,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db, pool } from "./db";
+import { TeamEntryPolicy, enforceTeamEntry } from "./teamEntryPolicy";
 import { getTeamStreaks } from "./teamStreaks";
 import {
   finalizeScorekeeperGame,
@@ -7285,7 +7286,8 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
       const { sport, search } = req.query;
       const leagues = await storage.getLeagues(
         sport as string,
-        search as string
+        search as string,
+        true
       );
       // Explicitly map to ensure uniqueLeagueId is present
       const mappedLeagues = leagues.map(league => ({
@@ -8008,7 +8010,8 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   });
 
   // League membership routes
-  app.post("/api/leagues/:id/join", isAuthenticated, async (req: any, res) => {
+  app.post("/api/leagues/:id/join", isAuthenticated,
+    enforceTeamEntry(req => new TeamEntryPolicy(pool).publicLeagueJoin(req.params.id)), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const leagueId = req.params.id;
@@ -8189,7 +8192,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   });
 
   // Update league member details (team assignment, captain role, position, etc.)
-  app.patch("/api/leagues/:leagueId/members/:memberId", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/leagues/:leagueId/members/:memberId", isAuthenticated,
+    enforceTeamEntry(async req => {
+      if (typeof req.body?.assignedTeamId === "string" && req.body.assignedTeamId) {
+        await new TeamEntryPolicy(pool).teamAssignment(req.params.leagueId, req.body.assignedTeamId);
+      }
+    }), async (req: any, res) => {
     try {
       const { leagueId, memberId } = req.params;
       const userId = req.user.claims.sub;
@@ -8648,7 +8656,8 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     }
   });
 
-  app.post("/api/league-memberships/:id/approve", isAuthenticated, async (req: any, res) => {
+  app.post("/api/league-memberships/:id/approve", isAuthenticated,
+    enforceTeamEntry(req => new TeamEntryPolicy(pool).membershipDecision(req.params.id, req.user.claims.sub)), async (req: any, res) => {
     try {
       const membershipId = req.params.id;
       const userId = req.user.claims.sub;
@@ -8683,7 +8692,8 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     }
   });
 
-  app.post("/api/league-memberships/:id/reject", isAuthenticated, async (req: any, res) => {
+  app.post("/api/league-memberships/:id/reject", isAuthenticated,
+    enforceTeamEntry(req => new TeamEntryPolicy(pool).membershipDecision(req.params.id, req.user.claims.sub)), async (req: any, res) => {
     try {
       const membershipId = req.params.id;
       const userId = req.user.claims.sub;
@@ -9059,6 +9069,21 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
   });
 
   // Team routes
+  // Register static discovery before :id so "search" is never a team ID.
+  app.get('/api/teams/search', isAuthenticated, async (req, res) => {
+    try {
+      const { search } = req.query;
+      const teams = await storage.searchTeams(search as string);
+      res.json(teams.map(team => ({
+        ...team,
+        uniqueTeamId: team.uniqueTeamId || (team as any).unique_team_id,
+      })));
+    } catch (error) {
+      console.error('Error searching teams:', error);
+      res.status(500).json({ message: 'Failed to search teams' });
+    }
+  });
+
   app.get("/api/teams/:id", isAuthenticated, async (req: any, res) => {
     try {
       const teamId = req.params.id;
@@ -9073,7 +9098,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     }
   });
 
-  app.post("/api/teams", isAuthenticated, async (req: any, res) => {
+  app.post("/api/teams", isAuthenticated,
+    enforceTeamEntry(async req => {
+      if (typeof req.body?.leagueId === "string" && req.body.leagueId) {
+        await new TeamEntryPolicy(pool).teamCreation(req.body.leagueId, req.user.claims.sub);
+      }
+    }), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const teamData = insertTeamSchema.parse(req.body);
@@ -11302,30 +11332,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     }
   });
 
-  app.get('/api/teams/search', async (req, res) => {
-    try {
-      const { search } = req.query;
-      const teams = await storage.searchTeams(search as string);
-      
-      // Map to ensure uniqueTeamId is in camelCase
-      const mappedTeams = teams.map(team => ({
-        ...team,
-        uniqueTeamId: team.uniqueTeamId || (team as any).unique_team_id
-      }));
-      
-      res.json(mappedTeams);
-    } catch (error) {
-      console.error('Error searching teams:', error);
-      res.status(500).json({ message: 'Failed to search teams' });
-    }
-  });
-
   app.get('/api/teams/by-code/:uniqueTeamId', async (req, res) => {
     try {
       const { uniqueTeamId } = req.params;
       const team = await storage.getTeamByUniqueId(uniqueTeamId.toUpperCase());
       
-      if (!team) {
+      if (!team || !await new TeamEntryPolicy(pool).discoverableTeam(team.id)) {
         return res.status(404).json({ message: 'Team not found' });
       }
       
@@ -11507,7 +11519,12 @@ export async function registerRoutes(app: Express, services: RouteServices = {})
     }
   });
 
-  app.post('/api/teams/:teamId/join-league', isAuthenticated, async (req: any, res) => {
+  app.post('/api/teams/:teamId/join-league', isAuthenticated,
+    enforceTeamEntry(async req => {
+      if (typeof req.body?.leagueId === "string" && req.body.leagueId) {
+        await new TeamEntryPolicy(pool).publicLeagueJoin(req.body.leagueId);
+      }
+    }), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { teamId } = req.params;

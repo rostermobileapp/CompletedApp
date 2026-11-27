@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Users } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { getImageUrl } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 
 export default function TeamSearch() {
   const [search, setSearch] = useState('');
@@ -15,8 +15,7 @@ export default function TeamSearch() {
       const params = new URLSearchParams();
       if (committedSearch) params.append('search', committedSearch);
       
-      const response = await fetch(`/api/teams/search?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch teams');
+      const response = await apiRequest('GET', `/api/teams/search?${params}`);
       return response.json();
     },
     enabled: committedSearch.trim().length > 0,

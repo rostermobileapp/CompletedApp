@@ -161,21 +161,17 @@ export class HighSchoolOnboarding {
         await this.event(tx,actor,"per_player_consent_draft_saved");
       } else {
         if(Boolean(data.newSchool)===Boolean(data.programId)) fail("CHOOSE_SCHOOL_OR_REQUEST");
-        let programId=data.programId;
-        if(data.newSchool) {
-          if(!["head_coach","athletic_director"].includes(data.role)) fail("SCHOOL_CREATION_ROLE_REQUIRED",403);
-          if(!(await tx.query("SELECT 1 FROM hs_onboarding.leagues WHERE id=$1",[data.newSchool.leagueId])).rows.length) fail("UNKNOWN_LEAGUE");
-          programId=randomUUID();
-          await tx.query("INSERT INTO hs_onboarding.programs(id,league_id,name,town,status,requested_by) VALUES($1,$2,$3,$4,'pending',$5)",
-            [programId,data.newSchool.leagueId,data.newSchool.name,data.newSchool.town,actor.authId]);
-        } else {
-          const program=(await tx.query("SELECT * FROM hs_onboarding.programs WHERE id=$1 AND(status='approved' OR requested_by=$2)",[programId,actor.authId])).rows[0];
-          if(!program) fail("UNKNOWN_SCHOOL");
-          if(!data.teamId) fail("TEAM_REQUIRED");
-          if(!(await tx.query("SELECT 1 FROM hs_onboarding.teams WHERE id=$1 AND program_id=$2",[data.teamId,programId])).rows.length) fail("WRONG_SCHOOL_TEAM");
-        }
+        // Existing-team staff entry must use lookupInvitation, which validates
+        // the recipient, expiry, inviter's current authority and invited role.
+        if(!data.newSchool) throw new OnboardingError("INVITATION_REQUIRED",403);
+        if(data.teamId) fail("NEW_SCHOOL_TEAM_NOT_ALLOWED");
+        if(!["head_coach","athletic_director"].includes(data.role)) fail("SCHOOL_CREATION_ROLE_REQUIRED",403);
+        if(!(await tx.query("SELECT 1 FROM hs_onboarding.leagues WHERE id=$1",[data.newSchool.leagueId])).rows.length) fail("UNKNOWN_LEAGUE");
+        const programId=randomUUID();
+        await tx.query("INSERT INTO hs_onboarding.programs(id,league_id,name,town,status,requested_by) VALUES($1,$2,$3,$4,'pending',$5)",
+          [programId,data.newSchool.leagueId,data.newSchool.name,data.newSchool.town,actor.authId]);
         const id=randomUUID();
-        await tx.query("INSERT INTO hs_onboarding.staff_requests(id,auth_id,program_id,team_id,role) VALUES($1,$2,$3,$4,$5)",[id,actor.authId,programId,data.teamId??null,data.role]);
+        await tx.query("INSERT INTO hs_onboarding.staff_requests(id,auth_id,program_id,team_id,role) VALUES($1,$2,$3,NULL,$4)",[id,actor.authId,programId,data.role]);
         await tx.query("UPDATE hs_onboarding.flows SET status='waiting_approval',draft=$2,revision=revision+1,updated_at=now() WHERE auth_id=$1",
           [actor.authId,{role:data.role,programId,teamId:data.teamId??null,requestId:id}]);
         await this.event(tx,actor,"staff_approval_requested",id);

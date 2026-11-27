@@ -10,7 +10,7 @@ import {
   AdultRoleScreen, HighSchoolRoleScreen, HockeyTypeScreen, SignupEntryScreen,
 } from "@/components/high-school-onboarding/EntryScreens";
 import {
-  FindSchoolScreen, PickTeamScreen, StaffRoleScreen, StaffWaitingScreen,
+  StaffInvitationScreen, StaffRoleScreen, StaffWaitingScreen,
 } from "@/components/high-school-onboarding/StaffScreens";
 import {
   LeagueDetailsScreen, LeagueInvitesScreen, LeaguePlanScreen, LeagueScheduleScreen,
@@ -290,24 +290,22 @@ export default function HighSchoolYouthOnboarding({request=realRequest,authentic
   else if(view==="referral")screen=<ReferralScreen partners={partners} partnerId={referralPartnerId} source={referral} otherSource={otherReferral} locked={!!latestState.current?.journey?.referralPartnerId||!!latestState.current?.journey?.referralSourceOther} onPartner={setReferralPartnerId} onSource={setReferral} onOther={setOtherReferral} onBack={()=>setView("hs-role")} onContinue={saveReferral} busy={busy}/>;
   else if(view==="profile")screen=<ProfileScreen profile={profile} update={patch=>setProfile(current=>({...current,...patch}))} onBack={()=>setView("referral")} onContinue={saveProfile} busy={busy}/>;
   else if(view==="staff-role")screen=<StaffRoleScreen role={staffRole} setRole={setStaffRole} onBack={()=>setView("hs-role")} onContinue={()=>void go("staff-school","staff_role",{staffRole})} busy={busy}/>;
-  else if(view==="staff-school")screen=<FindSchoolScreen search={search} setSearch={setSearch} programs={programs} selectedProgram={programId} selectProgram={id=>{setProgramId(id);setTeamId("");}} loading={catalogLoading} onRetry={()=>setSearch(search+" ")} onBack={()=>setView("staff-role")}
+  else if(view==="staff-school"||view==="staff-team")screen=<StaffInvitationScreen invitation={entry} setInvitation={setEntry} onBack={()=>setView("staff-role")} busy={busy}
     onAddSchool={["head_coach","athletic_director"].includes(staffRole)?()=>setView("staff-new-school"):undefined}
-    onContinue={()=>{const selected=programs.find(p=>p.id===programId);void run(async()=>{if(!selected)throw new Error("Choose a school before continuing.");setTeamId("");await progress("staff_team",{programId:selected.id,teamId:null});setView("staff-team");});}}/>;
+    onContinue={()=>void run(async()=>{
+      await request("POST",`${API}/lookup`,{revision:latestState.current.revision,invitation:entry.trim()});
+      const next=await refresh();
+      setProgramId(next.draft?.programId??"");setTeamId(next.draft?.teamId??"");
+      setStaffRole(next.draft?.role??staffRole);setEntry("");
+      await progress("staff_waiting");setView("staff-wait");
+      setMessage("Invitation matched. Team access still requires staff approval.");
+    })}/>;
   else if(view==="staff-new-school")screen=<StaffSchoolRequestScreen value={schoolRequest} update={patch=>setSchoolRequest(current=>({...current,...patch}))} leagues={schoolLeagues} busy={busy} onBack={()=>setView("staff-school")} onSubmit={()=>void run(async()=>{
     await request("POST",`${API}/draft`,{kind:"staff",revision:latestState.current.revision,role:staffRole,newSchool:schoolRequest});
     const next=await refresh();
     setProgramId(next.draft?.programId??"");setTeamId("");
     await progress("staff_waiting",{staffRole,programId:next.draft?.programId??null,teamId:null});setView("staff-wait");
   })}/>;
-  else if(view==="staff-team"){
-    const program=programs.find(p=>p.id===programId);
-    screen=<PickTeamScreen program={program} teamId={teamId} setTeamId={setTeamId} roleName={roleNames[staffRole]??"Staff"} onBack={()=>setView("staff-school")} busy={busy} onContinue={()=>void run(async()=>{
-       await progress("staff_team",{programId,teamId});
-       await request("POST",`${API}/draft`,{kind:"staff",revision:latestState.current.revision,role:staffRole,programId,teamId});
-       const next=await refresh();
-       if(next.status!=="draft"){await progress("staff_waiting");setView("staff-wait");}else setView("staff-team");
-    })}/>;
-  }
   else if(view==="staff-wait")screen=<StaffWaitingScreen status={state?.status??"waiting_approval"} programName={programs.find(p=>p.id===programId)?.name} teamName={programs.find(p=>p.id===programId)?.teams?.find((t:any)=>t.id===teamId)?.name} roleName={roleNames[staffRole]??staffRole} onBack={()=>setView("staff-team")} busy={busy} onRefresh={()=>void run(refresh)}/>;
   else if(view==="parent-add")screen=<AddPlayersScreen players={players} update={updatePlayer} add={()=>setPlayers(current=>current.length<HS_MAX_FAMILY_PLAYERS?[...current,newPlayer()]:current)} remove={id=>players.length>1&&setPlayers(players.filter(p=>p.id!==id))} onBack={()=>setView("profile")} onContinue={()=>void run(async()=>{setConsentIndex(0);await progress("parent_consent");setView("parent-consent");})} busy={busy}/>;
   else if(view==="parent-consent")screen=<ConsentScreen player={players[consentIndex]??players[0]} index={consentIndex} total={players.length} guardian={guardian} setGuardian={setGuardian} update={patch=>updatePlayer(players[consentIndex]?.id,patch)} onBack={()=>consentIndex?setConsentIndex(consentIndex-1):setView("parent-add")} onContinue={nextConsent} busy={busy}/>;

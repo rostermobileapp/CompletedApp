@@ -37,6 +37,21 @@ export function FindSchoolScreen({ search, setSearch, programs, selectedProgram,
   </ScreenFrame>;
 }
 
+export function StaffInvitationScreen({ invitation, setInvitation, onBack, onContinue, onAddSchool, busy }: {
+  invitation: string; setInvitation: (value: string) => void; onBack: () => void; onContinue: () => void;
+  onAddSchool?: () => void; busy?: boolean;
+}) {
+  return <ScreenFrame header={<StepHeader step={2} total={4} onBack={onBack}/>}
+    action={<button className="hsy-primary" disabled={!invitation.trim() || busy} onClick={onContinue}>Use invitation</button>}>
+    <section className="hsy-content"><h1>Join with an invitation</h1>
+      <p className="hsy-subtitle">High School and Youth teams are invite-only. Ask your head coach, athletic director or league admin for an invitation.</p>
+      <Field label="Invitation code" value={invitation} onChange={setInvitation} placeholder="Enter your invitation code"/>
+      <div className="hsy-card tint" style={{marginTop:18}}>Your invitation must match your account. Team IDs and school searches cannot be used to request access.</div>
+      {onAddSchool && <button className="hsy-secondary" style={{width:"100%",marginTop:20}} onClick={onAddSchool}>Set up a new school</button>}
+    </section>
+  </ScreenFrame>;
+}
+
 export function PickTeamScreen({ program, teamId, setTeamId, roleName, onBack, onContinue, busy }: {
   program?: any; teamId: string; setTeamId: (v: string) => void; roleName: string; onBack: () => void; onContinue: () => void; busy?: boolean;
 }) {

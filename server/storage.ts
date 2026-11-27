@@ -1,4 +1,5 @@
 import { hasOneGoalMargin } from "@shared/gameResultType";
+import { publicLeagueDiscoveryCondition, publicTeamDiscoveryCondition } from "./teamEntryPolicy";
 import { resolveTeamJerseyNumber } from "./teamJerseyNumber";
 import { leagueStatsPlayerEligible, leagueStatsTeamEligible } from "./leagueStatsEligibility";
 import { readActiveProSeats, readHasActiveProSeat } from "./proSeatReader";
@@ -374,7 +375,7 @@ export interface IStorage {
   
   // League operations
   createLeague(league: InsertLeague): Promise<League>;
-  getLeagues(sport?: string, search?: string): Promise<League[]>;
+  getLeagues(sport?: string, search?: string, publicDiscovery?: boolean): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
   getUserLeagues(userId: string): Promise<(League & { hasActiveSeason?: boolean; pastSeasons?: { id: string; name: string; startDate: Date | null }[] })[]>;
   getLeaguesByCommissioner(commissionerId: string): Promise<League[]>;
@@ -2359,7 +2360,7 @@ export class DatabaseStorage implements IStorage {
     return newLeague;
   }
 
-  async getLeagues(sport?: string, search?: string): Promise<League[]> {
+  async getLeagues(sport?: string, search?: string, publicDiscovery = false): Promise<League[]> {
     const conditions: any[] = [
       notExists(
         db
@@ -2369,6 +2370,7 @@ export class DatabaseStorage implements IStorage {
       ),
     ];
     
+    if (publicDiscovery) conditions.push(publicLeagueDiscoveryCondition);
     if (sport && sport !== "all") {
       conditions.push(eq(leagues.sport, sport as any));
     }
@@ -3653,7 +3655,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(teams)
       .leftJoin(leagues, eq(teams.leagueId, leagues.id))
-      .where(ilike(teams.uniqueTeamId, `%${search}%`));
+      .where(and(ilike(teams.uniqueTeamId, `%${search}%`), publicTeamDiscoveryCondition));
 
     return results.map(r => ({
       ...r.team,

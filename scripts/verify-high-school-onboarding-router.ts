@@ -110,9 +110,11 @@ const bundle = await build({
 type Fixture = {
   enrolled: boolean; active: boolean; completed: boolean; path: string | null;
   statusError?: boolean; stateError?: boolean; revoked?: boolean; challengePurpose?: string;
+  staffDraft?: boolean; staffInvited?: boolean;
   calls: { method: string; path: string }[]; unexpected: string[];
 };
 const fixtures = new Map<string, Fixture>();
+const staffInvitationOnly = process.argv.includes("--staff-invitation-only");
 const fixtureGrant = "g".repeat(43);
 // Deliberately unsigned, synthetic session envelopes. Never sent outside loopback.
 const session = (id: string) => `fixture.${Buffer.from(JSON.stringify({ sub: "router-synthetic-adult", session_id: id })).toString("base64url")}.not-a-signature`;
@@ -133,8 +135,10 @@ app.use("/api", (req, res) => {
     return res.json({
       active: f.active, path: f.path, revision: 0,
       hockeyType: f.path ? ["player","organizer"].includes(f.path) ? "adult" : "high_school_youth" : undefined,
-      ...((f.path==="staff"||f.path==="parent"&&verified)?{journey:{profile:{firstName:"Fixture",lastName:"Adult",timezone:"America/New_York"}}}:{}),
-      status: f.path === "parent" ? verified ? "draft" : "parent_verification_required" : f.path === "staff" ? "waiting_approval" : "choose",
+      ...((f.path==="staff"||f.path==="parent"&&verified)?{journey:{profile:{firstName:"Fixture",lastName:"Adult",timezone:"America/New_York"},
+        ...(f.staffDraft?{programId:"synthetic-school",teamId:"synthetic-team",staffRole:"assistant_coach"}:{})}}:{}),
+      status: f.path === "parent" ? verified ? "draft" : "parent_verification_required" : f.path === "staff" ? f.staffDraft&&!f.staffInvited?"draft":"waiting_approval" : "choose",
+      ...(f.staffInvited?{draft:{programId:"synthetic-school",teamId:"synthetic-team",role:"assistant_coach"}}:{}),
       ...(f.path === "parent" && verified ? { draft: { guardianConfirmed: false, players: [{
         id: "00000000-0000-4000-8000-000000000009", firstName: "RouterFixtureChild", lastName: "Example",
         gradYear: 2030, position: "F", jerseyNumber: "", consent: false, photoConsent: false, publicNameConsent: false,
@@ -143,6 +147,11 @@ app.use("/api", (req, res) => {
   }
   if (req.method === "GET" && requestPath.startsWith("/high-school/onboarding/catalog")) return res.json({ programs: [], leagues: [] });
   if (req.method === "GET" && requestPath === "/high-school/onboarding/referral-partners") return res.json([]);
+  if (req.method === "POST" && requestPath === "/high-school/onboarding/lookup" && f.staffDraft) {
+    if(req.body.invitation!=="SyntheticStaffInvitationForUiTesting12345") return res.status(403).json({code:"INVALID_INVITATION",message:"Invitation is invalid or expired."});
+    f.staffInvited=true;return res.json({matched:true});
+  }
+  if (req.method === "POST" && requestPath === "/high-school/onboarding/journey" && f.staffDraft) return res.json({revision:1});
   if (req.method === "POST" && requestPath === "/high-school/onboarding/hockey-type") return res.json({saved:true,hockeyType:req.body.hockeyType});
   if (req.method === "GET" && requestPath === "/user") return res.json({ id: "router-synthetic-adult", onboardingCompleted: f.completed });
   if (req.method === "POST" && requestPath === "/high-school/onboarding/choose") {
@@ -171,10 +180,14 @@ const server = app.listen(0, "127.0.0.1"); await new Promise<void>(r => server.o
 const origin = `http://127.0.0.1:${(server.address() as any).port}`;
 const browser = await chromium.launch({ executablePath: "/repl/tools/bin/chromium", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 const report: any = { scope: "Actual App.Router and request/query/session plumbing; fixture Auth/events and loopback HTTP; unrelated pages are markers",
+  selection: staffInvitationOnly ? "staff-invitation-only" : "full-router",
   checks: [], realProviderSdkAcceptance: false, realEmailsSent: 0, databaseConnections: 0, externalRequests: 0 };
-const mark = (name: string) => report.checks.push(name);
+const mark = (name: string) => {
+  if(!staffInvitationOnly || name==="saved_school_selections_require_invitation_and_cannot_submit_uninvited_staff_requests") report.checks.push(name);
+};
 async function runCase(id: string, options: Partial<Fixture> & { guest?: boolean; cachedAdult?: boolean; width?: number; ageRestricted?: boolean }, visit: string,
   test: (page: Page, fixture: Fixture) => Promise<void>) {
+  if(staffInvitationOnly && id!=="staff-invitation-only") return;
   const f: Fixture = { enrolled: false, active: true, completed: false, path: null, ...options, calls: [], unexpected: [] };
   fixtures.set(id, f);
   const context = await browser.newContext({ viewport: { width: options.width || 390, height: 844 } });
@@ -282,6 +295,26 @@ try {
     await p.getByRole("heading", { name: "Enter your parent's code", exact: true }).waitFor();
     assert.equal(f.calls.length, 0); assert.equal((await inspection(p)).parentHeadersPresent, false);
   });
+  if(!production){
+    await runCase("staff-invitation-only", { path:"staff",staffDraft:true }, "/high-school/onboarding", async(p,f)=>{
+      await p.getByRole("heading",{name:"Join with an invitation",exact:true}).waitFor();
+      const submit=p.getByRole("button",{name:"Use invitation",exact:true});
+      assert.equal(await submit.isDisabled(),true);
+      assert.equal(await p.getByRole("heading",{name:"Find your school",exact:true}).count(),0);
+      assert.equal(await p.getByRole("button",{name:"Send request",exact:true}).count(),0);
+      assert.equal(await p.getByRole("button",{name:"Set up a new school",exact:true}).count(),0);
+      await p.getByLabel("Invitation code",{exact:true}).fill("NotAValidInvitation");
+      const refused=p.waitForResponse(response=>response.url().endsWith("/onboarding/lookup")&&response.status()===403);
+      await submit.click();await refused;
+      await p.getByRole("heading",{name:"Join with an invitation",exact:true}).waitFor();
+      await p.getByLabel("Invitation code",{exact:true}).fill("SyntheticStaffInvitationForUiTesting12345");
+      await submit.click();
+      await p.getByRole("heading",{name:"Waiting for approval",exact:true}).waitFor();
+      assert.equal(f.calls.filter(call=>call.method==="POST"&&call.path==="/high-school/onboarding/lookup").length,2);
+      assert.equal(f.calls.filter(call=>call.method==="POST"&&call.path==="/high-school/onboarding/draft").length,0);
+    });
+    mark("saved_school_selections_require_invitation_and_cannot_submit_uninvited_staff_requests");
+  }
   mark("preview_route_avoids_authenticated_api_queries_even_for_locked_parent");
   for (const role of ["player", "organizer"]) {
     await runCase("adult-" + role, {}, "/", async (p, f) => {
