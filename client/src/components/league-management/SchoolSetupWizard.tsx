@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { SchoolStructureDeleteControl } from "./SchoolStructureDeleteControl";
 import type { SchoolLeagueActionResult, SchoolLeagueWorkspace } from "@shared/schoolLeagueManagement";
 
 type Step = "school" | "program" | "team";
@@ -280,6 +281,8 @@ function StepContent({
                 <button className={secondaryButton} type="submit" disabled={isPending || !draft.name.trim() || !draft.schoolId || !isEditing}>{linkedSchool ? "Save program" : "Link program to school"}</button>
               </form>
               <p className="mt-2 text-xs text-muted-foreground">{linkedSchool ? `Linked to ${linkedSchool.name} · ${program.status.replace(/_/g, " ")}` : "Needs a school link · existing teams remain with this program."}</p>
+              <SchoolStructureDeleteControl leagueId={workspace.league.id} kind="program" id={program.id}
+                name={program.name} isPending={isPending} runAction={runAction}/>
               {!schools.length && <div className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground">Add a school before this program can be linked. <button className="font-medium text-primary underline underline-offset-2" type="button" onClick={() => onStep("school")}>Go to School step</button></div>}
             </li>;
           })}
@@ -330,8 +333,10 @@ function StepContent({
           {workspace.teams.map(team => {
             const program = workspace.programs.find(item => item.id === team.programId);
             const school = program ? programSchool(program.id) : undefined;
-            return <li key={team.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
-              <span className="font-medium">{team.name}</span><span className="text-sm text-muted-foreground">{school ? `${school.name} / ` : "Unlinked school / "}{program?.name || "Program"}</span>
+            return <li key={team.id} className="py-3 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{team.name}</span><span className="text-sm text-muted-foreground">{school ? `${school.name} / ` : "Unlinked school / "}{program?.name || "Program"}</span></div>
+              <SchoolStructureDeleteControl leagueId={workspace.league.id} kind="team" id={team.id}
+                name={team.name} isPending={isPending} runAction={runAction}/>
             </li>;
           })}
         </ul>}

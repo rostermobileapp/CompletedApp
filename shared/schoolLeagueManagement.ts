@@ -20,6 +20,17 @@ export interface SchoolDeletionPreview {
   school: { id: string; name: string; town: string };
   programCount: number; teamCount: number; programIds: string[]; teamIds: string[];
 }
+export const schoolStructureDeleteInput = z.object({
+  expectedName: z.string().min(1).max(100),
+  schoolId: z.string().uuid().nullable(),
+  programId: z.string().uuid(),
+  teamIds: z.array(z.string().uuid()).max(10000),
+  confirmation: z.string().min(1).max(100),
+}).strict();
+export interface SchoolStructureDeletionPreview {
+  kind: "program" | "team"; id: string; name: string; schoolId: string | null;
+  programId: string; teamIds: string[]; teamCount: number;
+}
 export const schoolProgramInput = z.object({ name, schoolId: z.string().uuid() }).strict();
 export const schoolProgramUpdateInput = schoolProgramInput;
 export const schoolTeamInput = z.object({ programId: z.string().uuid(), name }).strict();

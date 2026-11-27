@@ -13,6 +13,7 @@ import { previewEvents } from "./highSchoolStaffImports";
 import { StaffBase } from "./highSchoolStaffBase";
 import { SchoolPlayerEligibilityService } from "./schoolPlayerEligibility";
 import { deleteSchool, requireSchoolStructure, schoolDeletionPreview, updateSchool } from "./schoolStructureManagement";
+import { deleteProgramOrTeam, structureDeletionPreview } from "./schoolProgramTeamDeletion";
 
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 const decision = z.object({ approve: z.boolean() }).strict();
@@ -74,6 +75,18 @@ export class SchoolLeagueManagement extends StaffBase {
       return deleteSchool(db, actor, id, input);
     });
   }
+  async structureDeletionPreview(actor: OnboardingActor, leagueId: string, kind: "program"|"team", id: string) {
+    return this.transaction(async db => {
+      await this.owner(db,actor,leagueId);
+      return structureDeletionPreview(db,leagueId,kind,id);
+    });
+  }
+  async deleteProgramOrTeam(actor: OnboardingActor, leagueId: string, kind: "program"|"team", id: string, input: unknown) {
+    return this.transaction(async db => {
+      await this.owner(db,actor,leagueId);
+      return deleteProgramOrTeam(db,actor,leagueId,kind,id,input);
+    });
+  }
   private async target(db: ParentTransaction, leagueId: string, teamId: string) {
     z.string().uuid().parse(teamId);
     const [team] = (await db.query(`SELECT t.id,t.program_id FROM hs_onboarding.teams t
@@ -107,7 +120,7 @@ export class SchoolLeagueManagement extends StaffBase {
         FROM hs_onboarding.schools s
         WHERE s.deleted_at IS NULL AND (s.created_by=$1::uuid OR EXISTS (SELECT 1 FROM hs_onboarding.programs p
           JOIN public.leagues l ON l.id=p.league_id::text WHERE p.school_id=s.id
-          AND p.deleted_at IS NULL AND l.commissioner_id=$1::text AND l.league_type IN('high_school','youth')))
+          AND l.commissioner_id=$1::text AND l.league_type IN('high_school','youth')))
         ORDER BY s.name,s.town,s.id`, [actor.authId])).rows;
       for(const school of schools) if(!school.canDelete)
         school.deleteBlockedReason="This school is shared with a league you do not administer.";

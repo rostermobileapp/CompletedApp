@@ -24,8 +24,12 @@ async function schoolScope(db: ParentTransaction, actor: OnboardingActor, id: st
     throw new OnboardingError("SCHOOL_SHARED_WITH_OTHER_LEAGUES",403);
   if(programs.some(p=>!["high_school","youth"].includes(p.league_type)))
     throw new OnboardingError("SCHOOL_STRUCTURE_CHANGED_REFRESH_REQUIRED",409);
-  if(school.created_by!==actor.authId&&!programs.length)
-    throw new OnboardingError("SCHOOL_EDIT_FORBIDDEN",403);
+  if(school.created_by!==actor.authId&&!programs.length) {
+    const historicalOwner=(await db.query(`SELECT 1 FROM hs_onboarding.programs p
+      JOIN public.leagues l ON l.id=p.league_id::text WHERE p.school_id=$1
+      AND l.commissioner_id=$2 AND l.league_type IN('high_school','youth') LIMIT 1`,[id,actor.authId])).rows[0];
+    if(!historicalOwner)throw new OnboardingError("SCHOOL_EDIT_FORBIDDEN",403);
+  }
   const leagueIds=Array.from(new Set(programs.map(p=>String(p.league_id))));
   if(leagueIds.length) {
     const owners=(await db.query(`SELECT id,commissioner_id FROM public.leagues WHERE id=ANY($1::text[])
@@ -73,11 +77,19 @@ export async function deleteSchool(db: ParentTransaction, actor: OnboardingActor
     throw new OnboardingError("SCHOOL_STRUCTURE_CHANGED_REFRESH_REQUIRED",409);
   if(data.confirmation!==school.name)throw new OnboardingError("SCHOOL_DELETE_CONFIRMATION_REQUIRED",400);
 
+  await deactivateSchoolStructure(db,programIds,teamIds);
+  await db.query("UPDATE hs_onboarding.schools SET deleted_at=now() WHERE id=$1",[id]);
+  await db.query("INSERT INTO hs_onboarding.audit(auth_id,event,target_id) VALUES($1,'school_deleted',$2)",[actor.authId,id]);
+  return {saved:true};
+}
+
+export async function deactivateSchoolStructure(db: ParentTransaction, programIds: string[], teamIds: string[]) {
   // Existing child identities, approved consent requests, private chats, devices,
   // paid accounts and historical records must survive organization deletion.
   // Retain their FK anchors, but remove the whole tree from active operation.
   await db.query("DELETE FROM hs_onboarding.invitations WHERE team_id=ANY($1::uuid[])",[teamIds]);
-  await db.query("UPDATE hs_onboarding.staff_requests SET status='denied' WHERE program_id=ANY($1::uuid[])",[programIds]);
+  await db.query(`UPDATE hs_onboarding.staff_requests SET status='denied'
+    WHERE program_id=ANY($1::uuid[]) OR team_id=ANY($2::uuid[])`,[programIds,teamIds]);
   await db.query(`UPDATE hs_onboarding.player_requests SET status='denied'
     WHERE team_id=ANY($1::uuid[]) AND status='pending_staff'`,[teamIds]);
   await db.query("DELETE FROM public.team_memberships WHERE team_id=ANY($1::text[])",[teamIds]);
@@ -90,7 +102,4 @@ export async function deleteSchool(db: ParentTransaction, actor: OnboardingActor
   await db.query(`UPDATE hs_onboarding.teams SET deleted_at=now(),code_digest='deleted:'||id::text
     WHERE id=ANY($1::uuid[])`,[teamIds]);
   await db.query("UPDATE hs_onboarding.programs SET deleted_at=now(),status='pending' WHERE id=ANY($1::uuid[])",[programIds]);
-  await db.query("UPDATE hs_onboarding.schools SET deleted_at=now() WHERE id=$1",[id]);
-  await db.query("INSERT INTO hs_onboarding.audit(auth_id,event,target_id) VALUES($1,'school_deleted',$2)",[actor.authId,id]);
-  return {saved:true};
 }

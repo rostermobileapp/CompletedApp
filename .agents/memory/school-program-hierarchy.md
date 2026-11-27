@@ -94,3 +94,19 @@ team access, but preserve account, guardian, device and independent family-chat
 records. Retain internal history anchors where physical cascades would destroy
 those records. Never use one league's ownership to delete another owner's
 shared school structure.
+
+## Independent program and team deletion
+
+Programs and teams must be deletable individually. Deleting a program removes
+only that program and its teams, never its school or sibling programs. Deleting
+a team removes only that team, never its program or sibling teams. Retained
+schools must remain available to their legitimate administrators even after
+their last program is removed.
+
+**Why:** The owner requested independent deletion rather than having to delete
+an entire school to remove a program or team.
+
+**How to apply:** Use scope-specific warnings and confirmation, keep the current
+setup step selected, and apply the same account, device and independent family
+chat preservation rules as school deletion. Never expand a league owner's
+authority into another league merely because the school identity is shared.

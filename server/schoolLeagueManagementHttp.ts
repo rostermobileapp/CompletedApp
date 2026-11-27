@@ -44,6 +44,10 @@ export function registerSchoolLeagueManagement(app: Express, service: SchoolLeag
   app.post(`${base}/schools/:id/delete`, handle((r, a) => service.deleteSchool(a, r.params.leagueId, r.params.id, r.body)));
   app.post(`${base}/programs`, handle((r, a) => service.program(a, r.params.leagueId, r.body)));
   app.post(`${base}/programs/:id`, handle((r, a) => service.updateProgram(a, r.params.leagueId, r.params.id, r.body)));
+  for(const kind of ["program","team"] as const) {
+    app.get(`${base}/${kind}s/:id/deletion-preview`,handle((r,a)=>service.structureDeletionPreview(a,r.params.leagueId,kind,r.params.id)));
+    app.post(`${base}/${kind}s/:id/delete`,handle((r,a)=>service.deleteProgramOrTeam(a,r.params.leagueId,kind,r.params.id,r.body)));
+  }
   app.post(`${base}/teams`, handle((r, a) => service.team(a, r.params.leagueId, r.body)));
   app.post(`${base}/invitations`, handle((r, a) => service.invitation(a, r.params.leagueId, r.body)));
   app.post(`${base}/staff/:id/decision`, handle((r, a) => service.staffDecision(a, r.params.leagueId, r.params.id, r.body)));
