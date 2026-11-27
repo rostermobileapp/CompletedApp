@@ -2,6 +2,10 @@ import { z } from "zod";
 import { staffRoles, eventInput, type StaffEventInput, type StaffRole } from "./highSchoolStaff";
 
 const name = z.string().trim().min(1).max(100);
+export const schoolLeagueNameInput = z.object({
+  name,
+  expectedName: z.string().min(1).max(200),
+}).strict();
 export const schoolInput = z.object({ name, town: name }).strict();
 export const schoolProgramInput = z.object({ name, schoolId: z.string().uuid() }).strict();
 export const schoolProgramUpdateInput = schoolProgramInput;

@@ -23,6 +23,9 @@ export function useSchoolLeagueAction(leagueId: string) {
     onSuccess: async (_result, action) => {
       if (action.path === "/schedule/preview") return;
       await queries.invalidateQueries({ queryKey: schoolLeagueKey(leagueId) });
+      if (action.path === "/name") {
+        await queries.invalidateQueries({ queryKey: ["/api/leagues"] });
+      }
       await queries.invalidateQueries({ queryKey: ["/api/user/teams"] });
     },
   });

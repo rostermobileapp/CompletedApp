@@ -129,6 +129,24 @@ try {
   assert.equal(created,1);
    assert.equal(mail.length,0);
    assert.equal(new URL(page.url()).pathname,"/league-management");
+   const createdLeagueId=new URL(page.url()).searchParams.get("leagueId")!;
+   await page.getByTestId("edit-league-name").click();
+   assert.equal(await page.getByLabel("League name",{exact:true}).inputValue(),"Synthetic High School League");
+   await page.getByLabel("League name",{exact:true}).fill("Do not save");
+   await page.getByTestId("cancel-league-name").click();
+   await page.getByRole("heading",{name:"Synthetic High School League",exact:true}).waitFor();
+   await page.getByTestId("edit-league-name").click();
+   await page.getByLabel("League name",{exact:true}).fill("  ");
+   assert.equal(await page.getByTestId("save-league-name").isDisabled(),true);
+   await page.getByLabel("League name",{exact:true}).fill("  Renamed High School League  ");
+   await page.setViewportSize({width:402,height:874});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.screenshot({path:`${out}/league-name-editor-phone.png`});
+   await page.setViewportSize({width:1280,height:1000});
+   await page.getByTestId("save-league-name").click();
+   await page.getByRole("heading",{name:"Renamed High School League",exact:true}).waitFor();
+   assert.equal((await pool.query("SELECT name FROM public.leagues WHERE id=$1",[createdLeagueId])).rows[0].name,"Renamed High School League");
+   assert.equal((await pool.query("SELECT count(*)::int n FROM hs_onboarding.leagues WHERE id=$1",[createdLeagueId])).rows[0].n,0);
    const setupGuide=page.getByTestId("league-setup-guidance");
    const expectSetupStage=async(current:"school"|"program"|"team"|"complete")=>{
      const stages=["school","program","team"] as const;
@@ -195,6 +213,23 @@ try {
    await setupGuide.getByText("Initial setup complete",{exact:true}).waitFor();
    await page.getByTestId("setup-count-team").locator("..").screenshot({path:`${out}/setup-complete.png`});
    await page.reload();
+   await expectSetupStage("complete");
+   // A second admin/device changes the persisted name while this editor is open.
+   await page.getByTestId("edit-league-name").click();
+   await page.getByLabel("League name",{exact:true}).fill("My stale edit");
+   await new SchoolLeagueManagement(pool).rename(actor,createdLeagueId,{
+     name:"Updated elsewhere",expectedName:"Renamed High School League",
+   });
+   await page.getByTestId("save-league-name").click();
+   await page.getByTestId("reload-latest-league-name").waitFor();
+   assert.equal(await page.getByTestId("save-league-name").isDisabled(),true);
+   assert.equal(await page.getByLabel("League name",{exact:true}).inputValue(),"My stale edit");
+   await page.getByTestId("reload-latest-league-name").click();
+   await page.waitForFunction(()=>document.querySelector<HTMLInputElement>('[data-testid="league-name-input"]')?.value==="Updated elsewhere");
+   await page.getByLabel("League name",{exact:true}).fill("Final High School League");
+   await page.getByTestId("save-league-name").click();
+   await page.getByRole("heading",{name:"Final High School League",exact:true}).waitFor();
+   assert.equal((await pool.query("SELECT name FROM hs_onboarding.leagues WHERE id=$1",[createdLeagueId])).rows[0].name,"Final High School League");
    await expectSetupStage("complete");
    for (const name of ["Fixture JV", "Fixture Freshman"]) {
      await page.getByLabel("New team name for Fixture School Hockey",{exact:true}).fill(name);

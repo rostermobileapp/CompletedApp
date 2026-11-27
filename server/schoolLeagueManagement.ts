@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
-  schoolInvitationInput, schoolInput, schoolProgramInput, schoolProgramUpdateInput, schoolScheduleImportInput,
+  schoolInvitationInput, schoolInput, schoolLeagueNameInput, schoolProgramInput, schoolProgramUpdateInput, schoolScheduleImportInput,
   schoolSchedulePreviewInput, schoolTeamInput, type SchoolLeagueWorkspace,
 } from "../shared/schoolLeagueManagement";
 import { OnboardingError, type OnboardingActor } from "./highSchoolOnboarding";
@@ -33,14 +33,27 @@ export class SchoolLeagueManagement extends StaffBase {
     this.events = new HighSchoolStaffEvents(pool, undefined,
       async () => { throw new Error("TEST_NOTIFICATION_DELIVERY_DISABLED"); }, live, true);
   }
-  private async owner(db: ParentTransaction, actor: OnboardingActor, leagueId: string) {
+  private async owner(db: ParentTransaction, actor: OnboardingActor, leagueId: string, forUpdate = false) {
     z.string().uuid().parse(leagueId);
     await this.active(db, actor);
     const [league] = (await db.query(`SELECT id,name,league_type AS "leagueType" FROM public.leagues
-      WHERE id=$1 AND commissioner_id=$2 FOR SHARE`, [leagueId, actor.authId])).rows;
+      WHERE id=$1 AND commissioner_id=$2 ${forUpdate ? "FOR UPDATE" : "FOR SHARE"}`, [leagueId, actor.authId])).rows;
     if (!league) throw new OnboardingError("LEAGUE_MANAGEMENT_FORBIDDEN", 403);
     if (!["high_school", "youth"].includes(league.leagueType)) throw new OnboardingError("SCHOOL_LEAGUE_REQUIRED", 400);
     return league as SchoolLeagueWorkspace["league"];
+  }
+  async rename(actor: OnboardingActor, leagueId: string, input: unknown) {
+    const data = schoolLeagueNameInput.parse(input);
+    return this.transaction(async db => {
+      const league = await this.owner(db, actor, leagueId, true);
+      if (league.name !== data.expectedName)
+        throw new OnboardingError("LEAGUE_NAME_CHANGED_REFRESH_REQUIRED", 409);
+      await db.query("UPDATE public.leagues SET name=$2 WHERE id=$1", [leagueId, data.name]);
+      // The private mirror is created only once the league has a program.
+      // Keep it synchronized if present; renaming must not create setup records.
+      await db.query("UPDATE hs_onboarding.leagues SET name=$2 WHERE id=$1", [leagueId, data.name]);
+      return { saved: true };
+    });
   }
   private async target(db: ParentTransaction, leagueId: string, teamId: string) {
     z.string().uuid().parse(teamId);

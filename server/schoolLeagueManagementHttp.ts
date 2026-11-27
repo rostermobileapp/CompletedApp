@@ -15,6 +15,9 @@ export function registerSchoolLeagueManagement(app: Express, service: SchoolLeag
       const duplicate = (error as { code?: string })?.code === "23505";
       res.status(known ? error.status : duplicate ? 409 : error instanceof ZodError ? 400 : 503).json({
         code: known ? error.code : duplicate ? "PROGRAM_ALREADY_EXISTS_FOR_SCHOOL" : error instanceof ZodError ? "INVALID_SCHOOL_LEAGUE_INPUT" : "SCHOOL_LEAGUE_UNAVAILABLE",
+        ...(error instanceof OnboardingError && error.code === "LEAGUE_NAME_CHANGED_REFRESH_REQUIRED" ? {
+          message: "The league name changed elsewhere. Reload the latest name before saving again.",
+        } : {}),
         ...(error instanceof OnboardingError && error.code === "SCHOOL_STRUCTURE_UPDATE_REQUIRED" ? {
           message: "The school and program database update has not been installed. Existing teams and permissions are unchanged.",
         } : {}),
@@ -22,6 +25,7 @@ export function registerSchoolLeagueManagement(app: Express, service: SchoolLeag
     }
   };
   app.get(base, handle((r, a) => service.workspace(a, r.params.leagueId)));
+  app.post(`${base}/name`, handle((r, a) => service.rename(a, r.params.leagueId, r.body)));
   app.get(`${base}/eligibility`, handle((r, a) => service.eligibility(a, r.params.leagueId)));
   app.post(`${base}/eligibility/:teamId/:playerId`, handle((r, a) =>
     service.setEligibility(a, r.params.leagueId, r.params.teamId, r.params.playerId, r.body)));
